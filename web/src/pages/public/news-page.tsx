@@ -87,12 +87,12 @@ export function NewsPage() {
 								<div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
 									<div className="flex items-center gap-2">
 										<Bell className="size-4 text-orange" />
-										<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+										<p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-orange">
 											Latest notices
 										</p>
 									</div>
 									<div className="flex flex-wrap items-center gap-2">
-										<span className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+										<span className="flex items-center gap-1 font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 											<Filter className="size-3" /> Filter:
 										</span>
 										{categories.map((cat) => (
@@ -100,7 +100,7 @@ export function NewsPage() {
 												key={cat}
 												type="button"
 												onClick={() => setActiveCategory(cat)}
-												className={`rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] transition-colors ${
+												className={`rounded-full px-2.5 py-1 font-mono text-[12px] uppercase tracking-[0.12em] transition-colors ${
 													activeCategory === cat
 														? "bg-orange text-white"
 														: "bg-paper text-ink-soft ring-1 ring-line hover:bg-sand-2 hover:text-ink"
@@ -136,15 +136,15 @@ export function NewsPage() {
 																<Calendar className="size-4" />
 															</span>
 															<div>
-																<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+																<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 																	{notice.date}
 																</p>
-																<p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-orange">
+																<p className="mt-0.5 font-mono text-[12px] uppercase tracking-[0.12em] text-orange">
 																	{notice.category}
 																</p>
 															</div>
 														</div>
-														<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+														<span className="font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 															0{notices.length - originalIndex}
 														</span>
 													</div>
@@ -166,7 +166,7 @@ export function NewsPage() {
 														>
 															<Check className="size-4" /> Save notice
 														</Button>
-														<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+														<span className="font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 															Ref · TRN-NTC-{String(originalIndex + 1).padStart(3, "0")}
 														</span>
 													</div>
@@ -187,7 +187,7 @@ export function NewsPage() {
 									<div className="relative">
 										<div className="flex items-center gap-2">
 											<Clock3 className="size-4 text-orange" />
-											<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+											<p className="font-mono text-[12px] uppercase tracking-[0.16em] text-orange">
 												Plan before arrival
 											</p>
 										</div>
@@ -207,7 +207,7 @@ export function NewsPage() {
 								</div>
 
 								<div className="rounded-2xl bg-paper p-5 ring-1 ring-line">
-									<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+									<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 										Notice categories
 									</p>
 									<ul className="mt-4 space-y-2.5">
@@ -229,7 +229,7 @@ export function NewsPage() {
 													>
 														<span>{category}</span>
 														<span
-															className={`font-mono text-[10px] ${
+															className={`font-mono text-[12px] ${
 																isActive ? "text-white/80" : "text-ink-soft"
 															}`}
 														>
@@ -252,7 +252,7 @@ export function NewsPage() {
 								</div>
 
 								<div className="rounded-2xl bg-paper p-5 ring-1 ring-line">
-									<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+									<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 										Need an update?
 									</p>
 									<p className="mt-3 text-sm leading-6 text-ink-soft">

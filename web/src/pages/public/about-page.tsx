@@ -126,7 +126,7 @@ export function AboutPage() {
 									Three principles behind every handoff.
 								</h2>
 							</div>
-							<p className="max-w-md text-sm leading-6 text-ink-soft">
+							<p className="max-w-md leading-6 text-ink-soft">
 								These are the checks applied to every decision, record, and message we put
 								in front of a customer, agent, or regulator.
 							</p>
@@ -141,12 +141,12 @@ export function AboutPage() {
 										<div className="grid size-11 place-items-center rounded-xl bg-orange text-white transition-colors group-hover:bg-orange-deep">
 											<Icon className="size-5" />
 										</div>
-										<span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+										<span className="font-mono text-[1px] uppercase tracking-[0.16em] text-ink-soft">
 											{number}
 										</span>
 									</div>
 									<h3 className="mt-6 font-display text-xl font-bold text-ink">{title}</h3>
-									<p className="mt-3 text-sm leading-6 text-ink-soft">{detail}</p>
+									<p className="mt-3  leading-6 text-ink-soft">{detail}</p>
 								</article>
 							))}
 						</div>
@@ -179,7 +179,7 @@ export function AboutPage() {
 									<p className="font-display text-sm font-bold text-ink">
 										Bilal Aijjola
 									</p>
-									<p className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+									<p className="mt-1 font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 										Chief Executive Officer / Managing Director, TRÏNŪ Bonded Warehouse
 									</p>
 								</div>
@@ -219,7 +219,6 @@ export function AboutPage() {
 					</div>
 				</section>
 
-				{/* WHY THE FACILITY MATTERS — CEO quote, Slate formal band */}
 				<section className="relative overflow-hidden border-y border-slate bg-slate text-sand">
 					<div
 						aria-hidden="true"
@@ -233,7 +232,7 @@ export function AboutPage() {
 						<div>
 							<div className="flex items-center gap-2">
 								<Quote className="size-4 text-orange" />
-								<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+								<p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-orange">
 									Why the facility matters
 								</p>
 							</div>
@@ -245,7 +244,7 @@ export function AboutPage() {
 									<p className="font-display text-sm font-bold text-sand">
 										Bilal Aijjola
 									</p>
-									<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-sand/60">
+									<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-sand/60">
 										Chief Executive Officer / Managing Director
 									</p>
 								</div>
@@ -296,7 +295,7 @@ export function AboutPage() {
 										<p className="font-display text-sm font-bold text-ink">
 											Bilal Aijjola
 										</p>
-										<p className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+										<p className="mt-1 font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 											Chief Executive Officer / Managing Director, TRÏNŪ Bonded Warehouse
 										</p>
 									</div>
@@ -311,7 +310,7 @@ export function AboutPage() {
 												key={step}
 												className="rounded-xl bg-sand p-4 ring-1 ring-line"
 											>
-												<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+												<p className="font-mono text-[11px] uppercase tracking-[0.14em] text-orange">
 													{step}
 												</p>
 												<p className="mt-2 text-[13px] font-semibold text-ink">{label}</p>

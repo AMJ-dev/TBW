@@ -143,7 +143,7 @@ export function TrackingPage() {
 							<div className="grid size-8 place-items-center rounded-md bg-orange text-white">
 								<Search className="size-4" />
 							</div>
-							<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+							<p className="font-mono text-[15px] font-bold uppercase tracking-[0.16em] text-orange">
 								Track a shipment
 							</p>
 						</div>
@@ -187,7 +187,7 @@ export function TrackingPage() {
 									key={ref}
 									type="button"
 									onClick={() => setValue(ref)}
-									className="rounded-full border border-line bg-paper px-3 py-1 font-mono text-[11px] text-ink-soft transition-colors hover:border-orange/40 hover:bg-orange/10 hover:text-orange"
+									className="rounded-full border border-line bg-paper px-3 py-1 font-mono text-[12px] text-ink-soft transition-colors hover:border-orange/40 hover:bg-orange/10 hover:text-orange"
 								>
 									{ref}
 								</button>
@@ -242,7 +242,7 @@ function TrackingResult({ record, onReset }: { record: CargoRecord; onReset: () 
 				/>
 				<div className="relative flex flex-wrap items-start justify-between gap-4">
 					<div>
-						<p className="font-mono text-[10px] uppercase tracking-[0.15em] text-sand/60">
+						<p className="font-mono text-[12px] uppercase tracking-[0.15em] text-sand/60">
 							{record.reference} · {record.container}
 						</p>
 						<div className="mt-3 flex flex-wrap items-center gap-3">
@@ -258,7 +258,7 @@ function TrackingResult({ record, onReset }: { record: CargoRecord; onReset: () 
 						<div className="flex items-center gap-2">
 							<Clock3 className="size-4 text-orange" />
 							<div>
-								<p className="font-mono text-[9px] uppercase tracking-[0.14em] text-sand/60">
+								<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-sand/60">
 									Last updated
 								</p>
 								<p className="mt-0.5 font-mono text-[11px] text-sand">
@@ -403,12 +403,12 @@ function TimelineItem({
 						{label}
 					</p>
 					{active && (
-						<span className="font-mono text-[9px] uppercase tracking-[0.14em] text-orange">
+						<span className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 							Current
 						</span>
 					)}
 				</div>
-				<div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-soft">
+				<div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] text-ink-soft">
 					<span className="font-mono">{date}</span>
 					<span className="inline-flex items-center gap-1">
 						<MapPin className="size-3" />

@@ -85,7 +85,7 @@ export function FaqPage() {
 					<div className="mx-auto max-w-5xl px-5 py-14 lg:px-8 lg:py-20">
 						<div className="mb-8 flex items-center gap-2 border-b border-line pb-4">
 							<HelpCircle className="size-4 text-orange" />
-							<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+							<p className="font-mono text-[12px] uppercase tracking-[0.16em] text-orange">
 								{faqs.length} common questions
 							</p>
 						</div>
@@ -101,11 +101,11 @@ export function FaqPage() {
 											aria-expanded={isOpen}
 											className="group flex w-full items-start gap-5 py-6 text-left transition-colors hover:bg-paper"
 										>
-											<span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-orange font-mono text-[10px] font-semibold text-white">
+											<span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-md bg-orange font-mono text-[12px] font-semibold text-white">
 												{String(index + 1).padStart(2, "0")}
 											</span>
 											<div className="min-w-0 flex-1">
-												<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+												<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 													{category}
 												</p>
 												<p className="mt-1.5 font-display text-lg font-bold text-ink">
@@ -152,7 +152,7 @@ export function FaqPage() {
 							<div>
 								<div className="flex items-center gap-2">
 									<MessageSquare className="size-4 text-orange" />
-									<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+									<p className="font-mono text-[12px] uppercase tracking-[0.18em] text-orange">
 										Still need an answer?
 									</p>
 								</div>
