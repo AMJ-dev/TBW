@@ -6,38 +6,43 @@ import {
 	Check,
 	Eye,
 	EyeOff,
+	FileCheck2,
 	Lock,
 	Mail,
+	MapPin,
 	Phone,
 	ShieldCheck,
 	User,
+	Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
 
-type AccountType = "importer" | "agent" | "transporter";
+type AccountType = "importer" | "agent";
 
-const accountTypes: { key: AccountType; label: string; detail: string }[] = [
+const accountTypes: {
+	key: AccountType;
+	label: string;
+	detail: string;
+	icon: typeof User;
+}[] = [
 	{
 		key: "importer",
 		label: "Importer / consignee",
 		detail: "Direct access for your organisation's cargo.",
+		icon: Building2,
 	},
 	{
 		key: "agent",
 		label: "Licensed agent",
 		detail: "Multi-client access with delegated authority.",
-	},
-	{
-		key: "transporter",
-		label: "Transporter / haulage",
-		detail: "Truck slots, gate passes, and coordination.",
+		icon: Users,
 	},
 ];
 
-const steps = ["Your details", "Organisation", "Verify"];
+const steps = ["Your details", "Organisation", "Verify"] as const;
 
 export function RegisterPage() {
 	const [step, setStep] = useState(0);
@@ -83,6 +88,10 @@ export function RegisterPage() {
 				toast.error("Enter your organisation name to continue.");
 				return;
 			}
+			if (accountType === "agent" && !rcNumber.trim()) {
+				toast.error("Enter your RC number to continue as a licensed agent.");
+				return;
+			}
 			if (!agreed) {
 				toast.error("Accept the privacy notice and terms to continue.");
 				return;
@@ -103,139 +112,182 @@ export function RegisterPage() {
 
 	if (submitted) {
 		return (
-			<div className="relative min-h-screen overflow-hidden bg-paper text-ink">
-				<div
-					aria-hidden="true"
-					className="pointer-events-none absolute -right-40 -top-40 size-[620px] rounded-full bg-orange/20 blur-3xl"
-				/>
-				<div
-					aria-hidden="true"
-					className="pointer-events-none absolute -left-40 bottom-0 size-[480px] rounded-full bg-carmine/15 blur-3xl"
-				/>
+			<PublicFrame>
+				<main className="bg-paper">
+					<section className="relative overflow-hidden border-b border-line">
+						<div
+							aria-hidden="true"
+							className="pointer-events-none absolute -right-32 -top-40 size-[560px] rounded-full bg-orange/20 blur-3xl"
+						/>
+						<div
+							aria-hidden="true"
+							className="pointer-events-none absolute -left-40 bottom-0 size-[420px] rounded-full bg-carmine/15 blur-3xl"
+						/>
+						<div className="relative mx-auto grid max-w-3xl place-items-center px-5 py-24 text-center lg:px-8">
+							<div>
+								<div className="mx-auto grid size-16 place-items-center rounded-full bg-orange text-white">
+									<Check className="size-8" />
+								</div>
+								<PublicKicker>Request submitted</PublicKicker>
+								<h1 className="mt-3 font-display text-3xl font-bold text-ink sm:text-4xl">
+									We'll be in touch.
+								</h1>
+								<p className="mx-auto mt-4 max-w-md leading-7 text-ink-soft">
+									Your registration has been received for review. A TRÏNŪ coordinator
+									will verify your organisation details and contact you using the
+									information provided.
+								</p>
 
-				<main className="relative mx-auto grid min-h-screen max-w-3xl place-items-center px-5 py-16 text-center">
-					<div>
-						<div className="mx-auto grid size-16 place-items-center rounded-full bg-orange text-white">
-							<Check className="size-8" />
-						</div>
-						<p className="mt-7 font-mono text-[10px] uppercase tracking-[0.2em] text-orange">
-							Local preview complete
-						</p>
-						<h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-							Registration preview complete.
-						</h1>
-						<p className="mx-auto mt-4 max-w-md leading-7 text-ink-soft">
-							Your details were validated in this browser only. No account was created and no
-							information was sent to TRÏNŪ.
-						</p>
+								<div className="mx-auto mt-7 max-w-sm rounded-xl bg-sand p-5 ring-1 ring-line">
+									<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+										Reference
+									</p>
+									<p className="mt-2 font-mono text-lg font-bold text-ink">
+										TRN-REG-2026-00417
+									</p>
+								</div>
 
-						<div className="mt-7 rounded-xl bg-sand p-5 ring-1 ring-line">
-							<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
-								Reference
-							</p>
-							<p className="mt-2 font-mono text-lg font-bold text-ink">
-								TRN-REG-2026-00417
-							</p>
+								<div className="mt-8 flex flex-wrap justify-center gap-3">
+									<Link to="/">
+										<Button
+											variant="outline"
+											className="border-line bg-paper text-ink hover:bg-sand"
+										>
+											Return home
+										</Button>
+									</Link>
+									<Link to="/login">
+										<Button className="bg-orange text-white hover:bg-orange-deep">
+											Go to sign-in <ArrowRight />
+										</Button>
+									</Link>
+								</div>
+							</div>
 						</div>
-
-						<div className="mt-8 flex flex-wrap justify-center gap-3">
-							<Link to="/">
-								<Button
-									variant="outline"
-									className="border-line bg-paper text-ink hover:bg-sand"
-								>
-									Return home
-								</Button>
-							</Link>
-							<Link to="/login">
-								<Button className="bg-orange text-white hover:bg-orange-deep">
-									Go to sign-in <ArrowRight />
-								</Button>
-							</Link>
-						</div>
-					</div>
+					</section>
 				</main>
-			</div>
+			</PublicFrame>
 		);
 	}
 
 	return (
-		<div className="relative min-h-screen overflow-hidden bg-paper text-ink">
-			<div
-				aria-hidden="true"
-				className="pointer-events-none absolute -right-40 -top-40 size-[620px] rounded-full bg-orange/20 blur-3xl"
-			/>
-			<div
-				aria-hidden="true"
-				className="pointer-events-none absolute -left-40 bottom-0 size-[480px] rounded-full bg-carmine/15 blur-3xl"
-			/>
+		<PublicFrame>
+			<main className="bg-paper">
+				<section className="relative overflow-hidden border-b border-line">
+					<div
+						aria-hidden="true"
+						className="pointer-events-none absolute -right-32 -top-40 size-[560px] rounded-full bg-orange/20 blur-3xl"
+					/>
+					<div
+						aria-hidden="true"
+						className="pointer-events-none absolute -left-40 bottom-0 size-[420px] rounded-full bg-carmine/15 blur-3xl"
+					/>
 
-			<div className="relative mx-auto grid min-h-screen max-w-7xl gap-0 px-5 py-10 lg:grid-cols-[1.05fr_.95fr] lg:gap-16 lg:px-8 lg:py-14">
-				<div className="hidden flex-col justify-between lg:flex">
-					<Link to="/" aria-label="TRINU home" className="inline-flex">
-						<img src="/logo.png" alt="TRINU Bonded Terminal" className="h-14 w-14" />
-					</Link>
+					<div className="relative mx-auto grid max-w-7xl gap-12 px-5 py-16 lg:grid-cols-[.9fr_1.1fr] lg:items-start lg:px-8 lg:py-20">
+						{/* LEFT — info column */}
+						<div>
+							<PublicKicker>Create an account</PublicKicker>
+							<h1 className="mt-3 max-w-lg font-display text-4xl font-bold leading-[1.05] text-ink sm:text-5xl">
+								Access the <span className="text-orange">stakeholder portal.</span>
+							</h1>
+							<p className="mt-5 max-w-lg leading-7 text-ink-soft">
+								Register as an importer or a licensed agent to track consignments,
+								manage documents, coordinate collection, and view financial
+								obligations — all from one operating record.
+							</p>
 
-					<div className="max-w-lg">
-						<p className="font-mono text-[10px] uppercase tracking-[0.22em] text-orange">
-							Request access
-						</p>
-						<h1 className="mt-4 max-w-xl font-display text-4xl font-bold leading-[1.05] text-ink xl:text-5xl">
-							Create your{" "}
-							<span className="text-orange">TRINŪ account.</span>
-						</h1>
-						<p className="mt-6 text-base leading-7 text-ink-soft">
-							Registration is reviewed before access is granted. This keeps the operating
-							record dependable for everyone on the platform.
-						</p>
+							<div className="mt-10 grid gap-3">
+								{[
+									{
+										icon: ShieldCheck,
+										label: "Reviewed before access",
+										detail: "Registration is reviewed so the operating record stays dependable.",
+									},
+									{
+										icon: FileCheck2,
+										label: "Documented coordination",
+										detail: "Every handoff is timestamped, attributed, and searchable.",
+									},
+									{
+										icon: MapPin,
+										label: "Abuja flagship facility",
+										detail: "The first step in a broader inland bonded network.",
+									},
+								].map((item) => {
+									const Icon = item.icon;
+									return (
+										<div
+											key={item.label}
+											className="flex items-start gap-4 rounded-xl bg-sand p-4 ring-1 ring-line"
+										>
+											<div className="grid size-10 shrink-0 place-items-center rounded-md bg-orange text-white">
+												<Icon className="size-5" />
+											</div>
+											<div className="min-w-0 flex-1">
+												<p className="text-sm font-semibold text-ink">
+													{item.label}
+												</p>
+												<p className="mt-0.5 text-[12px] leading-5 text-ink-soft">
+													{item.detail}
+												</p>
+											</div>
+										</div>
+									);
+								})}
+							</div>
 
-						<ol className="mt-9 space-y-5">
-							{[
-								["Submit your details", "Tell us who you are and what your organisation does."],
-								[
-									"Organisation review",
-									"We verify RC, TIN, and licence references where applicable.",
-								],
-								[
-									"Access granted",
-									"Once approved, you receive credentials and delegation options.",
-								],
-							].map(([title, detail], i) => (
-								<li key={title} className="flex gap-4">
-									<span className="grid size-7 shrink-0 place-items-center rounded-full bg-orange font-mono text-[10px] font-semibold text-white">
-										0{i + 1}
-									</span>
-									<div>
-										<p className="text-sm font-semibold text-ink">{title}</p>
-										<p className="mt-1 text-[12px] leading-5 text-ink-soft">{detail}</p>
-									</div>
-								</li>
-							))}
-						</ol>
-					</div>
+							<ol className="mt-10 space-y-5 border-t border-line pt-8">
+								{[
+									[
+										"Submit your details",
+										"Tell us who you are and what your organisation does.",
+									],
+									[
+										"Organisation review",
+										"We verify RC, TIN, and licence references where applicable.",
+									],
+									[
+										"Access granted",
+										"Once approved, you receive credentials and delegation options.",
+									],
+								].map(([title, detail], i) => (
+									<li key={title} className="flex gap-4">
+										<span className="grid size-7 shrink-0 place-items-center rounded-full bg-orange font-mono text-[10px] font-semibold text-white">
+											0{i + 1}
+										</span>
+										<div>
+											<p className="text-sm font-semibold text-ink">{title}</p>
+											<p className="mt-1 text-[12px] leading-5 text-ink-soft">
+												{detail}
+											</p>
+										</div>
+									</li>
+								))}
+							</ol>
 
-					<div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-						<span className="inline-flex items-center gap-2">
-							<span className="size-1.5 rounded-full bg-orange" />
-							Demo flow · no account created
-						</span>
-						<span>TRINŪ · Abuja Flagship Facility</span>
-					</div>
-				</div>
-
-				<div className="flex items-center justify-center">
-					<div className="w-full max-w-lg">
-						<div className="mb-8 flex items-center justify-between lg:hidden">
-							<Link to="/" aria-label="TRINU home" className="inline-flex">
-								<img src="/logo.png" alt="TRINU Bonded Terminal" className="h-12 w-12" />
-							</Link>
-							<Link to="/login" className="text-[12px] font-semibold text-orange">
-								Already have an account?
-							</Link>
+							<div className="mt-10 rounded-2xl bg-slate p-6 text-sand ring-1 ring-slate">
+								<div className="flex items-center gap-2">
+									<ShieldCheck className="size-4 text-orange" />
+									<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+										Important boundary
+									</p>
+								</div>
+								<p className="mt-3 text-[12px] leading-6 text-sand/75">
+									TRÏNŪ provides facilities and coordination. Customs decisions and
+									other statutory outcomes remain with the competent authority.
+								</p>
+								<Link
+									to="/compliance"
+									className="mt-4 inline-flex items-center gap-2 text-[12px] font-semibold text-orange hover:text-orange-deep"
+								>
+									Read the compliance position <ArrowRight className="size-3.5" />
+								</Link>
+							</div>
 						</div>
 
+						{/* RIGHT — form */}
 						<div className="overflow-hidden rounded-2xl bg-paper shadow-xl ring-1 ring-line">
-							<div className="border-b border-line bg-sand p-6 sm:p-7">
+							<div className="border-b border-line bg-sand p-5 sm:p-7">
 								<div className="flex items-center justify-between">
 									<div className="flex items-center gap-2">
 										<div className="grid size-8 place-items-center rounded-md bg-orange text-white">
@@ -256,10 +308,10 @@ export function RegisterPage() {
 									{steps.map((_, i) => (
 										<div
 											key={i}
-											className={cn(
-												"h-1 flex-1 rounded-full transition-colors",
-												i <= step ? "bg-orange" : "bg-line"
-											)}
+											className={
+												"h-1 flex-1 rounded-full transition-colors " +
+												(i <= step ? "bg-orange" : "bg-line")
+											}
 										/>
 									))}
 								</div>
@@ -271,43 +323,48 @@ export function RegisterPage() {
 										e.preventDefault();
 										next();
 									}}
-									className="p-6 sm:p-7"
+									className="p-5 sm:p-7"
 								>
 									{step === 0 && (
-										<div className="space-y-4">
+										<div className="space-y-5">
 											<div>
 												<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
 													Account type
 												</p>
 												<div className="mt-2 grid gap-2">
-													{accountTypes.map((t) => (
-														<label
-															key={t.key}
-															className={cn(
-																"flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors",
-																accountType === t.key
-																	? "border-orange bg-orange/10"
-																	: "border-line bg-sand hover:bg-sand-2"
-															)}
-														>
-															<input
-																type="radio"
-																name="account-type"
-																value={t.key}
-																checked={accountType === t.key}
-																onChange={() => setAccountType(t.key)}
-																className="mt-1 size-3.5 accent-orange"
-															/>
-															<div className="min-w-0 flex-1">
-																<p className="text-sm font-semibold text-ink">
-																	{t.label}
-																</p>
-																<p className="mt-0.5 text-[11px] text-ink-soft">
-																	{t.detail}
-																</p>
-															</div>
-														</label>
-													))}
+													{accountTypes.map((t) => {
+														const Icon = t.icon;
+														const active = accountType === t.key;
+														return (
+															<label
+																key={t.key}
+																className={
+																	"flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors " +
+																	(active
+																		? "border-orange bg-orange/10"
+																		: "border-line bg-sand hover:bg-sand-2")
+																}
+															>
+																<input
+																	type="radio"
+																	name="account-type"
+																	value={t.key}
+																	checked={active}
+																	onChange={() => setAccountType(t.key)}
+																	className="mt-1 size-3.5 accent-orange"
+																/>
+																<Icon className="mt-0.5 size-4 shrink-0 text-orange" />
+																<div className="min-w-0 flex-1">
+																	<p className="text-sm font-semibold text-ink">
+																		{t.label}
+																	</p>
+																	<p className="mt-0.5 text-[11px] text-ink-soft">
+																		{t.detail}
+																	</p>
+																</div>
+															</label>
+														);
+													})}
 												</div>
 											</div>
 
@@ -414,7 +471,7 @@ export function RegisterPage() {
 									)}
 
 									{step === 1 && (
-										<div className="space-y-4">
+										<div className="space-y-5">
 											<label className="block">
 												<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 													Organisation name
@@ -435,6 +492,9 @@ export function RegisterPage() {
 												<label className="block">
 													<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 														RC number
+														{accountType === "agent" && (
+															<span className="ml-1 text-orange">*</span>
+														)}
 													</span>
 													<Input
 														placeholder="e.g. RC-1284921"
@@ -476,8 +536,8 @@ export function RegisterPage() {
 												<ul className="mt-3 space-y-2 text-[12px] leading-5 text-ink-soft">
 													<li className="flex items-start gap-2">
 														<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
-														We verify your organisation details and licence references
-														where applicable.
+														We verify your organisation details and licence
+														references where applicable.
 													</li>
 													<li className="flex items-start gap-2">
 														<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
@@ -530,7 +590,7 @@ export function RegisterPage() {
 							)}
 
 							{step === 2 && (
-								<form onSubmit={handleVerify} className="p-6 sm:p-7">
+								<form onSubmit={handleVerify} className="p-5 sm:p-7">
 									<p className="text-[13px] leading-6 text-ink-soft">
 										We sent a 6-digit verification code to{" "}
 										<span className="font-mono text-ink">{email || "your email"}</span>.
@@ -560,7 +620,9 @@ export function RegisterPage() {
 											<button
 												type="button"
 												className="font-semibold text-orange"
-												onClick={() => toast.success("Verification resend simulated locally.")}
+												onClick={() =>
+													toast.success("Verification resend simulated locally.")
+												}
 											>
 												resend the code
 											</button>
@@ -587,33 +649,9 @@ export function RegisterPage() {
 								</form>
 							)}
 						</div>
-
-						<p className="mt-6 text-center text-[12px] text-ink-soft">
-							Already have an account?{" "}
-							<Link to="/login" className="font-semibold text-orange">
-								Sign in
-							</Link>
-						</p>
-
-						<nav className="mt-6 flex flex-wrap items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-							<Link to="/" className="hover:text-orange">
-								← Back to TRINŪ
-							</Link>
-							<div className="flex items-center gap-4">
-								<Link to="/privacy" className="hover:text-orange">
-									Privacy
-								</Link>
-								<Link to="/terms" className="hover:text-orange">
-									Terms
-								</Link>
-								<Link to="/compliance" className="hover:text-orange">
-									Compliance
-								</Link>
-							</div>
-						</nav>
 					</div>
-				</div>
-			</div>
-		</div>
+				</section>
+			</main>
+		</PublicFrame>
 	);
 }

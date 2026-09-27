@@ -224,7 +224,7 @@ export function LoginPage() {
 
 								<p className="mt-6 text-center text-[12px] text-ink-soft">
 									New to TRINŪ?{" "}
-									<Link to="/quote" className="font-semibold text-orange">
+									<Link to="/register" className="font-semibold text-orange">
 										Request access
 									</Link>
 								</p>
