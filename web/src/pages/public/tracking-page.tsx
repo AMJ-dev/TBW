@@ -129,7 +129,7 @@ export function TrackingPage() {
 						].map(([value, label]) => (
 							<div key={label} className="rounded-xl bg-sand p-3 ring-1 ring-line">
 								<p className="font-display text-xl font-bold text-ink">{value}</p>
-								<p className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">
+								<p className="mt-1 font-mono text-[12px] uppercase tracking-[0.12em] text-ink-soft">
 									{label}
 								</p>
 							</div>
@@ -151,7 +151,7 @@ export function TrackingPage() {
 							<div>
 								<label
 									htmlFor="tracking-ref"
-									className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft"
+									className="font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft"
 								>
 									Container, BL, or terminal reference
 								</label>
@@ -179,7 +179,7 @@ export function TrackingPage() {
 							</Button>
 						</div>
 						<div className="mt-4 flex flex-wrap items-center gap-2">
-							<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+							<span className="font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 								Try:
 							</span>
 							{suggestedRefs.map((ref) => (
@@ -272,10 +272,10 @@ function TrackingResult({ record, onReset }: { record: CargoRecord; onReset: () 
 
 			<div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[1fr_260px]">
 				<div>
-					<p className="mb-5 font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+					<p className="mb-5 font-mono text-[12px] uppercase tracking-[0.16em] text-orange">
 						Movement timeline
 					</p>
-					<div className="relative space-y-6 before:absolute before:bottom-4 before:left-[9px] before:top-4 before:w-px before:bg-line">
+					<div className="relative space-y-6 before:absolute before:bottom-4 before:left-[12px] before:top-4 before:w-px before:bg-line">
 						{stages.map((label, index) => (
 							<TimelineItem
 								key={label}
@@ -293,7 +293,7 @@ function TrackingResult({ record, onReset }: { record: CargoRecord; onReset: () 
 					<div className="rounded-xl bg-paper p-4 ring-1 ring-line">
 						<div className="flex items-center gap-2">
 							<Boxes className="size-4 text-orange" />
-							<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+							<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 								Cargo summary
 							</p>
 						</div>
@@ -320,7 +320,7 @@ function TrackingResult({ record, onReset }: { record: CargoRecord; onReset: () 
 					<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
 						<div className="flex items-center gap-2">
 							<MapPin className="size-4 text-orange" />
-							<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+							<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 								Public view excludes
 							</p>
 						</div>

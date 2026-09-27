@@ -13,6 +13,7 @@ import {PrivacyPage} from "@/pages/public/privacy";
 import {CareersPage} from "@/pages/public/careers";
 import { CompliancePage } from "@/pages/public/compliance";
 import { AudiencePage } from "@/pages/public/audience";
+import { HowItWorksPage } from "@/pages/public/how-it-work";
 
 import { MfaPage } from "@/pages/auth/mfa";
 import { LoginPage } from "@/pages/auth/login";
@@ -108,6 +109,7 @@ export const router = createBrowserRouter([
   { path: "/careers", element: <CareersPage /> },
   { path: "/compliance", element: <CompliancePage /> },
   { path: "/for/:audience", element: <AudiencePage /> },
+  { path: "/how-it-works", element: <HowItWorksPage /> },
 
   { path: "/login", element: <LoginPage /> },
   { path: "/mfa", element: <MfaPage mode="challenge" /> },

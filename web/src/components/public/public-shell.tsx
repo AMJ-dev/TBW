@@ -11,11 +11,13 @@ import { cn } from "@/lib/utils";
 
 const navigation = [
 	["Services", "/services"],
+	["How it works", "/how-it-works"],
 	["Track cargo", "/tracking"],
 	["Compliance", "/compliance"],
 	["About", "/about"],
 	["News & notices", "/news"],
 	["FAQs", "/faq"],
+	["Contact", "/contact"],
 ] as const;
 
 const audienceLinks = [
@@ -28,6 +30,7 @@ const audienceLinks = [
 const footerLinks = {
 	Explore: [
 		["Services", "/services"],
+		["How it works", "/how-it-works"],
 		["Track cargo", "/tracking"],
 		["Verify document", "/verify"],
 		["Request a quote", "/quote"],
