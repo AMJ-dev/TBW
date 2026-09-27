@@ -1,0 +1,3 @@
+date,description,reference,amount,direction
+2026-09-25,Demo inbound transfer,DEMO-TRX-001,1250000,credit
+2026-09-25,Demo bank charge,DEMO-TRX-002,-2500,debit
