@@ -353,7 +353,7 @@ export function AudiencePage({ audience }: { audience?: AudienceKey }) {
 								{config.stat.map(([value, label]) => (
 									<div key={label} className="rounded-xl bg-sand p-3 ring-1 ring-line">
 										<p className="font-display text-xl font-bold text-ink">{value}</p>
-										<p className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">
+										<p className="mt-1 font-mono text-[12px] uppercase tracking-[0.12em] text-ink-soft">
 											{label}
 										</p>
 									</div>
@@ -474,7 +474,7 @@ export function AudiencePage({ audience }: { audience?: AudienceKey }) {
 					<div className="relative mx-auto max-w-7xl px-5 py-16 lg:px-8 lg:py-20">
 						<div className="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:items-center">
 							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+								<p className="font-mono text-[12px] uppercase tracking-[0.18em] text-orange">
 									Next step
 								</p>
 								<h2 className="mt-3 font-display text-3xl font-bold text-sand sm:text-4xl">

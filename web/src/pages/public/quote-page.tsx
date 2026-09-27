@@ -72,7 +72,7 @@ export function QuotePage() {
 						contact details were stored.
 					</p>
 					<div className="mt-7 rounded-xl bg-sand p-5 ring-1 ring-line">
-						<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+						<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 							Demo reference · not submitted
 						</p>
 						<p className="mt-2 font-display text-2xl font-bold text-ink">TRN-Q-2026-004821</p>
@@ -128,7 +128,7 @@ export function QuotePage() {
 							].map(([value, label]) => (
 								<div key={label} className="rounded-xl bg-sand p-3 ring-1 ring-line">
 									<p className="font-display text-xl font-bold text-ink">{value}</p>
-									<p className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">
+									<p className="mt-1 font-mono text-[12px] uppercase tracking-[0.12em] text-ink-soft">
 										{label}
 									</p>
 								</div>
@@ -143,7 +143,7 @@ export function QuotePage() {
 						<div className="grid gap-10 lg:grid-cols-[260px_1fr]">
 							<aside className="lg:sticky lg:top-24 lg:self-start">
 								<div className="rounded-2xl bg-paper p-5 ring-1 ring-line">
-									<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+									<p className="font-mono text-[12px] uppercase tracking-[0.16em] text-orange">
 										Progress
 									</p>
 									<div className="mt-4 flex items-baseline gap-2">
@@ -194,7 +194,7 @@ export function QuotePage() {
 								</div>
 
 								<div className="mt-4 rounded-2xl bg-paper p-5 ring-1 ring-line">
-									<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+									<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 										What happens next
 									</p>
 									<p className="mt-3 text-sm leading-6 text-ink-soft">
@@ -208,7 +208,7 @@ export function QuotePage() {
 								<div className="border-b border-line p-5 sm:p-7">
 									<div className="flex flex-wrap items-start justify-between gap-3">
 										<div>
-											<p className="font-mono text-[10px] uppercase tracking-[0.15em] text-orange">
+											<p className="font-mono text-[12px] uppercase tracking-[0.15em] text-orange">
 												Step {String(step + 1).padStart(2, "0")} of{" "}
 												{String(steps.length).padStart(2, "0")}
 											</p>
@@ -216,7 +216,7 @@ export function QuotePage() {
 												{steps[step]?.label}
 											</h2>
 										</div>
-										<span className="rounded-full bg-sand px-3 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft ring-1 ring-line">
+										<span className="rounded-full bg-sand px-3 py-1 font-mono text-[12px] uppercase tracking-[0.12em] text-ink-soft ring-1 ring-line">
 											Saved locally
 										</span>
 									</div>
@@ -258,7 +258,7 @@ export function QuotePage() {
 										{step === 1 && (
 											<>
 												<label className="block">
-													<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+													<span className="font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 														Cargo category
 													</span>
 													<div className="mt-2 flex flex-wrap gap-2">
@@ -307,7 +307,7 @@ export function QuotePage() {
 										{step === 2 && <ServiceSelects />}
 										{step === 3 && (
 											<label className="block">
-												<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+												<span className="font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 													Special requirements
 												</span>
 												<textarea
@@ -351,7 +351,7 @@ export function QuotePage() {
 														key={label}
 														className="flex flex-wrap items-start justify-between gap-2 rounded-xl bg-sand px-4 py-3 ring-1 ring-line"
 													>
-														<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+														<span className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 															{label}
 														</span>
 														<span className="text-right text-sm font-medium text-ink">
@@ -373,7 +373,7 @@ export function QuotePage() {
 											Back
 										</Button>
 										<div className="flex items-center gap-3">
-											<span className="hidden font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft sm:inline">
+											<span className="hidden font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft sm:inline">
 												{step === steps.length - 1
 													? "Ready to send"
 													: `${steps.length - step - 1} steps remaining`}
@@ -412,7 +412,7 @@ function Field({
 }) {
 	return (
 		<label className="block">
-			<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+			<span className="font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 				{label}
 			</span>
 			<Input

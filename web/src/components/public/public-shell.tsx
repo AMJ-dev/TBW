@@ -160,7 +160,7 @@ export function PublicHeader() {
 						{audienceOpen && (
 							<div className="absolute left-0 top-full pt-2">
 								<div className="w-64 overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line">
-									<p className="border-b border-line bg-sand px-4 py-3 font-mono text-[10px] uppercase tracking-[0.16em] text-brown">
+									<p className="border-b border-line bg-sand px-4 py-3 font-mono text-[12px] uppercase tracking-[0.16em] text-brown">
 										Built for the people around cargo
 									</p>
 									<ul className="p-2">
@@ -248,7 +248,7 @@ export function PublicHeader() {
 					))}
 
 					<div className="border-b border-line py-3">
-						<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-brown">
+						<p className="font-mono text-[12px] uppercase tracking-[0.16em] text-brown">
 							For you
 						</p>
 						<ul className="mt-2 space-y-1">
@@ -272,7 +272,7 @@ export function PublicHeader() {
 					</div>
 
 					<div className="border-b border-line py-3">
-						<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-brown">
+						<p className="font-mono text-[12px] uppercase tracking-[0.16em] text-brown">
 							Follow TRÏNŪ
 						</p>
 						<div className="mt-2 flex items-center gap-2">
@@ -408,7 +408,7 @@ export function PublicStatus({
 	return (
 		<span
 			className={cn(
-				"inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] ring-1",
+				"inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[12px] uppercase tracking-[0.08em] ring-1",
 				tones[tone]
 			)}
 		>

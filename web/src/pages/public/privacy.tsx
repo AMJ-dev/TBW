@@ -187,7 +187,7 @@ export function PrivacyPage() {
 								</p>
 							</div>
 							<div className="rounded-2xl bg-sand p-5 ring-1 ring-line">
-								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+								<p className="font-mono text-[12px] uppercase tracking-[0.16em] text-orange">
 									Document control
 								</p>
 								<dl className="mt-3 space-y-2.5 text-[12px]">
@@ -218,7 +218,7 @@ export function PrivacyPage() {
 					<div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 lg:grid-cols-[240px_1fr] lg:px-8 lg:py-20">
 						<aside className="h-fit lg:sticky lg:top-24">
 							<div className="rounded-2xl bg-paper p-5 ring-1 ring-line">
-								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+								<p className="font-mono text-[12px] uppercase tracking-[0.16em] text-orange">
 									Contents
 								</p>
 								<ul className="mt-4 space-y-2">
@@ -238,7 +238,7 @@ export function PrivacyPage() {
 							<div className="mt-4 rounded-2xl bg-slate p-5 text-sand ring-1 ring-slate">
 								<div className="flex items-center gap-2">
 									<ShieldCheck className="size-4 text-orange" />
-									<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+									<p className="font-mono text-[12px] uppercase tracking-[0.16em] text-orange">
 										Your rights
 									</p>
 								</div>
@@ -282,7 +282,7 @@ export function PrivacyPage() {
 							>
 								<div className="flex items-center gap-2">
 									<Mail className="size-4 text-orange" />
-									<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+									<p className="font-mono text-[12px] uppercase tracking-[0.16em] text-orange">
 										Data protection contact
 									</p>
 								</div>
@@ -296,7 +296,7 @@ export function PrivacyPage() {
 								</p>
 								<div className="mt-6 grid gap-3 sm:grid-cols-3">
 									<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
-										<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+										<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 											Data protection desk
 										</p>
 										<p className="mt-1 text-sm font-semibold text-ink">
@@ -304,7 +304,7 @@ export function PrivacyPage() {
 										</p>
 									</div>
 									<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
-										<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+										<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 											Facility
 										</p>
 										<p className="mt-1 text-sm font-semibold text-ink">
@@ -312,7 +312,7 @@ export function PrivacyPage() {
 										</p>
 									</div>
 									<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
-										<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+										<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 											Regulator
 										</p>
 										<p className="mt-1 text-sm font-semibold text-ink">
@@ -337,7 +337,7 @@ export function PrivacyPage() {
 								</div>
 							</section>
 
-							<div className="mt-10 border-t border-line pt-6 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+							<div className="mt-10 border-t border-line pt-6 font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 								<p>
 									TRN-PRV-001 · v1.0 · Effective 24 Sep 2026 · This notice is published,
 									versioned, and timestamped in line with the Nigeria Data Protection Act

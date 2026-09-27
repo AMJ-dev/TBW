@@ -215,7 +215,7 @@ export function TermsPage() {
 								</p>
 							</div>
 							<div className="rounded-2xl bg-sand p-5 ring-1 ring-line">
-								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+								<p className="font-mono text-[12px] uppercase tracking-[0.16em] text-orange">
 									Document control
 								</p>
 								<dl className="mt-3 space-y-2.5 text-[12px]">
@@ -246,7 +246,7 @@ export function TermsPage() {
 					<div className="mx-auto grid max-w-7xl gap-10 px-5 py-14 lg:grid-cols-[240px_1fr] lg:px-8 lg:py-20">
 						<aside className="h-fit lg:sticky lg:top-24">
 							<div className="rounded-2xl bg-paper p-5 ring-1 ring-line">
-								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+								<p className="font-mono text-[12px] uppercase tracking-[0.16em] text-orange">
 									Contents
 								</p>
 								<ul className="mt-4 space-y-2">
@@ -266,7 +266,7 @@ export function TermsPage() {
 							<div className="mt-4 rounded-2xl bg-slate p-5 text-sand ring-1 ring-slate">
 								<div className="flex items-center gap-2">
 									<ShieldCheck className="size-4 text-orange" />
-									<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+									<p className="font-mono text-[12px] uppercase tracking-[0.16em] text-orange">
 										Important boundary
 									</p>
 								</div>
@@ -310,7 +310,7 @@ export function TermsPage() {
 							>
 								<div className="flex items-center gap-2">
 									<FileText className="size-4 text-orange" />
-									<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+									<p className="font-mono text-[12px] uppercase tracking-[0.16em] text-orange">
 										Legal contact
 									</p>
 								</div>
@@ -323,7 +323,7 @@ export function TermsPage() {
 								</p>
 								<div className="mt-6 grid gap-3 sm:grid-cols-3">
 									<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
-										<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+										<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 											Legal contact
 										</p>
 										<p className="mt-1 text-sm font-semibold text-ink">
@@ -331,7 +331,7 @@ export function TermsPage() {
 										</p>
 									</div>
 									<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
-										<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+										<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 											Facility
 										</p>
 										<p className="mt-1 text-sm font-semibold text-ink">
@@ -339,7 +339,7 @@ export function TermsPage() {
 										</p>
 									</div>
 									<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
-										<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+										<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
 											Jurisdiction
 										</p>
 										<p className="mt-1 text-sm font-semibold text-ink">
@@ -364,7 +364,7 @@ export function TermsPage() {
 								</div>
 							</section>
 
-							<div className="mt-10 border-t border-line pt-6 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+							<div className="mt-10 border-t border-line pt-6 font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 								<p>
 									TRN-TOU-001 · v1.0 · Effective 24 Sep 2026 · These terms are governed by
 									the laws of the Federal Republic of Nigeria.
