@@ -1,0 +1,415 @@
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import {
+	Download,
+	Filter,
+	KeyRound,
+	Plus,
+	Search,
+	ShieldCheck,
+	UserCheck,
+	UserPlus,
+	Users,
+	X,
+} from "lucide-react";
+import { AppShell, StatusBadge, statusTone, Metric } from "@/components/shell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+
+interface UserRecord {
+	id: string;
+	name: string;
+	email: string;
+	role: string;
+	organization: string;
+	status: "Active" | "Pending" | "Suspended";
+	lastLogin: string;
+	twoFactor: boolean;
+}
+
+const initialUsers: UserRecord[] = [
+	{
+		id: "usr-1",
+		name: "D. Okafor",
+		email: "d.okafor@trinu.ng",
+		role: "Terminal Operations Manager",
+		organization: "TRÏNŪ Flagship Facility",
+		status: "Active",
+		lastLogin: "12 mins ago",
+		twoFactor: true,
+	},
+	{
+		id: "usr-2",
+		name: "A. Balogun",
+		email: "a.balogun@meridiancustoms.ng",
+		role: "Licensed Customs Broker",
+		organization: "Meridian Customs Services",
+		status: "Active",
+		lastLogin: "1 hour ago",
+		twoFactor: true,
+	},
+	{
+		id: "usr-3",
+		name: "Chukwuma Eze",
+		email: "c.eze@atlantictrade.com",
+		role: "Consignee Agent",
+		organization: "Atlantic Trade Nigeria Ltd",
+		status: "Active",
+		lastLogin: "Yesterday · 16:30",
+		twoFactor: true,
+	},
+	{
+		id: "usr-4",
+		name: "Ibrahim Musa",
+		email: "i.musa@meridiancustoms.ng",
+		role: "Licensed Customs Broker",
+		organization: "Meridian Customs Services",
+		status: "Active",
+		lastLogin: "2 days ago",
+		twoFactor: false,
+	},
+	{
+		id: "usr-5",
+		name: "Khadija Sani",
+		email: "k.sani@trinu.ng",
+		role: "Finance & Tariff Officer",
+		organization: "TRINU Finance Desk",
+		status: "Active",
+		lastLogin: "3 hours ago",
+		twoFactor: true,
+	},
+	{
+		id: "usr-6",
+		name: "Oluwaseun Adeleke",
+		email: "o.adeleke@apexhaulage.com",
+		role: "Truck Fleet Dispatcher",
+		organization: "Apex Haulage Logistics",
+		status: "Pending",
+		lastLogin: "Never",
+		twoFactor: false,
+	},
+];
+
+export default function AdminUsersRoute() {
+	const [users, setUsers] = useState<UserRecord[]>(initialUsers);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [roleFilter, setRoleFilter] = useState("ALL");
+	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+	const [newName, setNewName] = useState("");
+	const [newEmail, setNewEmail] = useState("");
+	const [newRole, setNewRole] = useState("Consignee Agent");
+	const [newOrg, setNewOrg] = useState("");
+
+	const filteredUsers = useMemo(() => {
+		return users.filter((u) => {
+			const matchQuery =
+				u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				u.organization.toLowerCase().includes(searchQuery.toLowerCase()) ||
+				u.role.toLowerCase().includes(searchQuery.toLowerCase());
+
+			const matchRole =
+				roleFilter === "ALL" ? true : u.role.toLowerCase().includes(roleFilter.toLowerCase());
+
+			return matchQuery && matchRole;
+		});
+	}, [users, searchQuery, roleFilter]);
+
+	const handleAddUser = (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!newName || !newEmail || !newOrg) {
+			toast.error("Please fill in all required fields.");
+			return;
+		}
+
+		const newUser: UserRecord = {
+			id: `usr-${users.length + 1}`,
+			name: newName,
+			email: newEmail,
+			role: newRole,
+			organization: newOrg,
+			status: "Pending",
+			lastLogin: "Never",
+			twoFactor: false,
+		};
+
+		setUsers([newUser, ...users]);
+		setIsAddModalOpen(false);
+		setNewName("");
+		setNewEmail("");
+		setNewOrg("");
+		toast.success(`User ${newName} added to the directory.`);
+	};
+
+	const handleExportUsers = () => {
+		const csv = [
+			["Name", "Email", "Role", "Organization", "Status", "Last Login", "2FA"].join(","),
+			...users.map((u) =>
+				[
+					u.name,
+					u.email,
+					`"${u.role}"`,
+					`"${u.organization}"`,
+					u.status,
+					u.lastLogin,
+					u.twoFactor ? "Yes" : "No",
+				].join(",")
+			),
+		].join("\n");
+
+		const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = `TRINU-Users-${new Date().toISOString().slice(0, 10)}.csv`;
+		a.click();
+		URL.revokeObjectURL(url);
+		toast.success("User directory exported locally.");
+	};
+
+	return (
+		<AppShell title="Users & Access" eyebrow="Administration · Identity Management">
+			<div className="flex flex-wrap items-end justify-between gap-4">
+				<div>
+					<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">
+						Security & Governance · Identity Provider
+					</p>
+					<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+						User Accounts & Delegated Access
+					</h2>
+					<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+						Manage terminal staff, licensed agents, consignees, and third-party
+						transporters working from the same operating record.
+					</p>
+				</div>
+				<div className="flex flex-wrap items-center gap-2">
+					<Button variant="outline" className="border-line bg-paper text-ink" onClick={handleExportUsers}>
+						<Download className="size-4" /> Export CSV
+					</Button>
+					<Button
+						className="bg-orange text-white hover:bg-orange-deep"
+						onClick={() => setIsAddModalOpen(true)}
+					>
+						<UserPlus className="size-4" /> Add User
+					</Button>
+				</div>
+			</div>
+
+			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+				<Metric
+					label="Active Users"
+					value={String(users.filter((u) => u.status === "Active").length)}
+					detail="Across registered organizations"
+					tone="success"
+					icon={Users}
+				/>
+				<Metric
+					label="Pending Invites"
+					value={String(users.filter((u) => u.status === "Pending").length)}
+					detail="Awaiting onboarding"
+					tone="warning"
+					icon={UserCheck}
+				/>
+				<Metric
+					label="2FA Enrollment"
+					value="84%"
+					detail="Strongly encouraged for trade users"
+					tone="info"
+					icon={KeyRound}
+				/>
+				<Metric
+					label="Audit Trail"
+					value="Logging"
+					detail="Authentication events recorded"
+					tone="info"
+					icon={ShieldCheck}
+				/>
+			</div>
+
+			<section className="rounded-xl bg-paper ring-1 ring-line">
+				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
+					<div className="relative min-w-[260px] flex-1">
+						<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
+						<Input
+							value={searchQuery}
+							onChange={(e) => setSearchQuery(e.target.value)}
+							placeholder="Search by name, email, organization, or role..."
+							className="h-10 border-line bg-sand pl-9 text-sm text-ink"
+						/>
+					</div>
+
+					<div className="flex items-center gap-2">
+						<span className="flex items-center gap-1 text-xs text-ink-soft">
+							<Filter className="size-3.5" /> Filter:
+						</span>
+						{["ALL", "Terminal", "Agent", "Consignee", "Finance"].map((cat) => (
+							<button
+								key={cat}
+								onClick={() => setRoleFilter(cat)}
+								className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+									roleFilter === cat
+										? "bg-ink text-sand"
+										: "bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink"
+								}`}
+							>
+								{cat}
+							</button>
+						))}
+					</div>
+				</div>
+
+				<div className="overflow-x-auto">
+					<table className="w-full min-w-[850px] text-left text-sm">
+						<thead>
+							<tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+								<th className="px-4 py-3 font-medium">User / Email</th>
+								<th className="px-4 py-3 font-medium">Role</th>
+								<th className="px-4 py-3 font-medium">Organization</th>
+								<th className="px-4 py-3 font-medium">2FA</th>
+								<th className="px-4 py-3 font-medium">Last Login</th>
+								<th className="px-4 py-3 font-medium">Status</th>
+								<th className="px-4 py-3 font-medium text-right">Action</th>
+							</tr>
+						</thead>
+						<tbody className="divide-y divide-line">
+							{filteredUsers.map((u) => (
+								<tr key={u.id} className="transition-colors hover:bg-sand/60">
+									<td className="px-4 py-3.5">
+										<p className="font-semibold text-ink">{u.name}</p>
+										<p className="font-mono text-xs text-ink-soft">{u.email}</p>
+									</td>
+									<td className="px-4 py-3.5 text-xs text-ink">{u.role}</td>
+									<td className="px-4 py-3.5 text-xs text-ink-soft">{u.organization}</td>
+									<td className="px-4 py-3.5">
+										{u.twoFactor ? (
+											<span className="inline-flex items-center gap-1 font-mono text-[10px] text-teal-deep">
+												<KeyRound className="size-3" /> Enabled
+											</span>
+										) : (
+											<span className="font-mono text-[10px] text-orange-deep">Not enrolled</span>
+										)}
+									</td>
+									<td className="px-4 py-3.5 text-xs text-ink-soft">{u.lastLogin}</td>
+									<td className="px-4 py-3.5">
+										<StatusBadge label={u.status} tone={statusTone(u.status)} />
+									</td>
+									<td className="px-4 py-3.5 text-right">
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => toast.success(`Viewing permissions for ${u.name}`)}
+											className="text-xs font-semibold text-orange-deep hover:bg-orange/10"
+										>
+											Manage
+										</Button>
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+
+				<div className="flex items-center justify-between border-t border-line px-4 py-3 font-mono text-[10px] text-ink-soft">
+					<span>
+						Showing {filteredUsers.length} of {users.length} registered accounts
+					</span>
+					<span>Role-based access control</span>
+				</div>
+			</section>
+
+			{isAddModalOpen && (
+				<div
+					className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4 backdrop-blur-sm"
+					onMouseDown={(e) => e.target === e.currentTarget && setIsAddModalOpen(false)}
+				>
+					<div className="w-full max-w-lg rounded-xl bg-paper p-6 shadow-2xl ring-1 ring-line">
+						<div className="flex items-center justify-between border-b border-line pb-4">
+							<div>
+								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-deep">
+									Identity Provisioning
+								</p>
+								<h3 className="mt-1 font-display text-xl font-bold text-ink">
+									Create User Account
+								</h3>
+							</div>
+							<Button variant="ghost" size="icon" onClick={() => setIsAddModalOpen(false)}>
+								<X />
+							</Button>
+						</div>
+
+						<form onSubmit={handleAddUser} className="mt-5 space-y-4">
+							<div>
+								<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+									Full Name
+								</label>
+								<Input
+									required
+									placeholder="e.g. Tunde Lawal"
+									value={newName}
+									onChange={(e) => setNewName(e.target.value)}
+									className="mt-1.5 border-line bg-sand text-ink"
+								/>
+							</div>
+
+							<div>
+								<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+									Work Email Address
+								</label>
+								<Input
+									required
+									type="email"
+									placeholder="e.g. tunde@atlantictrade.com"
+									value={newEmail}
+									onChange={(e) => setNewEmail(e.target.value)}
+									className="mt-1.5 border-line bg-sand text-ink"
+								/>
+							</div>
+
+							<div className="grid grid-cols-2 gap-3">
+								<div>
+									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+										Assigned Role
+									</label>
+									<select
+										value={newRole}
+										onChange={(e) => setNewRole(e.target.value)}
+										className="mt-1.5 h-10 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none"
+									>
+										<option>Consignee Agent</option>
+										<option>Licensed Customs Broker</option>
+										<option>Terminal Operations Staff</option>
+										<option>Finance Officer</option>
+										<option>Transporter Dispatcher</option>
+									</select>
+								</div>
+
+								<div>
+									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+										Organization
+									</label>
+									<Input
+										required
+										placeholder="e.g. Atlantic Trade Ltd"
+										value={newOrg}
+										onChange={(e) => setNewOrg(e.target.value)}
+										className="mt-1.5 border-line bg-sand text-ink"
+									/>
+								</div>
+							</div>
+
+							<div className="flex justify-end gap-2 border-t border-line pt-4">
+								<Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>
+									Cancel
+								</Button>
+								<Button type="submit" className="bg-orange text-white hover:bg-orange-deep">
+									Add User
+								</Button>
+							</div>
+						</form>
+					</div>
+				</div>
+			)}
+		</AppShell>
+	);
+}

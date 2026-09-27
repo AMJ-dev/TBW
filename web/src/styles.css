@@ -1,0 +1,217 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sand: var(--sand);
+  --color-sand-2: var(--sand-2);
+  --color-paper: var(--paper);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-orange: var(--orange);
+  --color-orange-deep: var(--orange-deep);
+  --color-carmine: var(--carmine);
+  --color-brown: var(--brown);
+  --color-slate: var(--slate);
+  --color-slate-deep: var(--slate-deep);
+  --color-teal: var(--teal);
+  --color-teal-deep: var(--teal-deep);
+  --color-amber: var(--amber);
+  --color-amber-deep: var(--amber-deep);
+  --color-coral: var(--coral);
+  --color-sky: var(--sky);
+  --color-sky-deep: var(--sky-deep);
+  --font-display: "Montserrat", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+:root {
+  --radius: 0.625rem;
+
+  /* ===== TRINU Brand Core — exact hex from deck ===== */
+  --orange: #FF6600;
+  --orange-deep: #E55A00;
+  --carmine: #B44D2F;
+  --brown: #422B1C;
+  --slate: #4E5157;
+  --slate-deep: #34373B;
+
+  /* ===== Warm neutrals (light surfaces) ===== */
+  --sand: #FAF0E3;
+  --sand-2: #F3E4CF;
+  --paper: #FFFBF5;
+  --line: #E8D9C2;
+  --ink: #2B2A28;
+  --ink-soft: #6B6357;
+
+  /* ===== Semantic ===== */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--paper);
+  --card-foreground: var(--ink);
+  --popover: var(--paper);
+  --popover-foreground: var(--ink);
+  --primary: var(--orange);
+  --primary-foreground: #FFFFFF;
+  --secondary: var(--sand-2);
+  --secondary-foreground: var(--ink);
+  --muted: var(--sand);
+  --muted-foreground: var(--ink-soft);
+  --accent: var(--sand-2);
+  --accent-foreground: var(--ink);
+  --destructive: #C0392B;
+  --destructive-foreground: #FFFFFF;
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--orange);
+
+  /* ===== Aliases ===== */
+  --teal: var(--orange);
+  --teal-deep: var(--orange-deep);
+  --amber: var(--orange);
+  --amber-deep: var(--orange-deep);
+  --coral: var(--carmine);
+  --sky: var(--slate);
+  --sky-deep: var(--slate-deep);
+
+  /* ===== Charts ===== */
+  --chart-1: var(--orange);
+  --chart-2: var(--carmine);
+  --chart-3: var(--brown);
+  --chart-4: var(--slate);
+  --chart-5: var(--slate-deep);
+
+  /* ===== Sidebar ===== */
+  --sidebar: var(--paper);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--orange);
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: var(--sand-2);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--orange);
+}
+
+.dark {
+  /* Formal / depth surfaces → Bistre Brown leads, Slate carries formal pieces */
+  --background: var(--brown);
+  --foreground: #F5EDE3;
+  --card: #4D3423;
+  --card-foreground: #F5EDE3;
+  --popover: #4D3423;
+  --popover-foreground: #F5EDE3;
+  --primary: var(--orange);
+  --primary-foreground: #FFFFFF;
+  --secondary: #4D3423;
+  --secondary-foreground: #F5EDE3;
+  --muted: #4D3423;
+  --muted-foreground: #B8A894;
+  --accent: #4D3423;
+  --accent-foreground: #F5EDE3;
+  --destructive: #E74C3C;
+  --destructive-foreground: #FFFFFF;
+  --border: rgba(255, 255, 255, 0.10);
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: var(--orange);
+
+  --sand: #4D3423;
+  --sand-2: #5A3E2B;
+  --paper: #3A2618;
+  --line: rgba(255, 255, 255, 0.12);
+  --ink: #F5EDE3;
+  --ink-soft: #B8A894;
+
+  --chart-1: var(--orange);
+  --chart-2: var(--carmine);
+  --chart-3: #8B6F5C;
+  --chart-4: var(--slate);
+  --chart-5: #6B7280;
+
+  --sidebar: #4D3423;
+  --sidebar-foreground: #F5EDE3;
+  --sidebar-primary: var(--orange);
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #5A3E2B;
+  --sidebar-accent-foreground: #F5EDE3;
+  --sidebar-border: rgba(255, 255, 255, 0.12);
+  --sidebar-ring: var(--orange);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: "Montserrat", sans-serif;
+  }
+
+  a, button, input, select, textarea {
+    transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-orange) 35%, transparent);
+    color: var(--color-ink);
+  }
+}
+
+@keyframes trinu-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@utility trinu-rise {
+  animation: trinu-rise 420ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
