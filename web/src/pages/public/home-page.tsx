@@ -140,13 +140,8 @@ export function HomePage() {
 								<span className="text-orange">so trade in Abuja moves at Abuja's pace.</span>
 							</h1>
 							<p className="mt-6 max-w-xl text-base leading-7 text-ink-soft sm:text-lg">
-								Clear your goods closer to home. Save time, save cost, and skip the long
-								haul — with customs coordination built in. We support and coordinate the
-								clearance process; Customs decisions remain with the competent authority.
-							</p>
-							<p className="mt-4 max-w-xl text-sm leading-6 text-ink-soft">
-								Built to work alongside licensed agents and forwarders — a facility you
-								plug into, not one that replaces you.
+								Clear your goods closer to home. Save time, save cost, and skip the trip to 
+								Lagos, Kano and Port Harcourt - with customs coordination built in.
 							</p>
 							<div className="mt-8 flex flex-wrap gap-3">
 								<Link to="/tracking">
@@ -167,19 +162,19 @@ export function HomePage() {
 							<div className="mt-14 grid max-w-xl grid-cols-3 gap-6 border-t border-line pt-5">
 								<div>
 									<p className="font-display text-2xl font-bold text-ink">06</p>
-									<p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">
+									<p className="mt-1 font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 										Terminal capabilities
 									</p>
 								</div>
 								<div>
 									<p className="font-display text-2xl font-bold text-ink">07</p>
-									<p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">
+									<p className="mt-1 font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 										Lifecycle stages
 									</p>
 								</div>
 								<div>
 									<p className="font-display text-2xl font-bold text-ink">24/7</p>
-									<p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">
+									<p className="mt-1 font-mono text-[12px] uppercase tracking-[0.14em] text-ink-soft">
 										Operational visibility
 									</p>
 								</div>
@@ -198,7 +193,7 @@ export function HomePage() {
 							/>
 							<div className="relative flex items-center justify-between">
 								<div>
-									<p className="font-mono text-[9px] uppercase tracking-[0.18em] text-sand/60">
+									<p className="font-mono  font-bold text-[12px] uppercase tracking-[0.18em] text-sand/60">
 										Public cargo view
 									</p>
 									<p className="mt-1 font-display text-xl font-bold text-sand">
@@ -261,7 +256,7 @@ export function HomePage() {
 							<div>
 								<label
 									htmlFor="home-track-ref"
-									className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft"
+									className="font-mono font-bold text-[15px] uppercase tracking-[0.14em] text-ink-soft"
 								>
 									Track a shipment
 								</label>
@@ -290,7 +285,7 @@ export function HomePage() {
 					<div className="mx-auto max-w-7xl px-5 py-14 lg:px-8">
 						<div className="mb-8 flex flex-wrap items-end justify-between gap-4">
 							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+								<p className="font-mono text-[15px] font-bold uppercase tracking-[0.18em] text-orange">
 									Latest notices
 								</p>
 								<h2 className="mt-2 font-display text-2xl font-bold text-ink sm:text-3xl">
@@ -311,10 +306,10 @@ export function HomePage() {
 									className="rounded-xl bg-sand p-5 ring-1 ring-line transition-colors hover:bg-sand-2"
 								>
 									<div className="flex items-center justify-between">
-										<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+										<span className="font-mono text-[15px] font-bold uppercase tracking-[0.14em] text-orange">
 											{notice.category}
 										</span>
-										<span className="font-mono text-[10px] text-ink-soft">{notice.date}</span>
+										<span className="font-mono text-[15px] text-ink-soft">{notice.date}</span>
 									</div>
 									<h3 className="mt-4 font-display text-base font-bold text-ink">
 										{notice.title}
@@ -336,7 +331,7 @@ export function HomePage() {
 					<div className="mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
 						<div className="mb-12 flex flex-wrap items-end justify-between gap-6 border-b border-line pb-8">
 							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+								<p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-orange">
 									What we do
 								</p>
 								<h2 className="mt-3 max-w-xl font-display text-3xl font-bold text-ink sm:text-4xl">
@@ -360,12 +355,12 @@ export function HomePage() {
 										<div className="grid size-11 place-items-center rounded-xl bg-orange text-white transition-colors duration-300 group-hover:bg-orange-deep">
 											<Icon className="size-5" />
 										</div>
-										<span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+										<span className="font-mono text-[12px] uppercase tracking-[0.16em] text-ink-soft">
 											0{index + 1}
 										</span>
 									</div>
 									<h3 className="mt-6 font-display text-lg font-bold text-ink">{title}</h3>
-									<p className="mt-3 text-sm leading-6 text-ink-soft">{detail}</p>
+									<p className="mt-3 text-[12px] leading-6 text-ink-soft">{detail}</p>
 								</article>
 							))}
 						</div>
@@ -374,14 +369,14 @@ export function HomePage() {
 						<div className="mt-16 rounded-2xl bg-paper p-6 ring-1 ring-line sm:p-8">
 							<div className="flex flex-wrap items-end justify-between gap-4">
 								<div>
-									<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+									<p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-orange">
 										Cargo we handle
 									</p>
 									<h3 className="mt-2 font-display text-xl font-bold text-ink sm:text-2xl">
 										Categories served at the Abuja flagship facility.
 									</h3>
 								</div>
-								<p className="max-w-md text-[12px] leading-5 text-ink-soft">
+								<p className="max-w-md text-[15px] leading-5 text-ink-soft">
 									Subject to licence conditions and equipment availability. Contact
 									operations for specialised or project cargo.
 								</p>
@@ -405,7 +400,7 @@ export function HomePage() {
 					<div className="mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
 						<div className="grid gap-12 lg:grid-cols-[.8fr_1.2fr] lg:items-start">
 							<div className="lg:sticky lg:top-24">
-								<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+								<p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-orange">
 									How it works
 								</p>
 								<h2 className="mt-3 max-w-md font-display text-3xl font-bold text-ink sm:text-4xl">
@@ -457,7 +452,7 @@ export function HomePage() {
 					<div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
 						<div className="grid gap-12 lg:grid-cols-[.7fr_1.3fr] lg:items-start">
 							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+								<p className="font-mono text-[15px] font-bold uppercase tracking-[0.18em] text-orange">
 									From our CEO
 								</p>
 								<div className="mt-6 flex items-center gap-4">
@@ -468,7 +463,7 @@ export function HomePage() {
 										<p className="font-display text-sm font-bold text-sand">
 											Bilal Aijjola
 										</p>
-										<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-sand/60">
+										<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-sand/60">
 											Chief Executive Officer / Managing Director, TRÏNŪ Bonded Warehouse
 										</p>
 									</div>
@@ -488,7 +483,7 @@ export function HomePage() {
 				<section className="bg-brown">
 					<div className="mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
 						<div className="mb-12 max-w-2xl">
-							<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+							<p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-orange">
 								Built for the people around cargo
 							</p>
 							<h2 className="mt-3 font-display text-3xl font-bold text-sand sm:text-4xl">
@@ -525,7 +520,7 @@ export function HomePage() {
 					<div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
 						<div className="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:items-center">
 							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+								<p className="font-mono text-[12px] uppercase tracking-[0.18em] text-orange">
 									Contact operations
 								</p>
 								<h2 className="mt-3 font-display text-3xl font-bold text-sand sm:text-4xl">

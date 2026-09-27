@@ -153,7 +153,7 @@ export function CompliancePage() {
 								].map(([value, label]) => (
 									<div key={label} className="rounded-xl bg-sand p-3 ring-1 ring-line">
 										<p className="font-display text-sm font-bold text-ink">{value}</p>
-										<p className="mt-1 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">
+										<p className="mt-1 font-mono text-[12px] uppercase tracking-[0.12em] text-ink-soft">
 											{label}
 										</p>
 									</div>
@@ -321,7 +321,7 @@ export function CompliancePage() {
 							<article className="rounded-2xl bg-sand p-6 ring-1 ring-line">
 								<div className="flex items-center gap-2">
 									<FileCheck2 className="size-4 text-orange" />
-									<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+									<p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-orange">
 										Shown publicly
 									</p>
 								</div>
@@ -338,7 +338,7 @@ export function CompliancePage() {
 							<article className="rounded-2xl bg-paper p-6 ring-1 ring-line">
 								<div className="flex items-center gap-2">
 									<ShieldCheck className="size-4 text-slate" />
-									<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-slate">
+									<p className="font-mono text-[12px] font-bold uppercase tracking-[0.16em] text-slate">
 										Excluded from public view
 									</p>
 								</div>
@@ -372,7 +372,7 @@ export function CompliancePage() {
 					<div className="relative mx-auto max-w-7xl px-5 py-16 lg:px-8 lg:py-20">
 						<div className="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:items-center">
 							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+								<p className="font-mono text-[12px] font-bold uppercase tracking-[0.18em] text-orange">
 									Need clarification?
 								</p>
 								<h2 className="mt-3 font-display text-3xl font-bold text-sand sm:text-4xl">

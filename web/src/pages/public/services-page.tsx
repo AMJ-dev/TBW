@@ -105,7 +105,7 @@ export function ServicesPage() {
 										className="rounded-xl bg-sand p-4 ring-1 ring-line"
 									>
 										<p className="font-display text-2xl font-bold text-ink">{value}</p>
-										<p className="mt-1 font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">
+										<p className="mt-1 font-mono text-[12px] font-bold uppercase tracking-[0.14em] text-ink-soft">
 											{label}
 										</p>
 									</div>
@@ -125,7 +125,7 @@ export function ServicesPage() {
 									Four services, one dependable picture.
 								</h2>
 							</div>
-							<p className="max-w-md text-sm leading-6 text-ink-soft">
+							<p className="max-w-md text-[15px] leading-6 text-ink-soft">
 								Each service is backed by an auditable operating record — so every handoff
 								has a name, a timestamp, and a next action.
 							</p>
@@ -263,7 +263,7 @@ export function ServicesPage() {
 					<div className="relative mx-auto max-w-7xl px-5 py-16 lg:px-8 lg:py-20">
 						<div className="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:items-center">
 							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+								<p className="font-mono text-[15px] font-bold uppercase tracking-[0.18em] text-orange">
 									Next step
 								</p>
 								<h2 className="mt-3 font-display text-3xl font-bold text-sand sm:text-4xl">

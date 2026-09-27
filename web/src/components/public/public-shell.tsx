@@ -11,11 +11,13 @@ import { cn } from "@/lib/utils";
 
 const navigation = [
 	["Services", "/services"],
+	["How it works", "/how-it-works"],
 	["Track cargo", "/tracking"],
 	["Compliance", "/compliance"],
 	["About", "/about"],
 	["News & notices", "/news"],
 	["FAQs", "/faq"],
+	["Contact", "/contact"],
 ] as const;
 
 const audienceLinks = [
@@ -28,6 +30,7 @@ const audienceLinks = [
 const footerLinks = {
 	Explore: [
 		["Services", "/services"],
+		["How it works", "/how-it-works"],
 		["Track cargo", "/tracking"],
 		["Verify document", "/verify"],
 		["Request a quote", "/quote"],
@@ -382,7 +385,7 @@ export function PublicFrame({ children }: { children: ReactNode }) {
 
 export function PublicKicker({ children }: { children: ReactNode }) {
 	return (
-		<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+		<p className="font-mono text-[15px] font-bold uppercase tracking-[0.18em] text-orange">
 			{children}
 		</p>
 	);
