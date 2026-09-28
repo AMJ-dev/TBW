@@ -1,4 +1,4 @@
-import { useContext, useState, type FormEvent } from "react";
+import { useContext, useState, useEffect, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import UserContext from "@/lib/userContext";
+import { http, type Resp } from "@/lib/httpClient";
 
 export function LoginPage() {
 	const navigate = useNavigate();
@@ -24,18 +25,30 @@ export function LoginPage() {
 	const [showPassword, setShowPassword] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 
-	const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		if (!email || !password) {
 			toast.error("Enter your email and password to continue.");
 			return;
 		}
 		setSubmitting(true);
-		setTimeout(() => {
-			void login({ token: "demo-session", remember: false });
-			toast.success("Demo sign-in complete. No credentials were sent or saved.");
-			navigate("/portal");
-		}, 700);
+		try {
+			let res = await http.post("sign-in/",{ email, password});
+			const resp:Resp = res.data;
+			if (resp?.error){
+				toast.error(resp?.data || "Login failed. Check the credentials and try again.")
+				return
+			}
+			toast.success(resp?.data);
+			sessionStorage.setItem('remember', 'true')
+			sessionStorage.setItem('jwt', String(resp.code?.jwt ?? ''))
+			sessionStorage.setItem('email', String(resp.code?.email ?? email.trim()))
+			navigate("/mfa", )
+		} catch (error) {
+			toast.error("Could not complete login. Try again later.")
+		}finally{
+			setSubmitting(false);
+		}
 	};
 
 	return (

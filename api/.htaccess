@@ -16,6 +16,6 @@ RewriteRule ^register-send-otp/$ src/register/send-otp.php [NC]
 RewriteRule ^register-verify-otp/$ src/register/verify-otp.php [NC]
 
 RewriteRule ^sign-in/$ src/login/sign-in.php [NC]
-RewriteRule ^login-send-otp/$ src/login/send-otp.php [NC]
+RewriteRule ^login-resend-otp/$ src/login/resend-otp.php [NC]
 RewriteRule ^login-verify-otp/$ src/login/verify-otp.php [NC]
 

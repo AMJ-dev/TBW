@@ -21,6 +21,7 @@ export interface Resp {
 	message: string
 	data: any
 	meta?: any
+	code: any
 }
 
 let listeners = new Set<LoadingListener>()

@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
-import { http } from "@/lib/httpClient";
+import { http, type Resp } from "@/lib/httpClient";
 
 type AccountType = "importer" | "agent";
 
@@ -141,7 +141,7 @@ export function RegisterPage() {
 				agreed,
 
 			});
-			const resp = res.data;
+			const resp:Resp = res.data;
 			if (resp?.error) {
 				toast.error(resp.data || "Could not send the verification code.");
 			} else {
@@ -172,7 +172,7 @@ export function RegisterPage() {
 				verification_code: verificationCode,
 				registration_ref: registrationRef,
 			});
-			const resp = res.data;
+			const resp:Resp = res.data;
 			if (resp?.error) {
 				toast.error(resp.data || "Verification failed. Check the code and try again.");
 			} else {
@@ -213,7 +213,7 @@ export function RegisterPage() {
 				verification_code: verificationCode,
 				registration_ref: registrationRef,
 			});
-			const resp = res.data;
+			const resp:Resp = res.data;
 			if (resp?.error) {
 				toast.error(resp.data || "Registration failed. Please try again.");
 			} else {

@@ -1,5 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, useContext, startTransition, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
+import { useNavigate } from "react-router-dom";
 import {
 	ArrowRight,
 	Check,
@@ -8,6 +9,10 @@ import {
 	ShieldCheck,
 	Smartphone,
 } from "lucide-react";
+import { http, type Resp } from '@/lib/httpClient'
+import userContext from '@/lib/userContext'
+import { useDeviceInfo } from '@/hooks/useDeviceInfo'
+import { useLocationInfo } from '@/hooks/useLocationInfo'
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,28 +21,77 @@ import { cn } from "@/lib/utils";
 type Mode = "setup" | "challenge";
 
 export function MfaPage({ mode = "challenge" }: { mode?: Mode }) {
-	return mode === "setup" ? <MfaSetup /> : <MfaChallenge />;
+	return mode == "setup" ? <MfaSetup /> : <MfaChallenge />;
 }
 
 function MfaChallenge() {
+	const navigate = useNavigate()
+	const { login } = useContext(userContext)
+	const deviceInfo = useDeviceInfo()
+	const { locationInfo, loading: locationLoading } = useLocationInfo()
+	const [jwt, setJwt] = useState<string>('')
+	const [remember, setRemember] = useState<boolean>(false)
 	const [code, setCode] = useState("");
 	const [trustDevice, setTrustDevice] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
-
+	const [mounted, setMounted] = useState(false)
+	const [email, setEmail] = useState<string>('')
+	const [countdown, setCountdown] = useState<number>(30)
+	const [canResend, setCanResend] = useState<boolean>(false)
 	const digits = code.replace(/\D/g, "").slice(0, 6);
 	const complete = digits.length === 6;
 
-	const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+	useEffect(() => {
+		setMounted(true)
+		const JWT = sessionStorage.getItem('jwt')
+		const Email = sessionStorage.getItem('email')
+		const Remember = sessionStorage.getItem('remember')
+		if (!JWT || !Email) {
+			startTransition(() => navigate('/login'))
+			return
+		}
+		setJwt(JWT)
+		setEmail(Email)
+		setRemember(Remember === 'true')
+	}, [])
+		
+	useEffect(() => {
+		if (countdown > 0 && !canResend) {
+			const t = setTimeout(() => setCountdown(prev => prev - 1), 1000)
+			return () => clearTimeout(t)
+		} else if (countdown === 0 && !canResend) setCanResend(true)
+	}, [countdown, canResend])
+
+
+	const formatDeviceInfo = () => `${deviceInfo.browser} on ${deviceInfo.os} (${deviceInfo.deviceType})`
+	const formatLocationInfo = () => (locationInfo ? `${locationInfo.city}, ${locationInfo.region}, ${locationInfo.country}` : 'Location information not available')
+
+	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		if (!complete) {
 			toast.error("Enter all six digits to continue.");
 			return;
 		}
 		setSubmitting(true);
-		setTimeout(() => {
-			setSubmitting(false);
-			toast.success("Verification simulated locally — no credentials are sent.");
-		}, 700);
+
+		const formData = { otp: digits, jwt, deviceInfo: formatDeviceInfo(), locationInfo: formatLocationInfo() }
+		try {
+			const resp: Resp = await http.post('login-verify-otp/', formData)
+			if (resp.error) toast.error(resp.data || 'Invalid OTP. Please try again.')
+			else {
+				sessionStorage.removeItem('jwt')
+				sessionStorage.removeItem('email')
+				toast.success(resp.data)
+				login({ token: resp.code.token, remember })
+				let redirect = sessionStorage.getItem('redirect')
+				// startTransition(() => navigate(redirect??'/dashboard', { replace: true }))
+			}
+		} catch (error: any) {
+			console.error(error)
+			toast.error(error?.response?.data?.message || 'Invalid OTP. Please try again.')
+		} finally {
+			setSubmitting(false)
+		}
 	};
 
 	return (
@@ -68,7 +122,7 @@ function MfaChallenge() {
 					</h2>
 					<p className="mt-1 text-[12px] text-ink-soft">
 						Signing in as{" "}
-						<span className="font-mono text-ink">ops@company.ng</span>
+						<span className="font-mono text-ink">{email}</span>
 					</p>
 				</div>
 
