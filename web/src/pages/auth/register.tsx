@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
+import {http} from "@/lib/httpClient"
 
 type AccountType = "importer" | "agent";
 
@@ -44,7 +45,7 @@ const accountTypes: {
 
 const steps = ["Your details", "Organisation", "Verify"] as const;
 
-export function RegisterPage() {
+export function CreateAccountPage() {
 	const [step, setStep] = useState(0);
 	const [accountType, setAccountType] = useState<AccountType>("importer");
 
@@ -54,6 +55,7 @@ export function RegisterPage() {
 	const [password, setPassword] = useState("");
 	const [confirmPassword, setConfirmPassword] = useState("");
 	const [showPassword, setShowPassword] = useState(false);
+	const [honeypot, setHoneypot] = useState("");
 
 	const [organisation, setOrganisation] = useState("");
 	const [rcNumber, setRcNumber] = useState("");
@@ -66,6 +68,10 @@ export function RegisterPage() {
 
 	const next = () => {
 		if (step === 0) {
+			if (honeypot.trim()) {
+				setSubmitted(true);
+				return;
+			}
 			if (!fullName.trim() || !email.trim() || !phone.trim()) {
 				toast.error("Enter your name, email, and phone to continue.");
 				return;
@@ -84,6 +90,10 @@ export function RegisterPage() {
 			}
 		}
 		if (step === 1) {
+			if (honeypot.trim()) {
+				setSubmitted(true);
+				return;
+			}
 			if (!organisation.trim()) {
 				toast.error("Enter your organisation name to continue.");
 				return;
@@ -102,6 +112,10 @@ export function RegisterPage() {
 
 	const handleVerify = (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
+		if (honeypot.trim()) {
+			setSubmitted(true);
+			return;
+		}
 		if (!verificationCode.trim()) {
 			toast.error("Enter the verification code we sent you.");
 			return;
@@ -184,7 +198,6 @@ export function RegisterPage() {
 					/>
 
 					<div className="relative mx-auto grid max-w-7xl gap-12 px-5 py-16 lg:grid-cols-[.9fr_1.1fr] lg:items-start lg:px-8 lg:py-20">
-						{/* LEFT — info column */}
 						<div>
 							<PublicKicker>Create an account</PublicKicker>
 							<h1 className="mt-3 max-w-lg font-display text-4xl font-bold leading-[1.05] text-ink sm:text-5xl">
@@ -285,7 +298,6 @@ export function RegisterPage() {
 							</div>
 						</div>
 
-						{/* RIGHT — form */}
 						<div className="overflow-hidden rounded-2xl bg-paper shadow-xl ring-1 ring-line">
 							<div className="border-b border-line bg-sand p-5 sm:p-7">
 								<div className="flex items-center justify-between">
@@ -325,6 +337,17 @@ export function RegisterPage() {
 									}}
 									className="p-5 sm:p-7"
 								>
+									<input
+										type="text"
+										name="website"
+										value={honeypot}
+										onChange={(e) => setHoneypot(e.target.value)}
+										tabIndex={-1}
+										autoComplete="off"
+										aria-hidden="true"
+										className="hidden"
+									/>
+
 									{step === 0 && (
 										<div className="space-y-5">
 											<div>
@@ -591,6 +614,17 @@ export function RegisterPage() {
 
 							{step === 2 && (
 								<form onSubmit={handleVerify} className="p-5 sm:p-7">
+									<input
+										type="text"
+										name="website"
+										value={honeypot}
+										onChange={(e) => setHoneypot(e.target.value)}
+										tabIndex={-1}
+										autoComplete="off"
+										aria-hidden="true"
+										className="hidden"
+									/>
+
 									<p className="text-[13px] leading-6 text-ink-soft">
 										We sent a 6-digit verification code to{" "}
 										<span className="font-mono text-ink">{email || "your email"}</span>.
