@@ -19,7 +19,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
-import {http} from "@/lib/httpClient"
+import { http } from "@/lib/httpClient";
 
 type AccountType = "importer" | "agent";
 
@@ -45,7 +45,7 @@ const accountTypes: {
 
 const steps = ["Your details", "Organisation", "Verify"] as const;
 
-export function CreateAccountPage() {
+export function RegisterPage() {
 	const [step, setStep] = useState(0);
 	const [accountType, setAccountType] = useState<AccountType>("importer");
 
@@ -64,7 +64,13 @@ export function CreateAccountPage() {
 	const [agreed, setAgreed] = useState(false);
 
 	const [verificationCode, setVerificationCode] = useState("");
+	const [otpSent, setOtpSent] = useState(false);
+	const [otpSending, setOtpSending] = useState(false);
+	const [otpVerifying, setOtpVerifying] = useState(false);
+	const [otpVerified, setOtpVerified] = useState(false);
+	const [submitting, setSubmitting] = useState(false);
 	const [submitted, setSubmitted] = useState(false);
+	const [registrationRef, setRegistrationRef] = useState("");
 
 	const next = () => {
 		if (step === 0) {
@@ -110,8 +116,47 @@ export function CreateAccountPage() {
 		setStep((s) => s + 1);
 	};
 
-	const handleVerify = (e: FormEvent<HTMLFormElement>) => {
-		e.preventDefault();
+	const handleSendOtp = async () => {
+		if (honeypot.trim()) {
+			setSubmitted(true);
+			return;
+		}
+		if (!email.trim()) {
+			toast.error("Enter your email before requesting a code.");
+			return;
+		}
+		setOtpSending(true);
+		try {
+			const res = await http.post("register-send-otp/", {
+				email,
+				full_name: fullName,
+				phone,
+				password,
+				confirm_password: confirmPassword,
+				account_type: accountType,
+				organisation,
+				rc_number: rcNumber,
+				tin,
+				role,
+				agreed,
+
+			});
+			const resp = res.data;
+			if (resp?.error) {
+				toast.error(resp.data || "Could not send the verification code.");
+			} else {
+				setRegistrationRef(res.data?.code?.registration_ref || "");
+				toast.success("Verification code sent to your email.");
+				setOtpSent(true);
+			}
+		} catch {
+			toast.error("Could not send the verification code.");
+		} finally {
+			setOtpSending(false);
+		}
+	};
+
+	const handleVerifyOtp = async () => {
 		if (honeypot.trim()) {
 			setSubmitted(true);
 			return;
@@ -120,8 +165,66 @@ export function CreateAccountPage() {
 			toast.error("Enter the verification code we sent you.");
 			return;
 		}
-		setSubmitted(true);
-		toast.success("Verification simulated locally — no account is created yet.");
+		setOtpVerifying(true);
+		try {
+			const res = await http.post("register-verify-otp/", {
+				email,
+				verification_code: verificationCode,
+				registration_ref: registrationRef,
+			});
+			const resp = res.data;
+			if (resp?.error) {
+				toast.error(resp.data || "Verification failed. Check the code and try again.");
+			} else {
+				toast.success("Email verified.");
+				setOtpVerified(true);
+			}
+		} catch {
+			toast.error("Verification failed. Check the code and try again.");
+		} finally {
+			setOtpVerifying(false);
+		}
+	};
+
+	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+		e.preventDefault();
+		if (honeypot.trim()) {
+			setSubmitted(true);
+			return;
+		}
+		if (!otpVerified) {
+			toast.error("Verify your email before completing registration.");
+			return;
+		}
+		setSubmitting(true);
+		try {
+			const res = await http.post("sign-up/", {
+				full_name: fullName,
+				email,
+				phone,
+				password,
+				confirm_password: confirmPassword,
+				account_type: accountType,
+				organisation,
+				rc_number: rcNumber,
+				tin,
+				role,
+				agreed,
+				verification_code: verificationCode,
+				registration_ref: registrationRef,
+			});
+			const resp = res.data;
+			if (resp?.error) {
+				toast.error(resp.data || "Registration failed. Please try again.");
+			} else {
+				toast.success(resp?.data || "Registration submitted.");
+				setSubmitted(true);
+			}
+		} catch {
+			toast.error("Registration failed. Please try again.");
+		} finally {
+			setSubmitting(false);
+		}
 	};
 
 	if (submitted) {
@@ -214,7 +317,8 @@ export function CreateAccountPage() {
 									{
 										icon: ShieldCheck,
 										label: "Reviewed before access",
-										detail: "Registration is reviewed so the operating record stays dependable.",
+										detail:
+											"Registration is reviewed so the operating record stays dependable.",
 									},
 									{
 										icon: FileCheck2,
@@ -613,7 +717,7 @@ export function CreateAccountPage() {
 							)}
 
 							{step === 2 && (
-								<form onSubmit={handleVerify} className="p-5 sm:p-7">
+								<form onSubmit={handleSubmit} className="p-5 sm:p-7">
 									<input
 										type="text"
 										name="website"
@@ -626,37 +730,81 @@ export function CreateAccountPage() {
 									/>
 
 									<p className="text-[13px] leading-6 text-ink-soft">
-										We sent a 6-digit verification code to{" "}
+										We'll send a 6-digit verification code to{" "}
 										<span className="font-mono text-ink">{email || "your email"}</span>.
-										Enter it below to complete registration.
+										Enter it below to confirm and complete registration.
 									</p>
+
+									<div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
+										<Button
+											type="button"
+											onClick={handleSendOtp}
+											disabled={otpSending || otpVerified}
+											variant={otpSent ? "outline" : "default"}
+											className={
+												otpSent
+													? "border-line bg-paper text-ink hover:bg-sand"
+													: "bg-orange text-white hover:bg-orange-deep"
+											}
+										>
+											{otpSending
+												? "Sending code…"
+												: otpVerified
+												? "Code verified"
+												: otpSent
+												? "Resend code"
+												: "Send verification code"}
+										</Button>
+										{otpVerified && (
+											<span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-orange">
+												<Check className="size-3.5" />
+												Email verified
+											</span>
+										)}
+									</div>
 
 									<label className="mt-5 block">
 										<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 											Verification code
 										</span>
-										<Input
-											required
-											inputMode="numeric"
-											autoComplete="one-time-code"
-											placeholder="000000"
-											maxLength={6}
-											value={verificationCode}
-											onChange={(e) => setVerificationCode(e.target.value)}
-											className="mt-2 h-12 border-line bg-sand text-center font-mono text-lg tracking-[0.4em] text-ink"
-										/>
+										<div className="mt-2 flex flex-col gap-2 sm:flex-row">
+											<Input
+												required
+												inputMode="numeric"
+												autoComplete="one-time-code"
+												placeholder="000000"
+												maxLength={6}
+												value={verificationCode}
+												onChange={(e) => {
+													setVerificationCode(e.target.value);
+													setOtpVerified(false);
+												}}
+												className="h-12 border-line bg-sand text-center font-mono text-lg tracking-[0.4em] text-ink"
+											/>
+											<Button
+												type="button"
+												onClick={handleVerifyOtp}
+												disabled={otpVerifying || otpVerified || !verificationCode.trim()}
+												className="h-12 bg-orange text-white hover:bg-orange-deep"
+											>
+												{otpVerifying
+													? "Verifying…"
+													: otpVerified
+													? "Verified"
+													: "Verify code"}
+											</Button>
+										</div>
 									</label>
 
 									<div className="mt-5 rounded-xl bg-sand p-4 ring-1 ring-line">
 										<p className="text-[12px] leading-5 text-ink-soft">
 											Didn't receive a code? Check that your email address is correct,
-											or{" "}
+											or use{" "}
 											<button
 												type="button"
 												className="font-semibold text-orange"
-												onClick={() =>
-													toast.success("Verification resend simulated locally.")
-												}
+												onClick={handleSendOtp}
+												disabled={otpSending}
 											>
 												resend the code
 											</button>
@@ -675,9 +823,11 @@ export function CreateAccountPage() {
 										</Button>
 										<Button
 											type="submit"
-											className="bg-orange text-white hover:bg-orange-deep"
+											disabled={submitting || !otpVerified}
+											className="bg-orange text-white hover:bg-orange-deep disabled:opacity-60"
 										>
-											Complete registration <ArrowRight />
+											{submitting ? "Submitting…" : "Complete registration"}{" "}
+											<ArrowRight />
 										</Button>
 									</div>
 								</form>

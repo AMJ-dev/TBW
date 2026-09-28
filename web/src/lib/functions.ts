@@ -1,5 +1,25 @@
+import { useContext } from "react";
 import moment from "moment";
+import UserContext from "./userContext";
 
+export const check_login = ()=>{
+	const {login} = useContext(UserContext);
+	return new Promise((resolve, reject)=>{
+		const remember = localStorage.getItem("remember");
+		const storedToken = get_token();
+		
+		if (storedToken) login({ token: storedToken, remember: remember === "1" });
+		resolve(true);
+	})
+}
+export const get_token = ()=>{
+    const remember = localStorage.getItem("remember");
+    const token = remember === "1" 
+        ? localStorage.getItem("token")
+        : sessionStorage.getItem("token");
+    
+    return token;
+}
 export const resolveSrc = (s: string) => {
 	if (!s) return s;
 	if (/^(?:https?:|blob:|data:)/i.test(s)) return s;

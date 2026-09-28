@@ -10,7 +10,7 @@
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $data = "Please enter valid email address.";
         else { 
             $chk_user = $conn->prepare('SELECT id, email, `password`, full_name FROM users WHERE email=:email');
-            $chk_user->execute([':email'=>strtolower($email)]);
+           $chk_user->execute([':email'=>strtolower($email)]);
             if ($chk_user->rowCount() > 0) {
                 $my_details = $chk_user->fetch(PDO::FETCH_OBJ);                    
                 if (password_verify($password, $my_details->password)) {
