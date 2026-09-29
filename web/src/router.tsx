@@ -11,7 +11,6 @@ import {
 import UserContext from "@/lib/userContext";
 import Preloader from "@/components/preloader";
 import { Seo } from "@/components/seo";
-import 
 
 const RequireAuth = () => {
 	const { auth, hydrated } = useContext(UserContext);
