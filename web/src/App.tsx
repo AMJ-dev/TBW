@@ -1,7 +1,5 @@
-import { RouterProvider } from "react-router-dom";
 import { Toaster } from "sonner";
-import { router } from "@/router";
-import { Seo } from "@/components/seo";
+import Routers from "@/router";
 import UserProvider from "@/context/userProvider";
 import { ToastContainer, Bounce } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -10,9 +8,8 @@ import "@/styles.css";
 function App() {
 	return (
 		<UserProvider>
-            <Seo router={router} />
-            <RouterProvider router={router} />
-            <Toaster position="bottom-right" />
+			<Routers />
+			<Toaster position="bottom-right" />
             <ToastContainer
                 position="top-right"
                 autoClose={5000}
@@ -26,7 +23,7 @@ function App() {
                 theme="light"
                 transition={Bounce}
             />
-        </UserProvider>
+		</UserProvider>
 	);
 }
 

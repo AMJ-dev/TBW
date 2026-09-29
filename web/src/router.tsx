@@ -1,35 +1,40 @@
 import { lazy, Suspense, useContext } from "react";
 import {
-    BrowserRouter,
-    Navigate,
-    Outlet,
-    Route,
-    Routes,
-    useLocation,
+	BrowserRouter,
+	Navigate,
+	Outlet,
+	Route,
+	Routes,
+	useLocation,
 } from "react-router-dom";
 
 import UserContext from "@/lib/userContext";
-import Preloader from "@/components/preloader"
+import Preloader from "@/components/preloader";
+import { Seo } from "@/components/seo";
+import 
 
 const RequireAuth = () => {
-    const { auth, hydrated } = useContext(UserContext);
-    const location = useLocation();
+	const { auth, hydrated } = useContext(UserContext);
+	const location = useLocation();
 
-    if (!hydrated) {
-        return <Preloader />;
-    }
+	if (!hydrated) {
+		return <Preloader />;
+	}
 
-    if (!auth) {
-        return (
-            <Navigate
-                to="/login"
-                replace
-                state={{ from: location }}
-            />
-        );
-    }
+	if (!auth) {
+		return <Navigate to="/login" replace state={{ from: location }} />;
+	}
 
-    return <Outlet />;
+	return <Outlet />;
+};
+
+const RootLayout = () => {
+	return (
+		<>
+			<Seo />
+			<Outlet />
+		</>
+	);
 };
 
 const HomePage = lazy(() => import("@/pages/public/home-page"));
@@ -75,6 +80,7 @@ const FinanceStatementPage = lazy(() => import("@/pages/finance/statement"));
 const FinanceApprovalsPage = lazy(() => import("@/pages/finance/approvals"));
 const FinanceTaxPage = lazy(() => import("@/pages/finance/tax"));
 const FinanceReconciliationPage = lazy(() => import("@/pages/finance/reconciliation"));
+
 const GatePage = lazy(() => import("@/pages/gate"));
 const GateDashboardPage = lazy(() => import("@/pages/gate/dashboard"));
 const GateAppointmentsPage = lazy(() => import("@/pages/gate/appointments"));
@@ -125,333 +131,114 @@ const RateLimitedPage = lazy(() => import("@/pages/errors/429"));
 const ServerErrorPage = lazy(() => import("@/pages/errors/500"));
 
 export default function Routers() {
-    return (
-        <BrowserRouter>
-            <Suspense fallback={<Preloader />}>
-                <Routes>
+	return (
+		<BrowserRouter>
+			<Suspense fallback={<Preloader />}>
+				<Routes>
+					<Route element={<RootLayout />}>
+						<Route path="/" element={<HomePage />} />
+						<Route path="/index" element={<Navigate to="/" replace />} />
+						<Route path="/about" element={<AboutPage />} />
+						<Route path="/contact" element={<ContactPage />} />
+						<Route path="/faq" element={<FaqPage />} />
+						<Route path="/news" element={<NewsPage />} />
+						<Route path="/quote" element={<QuotePage />} />
+						<Route path="/services" element={<ServicesPage />} />
+						<Route path="/tracking" element={<TrackingPage />} />
+						<Route path="/verify" element={<VerifyPage />} />
+						<Route path="/terms" element={<TermsPage />} />
+						<Route path="/privacy" element={<PrivacyPage />} />
+						<Route path="/careers" element={<CareersPage />} />
+						<Route path="/compliance" element={<CompliancePage />} />
+						<Route path="/for/:audience" element={<AudiencePage />} />
+						<Route path="/how-it-works" element={<HowItWorksPage />} />
 
-                    <Route path="/" element={<HomePage />} />
-                    <Route
-                        path="/index"
-                        element={<Navigate to="/" replace />}
-                    />
+						<Route path="/login" element={<LoginPage />} />
+						<Route path="/register" element={<RegisterPage />} />
+						<Route path="/forgot-password" element={<ForgotPasswordPage />} />
+						<Route path="/reset-password" element={<ResetPasswordPage />} />
+						<Route path="/logout" element={<LogoutPage />} />
+						<Route path="/session-management" element={<SessionManagementPage />} />
 
-                    <Route path="/about" element={<AboutPage />} />
-                    <Route path="/contact" element={<ContactPage />} />
-                    <Route path="/faq" element={<FaqPage />} />
-                    <Route path="/news" element={<NewsPage />} />
-                    <Route path="/quote" element={<QuotePage />} />
-                    <Route path="/services" element={<ServicesPage />} />
-                    <Route path="/tracking" element={<TrackingPage />} />
-                    <Route path="/verify" element={<VerifyPage />} />
-                    <Route path="/terms" element={<TermsPage />} />
-                    <Route path="/privacy" element={<PrivacyPage />} />
-                    <Route path="/careers" element={<CareersPage />} />
-                    <Route
-                        path="/compliance"
-                        element={<CompliancePage />}
-                    />
-                    <Route
-                        path="/for/:audience"
-                        element={<AudiencePage />}
-                    />
-                    <Route
-                        path="/how-it-works"
-                        element={<HowItWorksPage />}
-                    />
+						<Route path="/mfa" element={<MfaPage mode="challenge" />} />
+						<Route path="/mfa/setup" element={<MfaPage mode="setup" />} />
 
-                    <Route path="/login" element={<LoginPage />} />
-                    <Route path="/register" element={<RegisterPage />} />
-                    <Route
-                        path="/forgot-password"
-                        element={<ForgotPasswordPage />}
-                    />
-                    <Route
-                        path="/reset-password"
-                        element={<ResetPasswordPage />}
-                    />
-                    <Route path="/logout" element={<LogoutPage />} />
-                    <Route
-                        path="/session-management"
-                        element={<SessionManagementPage />}
-                    />
+						<Route element={<RequireAuth />}>
+							<Route path="/admin" element={<AdminPage />} />
+							<Route path="/admin/audit" element={<AdminAuditPage />} />
+							<Route path="/admin/configuration" element={<AdminConfigurationPage />} />
+							<Route path="/admin/organizations" element={<AdminOrganizationsPage />} />
+							<Route path="/admin/roles" element={<AdminRolesPage />} />
+							<Route path="/admin/users" element={<AdminUsersPage />} />
 
-                    <Route
-                        path="/mfa"
-                        element={<MfaPage mode="challenge" />}
-                    />
-                    <Route
-                        path="/mfa/setup"
-                        element={<MfaPage mode="setup" />}
-                    />
+							<Route path="/finance" element={<FinancePage />} />
+							<Route path="/finance/dashboard" element={<FinanceDashboardPage />} />
+							<Route path="/finance/invoices" element={<FinanceInvoicesPage />} />
+							<Route path="/finance/payments" element={<FinancePaymentsPage />} />
+							<Route path="/finance/tariffs" element={<FinanceTariffsPage />} />
+							<Route path="/finance/credit/apply" element={<FinanceCreditApplyPage />} />
+							<Route path="/finance/credit/limits" element={<FinanceCreditLimitsPage />} />
+							<Route path="/finance/collections" element={<FinanceCollectionsPage />} />
+							<Route path="/finance/statement/:customer" element={<FinanceStatementPage />} />
+							<Route path="/finance/approvals" element={<FinanceApprovalsPage />} />
+							<Route path="/finance/tax" element={<FinanceTaxPage />} />
+							<Route path="/finance/reconciliation" element={<FinanceReconciliationPage />} />
 
-                    <Route element={<RequireAuth />}>
+							<Route path="/gate" element={<GatePage />} />
+							<Route path="/gate/dashboard" element={<GateDashboardPage />} />
+							<Route path="/gate/appointments" element={<GateAppointmentsPage />} />
+							<Route path="/gate/passes" element={<GatePassesPage />} />
+							<Route path="/gate/in" element={<GateConsolePage />} />
+							<Route path="/gate/out" element={<GateConsolePage />} />
+							<Route path="/gate/vehicles" element={<GateVehiclesPage />} />
 
-                        <Route path="/admin" element={<AdminPage />} />
-                        <Route
-                            path="/admin/audit"
-                            element={<AdminAuditPage />}
-                        />
-                        <Route
-                            path="/admin/configuration"
-                            element={<AdminConfigurationPage />}
-                        />
-                        <Route
-                            path="/admin/organizations"
-                            element={<AdminOrganizationsPage />}
-                        />
-                        <Route
-                            path="/admin/roles"
-                            element={<AdminRolesPage />}
-                        />
-                        <Route
-                            path="/admin/users"
-                            element={<AdminUsersPage />}
-                        />
+							<Route path="/operations" element={<OperationsDashboardPage />} />
+							<Route path="/operations/dashboard" element={<OperationsDashboardPage />} />
+							<Route path="/operations/examination" element={<OperationsExaminationPage />} />
+							<Route path="/operations/holds" element={<OperationsHoldsPage />} />
+							<Route path="/operations/receiving" element={<OperationsReceivingPage />} />
+							<Route path="/operations/warehouse" element={<OperationsWarehousePage />} />
+							<Route path="/operations/yard" element={<OperationsYardPage />} />
+							<Route path="/operations/manifest" element={<OperationsManifestPage />} />
+							<Route path="/operations/seals" element={<OperationsSealsPage />} />
+							<Route path="/operations/inventory" element={<OperationsInventoryPage />} />
+							<Route path="/operations/stuffing" element={<OperationsStuffingPage />} />
+							<Route path="/operations/cycle-count" element={<OperationsCycleCountPage />} />
+							<Route path="/operations/value-added" element={<OperationsValueAddedPage />} />
+							<Route path="/operations/overrides" element={<OperationsOverridesPage />} />
 
-                        <Route
-                            path="/finance"
-                            element={<FinancePage />}
-                        />
-                        <Route
-                            path="/finance/dashboard"
-                            element={<FinanceDashboardPage />}
-                        />
-                        <Route
-                            path="/finance/invoices"
-                            element={<FinanceInvoicesPage />}
-                        />
-                        <Route
-                            path="/finance/payments"
-                            element={<FinancePaymentsPage />}
-                        />
-                        <Route
-                            path="/finance/tariffs"
-                            element={<FinanceTariffsPage />}
-                        />
-                        <Route
-                            path="/finance/credit/apply"
-                            element={<FinanceCreditApplyPage />}
-                        />
-                        <Route
-                            path="/finance/credit/limits"
-                            element={<FinanceCreditLimitsPage />}
-                        />
-                        <Route
-                            path="/finance/collections"
-                            element={<FinanceCollectionsPage />}
-                        />
-                        <Route
-                            path="/finance/statement/:customer"
-                            element={<FinanceStatementPage />}
-                        />
-                        <Route
-                            path="/finance/approvals"
-                            element={<FinanceApprovalsPage />}
-                        />
-                        <Route
-                            path="/finance/tax"
-                            element={<FinanceTaxPage />}
-                        />
-                        <Route
-                            path="/finance/reconciliation"
-                            element={<FinanceReconciliationPage />}
-                        />
+							<Route path="/portal" element={<PortalDashboardPage />} />
+							<Route path="/portal/dashboard" element={<PortalDashboardPage />} />
+							<Route path="/portal/bookings" element={<PortalBookingsPage />} />
+							<Route path="/portal/cargo" element={<CargoPage />} />
+							<Route path="/portal/cargo/:id" element={<CargoDetailPage />} />
+							<Route path="/portal/containers/:id" element={<ContainerDetailPage />} />
+							<Route path="/portal/packages/:id" element={<PackageDetailPage />} />
+							<Route path="/portal/cargo/:id/service-request" element={<ServiceRequestPage />} />
+							<Route path="/portal/cargo/:id/claim" element={<DiscrepancyClaimPage />} />
+							<Route path="/portal/documents" element={<PortalDocumentsPage />} />
+							<Route path="/portal/documents/upload" element={<DocumentUploadPage />} />
+							<Route path="/portal/invoices" element={<PortalInvoicesPage />} />
+							<Route path="/portal/payments" element={<PortalPaymentsPage />} />
+							<Route path="/portal/payments/dispute" element={<InvoiceDisputePage />} />
+							<Route path="/portal/statement" element={<StatementPage />} />
+							<Route path="/portal/kyc" element={<KycPage />} />
+							<Route path="/portal/delegation" element={<DelegationPage />} />
+							<Route path="/portal/users" element={<PortalUsersPage />} />
 
-                        <Route path="/gate" element={<GatePage />} />
-                        <Route
-                            path="/gate/dashboard"
-                            element={<GateDashboardPage />}
-                        />
-                        <Route
-                            path="/gate/appointments"
-                            element={<GateAppointmentsPage />}
-                        />
-                        <Route
-                            path="/gate/passes"
-                            element={<GatePassesPage />}
-                        />
-                        <Route
-                            path="/gate/in"
-                            element={<GateConsolePage />}
-                        />
-                        <Route
-                            path="/gate/out"
-                            element={<GateConsolePage />}
-                        />
-                        <Route
-                            path="/gate/vehicles"
-                            element={<GateVehiclesPage />}
-                        />
+							<Route path="/reports" element={<ReportsPage />} />
+							<Route path="/reports/operations" element={<ReportsOperationsPage />} />
+							<Route path="/reports/financial" element={<ReportsFinancialPage />} />
+							<Route path="/reports/compliance" element={<ReportsCompliancePage />} />
+						</Route>
 
-                        <Route
-                            path="/operations"
-                            element={<OperationsDashboardPage />}
-                        />
-                        <Route
-                            path="/operations/dashboard"
-                            element={<OperationsDashboardPage />}
-                        />
-                        <Route
-                            path="/operations/examination"
-                            element={<OperationsExaminationPage />}
-                        />
-                        <Route
-                            path="/operations/holds"
-                            element={<OperationsHoldsPage />}
-                        />
-                        <Route
-                            path="/operations/receiving"
-                            element={<OperationsReceivingPage />}
-                        />
-                        <Route
-                            path="/operations/warehouse"
-                            element={<OperationsWarehousePage />}
-                        />
-                        <Route
-                            path="/operations/yard"
-                            element={<OperationsYardPage />}
-                        />
-                        <Route
-                            path="/operations/manifest"
-                            element={<OperationsManifestPage />}
-                        />
-                        <Route
-                            path="/operations/seals"
-                            element={<OperationsSealsPage />}
-                        />
-                        <Route
-                            path="/operations/inventory"
-                            element={<OperationsInventoryPage />}
-                        />
-                        <Route
-                            path="/operations/stuffing"
-                            element={<OperationsStuffingPage />}
-                        />
-                        <Route
-                            path="/operations/cycle-count"
-                            element={<OperationsCycleCountPage />}
-                        />
-                        <Route
-                            path="/operations/value-added"
-                            element={<OperationsValueAddedPage />}
-                        />
-                        <Route
-                            path="/operations/overrides"
-                            element={<OperationsOverridesPage />}
-                        />
-
-                        <Route
-                            path="/portal"
-                            element={<PortalDashboardPage />}
-                        />
-                        <Route
-                            path="/portal/dashboard"
-                            element={<PortalDashboardPage />}
-                        />
-                        <Route
-                            path="/portal/bookings"
-                            element={<PortalBookingsPage />}
-                        />
-                        <Route
-                            path="/portal/cargo"
-                            element={<CargoPage />}
-                        />
-                        <Route
-                            path="/portal/cargo/:id"
-                            element={<CargoDetailPage />}
-                        />
-                        <Route
-                            path="/portal/containers/:id"
-                            element={<ContainerDetailPage />}
-                        />
-                        <Route
-                            path="/portal/packages/:id"
-                            element={<PackageDetailPage />}
-                        />
-                        <Route
-                            path="/portal/cargo/:id/service-request"
-                            element={<ServiceRequestPage />}
-                        />
-                        <Route
-                            path="/portal/cargo/:id/claim"
-                            element={<DiscrepancyClaimPage />}
-                        />
-                        <Route
-                            path="/portal/documents"
-                            element={<PortalDocumentsPage />}
-                        />
-                        <Route
-                            path="/portal/documents/upload"
-                            element={<DocumentUploadPage />}
-                        />
-                        <Route
-                            path="/portal/invoices"
-                            element={<PortalInvoicesPage />}
-                        />
-                        <Route
-                            path="/portal/payments"
-                            element={<PortalPaymentsPage />}
-                        />
-                        <Route
-                            path="/portal/payments/dispute"
-                            element={<InvoiceDisputePage />}
-                        />
-                        <Route
-                            path="/portal/statement"
-                            element={<StatementPage />}
-                        />
-                        <Route
-                            path="/portal/kyc"
-                            element={<KycPage />}
-                        />
-                        <Route
-                            path="/portal/delegation"
-                            element={<DelegationPage />}
-                        />
-                        <Route
-                            path="/portal/users"
-                            element={<PortalUsersPage />}
-                        />
-
-                        <Route
-                            path="/reports"
-                            element={<ReportsPage />}
-                        />
-                        <Route
-                            path="/reports/operations"
-                            element={<ReportsOperationsPage />}
-                        />
-                        <Route
-                            path="/reports/financial"
-                            element={<ReportsFinancialPage />}
-                        />
-                        <Route
-                            path="/reports/compliance"
-                            element={<ReportsCompliancePage />}
-                        />
-
-                    </Route>
-
-                    <Route
-                        path="/403"
-                        element={<ForbiddenPage />}
-                    />
-                    <Route
-                        path="/429"
-                        element={<RateLimitedPage />}
-                    />
-                    <Route
-                        path="/500"
-                        element={<ServerErrorPage />}
-                    />
-                    <Route
-                        path="*"
-                        element={<NotFoundPage />}
-                    />
-
-                </Routes>
-            </Suspense>
-        </BrowserRouter>
-    );
+						<Route path="/403" element={<ForbiddenPage />} />
+						<Route path="/429" element={<RateLimitedPage />} />
+						<Route path="/500" element={<ServerErrorPage />} />
+						<Route path="*" element={<NotFoundPage />} />
+					</Route>
+				</Routes>
+			</Suspense>
+		</BrowserRouter>
+	);
 }
