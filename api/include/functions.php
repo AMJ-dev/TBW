@@ -143,14 +143,17 @@
         $minutes = max(1, ceil($words / 200));
         return $minutes . ' min read';
     }
+    function generateId(){
+        $bytes = random_bytes(16);
+        $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
+        $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
+        $hex = bin2hex($bytes);
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split($hex, 4));
+    }
     function generate_excerpt(string $content, int $limit = 180): string {
         $text = html_entity_decode(strip_tags($content));
         $text = preg_replace('/\s+/', ' ', trim($text));
-
-        if (mb_strlen($text) <= $limit) {
-            return $text;
-        }
-
+        if (mb_strlen($text) <= $limit) return $text;
         return mb_substr($text, 0, $limit) . '...';
     }
     function delete_file($file){
