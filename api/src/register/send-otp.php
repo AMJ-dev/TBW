@@ -1,17 +1,11 @@
-    <?php
-
+<?php
     require_once dirname(__DIR__, 2) . '/include/set-header.php';
-
-    header('Content-Type: application/json; charset=UTF-8');
-
-    $input = json_decode(file_get_contents('php://input'), true);
-    $input = is_array($input) ? array_merge($_POST, $input) : $_POST;
 
     $code = [];
     $error = true;
     $data = "Unable to send verification code.";
 
-    $honeypot = trim($input['honeypot'] ?? $input['website'] ?? '');
+    $honeypot = trim($_POST['honeypot'] ?? $_POST['website'] ?? '');
 
     if ($honeypot !== '') {
         echo json_encode([
@@ -22,17 +16,17 @@
         exit;
     }
 
-    $account_type = trim($input['account_type'] ?? '');
-    $full_name = trim($input['full_name'] ?? '');
-    $email = strtolower(trim($input['email'] ?? ''));
-    $phone = trim($input['phone'] ?? '');
-    $password = $input['password'] ?? '';
-    $confirm_password = $input['confirm_password'] ?? '';
-    $organisation_name = trim($input['organisation'] ?? '');
-    $rc_number = trim($input['rc_number'] ?? '');
-    $tin = trim($input['tin'] ?? '');
-    $job_title = trim($input['role'] ?? '');
-    $agreed = filter_var($input['agreed'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    $account_type = trim($_POST['account_type'] ?? '');
+    $full_name = trim($_POST['full_name'] ?? '');
+    $email = strtolower(trim($_POST['email'] ?? ''));
+    $phone = trim($_POST['phone'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
+    $organisation_name = trim($_POST['organisation'] ?? '');
+    $rc_number = trim($_POST['rc_number'] ?? '');
+    $tin = trim($_POST['tin'] ?? '');
+    $job_title = trim($_POST['role'] ?? '');
+    $agreed = filter_var($_POST['agreed'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
     if (
         $account_type === '' ||

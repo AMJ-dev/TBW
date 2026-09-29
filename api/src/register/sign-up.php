@@ -1,16 +1,11 @@
 <?php
-
     require_once dirname(__DIR__, 2) . '/include/set-header.php';
-
-
-    $input = json_decode(file_get_contents('php://input'), true);
-    $input = is_array($input) ? array_merge($_POST, $input) : $_POST;
 
     $code = [];
     $error = true;
     $data = "Unable to complete registration.";
 
-    $honeypot = trim($input['honeypot'] ?? $input['website'] ?? '');
+    $honeypot = trim($_POST['honeypot'] ?? $_POST['website'] ?? '');
 
     if ($honeypot !== '') {
         echo json_encode([
@@ -21,7 +16,7 @@
         exit;
     }
 
-    $registration_ref = trim($input['registration_ref'] ?? '');
+    $registration_ref = trim($_POST['registration_ref'] ?? '');
 
     if ($registration_ref === '') {
         echo json_encode([

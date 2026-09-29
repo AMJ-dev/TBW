@@ -1,7 +1,14 @@
 import { useState, useEffect, useContext, startTransition, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Check, KeyRound, Lock, ShieldCheck, Smartphone} from "lucide-react";
+import {
+	ArrowRight,
+	Check,
+	KeyRound,
+	Lock,
+	ShieldCheck,
+	Smartphone,
+} from "lucide-react";
 import { http, type Resp } from '@/lib/httpClient'
 import userContext from '@/lib/userContext'
 import { useDeviceInfo } from '@/hooks/useDeviceInfo'
@@ -14,7 +21,7 @@ import { cn } from "@/lib/utils";
 type Mode = "setup" | "challenge";
 
 export function MfaPage({ mode = "challenge" }: { mode?: Mode }) {
-	return mode === "setup" ? <MfaSetup /> : <MfaChallenge />;
+	return mode == "setup" ? <MfaSetup /> : <MfaChallenge />;
 }
 
 function MfaChallenge() {
@@ -36,42 +43,43 @@ function MfaChallenge() {
 	const complete = digits.length === 6;
 
 	useEffect(() => {
-		setMounted(true)
 		const ExpiresIn = sessionStorage.getItem('expires_in')
 		const Email = sessionStorage.getItem('email')
 		const Remember = sessionStorage.getItem('remember')
 		if (!ExpiresIn || !Email) {
-			startTransition(() => navigate('/login'))
+			startTransition(() => navigate('/login', { replace: true }))
 			return
 		}
 		setExpiresIn(Number(ExpiresIn))
 		setEmail(Email)
 		setRemember(Remember === 'true')
-	}, [])
+		setMounted(true)
+	}, [navigate])
 
 	useEffect(() => {
+		if (!mounted) return
 		if (countdown > 0 && !canResend) {
 			const t = setTimeout(() => setCountdown(prev => prev - 1), 1000)
 			return () => clearTimeout(t)
 		} else if (countdown === 0 && !canResend) setCanResend(true)
-	}, [countdown, canResend])
-
+	}, [countdown, canResend, mounted])
 
 	const formatDeviceInfo = () => `${deviceInfo.browser} on ${deviceInfo.os} (${deviceInfo.deviceType})`
 	const formatLocationInfo = () => (locationInfo ? `${locationInfo.city}, ${locationInfo.region}, ${locationInfo.country}` : 'Location information not available')
 
 	const handleResend = async () => {
-		if (!canResend || sending) return
+		if (!canResend || sending || !email) return
 		setSending(true)
 		try {
-			const resp: Resp = await http.post('login-resend-otp/', { email })
+			const res = await http.post('login-resend-otp/', { email })
+			const resp: Resp = res.data
 			if (resp.error) {
 				toast.error(resp.data || 'Could not resend code. Please try again.')
 			} else {
 				toast.success(resp.data || 'A new code has been sent.')
-				setCanResend(false)
-				setCountdown(120)
 				setCode('')
+				setCountdown(120)
+				setCanResend(false)
 			}
 		} catch (error: any) {
 			console.error(error)
@@ -89,9 +97,10 @@ function MfaChallenge() {
 		}
 		setSubmitting(true);
 
-		const formData = { otp: digits, deviceInfo: formatDeviceInfo(), locationInfo: formatLocationInfo() }
+		const formData = { email, otp: digits, deviceInfo: formatDeviceInfo(), locationInfo: formatLocationInfo() }
 		try {
-			const resp: Resp = await http.post('login-verify-otp/', formData)
+			const res = await http.post('login-verify-otp/', formData)
+			const resp: Resp = res.data
 			if (resp.error) toast.error(resp.data || 'Invalid OTP. Please try again.')
 			else {
 				sessionStorage.removeItem('jwt')
@@ -137,10 +146,10 @@ function MfaChallenge() {
 					</h2>
 					<p className="mt-1 text-[12px] text-ink-soft">
 						Signing in as{" "}
-						<span className="font-mono text-ink">ops@company.ng</span>
+						<span className="font-mono text-ink">{email}</span>
 					</p>
 				</div>
-
+				
 				<form onSubmit={handleSubmit} className="p-6 sm:p-7">
 					<label className="block">
 						<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
@@ -200,13 +209,27 @@ function MfaChallenge() {
 					</Button>
 
 					<div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-[12px]">
-						<button
-							type="button"
-							className="font-semibold text-orange"
-							onClick={() => toast.success("Code resend simulated locally.")}
-						>
-							Resend code
-						</button>
+						{canResend ? (
+							<button
+								type="button"
+								className={cn(
+									"font-semibold text-orange",
+									sending && "cursor-not-allowed opacity-60"
+								)}
+								disabled={sending}
+								onClick={handleResend}
+							>
+								{sending ? "Sending…" : "Resend code"}
+							</button>
+						) : (
+							<span className="font-mono text-[11px] text-ink-soft">
+								Resend in{" "}
+								<span className="text-orange">
+									{String(Math.floor(countdown / 60)).padStart(2, "0")}:
+									{String(countdown % 60).padStart(2, "0")}
+								</span>
+							</span>
+						)}
 						<Link
 							to="/login"
 							className="text-ink-soft hover:text-orange"
@@ -227,13 +250,6 @@ function MfaChallenge() {
 					</div>
 				</form>
 			</div>
-
-			<p className="mt-6 text-center text-[12px] text-ink-soft">
-				Don't have two-factor yet?{" "}
-				<Link to="/mfa/setup" className="font-semibold text-orange">
-					Set it up now
-				</Link>
-			</p>
 
 			<LegalFooter />
 		</AuthShell>
@@ -513,8 +529,8 @@ function AuthShell({
 				className="pointer-events-none absolute -left-40 bottom-0 size-[480px] rounded-full bg-carmine/15 blur-3xl"
 			/>
 
-			<div className="relative mx-auto grid min-h-screen max-w-7xl gap-0 px-5 py-10 lg:grid-cols-[1.05fr_.95fr] lg:gap-16 lg:px-8 lg:py-14">
-				<div className="hidden flex-col justify-between lg:flex">
+			<div className="relative mx-auto grid min-h-screen max-w-7xl grid-cols-1 gap-0 px-5 py-10 lg:grid-cols-[1fr_520px] lg:gap-16 lg:px-8 lg:py-14">
+				<div className="hidden min-w-0 flex-col justify-between lg:flex">
 					<Link to="/" aria-label="TRINU home" className="inline-flex">
 						<img src="/logo.png" alt="TRINU Bonded Terminal" className="h-14 w-14" />
 					</Link>
@@ -547,16 +563,12 @@ function AuthShell({
 					</div>
 
 					<div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-						<span className="inline-flex items-center gap-2">
-							<span className="size-1.5 rounded-full bg-orange" />
-							Local simulation · no code is sent
-						</span>
 						<span>TRINŪ · Abuja Flagship Facility</span>
 					</div>
 				</div>
 
-				<div className="flex items-center justify-center">
-					<div className="w-full max-w-lg">
+				<div className="flex min-w-0 items-center justify-center">
+					<div className="w-full min-w-0 max-w-lg">
 						<div className="mb-8 flex items-center justify-between lg:hidden">
 							<Link to="/" aria-label="TRINU home" className="inline-flex">
 								<img src="/logo.png" alt="TRINU Bonded Terminal" className="h-12 w-12" />
@@ -595,7 +607,6 @@ function LegalFooter() {
 }
 
 function QrPlaceholder() {
-	// Simple visual placeholder for a QR-style grid — replaced with a real QR generator in production.
 	const pattern = [
 		"111111101011101111111",
 		"100000101001001000001",
