@@ -8,14 +8,14 @@
 
     $code = [];
     $error = true;
-    $message = "Unable to complete registration.";
+    $data = "Unable to complete registration.";
 
     $honeypot = trim($input['honeypot'] ?? $input['website'] ?? '');
 
     if ($honeypot !== '') {
         echo json_encode([
             'error' => false,
-            'message' => 'If your details are valid, you will receive further instructions.',
+            'data' => 'If your details are valid, you will receive further instructions.',
             'code' => []
         ]);
         exit;
@@ -26,7 +26,7 @@
     if ($registration_ref === '') {
         echo json_encode([
             'error' => true,
-            'message' => 'Registration reference is required.',
+            'data' => 'Registration reference is required.',
             'code' => []
         ]);
         exit;
@@ -54,7 +54,7 @@
 
             echo json_encode([
                 'error' => true,
-                'message' => 'Registration request not found.',
+                'data' => 'Registration request not found.',
                 'code' => []
             ]);
             exit;
@@ -65,7 +65,7 @@
 
             echo json_encode([
                 'error' => false,
-                'message' => 'Registration has already been submitted.',
+                'data' => 'Registration has already been submitted.',
                 'code' => [
                     'registration_ref' => $registration_ref,
                     'user_id' => $request->completed_user_id,
@@ -80,7 +80,7 @@
 
             echo json_encode([
                 'error' => true,
-                'message' => 'Please verify your email before completing registration.',
+                'data' => 'Please verify your email before completing registration.',
                 'code' => []
             ]);
             exit;
@@ -101,7 +101,7 @@
 
             echo json_encode([
                 'error' => true,
-                'message' => 'Registration request has expired. Please register again.',
+                'data' => 'Registration request has expired. Please register again.',
                 'code' => []
             ]);
             exit;
@@ -115,7 +115,7 @@
 
             echo json_encode([
                 'error' => true,
-                'message' => 'Terms and privacy acceptance is required.',
+                'data' => 'Terms and privacy acceptance is required.',
                 'code' => []
             ]);
             exit;
@@ -138,20 +138,23 @@
 
             echo json_encode([
                 'error' => true,
-                'message' => 'An account with this email or phone number already exists.',
+                'data' => 'An account with this email or phone number already exists.',
                 'code' => []
             ]);
             exit;
         }
 
+        $organisation_id = generateId();
         $organisation_query = $conn->prepare("
             INSERT INTO organisations (
+                id,
                 organisation_name,
                 rc_number,
                 tin,
                 organisation_type,
                 verification_status
             ) VALUES (
+                :id,
                 :organisation_name,
                 :rc_number,
                 :tin,
@@ -160,16 +163,17 @@
             )
         ");
 
+        $organisation_query->bindValue(':id', $organisation_id, PDO::PARAM_STR);
         $organisation_query->bindValue(':organisation_name', $request->organisation_name, PDO::PARAM_STR);
         $organisation_query->bindValue(':rc_number', $request->rc_number, $request->rc_number !== null ? PDO::PARAM_STR : PDO::PARAM_NULL);
         $organisation_query->bindValue(':tin', $request->tin, $request->tin !== null ? PDO::PARAM_STR : PDO::PARAM_NULL);
         $organisation_query->bindValue(':organisation_type', $request->account_type, PDO::PARAM_STR);
         $organisation_query->execute();
 
-        $organisation_id = (int)$conn->lastInsertId();
-
+        $user_id = generateId();
         $user_query = $conn->prepare("
             INSERT INTO users (
+                id,
                 organisation_id,
                 full_name,
                 email,
@@ -179,6 +183,7 @@
                 account_status,
                 password_changed_at
             ) VALUES (
+                :id,
                 :organisation_id,
                 :full_name,
                 :email,
@@ -190,7 +195,8 @@
             )
         ");
 
-        $user_query->bindValue(':organisation_id', $organisation_id, PDO::PARAM_INT);
+        $user_query->bindValue(':id', $user_id, PDO::PARAM_STR);
+        $user_query->bindValue(':organisation_id', $organisation_id, PDO::PARAM_STR);
         $user_query->bindValue(':full_name', $request->full_name, PDO::PARAM_STR);
         $user_query->bindValue(':email', $request->email, PDO::PARAM_STR);
         $user_query->bindValue(':phone', $request->phone, PDO::PARAM_STR);
@@ -198,10 +204,10 @@
         $user_query->bindValue(':email_verified_at', $request->email_verified_at, PDO::PARAM_STR);
         $user_query->execute();
 
-        $user_id = (int)$conn->lastInsertId();
-
+        $membership_id = generateId();
         $membership_query = $conn->prepare("
             INSERT INTO organisation_members (
+                id,
                 organisation_id,
                 user_id,
                 member_role,
@@ -209,6 +215,7 @@
                 membership_status,
                 joined_at
             ) VALUES (
+                :id,
                 :organisation_id,
                 :user_id,
                 'owner',
@@ -218,8 +225,9 @@
             )
         ");
 
-        $membership_query->bindValue(':organisation_id', $organisation_id, PDO::PARAM_INT);
-        $membership_query->bindValue(':user_id', $user_id, PDO::PARAM_INT);
+        $membership_query->bindValue(':id', $membership_id, PDO::PARAM_STR);
+        $membership_query->bindValue(':organisation_id', $organisation_id, PDO::PARAM_STR);
+        $membership_query->bindValue(':user_id', $user_id, PDO::PARAM_STR);
         $membership_query->bindValue(':job_title', $request->job_title, $request->job_title !== null ? PDO::PARAM_STR : PDO::PARAM_NULL);
         $membership_query->execute();
 
@@ -231,8 +239,8 @@
             AND status = 'verified'
         ");
 
-        $complete_request->bindValue(':user_id', $user_id, PDO::PARAM_INT);
-        $complete_request->bindValue(':id', $request->id, PDO::PARAM_INT);
+        $complete_request->bindValue(':user_id', $user_id, PDO::PARAM_STR);
+        $complete_request->bindValue(':id', $request->id, PDO::PARAM_STR);
         $complete_request->execute();
 
         if ($complete_request->rowCount() !== 1) {
@@ -242,7 +250,7 @@
         $conn->commit();
 
         $error = false;
-        $message = "Registration submitted successfully. Your account is pending approval.";
+        $data = "Registration submitted successfully. Your account is pending approval.";
 
         $code = [
             'registration_ref' => $registration_ref,
@@ -260,9 +268,9 @@
         error_log('Sign-up database error: ' . $e->getMessage());
 
         if ($e->getCode() === '23000') {
-            $message = "An account or organisation with these details already exists.";
+            $data = "An account or organisation with these details already exists.";
         } else {
-            $message = "An error occurred while completing registration.";
+            $data = "An error occurred while completing registration.";
         }
 
     } catch (Throwable $e) {
@@ -273,11 +281,11 @@
 
         error_log('Sign-up error: ' . $e->getMessage());
 
-        $message = "An error occurred. Please try again.";
+        $data = "An error occurred. Please try again.";
     }
 
     echo json_encode([
         'error' => $error,
-        'message' => $message,
+        'data' => $data,
         'code' => $code
     ]);

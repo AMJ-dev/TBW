@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
 import { useNavigate } from "react-router-dom";
 import {
@@ -14,12 +14,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import UserContext from "@/lib/userContext";
 import { http, type Resp } from "@/lib/httpClient";
 
 export function LoginPage() {
 	const navigate = useNavigate();
-	const { login } = useContext(UserContext);
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [showPassword, setShowPassword] = useState(false);
@@ -39,11 +37,11 @@ export function LoginPage() {
 				toast.error(resp?.data || "Login failed. Check the credentials and try again.")
 				return
 			}
-			toast.success(resp?.data);
+			toast.success(resp.data || "OTP sent successfully	.");
 			sessionStorage.setItem('remember', 'true')
-			sessionStorage.setItem('jwt', String(resp.code?.jwt ?? ''))
-			sessionStorage.setItem('email', String(resp.code?.email ?? email.trim()))
-			navigate("/mfa", )
+			sessionStorage.setItem('expires_in', String(resp.code?.expires_in ?? 300))
+			sessionStorage.setItem('email', String(email.trim()))
+			navigate("/mfa")
 		} catch (error) {
 			toast.error("Could not complete login. Try again later.")
 		}finally{
@@ -212,28 +210,6 @@ export function LoginPage() {
 									{submitting ? "Signing in…" : "Sign in"}
 									{!submitting && <ArrowRight />}
 								</Button>
-
-								<div className="mt-6 flex items-center gap-3">
-									<span className="h-px flex-1 bg-line" />
-									<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										or
-									</span>
-									<span className="h-px flex-1 bg-line" />
-								</div>
-
-								<div className="mt-6 grid gap-2">
-									<Button
-										type="button"
-										variant="outline"
-										className="border-line bg-paper text-ink hover:bg-sand"
-										onClick={() =>
-											toast.success("Single sign-on is available on production accounts.")
-										}
-									>
-										<ShieldCheck className="mr-2 size-4 text-orange" />
-										Continue with organisation SSO
-									</Button>
-								</div>
 
 								<p className="mt-6 text-center text-[12px] text-ink-soft">
 									New to TRINŪ?{" "}

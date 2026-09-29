@@ -170,9 +170,11 @@
         $otp_expires_at = date('Y-m-d H:i:s', time() + 300);
 
         $conn->beginTransaction();
+        $request_id = generateId();
 
         $insert_request = $conn->prepare("
             INSERT INTO registration_requests (
+                id,
                 registration_ref,
                 account_type,
                 full_name,
@@ -192,6 +194,7 @@
                 user_agent,
                 expires_at
             ) VALUES (
+                :id,
                 :registration_ref,
                 :account_type,
                 :full_name,
@@ -213,6 +216,7 @@
             )
         ");
 
+        $insert_request->bindValue(':id', $request_id, PDO::PARAM_STR);
         $insert_request->bindValue(':registration_ref', $registration_ref, PDO::PARAM_STR);
         $insert_request->bindValue(':account_type', $account_type, PDO::PARAM_STR);
         $insert_request->bindValue(':full_name', $full_name, PDO::PARAM_STR);
@@ -228,10 +232,11 @@
         $insert_request->bindValue(':expires_at', $request_expires_at, PDO::PARAM_STR);
         $insert_request->execute();
 
-        $request_id = (int)$conn->lastInsertId();
+        $otp_id = generateId();
 
         $insert_otp = $conn->prepare("
             INSERT INTO registration_otps (
+                id,
                 registration_request_id,
                 channel,
                 destination,
@@ -243,6 +248,7 @@
                 last_sent_at,
                 expires_at
             ) VALUES (
+                :id,
                 :request_id,
                 'email',
                 :destination,
@@ -256,7 +262,8 @@
             )
         ");
 
-        $insert_otp->bindValue(':request_id', $request_id, PDO::PARAM_INT);
+        $insert_otp->bindValue(':id', $otp_id, PDO::PARAM_STR);
+        $insert_otp->bindValue(':request_id', $request_id, PDO::PARAM_STR);
         $insert_otp->bindValue(':destination', $email, PDO::PARAM_STR);
         $insert_otp->bindValue(':otp_hash', $otp_hash, PDO::PARAM_STR);
         $insert_otp->bindValue(':expires_at', $otp_expires_at, PDO::PARAM_STR);

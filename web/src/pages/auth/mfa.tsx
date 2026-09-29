@@ -1,14 +1,7 @@
 import { useState, useEffect, useContext, startTransition, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
 import { useNavigate } from "react-router-dom";
-import {
-	ArrowRight,
-	Check,
-	KeyRound,
-	Lock,
-	ShieldCheck,
-	Smartphone,
-} from "lucide-react";
+import { ArrowRight, Check, KeyRound, Lock, ShieldCheck, Smartphone} from "lucide-react";
 import { http, type Resp } from '@/lib/httpClient'
 import userContext from '@/lib/userContext'
 import { useDeviceInfo } from '@/hooks/useDeviceInfo'
@@ -21,7 +14,7 @@ import { cn } from "@/lib/utils";
 type Mode = "setup" | "challenge";
 
 export function MfaPage({ mode = "challenge" }: { mode?: Mode }) {
-	return mode == "setup" ? <MfaSetup /> : <MfaChallenge />;
+	return mode === "setup" ? <MfaSetup /> : <MfaChallenge />;
 }
 
 function MfaChallenge() {
@@ -29,32 +22,33 @@ function MfaChallenge() {
 	const { login } = useContext(userContext)
 	const deviceInfo = useDeviceInfo()
 	const { locationInfo, loading: locationLoading } = useLocationInfo()
-	const [jwt, setJwt] = useState<string>('')
+	const [expiresIn, setExpiresIn] = useState<number>(300)
 	const [remember, setRemember] = useState<boolean>(false)
 	const [code, setCode] = useState("");
 	const [trustDevice, setTrustDevice] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 	const [mounted, setMounted] = useState(false)
 	const [email, setEmail] = useState<string>('')
-	const [countdown, setCountdown] = useState<number>(30)
+	const [countdown, setCountdown] = useState<number>(120)
 	const [canResend, setCanResend] = useState<boolean>(false)
+	const [sending, setSending] = useState<boolean>(false)
 	const digits = code.replace(/\D/g, "").slice(0, 6);
 	const complete = digits.length === 6;
 
 	useEffect(() => {
 		setMounted(true)
-		const JWT = sessionStorage.getItem('jwt')
+		const ExpiresIn = sessionStorage.getItem('expires_in')
 		const Email = sessionStorage.getItem('email')
 		const Remember = sessionStorage.getItem('remember')
-		if (!JWT || !Email) {
+		if (!ExpiresIn || !Email) {
 			startTransition(() => navigate('/login'))
 			return
 		}
-		setJwt(JWT)
+		setExpiresIn(Number(ExpiresIn))
 		setEmail(Email)
 		setRemember(Remember === 'true')
 	}, [])
-		
+
 	useEffect(() => {
 		if (countdown > 0 && !canResend) {
 			const t = setTimeout(() => setCountdown(prev => prev - 1), 1000)
@@ -66,6 +60,27 @@ function MfaChallenge() {
 	const formatDeviceInfo = () => `${deviceInfo.browser} on ${deviceInfo.os} (${deviceInfo.deviceType})`
 	const formatLocationInfo = () => (locationInfo ? `${locationInfo.city}, ${locationInfo.region}, ${locationInfo.country}` : 'Location information not available')
 
+	const handleResend = async () => {
+		if (!canResend || sending) return
+		setSending(true)
+		try {
+			const resp: Resp = await http.post('login-resend-otp/', { email })
+			if (resp.error) {
+				toast.error(resp.data || 'Could not resend code. Please try again.')
+			} else {
+				toast.success(resp.data || 'A new code has been sent.')
+				setCanResend(false)
+				setCountdown(120)
+				setCode('')
+			}
+		} catch (error: any) {
+			console.error(error)
+			toast.error(error?.response?.data?.message || 'Could not resend code. Please try again.')
+		} finally {
+			setSending(false)
+		}
+	}
+
 	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		if (!complete) {
@@ -74,7 +89,7 @@ function MfaChallenge() {
 		}
 		setSubmitting(true);
 
-		const formData = { otp: digits, jwt, deviceInfo: formatDeviceInfo(), locationInfo: formatLocationInfo() }
+		const formData = { otp: digits, deviceInfo: formatDeviceInfo(), locationInfo: formatLocationInfo() }
 		try {
 			const resp: Resp = await http.post('login-verify-otp/', formData)
 			if (resp.error) toast.error(resp.data || 'Invalid OTP. Please try again.')
@@ -122,7 +137,7 @@ function MfaChallenge() {
 					</h2>
 					<p className="mt-1 text-[12px] text-ink-soft">
 						Signing in as{" "}
-						<span className="font-mono text-ink">{email}</span>
+						<span className="font-mono text-ink">ops@company.ng</span>
 					</p>
 				</div>
 
