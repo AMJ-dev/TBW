@@ -65,7 +65,7 @@ const verifiedDocuments: Record<string, VerifiedDocument> = {
 	},
 };
 
-export function VerifyPage() {
+export default function VerifyPage() {
 	const [code, setCode] = useState(
 		new URLSearchParams(window.location.search).get("code") ?? ""
 	);

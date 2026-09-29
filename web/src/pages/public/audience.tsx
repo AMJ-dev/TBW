@@ -297,7 +297,7 @@ const audiences = [
 	{ key: "transporters", label: "Transporters", icon: Truck },
 ] as const;
 
-export function AudiencePage({ audience }: { audience?: AudienceKey }) {
+export default function AudiencePage({ audience }: { audience?: AudienceKey }) {
 	const params = useParams<{ audience?: string }>();
 	const key = (audience ?? (params.audience as AudienceKey) ?? "importers") as AudienceKey;
 	const config = audienceConfig[key];

@@ -502,11 +502,16 @@ try {
     echo json_encode([
         "error" => false,
         "data" => "Login successful.",
-        "code" => [
+       "code" => [
             "token" => $session_token,
             "email" => $user["email"],
             "expires_in" => 2592000,
-            "account_type" => $user["account_type"],
+            "user" => [
+                "id" => $user["id"],
+                "email" => $user["email"],
+                "full_name" => $user["full_name"],
+                "account_type" => $user["account_type"]
+            ],
             "role" => [
                 "id" => $role_id,
                 "key" => $role_key,

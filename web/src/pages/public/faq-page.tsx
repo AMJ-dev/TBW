@@ -37,7 +37,7 @@ const faqs = [
 	},
 ] as const;
 
-export function FaqPage() {
+export default function FaqPage() {
 	const [open, setOpen] = useState<number>(0);
 
 	return (

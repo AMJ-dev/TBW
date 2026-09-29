@@ -327,7 +327,7 @@ function RoleCellContent({ cell }: { cell: RoleCell }) {
 	);
 }
 
-export function HowItWorksPage() {
+export default function HowItWorksPage() {
 	return (
 		<PublicFrame>
 			<main>

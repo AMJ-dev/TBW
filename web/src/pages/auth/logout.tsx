@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 
 type LogoutState = "signing-out" | "signed-out";
 
-export function LogoutPage() {
+export default function LogoutPage() {
 	const [state, setState] = useState<LogoutState>("signing-out");
 	const { logout } = useContext(UserContext);
 

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
 
-export function AboutPage() {
+export default function AboutPage() {
 	const values = [
 		{
 			number: "01",

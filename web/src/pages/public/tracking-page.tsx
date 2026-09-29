@@ -59,7 +59,7 @@ function validateISO6346(container: string): { valid: boolean; reason?: string }
 	return { valid: true };
 }
 
-export function TrackingPage() {
+export default function TrackingPage() {
 	const initialReference = new URLSearchParams(window.location.search).get("ref") ?? "";
 	const initialRecord = cargoRecords.find((cargo) =>
 		[cargo.container, cargo.reference, cargo.billOfLading].includes(initialReference.trim().toUpperCase())

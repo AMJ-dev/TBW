@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
 
-export function ContactPage() {
+export default function ContactPage() {
 	const [sent, setSent] = useState(false);
 	const submit = (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();

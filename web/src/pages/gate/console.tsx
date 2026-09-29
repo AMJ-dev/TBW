@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useLocation } from "react-router-dom";
 import { Link } from "@/components/router-link";
 import {
 	AlertTriangle,
@@ -127,12 +128,20 @@ const initialOutQueue: QueuedTruck[] = [
 
 type Mode = "queue" | "decision";
 
+export default function GateConsolePage({ direction }: { direction?: GateDirection } = {}) {
+	const location = useLocation();
+	const resolvedDirection: GateDirection =
+		direction ?? (location.pathname.endsWith("/out") ? "out" : "in");
+
+	return <GateConsole key={resolvedDirection} direction={resolvedDirection} />;
+}
+
 export function GateInPage() {
-	return <GateConsole direction="in" />;
+	return <GateConsolePage direction="in" />;
 }
 
 export function GateOutPage() {
-	return <GateConsole direction="out" />;
+	return <GateConsolePage direction="out" />;
 }
 
 function GateConsole({ direction }: { direction: GateDirection }) {

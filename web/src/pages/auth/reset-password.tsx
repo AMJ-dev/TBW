@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 
 type TokenState = "verifying" | "valid" | "invalid";
 
-export function ResetPasswordPage() {
+export default function ResetPasswordPage() {
 	const [params] = useSearchParams();
 	const token = params.get("token") ?? "";
 

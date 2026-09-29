@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 
 type Mode = "setup" | "challenge";
 
-export function MfaPage({ mode = "challenge" }: { mode?: Mode }) {
+export default function MfaPage({ mode = "challenge" }: { mode?: Mode }) {
 	return mode == "setup" ? <MfaSetup /> : <MfaChallenge />;
 }
 
@@ -106,7 +106,20 @@ function MfaChallenge() {
 				sessionStorage.removeItem('jwt')
 				sessionStorage.removeItem('email')
 				toast.success(resp.data)
-				login({ token: resp.code.token, remember })
+				login({
+					token: resp.code.token,
+					remember,
+					user: {
+						id: resp.code.user.id,
+						email: resp.code.user.email,
+						full_name: resp.code.user.full_name,
+						account_type: resp.code.user.account_type
+					},
+					role: resp.code.role,
+					route: resp.code.route,
+					privileges: resp.code.privileges,
+					permissions: resp.code.permissions
+				});
 				let redirect = sessionStorage.getItem('redirect')
 				// startTransition(() => navigate(redirect??'/dashboard', { replace: true }))
 			}

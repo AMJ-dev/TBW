@@ -34,7 +34,7 @@ const cargoCategories = [
 	"Project cargo",
 ] as const;
 
-export function QuotePage() {
+export default function QuotePage() {
 	const [step, setStep] = useState(0);
 	const [submitted, setSubmitted] = useState(false);
 	const [company, setCompany] = useState("");

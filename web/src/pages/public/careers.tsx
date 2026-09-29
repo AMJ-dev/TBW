@@ -90,7 +90,7 @@ const values = [
 	},
 ];
 
-export function CareersPage() {
+export default function CareersPage() {
 	return (
 		<PublicFrame>
 			<main>

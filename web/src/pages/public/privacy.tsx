@@ -160,7 +160,7 @@ const sections = [
 	},
 ] as const;
 
-export function PrivacyPage() {
+export default function PrivacyPage() {
 	return (
 		<PublicFrame>
 			<main>

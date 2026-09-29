@@ -104,7 +104,7 @@ const notices = [
 	},
 ] as const;
 
-export function HomePage() {
+export default function HomePage() {
 	const [trackRef, setTrackRef] = useState("TRIU1234567");
 
 	const handleTrack = (event: FormEvent<HTMLFormElement>) => {

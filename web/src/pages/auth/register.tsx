@@ -45,7 +45,7 @@ const accountTypes: {
 
 const steps = ["Your details", "Organisation", "Verify"] as const;
 
-export function RegisterPage() {
+export default function RegisterPage() {
 	const [step, setStep] = useState(0);
 	const [accountType, setAccountType] = useState<AccountType>("importer");
 

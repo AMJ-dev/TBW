@@ -132,7 +132,7 @@ const deviceIcon: Record<DeviceKind, typeof Laptop> = {
 	tablet: Tablet,
 };
 
-export function SessionManagementPage() {
+export default function SessionManagementPage() {
 	const [sessions, setSessions] = useState<SessionRecord[]>(initialSessions);
 	const [revoking, setRevoking] = useState<string | null>(null);
 
