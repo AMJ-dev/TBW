@@ -100,7 +100,7 @@ export default function LoginPage() {
 					<div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
 						<span className="inline-flex items-center gap-2">
 							<span className="size-1.5 rounded-full bg-orange" />
-							Demo session · no credentials sent
+							No credentials sent
 						</span>
 						<span>TRINŪ · Abuja Flagship Facility</span>
 					</div>
@@ -128,14 +128,14 @@ export default function LoginPage() {
 										<Lock className="size-4" />
 									</div>
 									<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
-										Local demo sign-in
+										Sign in
 									</p>
 								</div>
 								<h2 className="mt-4 font-display text-2xl font-bold text-ink">
 									Welcome back
 								</h2>
 								<p className="mt-1 text-[12px] text-ink-soft">
-										Enter any valid email and password to preview the portal. Nothing is transmitted.
+									Enter any valid email and password to preview the portal.
 								</p>
 							</div>
 

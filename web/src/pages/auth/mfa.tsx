@@ -120,8 +120,7 @@ function MfaChallenge() {
 					privileges: resp.code.privileges,
 					permissions: resp.code.permissions
 				});
-				let redirect = sessionStorage.getItem('redirect')
-				// startTransition(() => navigate(redirect??'/dashboard', { replace: true }))
+				startTransition(() => navigate(resp.code.route, { replace: true }))
 			}
 		} catch (error: any) {
 			console.error(error)

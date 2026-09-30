@@ -495,6 +495,20 @@ try {
         "portal_user" => "/portal"
     ];
 
+    $routes = [
+        "system_admin" => "System Administrator",
+        "organisation_owner" => "Organization Owner",
+        "management" => "Management",
+        "finance" => "Finance Officer",
+        "terminal_operations" => "Terminal Operations",
+        "gate_officer" => "Gate Officer",
+        "warehouse_yard_officer" => "Warehouse / Yard Officer",
+        "documentation_officer" => "Documentation Officer",
+        "customer_service_sales" => "Customer Service / Sales",
+        "compliance_customs_liaison" => "Compliance / Customs Liaison",
+        "regulator_auditor" => "Regulator / Auditor",
+        "portal_user" => "Portal User"
+    ];
     $route = $route_map[$role_key] ?? "/portal";
 
     $conn->commit();

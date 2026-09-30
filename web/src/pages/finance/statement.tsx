@@ -167,7 +167,7 @@ export default function FinanceStatementsIndexRoute() {
 			return;
 		}
 		const customer: StatementRow = {
-			id: `demo-${Date.now()}`,
+			id: `trinu-${Date.now()}`,
 			name: newName.trim(),
 			rc: newRc.trim(),
 			segment: newSegment,
@@ -177,7 +177,7 @@ export default function FinanceStatementsIndexRoute() {
 			creditLimit,
 			creditUsed: 0,
 			paymentTerms: "Net 14",
-			lastActivity: "Demo setup",
+			lastActivity: "Trinu setup",
 			health: "Current",
 		};
 		setRows((current) => [customer, ...current]);
@@ -185,7 +185,7 @@ export default function FinanceStatementsIndexRoute() {
 		setNewName("");
 		setNewRc("");
 		setNewCreditLimit("");
-		toast.success("Customer ledger added to this browser demo.");
+		toast.success("Customer ledger added to this browser.");
 	};
 
 	return (
@@ -431,7 +431,7 @@ export default function FinanceStatementsIndexRoute() {
 					<form role="dialog" aria-modal="true" aria-labelledby="new-ledger-title" onSubmit={createLedger} className="w-full max-w-lg space-y-4 rounded-xl bg-paper p-6 shadow-2xl ring-1 ring-line">
 						<div className="flex items-start justify-between gap-4">
 							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">Local demo</p>
+								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">Local</p>
 								<h3 id="new-ledger-title" className="mt-1 font-display text-xl font-bold text-ink">Create customer ledger</h3>
 							</div>
 							<Button type="button" variant="ghost" size="icon" onClick={() => setNewLedgerOpen(false)} aria-label="Close new ledger form">×</Button>

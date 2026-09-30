@@ -92,8 +92,7 @@ export default function ContactPage() {
 									For pricing and service planning, use the quote form.
 								</p>
 								<p className="mt-2 text-sm leading-6 text-sand/75">
-									Share cargo, timing, and service needs to preview the quote workflow. This demo
-									does not send details to a coordinator.
+									Share cargo, timing, and service needs to preview the quote workflow.
 								</p>
 								<Link to="/quote">
 									<Button className="mt-5 bg-orange text-white hover:bg-orange-deep">

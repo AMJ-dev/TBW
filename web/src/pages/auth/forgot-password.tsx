@@ -80,10 +80,6 @@ export default function ForgotPasswordPage() {
 					</div>
 
 					<div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-						<span className="inline-flex items-center gap-2">
-							<span className="size-1.5 rounded-full bg-orange" />
-							Demo only · no email is sent
-						</span>
 						<span>TRINŪ · Abuja Flagship Facility</span>
 					</div>
 				</div>

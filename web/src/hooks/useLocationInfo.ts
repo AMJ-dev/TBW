@@ -9,12 +9,12 @@ export interface LocationInfo {
 
 export const useLocationInfo = () => {
     const locationInfo: LocationInfo = {
-        ip: 'Not collected in demo',
+        ip: 'Not collected',
         country: 'Nigeria',
         region: 'FCT',
         city: 'Abuja',
         timezone: 'Africa/Lagos',
-        isp: 'Not collected in demo'
+        isp: 'Not collected'
     };
 
     return { locationInfo, loading: false, error: null };

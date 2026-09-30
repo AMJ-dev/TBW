@@ -261,4 +261,3 @@ export const timeline: [string, string, string, string, string, string][] = [
 	["09 Sep 2026", "Examination scheduled", "Coordination desk", "Examination Area 1", "TRINU-OPS-21", "EXM-001192"],
 ];
 
-export const roles = ["Management", "Operations Manager", "Gate Officer", "Finance Officer", "Importer"];

@@ -81,7 +81,7 @@ export default function LogoutPage() {
 											Session closed on this device
 										</p>
 										<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-											The demo identity has been cleared from this browser session. No server session was
+											The identity has been cleared from this browser session. No server session was
 											created.
 										</p>
 									</div>
@@ -95,10 +95,6 @@ export default function LogoutPage() {
 										<li className="flex items-start gap-2">
 											<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
 											Sign back in to continue where you left off.
-										</li>
-										<li className="flex items-start gap-2">
-											<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
-											Use session management to preview device controls in the demo.
 										</li>
 										<li className="flex items-start gap-2">
 											<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
@@ -123,14 +119,6 @@ export default function LogoutPage() {
 										Return home
 									</Button>
 								</Link>
-							</div>
-
-							<div className="mx-auto mt-8 flex max-w-md items-start gap-2 rounded-xl bg-sand p-4 text-left ring-1 ring-line">
-								<ShieldCheck className="mt-0.5 size-4 shrink-0 text-orange" />
-								<p className="text-[12px] leading-5 text-ink-soft">
-									This prototype does not create or change a real account. You can enter the demo
-									workspace again at any time.
-								</p>
 							</div>
 						</>
 					)}
