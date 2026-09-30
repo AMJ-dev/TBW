@@ -34,4 +34,4 @@ RewriteRule ^auth/mfa/verify/$ src/mfa/login.php [NC]
 
 RewriteRule ^my-sessions/$ src/sessions/get.php [NC]
 RewriteRule ^my-sessions/revoke-others/$ src/sessions/revoke-others.php [NC]
-RewriteRule ^my-sessions/revoke/([0-9]+)/$ src/sessions/revoke.php?id=$1 [NC]
+RewriteRule ^my-sessions/revoke/([0-9a-zA-Z-]+)/$ src/sessions/revoke.php?id=$1 [NC]

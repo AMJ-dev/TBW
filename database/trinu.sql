@@ -493,7 +493,7 @@ CREATE TABLE `sessions` (
 
 LOCK TABLES `sessions` WRITE;
 /*!40000 ALTER TABLE `sessions` DISABLE KEYS */;
-INSERT INTO `sessions` VALUES ('3abf2ce0-1d81-42c9-9717-d3a3bb5f2254','682f7cf2-b05f-4c','dc5a28ca7b21e38023b2dfd41fca3069a33f53960dc9ee3d6ed2cecabc2a3037',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-09-30 20:51:05','2026-10-30 20:51:05',NULL,NULL,'2026-09-30 19:51:05'),('71fc4a75-1e0d-47f3-bc19-df7493ce7387','682f7cf2-b05f-4c','625e0067d116d77076e2a4054280f11190fb3291d3f3b55fed48f02872de74b7',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-09-30 20:53:16','2026-10-30 20:53:16',NULL,NULL,'2026-09-30 19:53:16'),('d04d0e44-02fb-47d0-98e2-15da29b9c43c','682f7cf2-b05f-4c','043b9de56dcf3a5b97ba83a7a17432e208124f8b21cedda0039fd0cb46c37e4e',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-09-30 14:44:55','2026-10-30 14:44:55','2026-09-30 19:43:38','Password changed','2026-09-30 13:44:55'),('efbc35a2-dd8f-43','682f7cf2-b05f-4c','568d88207f1afe7b1d9d88cf24c4a8ea88e3feb3e9dd1a661c1d6e31e0761dd4',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-09-29 18:35:32','2026-10-29 18:35:32','2026-09-30 19:43:38','Password changed','2026-09-29 16:35:32');
+INSERT INTO `sessions` VALUES ('3abf2ce0-1d81-42c9-9717-d3a3bb5f2254','682f7cf2-b05f-4c','dc5a28ca7b21e38023b2dfd41fca3069a33f53960dc9ee3d6ed2cecabc2a3037',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-09-30 20:51:05','2026-10-30 20:51:05','2026-09-30 22:21:16','user_revoked','2026-09-30 19:51:05'),('71fc4a75-1e0d-47f3-bc19-df7493ce7387','682f7cf2-b05f-4c','625e0067d116d77076e2a4054280f11190fb3291d3f3b55fed48f02872de74b7',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-09-30 20:53:16','2026-10-30 20:53:16',NULL,NULL,'2026-09-30 19:53:16'),('d04d0e44-02fb-47d0-98e2-15da29b9c43c','682f7cf2-b05f-4c','043b9de56dcf3a5b97ba83a7a17432e208124f8b21cedda0039fd0cb46c37e4e',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-09-30 14:44:55','2026-10-30 14:44:55','2026-09-30 19:43:38','Password changed','2026-09-30 13:44:55'),('efbc35a2-dd8f-43','682f7cf2-b05f-4c','568d88207f1afe7b1d9d88cf24c4a8ea88e3feb3e9dd1a661c1d6e31e0761dd4',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-09-29 18:35:32','2026-10-29 18:35:32','2026-09-30 19:43:38','Password changed','2026-09-29 16:35:32');
 /*!40000 ALTER TABLE `sessions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -589,4 +589,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-30 22:19:47
+-- Dump completed on 2026-09-30 22:21:54
