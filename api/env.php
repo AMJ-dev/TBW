@@ -13,9 +13,8 @@
     $db_user = "cyberpros";
     $db_pass = "Group2022@";
 
-    $url = "trinubondedwarehouse.com";
-    $baseURL = "https://$url/";
-    $apiURL = "https://api.$url/";
+    $baseURL = "http://localhost:8080/";
+    $apiURL = "https://api.trinubondedwarehouse.com/";
 
     $email_host="mail.evcarsng.com";
     $email_port=465; 
@@ -23,3 +22,5 @@
     $email_password='vmh;)~#TpW0GkFiV';
     $sender_email = "sender@evcarsng.com";
     $info_email = "info@evcarsng.com";
+
+    $mfa_key = "8227adcc2200e3bb07c8eb44db8eaf3de06bf261662c889a3a0f2a01963a681b";

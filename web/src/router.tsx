@@ -58,7 +58,10 @@ const ResetPasswordPage = lazy(() => import("@/pages/auth/reset-password"));
 const RegisterPage = lazy(() => import("@/pages/auth/register"));
 const LogoutPage = lazy(() => import("@/pages/auth/logout"));
 const SessionManagementPage = lazy(() => import("@/pages/auth/sesssion-management"));
-const MfaPage = lazy(() => import("@/pages/auth/mfa"));
+const ChangePasswordPage = lazy(() => import("@/pages/auth/change-password"));
+const MfaSetupPage = lazy(() => import("@/pages/auth/mfa-setup"));
+const MfaChallengePage = lazy(() => import("@/pages/auth/mfa-challenge"));
+const OtpPage = lazy(() => import("@/pages/auth/otp"));
 
 const AdminPage = lazy(() => import("@/pages/admin"));
 const AdminAuditPage = lazy(() => import("@/pages/admin/audit"));
@@ -158,9 +161,11 @@ export default function Routers() {
 						<Route path="/reset-password" element={<ResetPasswordPage />} />
 						<Route path="/logout" element={<LogoutPage />} />
 						<Route path="/session-management" element={<SessionManagementPage />} />
+						<Route path="/change-password" element={<ChangePasswordPage />} />
 
-						<Route path="/mfa" element={<MfaPage mode="challenge" />} />
-						<Route path="/mfa/setup" element={<MfaPage mode="setup" />} />
+						<Route path="/otp" element={<OtpPage />} />
+						<Route path="/mfa" element={<MfaChallengePage />} />
+						<Route path="/mfa/setup" element={<MfaSetupPage />} />
 
 						<Route element={<RequireAuth />}>
 							<Route path="/admin" element={<AdminPage />} />

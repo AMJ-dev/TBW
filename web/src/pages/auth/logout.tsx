@@ -7,20 +7,34 @@ import {
 	Check,
 	Home,
 	LogOut,
-	ShieldCheck,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import {http, type Resp} from "@/lib/httpClient";
 
 type LogoutState = "signing-out" | "signed-out";
 
 export default function LogoutPage() {
+	const navigate = useNavigate();
 	const [state, setState] = useState<LogoutState>("signing-out");
 	const { logout } = useContext(UserContext);
 
 	useEffect(() => {
-		logout();
-		const t = setTimeout(() => setState("signed-out"), 700);
-		return () => clearTimeout(t);
+		const revokeToken = async () => {
+			try {
+				const res:any = await http.post("logout/");
+				const resp: Resp = res.data;
+				if (resp.error === false) {
+					logout();
+					setState("signed-out");
+				}
+			} catch (error) {
+				console.log(error);
+			} finally{
+				navigate("/", { replace: true });
+			}
+		}
+		revokeToken();
 	}, [logout]);
 
 	return (

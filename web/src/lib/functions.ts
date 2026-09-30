@@ -1,6 +1,6 @@
 import { useContext } from "react";
 import moment from "moment";
-import UserContext from "./userContext";
+import UserContext from "@/lib/userContext";
 
 export const check_login = ()=>{
 	const {login} = useContext(UserContext);

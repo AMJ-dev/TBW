@@ -389,7 +389,7 @@ export default function SessionManagementPage() {
 							your TRINŪ administrator.
 						</p>
 						<div className="mt-5 flex flex-wrap gap-2">
-							<Link to="/reset-password">
+							<Link to="/change-password">
 								<Button className="bg-orange text-white hover:bg-orange-deep">
 									Change password <ArrowRight />
 								</Button>

@@ -1,4 +1,5 @@
 <?php
+
     require_once dirname(__DIR__, 2) . "/include/set-header.php";
 
     $email = strtolower(trim($_POST["email"] ?? ""));
@@ -38,7 +39,8 @@
                 email_verified_at,
                 account_status,
                 failed_login_attempts,
-                locked_until
+                locked_until,
+                mfa_enabled
             FROM users
             WHERE email = :email
             LIMIT 1
@@ -291,6 +293,7 @@
         }
 
         if ($user["email_verified_at"] === null) {
+
             echo json_encode([
                 "error" => true,
                 "data" => "Please verify your email address before signing in.",
@@ -328,6 +331,10 @@
 
         $otp = (string)random_int(100000, 999999);
         $otp_hash = password_hash($otp, PASSWORD_DEFAULT);
+
+        $mfa_token = bin2hex(random_bytes(32));
+        $mfa_token_hash = hash("sha256", $mfa_token);
+
         $otp_id = generateId();
         $otp_expires_at = date("Y-m-d H:i:s", time() + 300);
 
@@ -336,6 +343,7 @@
                 id,
                 user_id,
                 otp_hash,
+                mfa_token_hash,
                 channel,
                 destination,
                 purpose,
@@ -349,6 +357,7 @@
                 :id,
                 :user_id,
                 :otp_hash,
+                :mfa_token_hash,
                 'email',
                 :destination,
                 'login_mfa',
@@ -365,6 +374,7 @@
             ":id" => $otp_id,
             ":user_id" => $user_id,
             ":otp_hash" => $otp_hash,
+            ":mfa_token_hash" => $mfa_token_hash,
             ":destination" => $user["email"],
             ":expires_at" => $otp_expires_at,
             ":ip_address" => $ip_address
@@ -450,7 +460,9 @@
             "data" => "A verification code has been sent to your email.",
             "code" => [
                 "email" => $user["email"],
-                "expires_in" => 300
+                "expires_in" => 300,
+                "mfa_enabled" => $user["mfa_enabled"],
+                "mfa_token" => $mfa_token
             ]
         ]);
 

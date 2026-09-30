@@ -5,28 +5,23 @@
     use Firebase\JWT\JWT;
     use Firebase\JWT\Key;
 
-    function get_token(): ?string {
-        $auth = null;
-        if (!empty($_SERVER['HTTP_AUTHORIZATION'])) $auth = $_SERVER['HTTP_AUTHORIZATION'];
-        elseif (function_exists('getallheaders')) {
-            $h = getallheaders();
-            $auth = $h['Authorization'] ?? $h['authorization'] ?? null;
-        } elseif (function_exists('apache_request_headers')) {
-            $h = apache_request_headers();
-            $auth = $h['Authorization'] ?? $h['authorization'] ?? null;
-        }
-        if ($auth && preg_match('/^Bearer\s+(.+)$/i', $auth, $m)) return trim($m[1]);
-        return null;
-    }
-
-    $token = get_token();
+    $token = $_COOKIE['token'] ?? null;
 
     if (!$token) invalid_token();
  
     try { 
         $decoded = JWT::decode($token, $publicKey, array('RS256')); 
         $my_details = get_user($decoded->id); 
-        if(empty($my_details) || $my_details==false || !$decoded->login) invalid_token(); 
+        if(empty($my_details) || $my_details==false || $my_details->account_status !='active') invalid_token(); 
+
+        $chk_session =$conn->prepare("SELECT expires_at FROM `sessions` WHERE user_id = :user_id AND id = :session_id");
+        $chk_session->execute([":user_id" => $decoded->id, ":session_id" => $decoded->session_id]);
+
+        $session =$chk_session->fetch(PDO::FETCH_ASSOC);
+
+        if (!$session) invalid_token();
+        if (strtotime($session['expires_at'] . ' UTC') < time()) invalid_token();
+
         unset($my_details->password); 
     } catch (Exception $e) { 
         invalid_token(); 

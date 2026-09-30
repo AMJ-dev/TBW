@@ -19,3 +19,11 @@ RewriteRule ^sign-in/$ src/login/sign-in.php [NC]
 RewriteRule ^login-resend-otp/$ src/login/resend-otp.php [NC]
 RewriteRule ^login-verify-otp/$ src/login/verify-otp.php [NC]
 RewriteRule ^login-verify-otp/$ src/login/verify-otp.php [NC]
+
+RewriteRule ^get-profile/$ src/profile/get.php [NC]
+RewriteRule ^auth/change-password/$ src/profile/change-password.php [NC]
+RewriteRule ^logout/$ src/profile/logout.php [NC]
+
+RewriteRule ^auth/mfa/setup/init/$ src/mfa/init.php [NC]
+RewriteRule ^auth/mfa/setup/verify/$ src/mfa/verify.php [NC]
+RewriteRule ^auth/mfa/verify/$ src/mfa/login.php [NC]

@@ -37,11 +37,13 @@ export default function LoginPage() {
 				toast.error(resp?.data || "Login failed. Check the credentials and try again.")
 				return
 			}
-			toast.success(resp.data || "OTP sent successfully	.");
+			toast.success(resp.data);
 			sessionStorage.setItem('remember', 'true')
 			sessionStorage.setItem('expires_in', String(resp.code?.expires_in ?? 300))
 			sessionStorage.setItem('email', String(email.trim()))
-			navigate("/mfa")
+			const isMfaEnabled = String(resp.code?.mfa_enabled) === "1" || resp.code?.mfa_enabled === true;
+			if(isMfaEnabled) sessionStorage.setItem('mfa_token', String(resp.code?.mfa_token))
+			navigate(isMfaEnabled ? "/mfa" : "/otp");
 		} catch (error) {
 			toast.error("Could not complete login. Try again later.")
 		}finally{

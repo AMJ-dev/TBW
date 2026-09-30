@@ -2205,3 +2205,26 @@ INSERT INTO `articles_and_notices` VALUES
 ('art-01','TRINU Terminal Launches Next-Generation Digital Operating Core','trinu-terminal-launches-next-gen-digital-operating-core','Technology','TRINU Bonded Warehouse inaugurates its client portal and digital terminal operating system to streamline northern corridor logistics.','<p>TRINU Bonded Warehouse has officially deployed its state-of-the-art Terminal Operating Core (TOC) and integrated Stakeholder Portal. The system provides real-time visibility from vessel discharge to final gate collection, eliminating manual paper bottlenecks.</p>','/news/digital-core-launch.jpg','TRINU Editorial Desk',1,'2026-09-01 09:00:00',1,4,'["Logistics","Technology","Customs"]','682f7cf2-b05f-4c','2026-09-01 09:00:00','2026-09-01 09:00:00'),
 ('art-02','New Vehicle Booking System (VBS) Mandatory for Inbound & Outbound Haulage','new-vbs-mandatory-for-haulage','Notices','All haulage operators and truck drivers must now possess a confirmed VBS digital slot prior to terminal gate presentation.','<p>To reduce truck dwell times and prevent congestion around the industrial terminal zone, TRINU has implemented a mandatory Vehicle Booking System. Trucks with active gate passes enjoy fast-track Lane 2 admission.</p>','/news/vbs-announcement.jpg','Operations Directorate',1,'2026-09-05 10:00:00',1,3,'["VBS","Gate","Trucks"]','682f7cf2-b05f-4c','2026-09-05 10:00:00','2026-09-05 10:00:00');
 UNLOCK TABLES;
+
+
+ALTER TABLE users
+ADD COLUMN mfa_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER phone_verified_at,
+ADD COLUMN mfa_secret TEXT DEFAULT NULL AFTER mfa_enabled;
+
+CREATE TABLE mfa_recovery_codes (
+    id CHAR(36) NOT NULL,
+    user_id CHAR(36) NOT NULL,
+    code_hash VARCHAR(255) NOT NULL,
+    used_at DATETIME DEFAULT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_mfa_recovery_user (user_id),
+    KEY idx_mfa_recovery_used (user_id, used_at),
+    CONSTRAINT fk_mfa_recovery_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE otp_codes
+ADD COLUMN mfa_token_hash VARCHAR(255) NULL AFTER otp_hash;

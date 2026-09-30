@@ -44,6 +44,7 @@ CREATE TABLE `account_events` (
 
 LOCK TABLES `account_events` WRITE;
 /*!40000 ALTER TABLE `account_events` DISABLE KEYS */;
+INSERT INTO `account_events` VALUES ('294fcac4-36f2-4b4c-be0a-0acf114ee36a','682f7cf2-b05f-4c','password_changed','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','{\"message\":\"Password changed successfully.\",\"sessions_revoked\":true}','2026-09-30 18:43:38'),('2b58b72a-08b0-4bbd-ba6b-f5217fd095e5','682f7cf2-b05f-4c','mfa_enabled','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','{\"method\":\"totp\",\"recovery_codes_generated\":8}','2026-09-30 19:12:05'),('78b1b078-baf3-46d8-ae27-9773957cfb38','682f7cf2-b05f-4c','password_changed','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','{\"message\":\"Password changed successfully.\",\"sessions_revoked\":true}','2026-09-30 18:43:58');
 /*!40000 ALTER TABLE `account_events` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -78,8 +79,38 @@ CREATE TABLE `login_attempts` (
 
 LOCK TABLES `login_attempts` WRITE;
 /*!40000 ALTER TABLE `login_attempts` DISABLE KEYS */;
-INSERT INTO `login_attempts` VALUES ('8257b8cb-7145-4111-aa42-653c9ae5a987','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 13:44:34'),('c7491f2a-27f9-4a35-8ed7-1cd8af5eb17d','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 13:43:25'),('c9ffd8e1-b7d0-48','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36','success','Password and MFA verified','2026-09-29 16:35:32'),('f2f9464e-9564-44e5-bb46-7db1dcfe3c3e','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','success','Password and MFA verified','2026-09-30 13:44:55');
+INSERT INTO `login_attempts` VALUES ('0b147a5e-457a-4099-9898-53fababc99e1','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 18:27:38'),('0fe5e6e5-e192-4b6d-b88d-64e6324e3eea','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 19:21:46'),('1ddb8d5c-01cc-4737-b89d-387a7bb345db','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_failed','Invalid MFA verification code','2026-09-30 19:38:48'),('2d65059c-2f32-4e9b-864f-9f7a97321a15','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 19:20:14'),('582f3189-4cf9-468a-91eb-7ed591211e7e','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 19:30:35'),('6bc5a6ee-3a9a-4008-9b7e-54088d23b9a7','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','success','Password and MFA verified','2026-09-30 18:28:39'),('8257b8cb-7145-4111-aa42-653c9ae5a987','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 13:44:34'),('8ec51495-904f-49cd-b4cd-f57566309a59','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_failed','Invalid MFA verification code','2026-09-30 19:36:43'),('ac9c10df-5d0b-44a0-93c0-8d2a7cee1724','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 19:34:05'),('b332115d-32fb-407e-96ad-50925cce4454','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 19:23:04'),('c481b7b1-c93f-4aab-89ad-5af35026697e','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 19:25:14'),('c7491f2a-27f9-4a35-8ed7-1cd8af5eb17d','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 13:43:25'),('c9ffd8e1-b7d0-48','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36','success','Password and MFA verified','2026-09-29 16:35:32'),('dad9d752-b8f5-404a-a74d-0446fff39594','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 19:22:48'),('e8320054-a7da-44a2-9cdc-cda37a7cada7','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 19:36:29'),('ef952c44-3c04-423d-9a49-13e14c1be72e','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_pending','Password verified, MFA required','2026-09-30 19:38:55'),('f2f9464e-9564-44e5-bb46-7db1dcfe3c3e','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','success','Password and MFA verified','2026-09-30 13:44:55'),('f4e68ca0-34c7-49f4-b3e3-573557117fc8','hqfdevelopers@gmail.com','682f7cf2-b05f-4c','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','mfa_failed','Invalid MFA verification code','2026-09-30 19:39:08');
 /*!40000 ALTER TABLE `login_attempts` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `mfa_recovery_codes`
+--
+
+DROP TABLE IF EXISTS `mfa_recovery_codes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `mfa_recovery_codes` (
+  `id` char(36) NOT NULL,
+  `user_id` char(36) NOT NULL,
+  `code_hash` varchar(255) NOT NULL,
+  `used_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_mfa_recovery_user` (`user_id`),
+  KEY `idx_mfa_recovery_used` (`user_id`,`used_at`),
+  CONSTRAINT `fk_mfa_recovery_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `mfa_recovery_codes`
+--
+
+LOCK TABLES `mfa_recovery_codes` WRITE;
+/*!40000 ALTER TABLE `mfa_recovery_codes` DISABLE KEYS */;
+INSERT INTO `mfa_recovery_codes` VALUES ('159acfde-d660-407d-9464-614eb9896a29','682f7cf2-b05f-4c','$2y$10$.o4C0uaS5OoVaSNX5G3nKe2V7HyJYiG3e6YGbH6BEPlGkJOj8bQ0u',NULL,'2026-09-30 19:12:04'),('6792df3a-74f2-4bdb-a2e5-cabb700513fc','682f7cf2-b05f-4c','$2y$10$toVMSdhRVnkKnn/3PTtA8uThmCf4vIgzuLx/VzX2rELd6yU42wjUO',NULL,'2026-09-30 19:12:04'),('7132c315-4bca-4e12-b0ea-c46b49816ab3','682f7cf2-b05f-4c','$2y$10$jRveFugODe1rf18Q4g1Qkue5Vz32.SV/RhPRMTv9FxK7QDaWq6u0m',NULL,'2026-09-30 19:12:04'),('73e07390-01ec-4362-8488-50a79714f03c','682f7cf2-b05f-4c','$2y$10$4weu/7QYJjmj.6s3q7UxxuhLx7SOHyJlT6wiTCvCThcFXw/7sgQOu',NULL,'2026-09-30 19:12:04'),('7c8b6e60-3538-4e4c-a191-4dd1ac6e8b5f','682f7cf2-b05f-4c','$2y$10$BKTui6PY7OQdjf7WcFEY9uVjwGgTiETFqNP2tfnKAd03R1hdWk2Hu',NULL,'2026-09-30 19:12:05'),('812d94f8-2e85-4cbd-8072-b90f6b2a0841','682f7cf2-b05f-4c','$2y$10$DxIwVnD7doh6S5d1o9uLH.sGhQDpdCt3FhY.0wgDvHIefTC3kDeca',NULL,'2026-09-30 19:12:04'),('93bca7fd-f64e-4032-a464-1aa485176a22','682f7cf2-b05f-4c','$2y$10$wt3BMukXtBm2cQMPOwwWcuHAkXJbpFLoCMqymLBR4fkYkEYKIcQh6',NULL,'2026-09-30 19:12:04'),('9f9b8f6f-8fdc-4193-a66c-a868d8d294fd','682f7cf2-b05f-4c','$2y$10$yHx83H5wybVTQhmxwvy5A.V.WKWzd2zuFiY/JQJSPGB3UkOizNbYy',NULL,'2026-09-30 19:12:04');
+/*!40000 ALTER TABLE `mfa_recovery_codes` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -169,6 +200,7 @@ CREATE TABLE `otp_codes` (
   `id` char(36) NOT NULL,
   `user_id` char(36) DEFAULT NULL,
   `otp_hash` varchar(255) NOT NULL,
+  `mfa_token_hash` varchar(255) DEFAULT NULL,
   `channel` enum('email','sms','whatsapp') NOT NULL DEFAULT 'email',
   `destination` varchar(254) NOT NULL,
   `purpose` enum('login_mfa','password_reset','phone_verify','regulator_access') NOT NULL,
@@ -196,7 +228,7 @@ CREATE TABLE `otp_codes` (
 
 LOCK TABLES `otp_codes` WRITE;
 /*!40000 ALTER TABLE `otp_codes` DISABLE KEYS */;
-INSERT INTO `otp_codes` VALUES ('27884dc6-9bae-4845-a7e6-50d682373f9c','682f7cf2-b05f-4c','$2y$10$X.3nn8XQiM9Sja6vHcLB2eYOsorlyMuQS78YaZBklZar634VaDgV2','email','hqfdevelopers@gmail.com','login_mfa',0,5,0,'2026-09-30 14:43:25','2026-09-30 14:48:25',NULL,'2026-09-30 14:44:34','::1','2026-09-30 13:43:25'),('4b1243da-ba18-4b','682f7cf2-b05f-4c','$2y$10$/F8waWdFIZkDaySUprDLaeRxw7gyMPArx1pIStGc3sjQzBPImIeSi','email','hqfdevelopers@gmail.com','login_mfa',0,5,1,'2026-09-29 18:35:10','2026-09-29 18:40:10','2026-09-29 18:35:32',NULL,'::1','2026-09-29 16:35:10'),('aeffe9ac-b748-4ffd-bdab-093c939f8686','682f7cf2-b05f-4c','$2y$10$eQFcjhroB6oevU0ASyETeeTtb3Mik0WVgia60XjgPKwCZU7io202G','email','hqfdevelopers@gmail.com','login_mfa',0,5,0,'2026-09-30 14:44:34','2026-09-30 14:49:34','2026-09-30 14:44:55',NULL,'::1','2026-09-30 13:44:34');
+INSERT INTO `otp_codes` VALUES ('27884dc6-9bae-4845-a7e6-50d682373f9c','682f7cf2-b05f-4c','$2y$10$X.3nn8XQiM9Sja6vHcLB2eYOsorlyMuQS78YaZBklZar634VaDgV2',NULL,'email','hqfdevelopers@gmail.com','login_mfa',0,5,0,'2026-09-30 14:43:25','2026-09-30 14:48:25',NULL,'2026-09-30 14:44:34','::1','2026-09-30 13:43:25'),('4b1243da-ba18-4b','682f7cf2-b05f-4c','$2y$10$/F8waWdFIZkDaySUprDLaeRxw7gyMPArx1pIStGc3sjQzBPImIeSi',NULL,'email','hqfdevelopers@gmail.com','login_mfa',0,5,1,'2026-09-29 18:35:10','2026-09-29 18:40:10','2026-09-29 18:35:32',NULL,'::1','2026-09-29 16:35:10'),('4b6a9218-1693-474f-abe2-fb0055fa80ed','682f7cf2-b05f-4c','$2y$10$m.MLx9maBBNgEUE9Wq381ekUtbgMRZl7aiFP0YoSx6vnpvOmCFfti',NULL,'email','hqfdevelopers@gmail.com','login_mfa',0,5,0,'2026-09-30 20:23:04','2026-09-30 20:28:04',NULL,'2026-09-30 20:25:14','::1','2026-09-30 19:23:04'),('57ec407c-7cd9-4f72-9179-e5478df85a5f','682f7cf2-b05f-4c','$2y$10$HkveBU1d67L0kmv8uurRYuUJCKgT1GFSEBQS6EZb0k21eiuzpXx4u',NULL,'email','hqfdevelopers@gmail.com','login_mfa',0,5,0,'2026-09-30 20:25:14','2026-09-30 20:30:14',NULL,'2026-09-30 20:30:35','::1','2026-09-30 19:25:14'),('6a0437b6-285f-48db-826c-4c6ddaf31155','682f7cf2-b05f-4c','$2y$10$Uwu.3wobQetWmo58lvWbZ.aQzOkaBGtYMKhNEl/8w6B2EJmjqiVne',NULL,'email','hqfdevelopers@gmail.com','login_mfa',0,5,0,'2026-09-30 20:34:05','2026-09-30 20:39:05',NULL,'2026-09-30 20:36:29','::1','2026-09-30 19:34:05'),('72a064a2-33ee-4642-8e76-decea93970ce','682f7cf2-b05f-4c','$2y$10$TNzauRreTfrEurpjYB9BgejljM6hmQMbUYX2f2xiZBjaEtusOUBtW',NULL,'email','hqfdevelopers@gmail.com','login_mfa',0,5,0,'2026-09-30 19:27:38','2026-09-30 19:32:38','2026-09-30 19:28:39',NULL,'::1','2026-09-30 18:27:38'),('88302643-3804-4adc-8209-a37e67f8dfca','682f7cf2-b05f-4c','$2y$10$4Gn352.tBa05rj9wPc4gnuUyVy33Yorwri4AB6Na.TNvE6ZJki3te','5a95ef9c53f26c22412d7e606416773db977b8f7a2fdb6d7d859a87b3518fd6b','email','hqfdevelopers@gmail.com','login_mfa',2,5,0,'2026-09-30 20:36:29','2026-09-30 20:41:29',NULL,'2026-09-30 20:38:55','::1','2026-09-30 19:36:29'),('922475c8-4225-476c-9834-3149fd669774','682f7cf2-b05f-4c','$2y$10$mcL5r7Su4SNpPmGNC4CLVOYsZ/mIUCfKcAfmYa6E8ZQ6Zhby.fwTK',NULL,'email','hqfdevelopers@gmail.com','login_mfa',0,5,0,'2026-09-30 20:20:14','2026-09-30 20:25:14',NULL,'2026-09-30 20:21:46','::1','2026-09-30 19:20:14'),('a4d0979a-4916-4593-bace-a98055165759','682f7cf2-b05f-4c','$2y$10$fj7sn.ilMYtDuZpUS75ePeMAt1nmW81U.09x6rZRn83v1zB8c8Wu2',NULL,'email','hqfdevelopers@gmail.com','login_mfa',0,5,0,'2026-09-30 20:21:46','2026-09-30 20:26:46',NULL,'2026-09-30 20:22:48','::1','2026-09-30 19:21:46'),('aeffe9ac-b748-4ffd-bdab-093c939f8686','682f7cf2-b05f-4c','$2y$10$eQFcjhroB6oevU0ASyETeeTtb3Mik0WVgia60XjgPKwCZU7io202G',NULL,'email','hqfdevelopers@gmail.com','login_mfa',0,5,0,'2026-09-30 14:44:34','2026-09-30 14:49:34','2026-09-30 14:44:55',NULL,'::1','2026-09-30 13:44:34'),('ca142404-1f33-4035-a193-2c3dcbe1d846','682f7cf2-b05f-4c','$2y$10$xvEMCgBMUdRP2Iw7gO2ywOg0IVzXLpZePYUzNYmTAeXgNrsgY6v.G',NULL,'email','hqfdevelopers@gmail.com','login_mfa',0,5,0,'2026-09-30 20:22:48','2026-09-30 20:27:48',NULL,'2026-09-30 20:23:04','::1','2026-09-30 19:22:48'),('cc4aeb95-8338-4d28-a88d-5ac55354bc33','682f7cf2-b05f-4c','$2y$10$cU36TCh4wwmarvbCIzeQReFamMcu8c9M98BrAdlH97fvB1PHqDiUO','407a6356578cd608d7b640d43c45c1cb3cd9416409cc22e0b669680a7eff2ddb','email','hqfdevelopers@gmail.com','login_mfa',1,5,0,'2026-09-30 20:38:55','2026-09-30 20:43:55',NULL,NULL,'::1','2026-09-30 19:38:55'),('ddc3b729-f1ab-485a-958f-84b6bfbae529','682f7cf2-b05f-4c','$2y$10$uTFkYzakeYxjx5KvoI.f1O.5BJ.bAz17JW4GhKgOXFOQ4rhKcNbxS',NULL,'email','hqfdevelopers@gmail.com','login_mfa',0,5,0,'2026-09-30 20:30:35','2026-09-30 20:35:35',NULL,'2026-09-30 20:34:05','::1','2026-09-30 19:30:35');
 /*!40000 ALTER TABLE `otp_codes` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -461,7 +493,7 @@ CREATE TABLE `sessions` (
 
 LOCK TABLES `sessions` WRITE;
 /*!40000 ALTER TABLE `sessions` DISABLE KEYS */;
-INSERT INTO `sessions` VALUES ('d04d0e44-02fb-47d0-98e2-15da29b9c43c','682f7cf2-b05f-4c','043b9de56dcf3a5b97ba83a7a17432e208124f8b21cedda0039fd0cb46c37e4e',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-09-30 14:44:55','2026-10-30 14:44:55',NULL,NULL,'2026-09-30 13:44:55'),('efbc35a2-dd8f-43','682f7cf2-b05f-4c','568d88207f1afe7b1d9d88cf24c4a8ea88e3feb3e9dd1a661c1d6e31e0761dd4',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-09-29 18:35:32','2026-10-29 18:35:32',NULL,NULL,'2026-09-29 16:35:32');
+INSERT INTO `sessions` VALUES ('d04d0e44-02fb-47d0-98e2-15da29b9c43c','682f7cf2-b05f-4c','043b9de56dcf3a5b97ba83a7a17432e208124f8b21cedda0039fd0cb46c37e4e',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-09-30 14:44:55','2026-10-30 14:44:55','2026-09-30 19:43:38','Password changed','2026-09-30 13:44:55'),('efbc35a2-dd8f-43','682f7cf2-b05f-4c','568d88207f1afe7b1d9d88cf24c4a8ea88e3feb3e9dd1a661c1d6e31e0761dd4',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-09-29 18:35:32','2026-10-29 18:35:32','2026-09-30 19:43:38','Password changed','2026-09-29 16:35:32');
 /*!40000 ALTER TABLE `sessions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -516,6 +548,8 @@ CREATE TABLE `users` (
   `password_hash` varchar(255) NOT NULL,
   `email_verified_at` datetime DEFAULT NULL,
   `phone_verified_at` datetime DEFAULT NULL,
+  `mfa_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `mfa_secret` text DEFAULT NULL,
   `account_status` enum('pending_approval','active','rejected','suspended','locked') NOT NULL DEFAULT 'pending_approval',
   `failed_login_attempts` smallint(5) unsigned NOT NULL DEFAULT 0,
   `locked_until` datetime DEFAULT NULL,
@@ -541,7 +575,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES ('682f7cf2-b05f-4c',NULL,'system','18386d94-bc37-11f1-bb55-5081407ad051','Mathias','hqfdevelopers@gmail.com','+2348164902529','$2y$10$T/EwX7MAZLm.S7MkDiYHveorvUIBR3m.zfrkuuKFn6kQ5PiGmgM62','2026-09-29 14:56:17',NULL,'active',0,NULL,'2026-09-30 14:44:55','2026-09-29 14:56:20','2026-09-29 12:56:20','2026-09-30 13:44:55');
+INSERT INTO `users` VALUES ('682f7cf2-b05f-4c',NULL,'system','18386d94-bc37-11f1-bb55-5081407ad051','Mathias','hqfdevelopers@gmail.com','+2348164902529','$2y$10$gF4l3XjwmHKgXEm6lXgUPu3fl/9Wo5ut0R0KQW3ukMToguhHfmmRO','2026-09-29 14:56:17',NULL,1,'KpeBepQxDDHRWudaQGQKk+ggQnWtjxb8jTnn9V6STedTmpKmEvSHOWldWsNqy41/qRHzzFCL+9C5I0a27kmbVg==','active',0,NULL,'2026-09-30 19:28:39','2026-09-30 19:43:58','2026-09-29 12:56:20','2026-09-30 19:12:05');
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -554,4 +588,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-30 17:37:11
+-- Dump completed on 2026-09-30 20:39:28

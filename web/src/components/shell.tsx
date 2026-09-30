@@ -23,6 +23,7 @@ import {
 	ListChecks,
 	HelpCircle,
 	LayoutDashboard,
+	LogOut,
 	Menu,
 	PackageCheck,
 	Package,
@@ -40,21 +41,6 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import UserContext from "@/lib/userContext";
 import { cargoRecords, notifications } from "@/data/mock";
-
-const roles = [
-    { key: "system_admin", name: "System Administrator" },
-    { key: "organisation_owner", name: "Organization Owner" },
-    { key: "management", name: "Management" },
-    { key: "finance", name: "Finance Officer" },
-    { key: "terminal_operations", name: "Terminal Operations" },
-    { key: "gate_officer", name: "Gate Officer" },
-    { key: "warehouse_yard_officer", name: "Warehouse / Yard Officer" },
-    { key: "documentation_officer", name: "Documentation Officer" },
-    { key: "customer_service_sales", name: "Customer Service / Sales" },
-    { key: "compliance_customs_liaison", name: "Compliance / Customs Liaison" },
-    { key: "regulator_auditor", name: "Regulator / Auditor" },
-    { key: "portal_user", name: "Portal User" }
-];
 
 export function TrinuMark({ compact = false }: { compact?: boolean }) {
 	return (
@@ -146,454 +132,135 @@ export function Metric({
 }
 
 const sections = [
-    {
-        title: "Administration",
-        items: [
-            {
-                label: "Admin overview",
-                to: "/admin",
-                icon: LayoutDashboard,
-                exact: true,
-                permission: "administration.view",
-            },
-            {
-                label: "Organizations",
-                to: "/admin/organizations",
-                icon: Boxes,
-                permission: "administration.organisations",
-            },
-            {
-                label: "Users",
-                to: "/admin/users",
-                icon: UsersRound,
-                permission: "administration.users",
-            },
-            {
-                label: "Roles & permissions",
-                to: "/admin/roles",
-                icon: ShieldCheck,
-                permission: "administration.roles",
-            },
-            {
-                label: "Configuration",
-                to: "/admin/configuration",
-                icon: Settings,
-                permission: "administration.configuration",
-            },
-            {
-                label: "Audit Log",
-                to: "/admin/audit",
-                icon: Activity,
-                permission: "administration.audit",
-            },
-        ],
-        permission_key: ["system_admin"],
-    },
-
-    {
-        title: "Operations",
-        items: [
-            {
-                label: "Operations dashboard",
-                to: "/operations/dashboard",
-                icon: LayoutDashboard,
-                permission: "operations.view",
-            },
-            {
-                label: "Manifest intake",
-                to: "/operations/manifest",
-                icon: FileSpreadsheet,
-                permission: "operations.cargo",
-            },
-            {
-                label: "Receiving",
-                to: "/operations/receiving",
-                icon: PackageCheck,
-                permission: "operations.cargo",
-            },
-            {
-                label: "Yard",
-                to: "/operations/yard",
-                icon: Grid2X2,
-                permission: "warehouse.position",
-            },
-            {
-                label: "Warehouse",
-                to: "/operations/warehouse",
-                icon: Warehouse,
-                permission: "warehouse.view",
-            },
-            {
-                label: "Examination",
-                to: "/operations/examination",
-                icon: ClipboardCheck,
-                permission: "operations.examination",
-            },
-            {
-                label: "Seal events",
-                to: "/operations/seals",
-                icon: ShieldCheck,
-                permission: "operations.manage",
-            },
-            {
-                label: "Inventory",
-                to: "/operations/inventory",
-                icon: Boxes,
-                permission: "warehouse.inventory",
-            },
-            {
-                label: "Stuffing work orders",
-                to: "/operations/stuffing",
-                icon: PackageCheck,
-                permission: "operations.manage",
-            },
-            {
-                label: "Cycle counts",
-                to: "/operations/cycle-count",
-                icon: ListChecks,
-                permission: "warehouse.inventory",
-            },
-            {
-                label: "Value-added services",
-                to: "/operations/value-added",
-                icon: Settings,
-                permission: "operations.manage",
-            },
-            {
-                label: "Overrides",
-                to: "/operations/overrides",
-                icon: ShieldCheck,
-                permission: "operations.manage",
-            },
-        ],
-        permission_key: [
-            "organisation_owner",
-            "management",
-            "terminal_operations",
-            "warehouse_yard_officer",
-        ],
-    },
-
-    {
-        title: "Cargo",
-        items: [
-            {
-                label: "Cargo records",
-                to: "/portal/cargo",
-                icon: Boxes,
-                permission: "portal.cargo",
-            },
-            {
-                label: "Sample consignment",
-                to: "/portal/cargo/2481",
-                icon: PackageCheck,
-                permission: "portal.cargo",
-            },
-            {
-                label: "Sample container",
-                to: "/portal/containers/c-1",
-                icon: Container,
-                permission: "portal.cargo",
-            },
-            {
-                label: "Sample package",
-                to: "/portal/packages/p-1",
-                icon: Package,
-                permission: "portal.cargo",
-            },
-            {
-                label: "Tracking",
-                to: "/tracking",
-                icon: Search,
-                permission: "portal.cargo",
-            },
-            {
-                label: "Holds & Exceptions",
-                to: "/operations/holds",
-                icon: AlertTriangle,
-                permission: "operations.holds",
-            },
-        ],
-        permission_key: [
-            "organisation_owner",
-            "management",
-            "terminal_operations",
-            "gate_officer",
-            "warehouse_yard_officer",
-            "documentation_officer",
-            "customer_service_sales",
-            "compliance_customs_liaison",
-            "regulator_auditor",
-        ],
-    },
-
-    {
-        title: "Stakeholder portal",
-        items: [
-            {
-                label: "Portal dashboard",
-                to: "/portal/dashboard",
-                icon: LayoutDashboard,
-                permission: "portal.view",
-            },
-            {
-                label: "Bookings",
-                to: "/portal/bookings",
-                icon: Clock3,
-                permission: "portal.requests",
-            },
-            {
-                label: "Documents",
-                to: "/portal/documents",
-                icon: FileText,
-                permission: "portal.documents",
-            },
-            {
-                label: "Upload documents",
-                to: "/portal/documents/upload",
-                icon: FileCheck2,
-                permission: "documents.manage",
-            },
-            {
-                label: "Invoices",
-                to: "/portal/invoices",
-                icon: FileSpreadsheet,
-                permission: "portal.financials",
-            },
-            {
-                label: "Payments",
-                to: "/portal/payments",
-                icon: ClipboardCheck,
-                permission: "portal.financials",
-            },
-            {
-                label: "Statement of account",
-                to: "/portal/statement",
-                icon: FileText,
-                permission: "portal.financials",
-            },
-            {
-                label: "KYC & signatories",
-                to: "/portal/kyc",
-                icon: ShieldCheck,
-                permission: "portal.requests",
-            },
-            {
-                label: "Delegated access",
-                to: "/portal/delegation",
-                icon: UsersRound,
-                permission: "portal.requests",
-            },
-            {
-                label: "Portal users",
-                to: "/portal/users",
-                icon: UsersRound,
-                permission: "administration.users",
-            },
-            {
-                label: "Session management",
-                to: "/session-management",
-                icon: ShieldCheck,
-                permission: "portal.view",
-            },
-        ],
-        permission_key: [
-            "organisation_owner",
-            "management",
-            "finance",
-            "terminal_operations",
-            "gate_officer",
-            "warehouse_yard_officer",
-            "documentation_officer",
-            "customer_service_sales",
-            "compliance_customs_liaison",
-            "regulator_auditor",
-            "portal_user",
-        ],
-    },
-
-    {
-        title: "Gate",
-        items: [
-            {
-                label: "Gate dashboard",
-                to: "/gate/dashboard",
-                icon: LayoutDashboard,
-                permission: "gate.view",
-            },
-            {
-                label: "Appointments",
-                to: "/gate/appointments",
-                icon: Clock3,
-                permission: "gate.bookings",
-            },
-            {
-                label: "Gate Passes",
-                to: "/gate/passes",
-                icon: QrCode,
-                permission: "gate.bookings",
-            },
-            {
-                label: "Gate-in console",
-                to: "/gate/in",
-                icon: Truck,
-                permission: "gate.admit",
-            },
-            {
-                label: "Gate-out console",
-                to: "/gate/out",
-                icon: Truck,
-                permission: "gate.gate_out",
-            },
-            {
-                label: "Vehicle registry",
-                to: "/gate/vehicles",
-                icon: UsersRound,
-                permission: "gate.bookings",
-            },
-        ],
-        permission_key: [
-            "organisation_owner",
-            "management",
-            "gate_officer",
-        ],
-    },
-
-    {
-        title: "Finance",
-        items: [
-            {
-                label: "Finance dashboard",
-                to: "/finance/dashboard",
-                icon: BarChart3,
-                permission: "finance.view",
-            },
-            {
-                label: "Invoice ledger",
-                to: "/finance/invoices",
-                icon: FileCheck2,
-                permission: "finance.invoices",
-            },
-            {
-                label: "Payments & receipts",
-                to: "/finance/payments",
-                icon: ClipboardCheck,
-                permission: "finance.payments",
-            },
-            {
-                label: "Tariffs",
-                to: "/finance/tariffs",
-                icon: FileSpreadsheet,
-                permission: "finance.tariffs",
-            },
-            {
-                label: "Credit application",
-                to: "/finance/credit/apply",
-                icon: FileText,
-                permission: "finance.view",
-            },
-            {
-                label: "Credit limits",
-                to: "/finance/credit/limits",
-                icon: ShieldCheck,
-                permission: "finance.view",
-            },
-            {
-                label: "Collections",
-                to: "/finance/collections",
-                icon: Clock3,
-                permission: "finance.collections",
-            },
-            {
-                label: "Customer statements",
-                to: "/finance/statement/atlantic-trade",
-                icon: FileText,
-                permission: "finance.view",
-            },
-            {
-                label: "Approvals",
-                to: "/finance/approvals",
-                icon: Check,
-                permission: "finance.adjustments",
-            },
-            {
-                label: "Tax rules",
-                to: "/finance/tax",
-                icon: FileSpreadsheet,
-                permission: "finance.view",
-            },
-            {
-                label: "Reconciliation",
-                to: "/finance/reconciliation",
-                icon: ClipboardCheck,
-                permission: "finance.reconciliation",
-            },
-        ],
-        permission_key: [
-            "organisation_owner",
-            "management",
-            "finance",
-        ],
-    },
-
-    {
-        title: "Reports",
-        items: [
-            {
-                label: "Report catalog",
-                to: "/reports",
-                icon: BarChart3,
-                exact: true,
-                permission: "reports.view",
-            },
-            {
-                label: "Operations report",
-                to: "/reports/operations",
-                icon: Truck,
-                permission: "reports.view",
-            },
-            {
-                label: "Financial report",
-                to: "/reports/financial",
-                icon: FileSpreadsheet,
-                permission: "reports.view",
-            },
-            {
-                label: "Compliance report",
-                to: "/reports/compliance",
-                icon: ShieldCheck,
-                permission: "reports.view",
-            },
-        ],
-        permission_key: [
-            "organisation_owner",
-            "management",
-            "finance",
-            "terminal_operations",
-            "gate_officer",
-            "warehouse_yard_officer",
-            "documentation_officer",
-            "customer_service_sales",
-            "compliance_customs_liaison",
-            "regulator_auditor",
-        ],
-    },
+	{
+		title: "Administration",
+		items: [
+			{ label: "Admin overview", to: "/admin", icon: LayoutDashboard, exact: true, permission: "administration.view" },
+			{ label: "Organizations", to: "/admin/organizations", icon: Boxes, permission: "administration.organisations" },
+			{ label: "Users", to: "/admin/users", icon: UsersRound, permission: "administration.users" },
+			{ label: "Roles & permissions", to: "/admin/roles", icon: ShieldCheck, permission: "administration.roles" },
+			{ label: "Configuration", to: "/admin/configuration", icon: Settings, permission: "administration.configuration" },
+			{ label: "Audit Log", to: "/admin/audit", icon: Activity, permission: "administration.audit" },
+		],
+		permission_key: ["system_admin"],
+	},
+	{
+		title: "Operations",
+		items: [
+			{ label: "Operations dashboard", to: "/operations/dashboard", icon: LayoutDashboard, permission: "operations.view" },
+			{ label: "Manifest intake", to: "/operations/manifest", icon: FileSpreadsheet, permission: "operations.cargo" },
+			{ label: "Receiving", to: "/operations/receiving", icon: PackageCheck, permission: "operations.cargo" },
+			{ label: "Yard", to: "/operations/yard", icon: Grid2X2, permission: "warehouse.position" },
+			{ label: "Warehouse", to: "/operations/warehouse", icon: Warehouse, permission: "warehouse.view" },
+			{ label: "Examination", to: "/operations/examination", icon: ClipboardCheck, permission: "operations.examination" },
+			{ label: "Seal events", to: "/operations/seals", icon: ShieldCheck, permission: "operations.manage" },
+			{ label: "Inventory", to: "/operations/inventory", icon: Boxes, permission: "warehouse.inventory" },
+			{ label: "Stuffing work orders", to: "/operations/stuffing", icon: PackageCheck, permission: "operations.manage" },
+			{ label: "Cycle counts", to: "/operations/cycle-count", icon: ListChecks, permission: "warehouse.inventory" },
+			{ label: "Value-added services", to: "/operations/value-added", icon: Settings, permission: "operations.manage" },
+			{ label: "Overrides", to: "/operations/overrides", icon: ShieldCheck, permission: "operations.manage" },
+		],
+		permission_key: ["organisation_owner", "management", "terminal_operations", "warehouse_yard_officer"],
+	},
+	{
+		title: "Cargo",
+		items: [
+			{ label: "Cargo records", to: "/portal/cargo", icon: Boxes, permission: "portal.cargo" },
+			{ label: "Sample consignment", to: "/portal/cargo/2481", icon: PackageCheck, permission: "portal.cargo" },
+			{ label: "Sample container", to: "/portal/containers/c-1", icon: Container, permission: "portal.cargo" },
+			{ label: "Sample package", to: "/portal/packages/p-1", icon: Package, permission: "portal.cargo" },
+			{ label: "Tracking", to: "/tracking", icon: Search, permission: "portal.cargo" },
+			{ label: "Holds & Exceptions", to: "/operations/holds", icon: AlertTriangle, permission: "operations.holds" },
+		],
+		permission_key: [
+			"organisation_owner", "management", "terminal_operations", "gate_officer",
+			"warehouse_yard_officer", "documentation_officer", "customer_service_sales",
+			"compliance_customs_liaison", "regulator_auditor",
+		],
+	},
+	{
+		title: "Stakeholder portal",
+		items: [
+			{ label: "Portal dashboard", to: "/portal/dashboard", icon: LayoutDashboard, permission: "portal.view" },
+			{ label: "Bookings", to: "/portal/bookings", icon: Clock3, permission: "portal.requests" },
+			{ label: "Documents", to: "/portal/documents", icon: FileText, permission: "portal.documents" },
+			{ label: "Upload documents", to: "/portal/documents/upload", icon: FileCheck2, permission: "documents.manage" },
+			{ label: "Invoices", to: "/portal/invoices", icon: FileSpreadsheet, permission: "portal.financials" },
+			{ label: "Payments", to: "/portal/payments", icon: ClipboardCheck, permission: "portal.financials" },
+			{ label: "Statement of account", to: "/portal/statement", icon: FileText, permission: "portal.financials" },
+			{ label: "KYC & signatories", to: "/portal/kyc", icon: ShieldCheck, permission: "portal.requests" },
+			{ label: "Delegated access", to: "/portal/delegation", icon: UsersRound, permission: "portal.requests" },
+			{ label: "Portal users", to: "/portal/users", icon: UsersRound, permission: "administration.users" },
+			{ label: "Session management", to: "/session-management", icon: ShieldCheck, permission: "portal.view" },
+		],
+		permission_key: [
+			"organisation_owner", "management", "finance", "terminal_operations",
+			"gate_officer", "warehouse_yard_officer", "documentation_officer",
+			"customer_service_sales", "compliance_customs_liaison", "regulator_auditor", "portal_user",
+		],
+	},
+	{
+		title: "Gate",
+		items: [
+			{ label: "Gate dashboard", to: "/gate/dashboard", icon: LayoutDashboard, permission: "gate.view" },
+			{ label: "Appointments", to: "/gate/appointments", icon: Clock3, permission: "gate.bookings" },
+			{ label: "Gate Passes", to: "/gate/passes", icon: QrCode, permission: "gate.bookings" },
+			{ label: "Gate-in console", to: "/gate/in", icon: Truck, permission: "gate.admit" },
+			{ label: "Gate-out console", to: "/gate/out", icon: Truck, permission: "gate.gate_out" },
+			{ label: "Vehicle registry", to: "/gate/vehicles", icon: UsersRound, permission: "gate.bookings" },
+		],
+		permission_key: ["organisation_owner", "management", "gate_officer"],
+	},
+	{
+		title: "Finance",
+		items: [
+			{ label: "Finance dashboard", to: "/finance/dashboard", icon: BarChart3, permission: "finance.view" },
+			{ label: "Invoice ledger", to: "/finance/invoices", icon: FileCheck2, permission: "finance.invoices" },
+			{ label: "Payments & receipts", to: "/finance/payments", icon: ClipboardCheck, permission: "finance.payments" },
+			{ label: "Tariffs", to: "/finance/tariffs", icon: FileSpreadsheet, permission: "finance.tariffs" },
+			{ label: "Credit application", to: "/finance/credit/apply", icon: FileText, permission: "finance.view" },
+			{ label: "Credit limits", to: "/finance/credit/limits", icon: ShieldCheck, permission: "finance.view" },
+			{ label: "Collections", to: "/finance/collections", icon: Clock3, permission: "finance.collections" },
+			{ label: "Customer statements", to: "/finance/statement/atlantic-trade", icon: FileText, permission: "finance.view" },
+			{ label: "Approvals", to: "/finance/approvals", icon: Check, permission: "finance.adjustments" },
+			{ label: "Tax rules", to: "/finance/tax", icon: FileSpreadsheet, permission: "finance.view" },
+			{ label: "Reconciliation", to: "/finance/reconciliation", icon: ClipboardCheck, permission: "finance.reconciliation" },
+		],
+		permission_key: ["organisation_owner", "management", "finance"],
+	},
+	{
+		title: "Reports",
+		items: [
+			{ label: "Report catalog", to: "/reports", icon: BarChart3, exact: true, permission: "reports.view" },
+			{ label: "Operations report", to: "/reports/operations", icon: Truck, permission: "reports.view" },
+			{ label: "Financial report", to: "/reports/financial", icon: FileSpreadsheet, permission: "reports.view" },
+			{ label: "Compliance report", to: "/reports/compliance", icon: ShieldCheck, permission: "reports.view" },
+		],
+		permission_key: [
+			"organisation_owner", "management", "finance", "terminal_operations",
+			"gate_officer", "warehouse_yard_officer", "documentation_officer",
+			"customer_service_sales", "compliance_customs_liaison", "regulator_auditor",
+		],
+	},
 ];
 
 export function AppShell({ children, title, eyebrow }: { children: ReactNode; title: string; eyebrow?: string }) {
 	const { pathname } = useLocation();
 	const navigate = useNavigate();
-    const { privileges, permissions, role, my_details } = useContext(UserContext);
+	const { privileges, permissions, role, my_details } = useContext(UserContext);
 	const [collapsed, setCollapsed] = useState(false);
 	const [mobileOpen, setMobileOpen] = useState(false);
-	// const [role, setRole] = useState(roles[1]);
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [notificationsOpen, setNotificationsOpen] = useState(false);
+	const [userMenuOpen, setUserMenuOpen] = useState(false);
+	const [loggingOut, setLoggingOut] = useState(false);
+
 	const matchingCargo = cargoRecords.filter((cargo) =>
 		[cargo.reference, cargo.container, cargo.billOfLading, cargo.cargo, cargo.consignee]
 			.some((value) => value.toLowerCase().includes(searchQuery.trim().toLowerCase()))
 	);
+
 	const userInitials = (() => {
 		const parts = my_details?.full_name?.trim().split(/\s+/).filter(Boolean) || [];
 		if (parts.length >= 2) {
@@ -602,23 +269,33 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 		return (parts[0]?.slice(0, 2) ?? "").toUpperCase();
 	})();
 
-	useEffect(() => {
-        console.log({privileges, permissions, role, my_details})
-
-		// const saved = window.localStorage.getItem("trinu-role");
-		// if (saved && roles.includes(saved)) setRole(saved);
-		const handler = (event: KeyboardEvent) => {
-			if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-				event.preventDefault();
-				setSearchOpen(true);
-			}
-		};
-		window.addEventListener("keydown", handler);
-		return () => window.removeEventListener("keydown", handler);
-	}, []);
-
 	const isActive = (to: string, exact = false) =>
 		exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
+
+	const handleLogout = async () => {
+		if (loggingOut) return;
+		setLoggingOut(true);
+		try {
+			sessionStorage.removeItem("jwt");
+			sessionStorage.removeItem("remember");
+			sessionStorage.removeItem("email");
+			setUserMenuOpen(false);
+			setMobileOpen(false);
+			toast.success("Signed out.");
+			navigate("/logout", { replace: true });
+		} catch {
+			toast.error("Could not complete sign-out. Try again.");
+		} finally {
+			setLoggingOut(false);
+		}
+	};
+
+	useEffect(() => {
+		if (!userMenuOpen) return;
+		const close = () => setUserMenuOpen(false);
+		window.addEventListener("click", close);
+		return () => window.removeEventListener("click", close);
+	}, [userMenuOpen]);
 
 	return (
 		<div className="min-h-screen bg-sand font-sans text-ink">
@@ -643,7 +320,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 							collapsed ? "lg:justify-center lg:px-3" : ""
 						)}
 					>
-						<Link to="/operations" onClick={() => setMobileOpen(false)}>
+						<Link to={"/operations"} onClick={() => setMobileOpen(false)}>
 							<TrinuMark compact={collapsed} />
 						</Link>
 						<Button
@@ -668,58 +345,127 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 					)}
 					<nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
 						{sections.map((section) => (
-                            role && section.permission_key.includes(role.key) && (
-                                <div key={section.title}>
-                                    <p
-                                        className={cn(
-                                            "px-2 pb-1 font-mono text-[9px] uppercase tracking-[0.2em] text-ink-soft/70",
-                                            collapsed ? "lg:hidden" : ""
-                                        )}
-                                    >
-                                        {section.title}
-                                    </p>
-                                    {section.items.map((item) => {
-                                        const { label, to, icon: Icon } = item;
-                                        const active = isActive(to, "exact" in item && item.exact);
-                                        return (
-                                            <Link
-                                                key={to}
-                                                to={to}
-                                                onClick={() => setMobileOpen(false)}
-                                                className={cn(
-                                                    "group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[12px] transition-colors",
-                                                    active
-                                                        ? "bg-ink text-sand shadow-sm"
-                                                        : "text-ink-soft hover:bg-sand-2 hover:text-ink",
-                                                    collapsed ? "lg:justify-center lg:px-0" : ""
-                                                )}
-                                                title={collapsed ? label : undefined}
-                                            >
-                                                <Icon className="size-4 shrink-0" />
-                                                <span className={collapsed ? "lg:hidden" : ""}>{label}</span>
-                                            </Link>
-                                        );
-                                    })}
-                                </div>
-                            )
+							role && section.permission_key.includes(role.key) && (
+								<div key={section.title}>
+									<p
+										className={cn(
+											"px-2 pb-1 font-mono text-[9px] uppercase tracking-[0.2em] text-ink-soft/70",
+											collapsed ? "lg:hidden" : ""
+										)}
+									>
+										{section.title}
+									</p>
+									{section.items.map((item) => {
+										const { label, to, icon: Icon } = item;
+										const active = isActive(to, "exact" in item && item.exact);
+										return (
+											<Link
+												key={to}
+												to={to}
+												onClick={() => setMobileOpen(false)}
+												className={cn(
+													"group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[12px] transition-colors",
+													active
+														? "bg-ink text-sand shadow-sm"
+														: "text-ink-soft hover:bg-sand-2 hover:text-ink",
+													collapsed ? "lg:justify-center lg:px-0" : ""
+												)}
+												title={collapsed ? label : undefined}
+											>
+												<Icon className="size-4 shrink-0" />
+												<span className={collapsed ? "lg:hidden" : ""}>{label}</span>
+											</Link>
+										);
+									})}
+								</div>
+							)
 						))}
 					</nav>
-					{!collapsed && (
-						<div className="border-t border-line p-4">
-							<div className="flex items-center gap-2.5">
-								<div className="grid size-8 place-items-center rounded-full bg-ink font-display text-xs font-semibold text-sand">
-									{userInitials}
-								</div>
-								<div className="leading-tight">
-									<p className="text-[12px] font-semibold text-ink">{my_details?.full_name}</p>
-									<p className="font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">
-										{role?.name}
+
+					{/* User block — sidebar footer */}
+					<div className="relative border-t border-line p-4">
+						<button
+							type="button"
+							onClick={(e) => {
+								e.stopPropagation();
+								setUserMenuOpen((v) => !v);
+							}}
+							aria-haspopup="menu"
+							aria-expanded={userMenuOpen}
+							className={cn(
+								"flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-sand-2",
+								collapsed ? "lg:justify-center lg:px-0" : ""
+							)}
+						>
+							<div className="grid size-8 shrink-0 place-items-center rounded-full bg-ink font-display text-xs font-semibold text-sand">
+								{userInitials || "—"}
+							</div>
+							<div className={cn("min-w-0 leading-tight", collapsed ? "lg:hidden" : "")}>
+								<p className="truncate text-[12px] font-semibold text-ink">
+									{my_details?.full_name ?? "Unknown user"}
+								</p>
+								<p className="truncate font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">
+									{role?.name ?? "—"}
+								</p>
+							</div>
+							{!collapsed && (
+								<ChevronRight
+									className={cn(
+										"ml-auto size-3.5 shrink-0 text-ink-soft transition-transform",
+										userMenuOpen && "rotate-90"
+									)}
+								/>
+							)}
+						</button>
+
+						{userMenuOpen && (
+							<div
+								role="menu"
+								onClick={(e) => e.stopPropagation()}
+								className={cn(
+									"absolute bottom-[calc(100%-8px)] z-40 w-[220px] overflow-hidden rounded-lg bg-paper shadow-2xl ring-1 ring-line",
+									collapsed ? "left-[72px] lg:left-[68px]" : "left-4"
+								)}
+							>
+								<div className="border-b border-line px-3 py-2.5">
+									<p className="truncate text-[12px] font-semibold text-ink">
+										{my_details?.full_name ?? "Unknown user"}
+									</p>
+									<p className="truncate font-mono text-[10px] text-ink-soft">
+										{my_details?.email ?? ""}
 									</p>
 								</div>
+								<Link
+									to="/session-management"
+									onClick={() => setUserMenuOpen(false)}
+									className="flex items-center gap-2 px-3 py-2.5 text-[12px] text-ink-soft transition-colors hover:bg-sand-2 hover:text-ink"
+								>
+									<ShieldCheck className="size-3.5" />
+									Account security
+								</Link>
+								<Link
+									to="/faq"
+									onClick={() => setUserMenuOpen(false)}
+									className="flex items-center gap-2 px-3 py-2.5 text-[12px] text-ink-soft transition-colors hover:bg-sand-2 hover:text-ink"
+								>
+									<HelpCircle className="size-3.5" />
+									Help & FAQs
+								</Link>
+								<button
+									type="button"
+									role="menuitem"
+									onClick={handleLogout}
+									disabled={loggingOut}
+									className="flex w-full items-center gap-2 border-t border-line px-3 py-2.5 text-left text-[12px] font-semibold text-carmine transition-colors hover:bg-carmine/10 disabled:opacity-60"
+								>
+									<LogOut className="size-3.5" />
+									{loggingOut ? "Signing out…" : "Sign out"}
+								</button>
 							</div>
-						</div>
-					)}
+						)}
+					</div>
 				</aside>
+
 				<div className="min-w-0 flex-1">
 					<header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-sand/85 px-4 py-3 backdrop-blur-md sm:px-6">
 						<Button
@@ -781,8 +527,20 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 							>
 								<HelpCircle />
 							</Button>
+							<Button
+								variant="ghost"
+								size="icon"
+								className="min-h-10 min-w-10 text-ink-soft hover:text-carmine"
+								onClick={handleLogout}
+								disabled={loggingOut}
+								title="Sign out"
+								aria-label="Sign out"
+							>
+								<LogOut />
+							</Button>
 						</div>
 					</header>
+
 					{notificationsOpen && (
 						<div className="fixed right-4 top-[68px] z-50 w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line sm:right-6">
 							<div className="flex items-center justify-between border-b border-line px-4 py-3">
@@ -796,9 +554,18 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 							</div>
 							<div className="max-h-[60vh] overflow-y-auto px-4">
 								{notifications.map((item) => {
-									const destination = item.category === "Documents" ? "/portal/documents" : item.category === "Examination" ? "/operations/examination" : item.category === "Holds" ? "/operations/holds" : "/gate/passes";
+									const destination =
+										item.category === "Documents" ? "/portal/documents" :
+										item.category === "Examination" ? "/operations/examination" :
+										item.category === "Holds" ? "/operations/holds" :
+										"/gate/passes";
 									return (
-										<Link key={item.title} to={destination} onClick={() => setNotificationsOpen(false)} className="block border-b border-line py-3 last:border-0 hover:bg-sand/60">
+										<Link
+											key={item.title}
+											to={destination}
+											onClick={() => setNotificationsOpen(false)}
+											className="block border-b border-line py-3 last:border-0 hover:bg-sand/60"
+										>
 											<div className="flex items-start justify-between gap-3">
 												<p className="text-sm font-semibold text-ink">{item.title}</p>
 												<span className="font-mono text-[9px] uppercase text-ink-soft">{item.time}</span>
@@ -864,7 +631,9 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 								</Link>
 							))}
 							{matchingCargo.length === 0 && (
-								<p className="px-3 py-6 text-center text-sm text-ink-soft">No local records match that search.</p>
+								<p className="px-3 py-6 text-center text-sm text-ink-soft">
+									No local records match that search.
+								</p>
 							)}
 						</div>
 					</div>

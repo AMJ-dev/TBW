@@ -15,7 +15,6 @@ export interface User {
 }
 
 export interface LoginData {
-    token: string;
     remember: boolean;
     user: User;
     role: UserRole;
@@ -26,7 +25,6 @@ export interface LoginData {
 
 export interface AuthContextValue {
     auth: boolean;
-    token: string | null;
     my_id: string | null;
     my_details: User | null;
     role: UserRole | null;
@@ -36,7 +34,6 @@ export interface AuthContextValue {
     hydrated: boolean;
     detailsReady: boolean;
     setAuth: (next: boolean) => void;
-    setToken: (next: string | null) => void;
     setMyID: (next: string | null) => void;
     setMyDetails: (next: User | null) => void;
     setRole: (next: UserRole | null) => void;
@@ -55,7 +52,6 @@ export interface AuthContextValue {
 
 export const defaultValue: AuthContextValue = {
     auth: false,
-    token: null,
     my_id: null,
     my_details: null,
     role: null,
@@ -65,7 +61,6 @@ export const defaultValue: AuthContextValue = {
     hydrated: false,
     detailsReady: false,
     setAuth: () => {},
-    setToken: () => {},
     setMyID: () => {},
     setMyDetails: () => {},
     setRole: () => {},
