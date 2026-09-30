@@ -118,6 +118,8 @@
                 "id" => $my_details->id,
                 "email" => $my_details->email,
                 "full_name" => $my_details->full_name,
+                "phone" => $my_details->phone,
+                "pics" => $my_details->pics,
                 "account_type" => $my_details->account_type
             ],
             "role" => [

@@ -67,6 +67,8 @@ export default function UserProvider({ children }: PropsWithChildren) {
         const user: User = {
             id: data.user.id,
             email: data.user.email,
+            pics: data.user.pics,
+            phone: data.user.phone,
             full_name: data.user.full_name,
             account_type: data.user.account_type
         };
@@ -126,6 +128,7 @@ export default function UserProvider({ children }: PropsWithChildren) {
 
             if (resp.error === false && resp.data) {
                 updateProfile(resp.data);
+                // console.log(resp.data.user)
             }
         } catch (error: any) {
             const status =

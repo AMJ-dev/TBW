@@ -198,6 +198,7 @@
                 id,
                 full_name,
                 email,
+                phone,
                 account_type,
                 system_role_id,
                 account_status,
@@ -804,6 +805,7 @@
                     "id" => $user["id"],
                     "email" => $user["email"],
                     "full_name" => $user["full_name"],
+                    "phone" => $user["phone"],
                     "account_type" => $user["account_type"]
                 ],
                 "role" => [

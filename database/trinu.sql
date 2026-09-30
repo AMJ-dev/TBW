@@ -545,6 +545,7 @@ CREATE TABLE `users` (
   `full_name` varchar(150) NOT NULL,
   `email` varchar(254) NOT NULL,
   `phone` varchar(25) NOT NULL,
+  `pics` varchar(200) NOT NULL DEFAULT 'avatar.png',
   `password_hash` varchar(255) NOT NULL,
   `email_verified_at` datetime DEFAULT NULL,
   `phone_verified_at` datetime DEFAULT NULL,
@@ -575,7 +576,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES ('682f7cf2-b05f-4c',NULL,'system','18386d94-bc37-11f1-bb55-5081407ad051','Mathias','hqfdevelopers@gmail.com','+2348164902529','$2y$10$gF4l3XjwmHKgXEm6lXgUPu3fl/9Wo5ut0R0KQW3ukMToguhHfmmRO','2026-09-29 14:56:17',NULL,1,'KpeBepQxDDHRWudaQGQKk+ggQnWtjxb8jTnn9V6STedTmpKmEvSHOWldWsNqy41/qRHzzFCL+9C5I0a27kmbVg==','active',0,NULL,'2026-09-30 20:53:16','2026-09-30 19:43:58','2026-09-29 12:56:20','2026-09-30 19:53:16');
+INSERT INTO `users` VALUES ('682f7cf2-b05f-4c',NULL,'system','18386d94-bc37-11f1-bb55-5081407ad051','Mathias','hqfdevelopers@gmail.com','+2348164902527','uploads/73b2c6e1af2026_09_30_09_46_43x612.jpg','$2y$10$gF4l3XjwmHKgXEm6lXgUPu3fl/9Wo5ut0R0KQW3ukMToguhHfmmRO','2026-09-29 14:56:17',NULL,1,'KpeBepQxDDHRWudaQGQKk+ggQnWtjxb8jTnn9V6STedTmpKmEvSHOWldWsNqy41/qRHzzFCL+9C5I0a27kmbVg==','active',0,NULL,'2026-09-30 20:53:16','2026-09-30 19:43:58','2026-09-29 12:56:20','2026-09-30 20:46:43');
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
@@ -588,4 +589,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-09-30 20:53:59
+-- Dump completed on 2026-09-30 22:19:47

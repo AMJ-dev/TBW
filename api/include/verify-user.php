@@ -21,6 +21,8 @@
 
         if (!$session) invalid_token();
         if (strtotime($session['expires_at'] . ' UTC') < time()) invalid_token();
+        
+        $my_details->session_id = $decoded->session_id;
 
         unset($my_details->password); 
     } catch (Exception $e) { 

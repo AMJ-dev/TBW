@@ -27,11 +27,12 @@ import {
 	Menu,
 	PackageCheck,
 	Package,
-	Settings,
 	QrCode,
 	Search,
+	Settings,
 	ShieldCheck,
 	Truck,
+	User,
 	UsersRound,
 	Warehouse,
 	X,
@@ -41,6 +42,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import UserContext from "@/lib/userContext";
 import { cargoRecords, notifications } from "@/data/mock";
+import { resolveSrc } from "@/lib/functions";
 
 export function TrinuMark({ compact = false }: { compact?: boolean }) {
 	return (
@@ -127,6 +129,55 @@ export function Metric({
 					{info}
 				</div>
 			)}
+		</div>
+	);
+}
+
+export function Avatar({
+	pics,
+	fullName,
+	size = 32,
+	className,
+}: {
+	pics?: string | null | undefined;
+	fullName?: string | undefined;
+	size?: number | undefined;
+	className?: string | undefined;
+}) {
+	const trimmed = (pics ?? "").trim();
+	const isPlaceholder =
+		!trimmed ||
+		trimmed.toLowerCase() === "avatar.png" ||
+		trimmed.toLowerCase().endsWith("/avatar.png");
+
+	const initials = (() => {
+		const parts = fullName?.trim().split(/\s+/).filter(Boolean) || [];
+		if (parts.length >= 2) {
+			return ((parts[0]?.charAt(0) ?? "") + (parts[1]?.charAt(0) ?? "")).toUpperCase();
+		}
+		return (parts[0]?.slice(0, 2) ?? "").toUpperCase();
+	})();
+
+	if (!isPlaceholder) {
+		return (
+			<img
+				src={resolveSrc(trimmed)}
+				alt={fullName ?? "Profile"}
+				className={cn("shrink-0 rounded-full object-cover", className)}
+				style={{ width: size, height: size }}
+			/>
+		);
+	}
+
+	return (
+		<div
+			className={cn(
+				"grid shrink-0 place-items-center rounded-full bg-ink font-display font-semibold text-sand",
+				className
+			)}
+			style={{ width: size, height: size, fontSize: size * 0.36 }}
+		>
+			{initials || "—"}
 		</div>
 	);
 }
@@ -261,14 +312,6 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 			.some((value) => value.toLowerCase().includes(searchQuery.trim().toLowerCase()))
 	);
 
-	const userInitials = (() => {
-		const parts = my_details?.full_name?.trim().split(/\s+/).filter(Boolean) || [];
-		if (parts.length >= 2) {
-			return ((parts[0]?.charAt(0) ?? "") + (parts[1]?.charAt(0) ?? "")).toUpperCase();
-		}
-		return (parts[0]?.slice(0, 2) ?? "").toUpperCase();
-	})();
-
 	const isActive = (to: string, exact = false) =>
 		exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
 
@@ -288,6 +331,12 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 		} finally {
 			setLoggingOut(false);
 		}
+	};
+
+	const goToProfile = () => {
+		setUserMenuOpen(false);
+		setMobileOpen(false);
+		navigate("/my-profile");
 	};
 
 	useEffect(() => {
@@ -382,7 +431,6 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 						))}
 					</nav>
 
-					{/* User block — sidebar footer */}
 					<div className="relative border-t border-line p-4">
 						<button
 							type="button"
@@ -397,9 +445,11 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 								collapsed ? "lg:justify-center lg:px-0" : ""
 							)}
 						>
-							<div className="grid size-8 shrink-0 place-items-center rounded-full bg-ink font-display text-xs font-semibold text-sand">
-								{userInitials || "—"}
-							</div>
+							<Avatar
+								pics={my_details?.pics}
+								fullName={my_details?.full_name}
+								size={32}
+							/>
 							<div className={cn("min-w-0 leading-tight", collapsed ? "lg:hidden" : "")}>
 								<p className="truncate text-[12px] font-semibold text-ink">
 									{my_details?.full_name ?? "Unknown user"}
@@ -435,6 +485,26 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 										{my_details?.email ?? ""}
 									</p>
 								</div>
+
+								<button
+									type="button"
+									role="menuitem"
+									onClick={goToProfile}
+									className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[12px] text-ink-soft transition-colors hover:bg-sand-2 hover:text-ink"
+								>
+									<User className="size-3.5" />
+									View profile
+								</button>
+
+								<Link
+									to="/change-password"
+									onClick={() => setUserMenuOpen(false)}
+									className="flex items-center gap-2 px-3 py-2.5 text-[12px] text-ink-soft transition-colors hover:bg-sand-2 hover:text-ink"
+								>
+									<Settings className="size-3.5" />
+									Change password
+								</Link>
+
 								<Link
 									to="/session-management"
 									onClick={() => setUserMenuOpen(false)}
@@ -443,6 +513,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 									<ShieldCheck className="size-3.5" />
 									Account security
 								</Link>
+
 								<Link
 									to="/faq"
 									onClick={() => setUserMenuOpen(false)}
@@ -451,6 +522,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 									<HelpCircle className="size-3.5" />
 									Help & FAQs
 								</Link>
+
 								<button
 									type="button"
 									role="menuitem"
@@ -527,6 +599,19 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 							>
 								<HelpCircle />
 							</Button>
+							<button
+								type="button"
+								onClick={goToProfile}
+								title="View profile"
+								aria-label="View profile"
+								className="ml-1 rounded-full ring-2 ring-transparent transition-all hover:ring-orange/40"
+							>
+								<Avatar
+									pics={my_details?.pics}
+									fullName={my_details?.full_name}
+									size={36}
+								/>
+							</button>
 							<Button
 								variant="ghost"
 								size="icon"
@@ -614,8 +699,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 							{matchingCargo.slice(0, 5).map((cargo) => (
 								<Link
 									key={cargo.id}
-									to="/portal/cargo/$id"
-									params={{ id: cargo.id }}
+									to={`/portal/cargo/${cargo.id}`}
 									onClick={() => setSearchOpen(false)}
 									className="flex items-center justify-between rounded-md px-3 py-3 hover:bg-sand-2"
 								>

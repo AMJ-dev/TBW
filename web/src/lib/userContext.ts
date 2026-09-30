@@ -11,6 +11,8 @@ export interface User {
     id: string;
     email?: string;
     full_name?: string;
+    phone?: string;
+    pics?: string;
     account_type?: "system" | "organisation";
 }
 

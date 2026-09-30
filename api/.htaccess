@@ -21,9 +21,17 @@ RewriteRule ^login-verify-otp/$ src/login/verify-otp.php [NC]
 RewriteRule ^login-verify-otp/$ src/login/verify-otp.php [NC]
 
 RewriteRule ^get-profile/$ src/profile/get.php [NC]
+RewriteRule ^my-profile/$ src/profile/my-details.php [NC]
+
 RewriteRule ^auth/change-password/$ src/profile/change-password.php [NC]
+RewriteRule ^auth/profile/update/$ src/profile/update.php [NC]
+RewriteRule ^auth/profile/avatar/$ src/profile/avatar.php [NC]
 RewriteRule ^logout/$ src/profile/logout.php [NC]
 
 RewriteRule ^auth/mfa/setup/init/$ src/mfa/init.php [NC]
 RewriteRule ^auth/mfa/setup/verify/$ src/mfa/verify.php [NC]
 RewriteRule ^auth/mfa/verify/$ src/mfa/login.php [NC]
+
+RewriteRule ^my-sessions/$ src/sessions/get.php [NC]
+RewriteRule ^my-sessions/revoke-others/$ src/sessions/revoke-others.php [NC]
+RewriteRule ^my-sessions/revoke/([0-9]+)/$ src/sessions/revoke.php?id=$1 [NC]

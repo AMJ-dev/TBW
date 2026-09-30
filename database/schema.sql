@@ -2228,3 +2228,5 @@ CREATE TABLE mfa_recovery_codes (
 
 ALTER TABLE otp_codes
 ADD COLUMN mfa_token_hash VARCHAR(255) NULL AFTER otp_hash;
+
+ALTER TABLE `users` ADD `pics` VARCHAR(200) NOT NULL DEFAULT 'avatar.png' AFTER `phone`;

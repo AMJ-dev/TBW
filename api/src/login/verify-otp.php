@@ -47,6 +47,7 @@
                 full_name,
                 email,
                 account_type,
+                phone,
                 system_role_id,
                 account_status,
                 email_verified_at
@@ -510,6 +511,7 @@
                     "id" => $user["id"],
                     "email" => $user["email"],
                     "full_name" => $user["full_name"],
+                    "phone" => $user["phone"],
                     "account_type" => $user["account_type"]
                 ],
                 "role" => [
