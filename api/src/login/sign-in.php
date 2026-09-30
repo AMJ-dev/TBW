@@ -184,7 +184,7 @@
 
                 $stmt->execute([
                     ":id" => $attempt_id,
-                    ":email" => $email,
+                    ":email" => $user["email"],
                     ":user_id" => $user_id,
                     ":ip_address" => $ip_address,
                     ":user_agent" => $user_agent,
@@ -234,7 +234,7 @@
 
             $stmt->execute([
                 ":id" => $attempt_id,
-                ":email" => $email,
+                ":email" => $user["email"],
                 ":user_id" => $user_id,
                 ":ip_address" => $ip_address,
                 ":user_agent" => $user_agent,
@@ -275,7 +275,7 @@
 
             $stmt->execute([
                 ":id" => $attempt_id,
-                ":email" => $email,
+                ":email" => $user["email"],
                 ":user_id" => $user_id,
                 ":ip_address" => $ip_address,
                 ":user_agent" => $user_agent,
@@ -329,14 +329,109 @@
             ":user_id" => $user_id
         ]);
 
-        $otp = (string)random_int(100000, 999999);
-        $otp_hash = password_hash($otp, PASSWORD_DEFAULT);
+        $mfa_enabled = (int)$user["mfa_enabled"] === 1;
 
         $mfa_token = bin2hex(random_bytes(32));
         $mfa_token_hash = hash("sha256", $mfa_token);
 
         $otp_id = generateId();
         $otp_expires_at = date("Y-m-d H:i:s", time() + 300);
+
+        if ($mfa_enabled) {
+
+            $otp_hash = password_hash(
+                bin2hex(random_bytes(32)),
+                PASSWORD_DEFAULT
+            );
+
+            $stmt = $conn->prepare("
+                INSERT INTO otp_codes (
+                    id,
+                    user_id,
+                    otp_hash,
+                    mfa_token_hash,
+                    channel,
+                    destination,
+                    purpose,
+                    attempts,
+                    max_attempts,
+                    resend_count,
+                    last_sent_at,
+                    expires_at,
+                    ip_address
+                ) VALUES (
+                    :id,
+                    :user_id,
+                    :otp_hash,
+                    :mfa_token_hash,
+                    'email',
+                    :destination,
+                    'login_mfa',
+                    0,
+                    5,
+                    0,
+                    NULL,
+                    :expires_at,
+                    :ip_address
+                )
+            ");
+
+            $stmt->execute([
+                ":id" => $otp_id,
+                ":user_id" => $user_id,
+                ":otp_hash" => $otp_hash,
+                ":mfa_token_hash" => $mfa_token_hash,
+                ":destination" => $user["email"],
+                ":expires_at" => $otp_expires_at,
+                ":ip_address" => $ip_address
+            ]);
+
+            $attempt_id = generateId();
+
+            $stmt = $conn->prepare("
+                INSERT INTO login_attempts (
+                    id,
+                    email,
+                    user_id,
+                    ip_address,
+                    user_agent,
+                    outcome,
+                    reason
+                ) VALUES (
+                    :id,
+                    :email,
+                    :user_id,
+                    :ip_address,
+                    :user_agent,
+                    'mfa_pending',
+                    :reason
+                )
+            ");
+
+            $stmt->execute([
+                ":id" => $attempt_id,
+                ":email" => $user["email"],
+                ":user_id" => $user_id,
+                ":ip_address" => $ip_address,
+                ":user_agent" => $user_agent,
+                ":reason" => "Password verified, authenticator MFA required"
+            ]);
+
+            echo json_encode([
+                "error" => false,
+                "data" => "Authenticator verification required.",
+                "code" => [
+                    "email" => $user["email"],
+                    "expires_in" => 300,
+                    "mfa_enabled" => true,
+                    "mfa_token" => $mfa_token
+                ]
+            ]);
+            exit;
+        }
+
+        $otp = (string)random_int(100000, 999999);
+        $otp_hash = password_hash($otp, PASSWORD_DEFAULT);
 
         $stmt = $conn->prepare("
             INSERT INTO otp_codes (
@@ -408,7 +503,7 @@
             ":user_id" => $user_id,
             ":ip_address" => $ip_address,
             ":user_agent" => $user_agent,
-            ":reason" => "Password verified, MFA required"
+            ":reason" => "Password verified, email OTP required"
         ]);
 
         $subject = "Your TRINŪ Sign-In Verification Code";
@@ -461,7 +556,7 @@
             "code" => [
                 "email" => $user["email"],
                 "expires_in" => 300,
-                "mfa_enabled" => $user["mfa_enabled"],
+                "mfa_enabled" => false,
                 "mfa_token" => $mfa_token
             ]
         ]);

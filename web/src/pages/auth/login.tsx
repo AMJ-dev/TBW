@@ -42,7 +42,7 @@ export default function LoginPage() {
 			sessionStorage.setItem('expires_in', String(resp.code?.expires_in ?? 300))
 			sessionStorage.setItem('email', String(email.trim()))
 			const isMfaEnabled = String(resp.code?.mfa_enabled) === "1" || resp.code?.mfa_enabled === true;
-			if(isMfaEnabled) sessionStorage.setItem('mfa_token', String(resp.code?.mfa_token))
+			if(isMfaEnabled) sessionStorage.setItem('mfa_token', String(resp.code?.mfa_token));
 			navigate(isMfaEnabled ? "/mfa" : "/otp");
 		} catch (error) {
 			toast.error("Could not complete login. Try again later.")
