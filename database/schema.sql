@@ -2251,3 +2251,31 @@ CREATE TABLE `registration_documents` (
     REFERENCES `registration_requests` (`id`)
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE organisation_document_reviews (
+    id char(36) NOT NULL,
+    registration_document_id char(36) NOT NULL,
+    organisation_id char(36) NOT NULL,
+    status enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+    rejection_reason text DEFAULT NULL,
+    reviewed_by char(36) DEFAULT NULL,
+    reviewed_at datetime DEFAULT NULL,
+    created_at timestamp NOT NULL DEFAULT current_timestamp(),
+    updated_at timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_document_review (registration_document_id),
+    KEY idx_document_review_org (organisation_id),
+    KEY idx_document_review_status (status),
+    KEY idx_document_review_reviewer (reviewed_by),
+    CONSTRAINT fk_document_review_document
+        FOREIGN KEY (registration_document_id)
+        REFERENCES registration_documents(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_document_review_org
+        FOREIGN KEY (organisation_id)
+        REFERENCES organisations(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_document_review_user
+        FOREIGN KEY (reviewed_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

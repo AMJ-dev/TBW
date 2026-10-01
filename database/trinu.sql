@@ -114,6 +114,43 @@ INSERT INTO `mfa_recovery_codes` VALUES ('159acfde-d660-407d-9464-614eb9896a29',
 UNLOCK TABLES;
 
 --
+-- Table structure for table `organisation_document_reviews`
+--
+
+DROP TABLE IF EXISTS `organisation_document_reviews`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `organisation_document_reviews` (
+  `id` char(36) NOT NULL,
+  `registration_document_id` char(36) NOT NULL,
+  `organisation_id` char(36) NOT NULL,
+  `status` enum('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+  `rejection_reason` text DEFAULT NULL,
+  `reviewed_by` char(36) DEFAULT NULL,
+  `reviewed_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_document_review` (`registration_document_id`),
+  KEY `idx_document_review_org` (`organisation_id`),
+  KEY `idx_document_review_status` (`status`),
+  KEY `idx_document_review_reviewer` (`reviewed_by`),
+  CONSTRAINT `fk_document_review_document` FOREIGN KEY (`registration_document_id`) REFERENCES `registration_documents` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_document_review_org` FOREIGN KEY (`organisation_id`) REFERENCES `organisations` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_document_review_user` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `organisation_document_reviews`
+--
+
+LOCK TABLES `organisation_document_reviews` WRITE;
+/*!40000 ALTER TABLE `organisation_document_reviews` DISABLE KEYS */;
+/*!40000 ALTER TABLE `organisation_document_reviews` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `organisation_members`
 --
 
@@ -626,4 +663,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-01 16:26:25
+-- Dump completed on 2026-10-01 17:10:47

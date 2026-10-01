@@ -1,9 +1,9 @@
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
-    $id = $_GET['id'] ?? '';
+    $id = trim($_GET["id"] ?? "");
 
-    if (empty($id)) {
+    if ($id === "") {
         http_response_code(400);
 
         echo json_encode([
@@ -29,7 +29,10 @@
 
     try {
         $stmt = $conn->prepare("
-            SELECT id, verification_status
+            SELECT
+                id,
+                organisation_name,
+                verification_status
             FROM organisations
             WHERE id = :id
             LIMIT 1
@@ -53,7 +56,7 @@
             exit;
         }
 
-        if (!in_array($organisation["verification_status"], ["pending", "under_review"], true)) {
+        if (!in_array($organisation["verification_status"], ["pending", "under_review", "rejected"], true)) {
             http_response_code(400);
 
             echo json_encode([
@@ -84,7 +87,8 @@
 
         $userUpdate = $conn->prepare("
             UPDATE users
-            SET account_status = 'active'
+            SET
+                account_status = 'active'
             WHERE organisation_id = :organisation_id
             AND account_status = 'pending_approval'
         ");
@@ -106,6 +110,37 @@
             ":organisation_id" => $id
         ]);
 
+        $documentSelect = $conn->prepare("
+            SELECT
+                odr.id,
+                odr.registration_document_id
+            FROM organisation_document_reviews odr
+            WHERE odr.organisation_id = :organisation_id
+        ");
+
+        $documentSelect->execute([
+            ":organisation_id" => $id
+        ]);
+
+        $documentReviews = $documentSelect->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!empty($documentReviews)) {
+            $documentUpdate = $conn->prepare("
+                UPDATE organisation_document_reviews
+                SET
+                    status = 'approved',
+                    rejection_reason = NULL,
+                    reviewed_by = :reviewed_by,
+                    reviewed_at = NOW()
+                WHERE organisation_id = :organisation_id
+            ");
+
+            $documentUpdate->execute([
+                ":reviewed_by" => $my_details->id,
+                ":organisation_id" => $id
+            ]);
+        }
+
         $conn->commit();
 
         echo json_encode([
@@ -113,9 +148,14 @@
             "data" => "Organisation approved successfully",
             "code" => [
                 "id" => $id,
-                "status" => "verified"
+                "status" => "verified",
+                "documents" => [
+                    "status" => "approved",
+                    "count" => count($documentReviews)
+                ]
             ]
         ]);
+
     } catch (Throwable $e) {
         if ($conn->inTransaction()) {
             $conn->rollBack();
