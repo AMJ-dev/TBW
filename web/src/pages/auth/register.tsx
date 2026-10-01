@@ -2,16 +2,23 @@ import { useState, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
 import {
 	ArrowRight,
+	Award,
 	Building2,
 	Check,
 	Eye,
 	EyeOff,
 	FileCheck2,
+	FileText,
 	Lock,
 	Mail,
 	MapPin,
+	MessageSquare,
+	Paperclip,
 	Phone,
+	Plus,
 	ShieldCheck,
+	Trash2,
+	Upload,
 	User,
 	Users,
 } from "lucide-react";
@@ -43,7 +50,64 @@ const accountTypes: {
 	},
 ];
 
-const steps = ["Your details", "Organisation", "Verify"] as const;
+type DocKey = "cac" | "tin" | "signatory_id";
+
+type DocumentSlot = {
+	key: DocKey;
+	label: string;
+	detail: string;
+	accept: string;
+};
+
+const documentSlots: DocumentSlot[] = [
+	{
+		key: "cac",
+		label: "CAC certificate",
+		detail: "Certificate of incorporation or business name registration.",
+		accept: "application/pdf,image/*",
+	},
+	{
+		key: "tin",
+		label: "TIN certificate",
+		detail: "Tax Identification Number certificate issued by FIRS.",
+		accept: "application/pdf,image/*",
+	},
+	{
+		key: "signatory_id",
+		label: "Authorised signatory ID",
+		detail: "National ID, driver's licence, or international passport.",
+		accept: "application/pdf,image/*",
+	},
+];
+
+type LicenceType =
+	| "ncs_customs_agent"
+	| "nafdac"
+	| "son"
+	| "naqs"
+	| "soncap"
+	| "other";
+
+const licenceTypes: { key: LicenceType; label: string }[] = [
+	{ key: "ncs_customs_agent", label: "NCS Customs Agent Licence" },
+	{ key: "nafdac", label: "NAFDAC Permit" },
+	{ key: "son", label: "SON (Standards Organisation of Nigeria)" },
+	{ key: "naqs", label: "NAQS (Quarantine Service)" },
+	{ key: "soncap", label: "SONCAP Certificate" },
+	{ key: "other", label: "Other operational licence" },
+];
+
+type LicenceEntry = {
+	id: string;
+	type: LicenceType | "";
+	reference: string;
+	file: File | null;
+};
+
+const MAX_DOC_BYTES = 5 * 1024 * 1024;
+const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+
+const steps = ["Your details", "Organisation", "Documents", "Verify"] as const;
 
 export default function RegisterPage() {
 	const [step, setStep] = useState(0);
@@ -63,14 +127,90 @@ export default function RegisterPage() {
 	const [role, setRole] = useState("");
 	const [agreed, setAgreed] = useState(false);
 
-	const [verificationCode, setVerificationCode] = useState("");
-	const [otpSent, setOtpSent] = useState(false);
-	const [otpSending, setOtpSending] = useState(false);
-	const [otpVerifying, setOtpVerifying] = useState(false);
-	const [otpVerified, setOtpVerified] = useState(false);
+	const [documents, setDocuments] = useState<Record<DocKey, File | null>>({
+		cac: null,
+		tin: null,
+		signatory_id: null,
+	});
+
+	const [licences, setLicences] = useState<LicenceEntry[]>([
+		{
+			id: crypto.randomUUID(),
+			type: "ncs_customs_agent",
+			reference: "",
+			file: null,
+		},
+	]);
+
+	const [emailOtp, setEmailOtp] = useState("");
+	const [emailOtpSent, setEmailOtpSent] = useState(false);
+	const [emailOtpSending, setEmailOtpSending] = useState(false);
+	const [emailOtpVerifying, setEmailOtpVerifying] = useState(false);
+	const [emailVerified, setEmailVerified] = useState(false);
+
+	const [phoneOtp, setPhoneOtp] = useState("");
+	const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+	const [phoneOtpSending, setPhoneOtpSending] = useState(false);
+	const [phoneOtpVerifying, setPhoneOtpVerifying] = useState(false);
+	const [phoneVerified, setPhoneVerified] = useState(false);
+
 	const [submitting, setSubmitting] = useState(false);
 	const [submitted, setSubmitted] = useState(false);
 	const [registrationRef, setRegistrationRef] = useState("");
+
+	const pickDocument = (key: DocKey, file: File | null) => {
+		if (!file) {
+			setDocuments((prev) => ({ ...prev, [key]: null }));
+			return;
+		}
+		if (file.size > MAX_DOC_BYTES) {
+			toast.error("Each document must be 5MB or smaller.");
+			return;
+		}
+		if (!ALLOWED_MIME.includes(file.type)) {
+			toast.error("Only PDF, JPG, PNG, or WebP files are accepted.");
+			return;
+		}
+		setDocuments((prev) => ({ ...prev, [key]: file }));
+	};
+
+	const addLicence = () => {
+		setLicences((prev) => [
+			...prev,
+			{ id: crypto.randomUUID(), type: "", reference: "", file: null },
+		]);
+	};
+
+	const updateLicence = (id: string, patch: Partial<LicenceEntry>) => {
+		setLicences((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+	};
+
+	const removeLicence = (id: string) => {
+		setLicences((prev) => prev.filter((l) => l.id !== id));
+	};
+
+	const pickLicenceFile = (id: string, file: File | null) => {
+		if (!file) {
+			updateLicence(id, { file: null });
+			return;
+		}
+		if (file.size > MAX_DOC_BYTES) {
+			toast.error("Each licence document must be 5MB or smaller.");
+			return;
+		}
+		if (!ALLOWED_MIME.includes(file.type)) {
+			toast.error("Only PDF, JPG, PNG, or WebP files are accepted.");
+			return;
+		}
+		updateLicence(id, { file });
+	};
+
+	const hasRequiredLicence = () => {
+		if (accountType !== "agent") return true;
+		return licences.some(
+			(l) => l.type === "ncs_customs_agent" && l.reference.trim() && l.file
+		);
+	};
 
 	const next = () => {
 		if (step === 0) {
@@ -104,8 +244,8 @@ export default function RegisterPage() {
 				toast.error("Enter your organisation name to continue.");
 				return;
 			}
-			if (accountType === "agent" && !rcNumber.trim()) {
-				toast.error("Enter your RC number to continue as a licensed agent.");
+			if (!rcNumber.trim()) {
+				toast.error("Enter your RC number to continue.");
 				return;
 			}
 			if (!agreed) {
@@ -113,10 +253,67 @@ export default function RegisterPage() {
 				return;
 			}
 		}
+		if (step === 2) {
+			if (honeypot.trim()) {
+				setSubmitted(true);
+				return;
+			}
+			const missing = documentSlots
+				.map((s) => s.key)
+				.filter((key) => !documents[key]);
+			if (missing.length > 0) {
+				toast.error(
+					`Upload all required documents: ${missing
+						.map((k) => documentSlots.find((s) => s.key === k)?.label ?? k)
+						.join(", ")}.`
+				);
+				return;
+			}
+			if (!hasRequiredLicence()) {
+				toast.error(
+					"Licensed agents must upload a valid NCS Customs Agent Licence with its reference number."
+				);
+				return;
+			}
+		}
 		setStep((s) => s + 1);
 	};
 
-	const handleSendOtp = async () => {
+	const buildFormData = () => {
+		const form = new FormData();
+		form.append("full_name", fullName);
+		form.append("email", email);
+		form.append("phone", phone);
+		form.append("password", password);
+		form.append("confirm_password", confirmPassword);
+		form.append("account_type", accountType);
+		form.append("organisation", organisation);
+		form.append("rc_number", rcNumber);
+		form.append("tin", tin);
+		form.append("role", role);
+		form.append("agreed", agreed ? "1" : "0");
+
+		documentSlots.forEach((slot) => {
+			const file = documents[slot.key];
+			if (file) form.append(slot.key, file);
+		});
+
+		const licenceMeta = licences
+			.filter((l) => l.type && l.reference.trim())
+			.map((l) => ({ id: l.id, type: l.type, reference: l.reference.trim() }));
+		form.append("licences", JSON.stringify(licenceMeta));
+
+		licences.forEach((l, index) => {
+			if (l.file) {
+				form.append(`licence_file_${index}`, l.file);
+				form.append(`licence_id_${index}`, l.id);
+			}
+		});
+
+		return form;
+	};
+
+	const handleSendEmailOtp = async () => {
 		if (honeypot.trim()) {
 			setSubmitted(true);
 			return;
@@ -125,64 +322,109 @@ export default function RegisterPage() {
 			toast.error("Enter your email before requesting a code.");
 			return;
 		}
-		setOtpSending(true);
+		setEmailOtpSending(true);
 		try {
-			const res = await http.post("register-send-otp/", {
-				email,
-				full_name: fullName,
-				phone,
-				password,
-				confirm_password: confirmPassword,
-				account_type: accountType,
-				organisation,
-				rc_number: rcNumber,
-				tin,
-				role,
-				agreed,
-
+			const res = await http.post("register-send-otp/", buildFormData(), {
+				headers: { "Content-Type": "multipart/form-data" },
 			});
-			const resp:Resp = res.data;
+			const resp: Resp = res.data;
 			if (resp?.error) {
 				toast.error(resp.data || "Could not send the verification code.");
 			} else {
 				setRegistrationRef(res.data?.code?.registration_ref || "");
 				toast.success("Verification code sent to your email.");
-				setOtpSent(true);
+				setEmailOtpSent(true);
 			}
 		} catch {
 			toast.error("Could not send the verification code.");
 		} finally {
-			setOtpSending(false);
+			setEmailOtpSending(false);
 		}
 	};
 
-	const handleVerifyOtp = async () => {
+	const handleVerifyEmailOtp = async () => {
 		if (honeypot.trim()) {
 			setSubmitted(true);
 			return;
 		}
-		if (!verificationCode.trim()) {
-			toast.error("Enter the verification code we sent you.");
+		if (!emailOtp.trim()) {
+			toast.error("Enter the email verification code we sent you.");
 			return;
 		}
-		setOtpVerifying(true);
+		setEmailOtpVerifying(true);
 		try {
 			const res = await http.post("register-verify-otp/", {
 				email,
-				verification_code: verificationCode,
+				verification_code: emailOtp,
 				registration_ref: registrationRef,
 			});
-			const resp:Resp = res.data;
+			const resp: Resp = res.data;
 			if (resp?.error) {
-				toast.error(resp.data || "Verification failed. Check the code and try again.");
+				toast.error(resp.data || "Email verification failed. Check the code and try again.");
 			} else {
 				toast.success("Email verified.");
-				setOtpVerified(true);
+				setEmailVerified(true);
 			}
 		} catch {
-			toast.error("Verification failed. Check the code and try again.");
+			toast.error("Email verification failed. Check the code and try again.");
 		} finally {
-			setOtpVerifying(false);
+			setEmailOtpVerifying(false);
+		}
+	};
+
+	const handleSendPhoneOtp = async () => {
+		if (honeypot.trim()) {
+			setSubmitted(true);
+			return;
+		}
+		if (!phone.trim()) {
+			toast.error("Enter your phone number before requesting a code.");
+			return;
+		}
+		setPhoneOtpSending(true);
+		try {
+			const res = await http.post("register/sms-send-otp/", { phone });
+			const resp: Resp = res.data;
+			if (resp?.error) {
+				toast.error(resp.data || "Could not send the SMS code.");
+			} else {
+				toast.success("Verification code sent to your phone.");
+				setPhoneOtpSent(true);
+			}
+		} catch {
+			toast.error("Could not send the SMS code.");
+		} finally {
+			setPhoneOtpSending(false);
+		}
+	};
+
+	const handleVerifyPhoneOtp = async () => {
+		if (honeypot.trim()) {
+			setSubmitted(true);
+			return;
+		}
+		if (!phoneOtp.trim()) {
+			toast.error("Enter the SMS verification code we sent you.");
+			return;
+		}
+		setPhoneOtpVerifying(true);
+		try {
+			const res = await http.post("register/sms-verify-otp/", {
+				phone,
+				verification_code: phoneOtp,
+				registration_ref: registrationRef,
+			});
+			const resp: Resp = res.data;
+			if (resp?.error) {
+				toast.error(resp.data || "Phone verification failed. Check the code and try again.");
+			} else {
+				toast.success("Phone number verified.");
+				setPhoneVerified(true);
+			}
+		} catch {
+			toast.error("Phone verification failed. Check the code and try again.");
+		} finally {
+			setPhoneOtpVerifying(false);
 		}
 	};
 
@@ -192,28 +434,25 @@ export default function RegisterPage() {
 			setSubmitted(true);
 			return;
 		}
-		if (!otpVerified) {
+		if (!emailVerified) {
 			toast.error("Verify your email before completing registration.");
+			return;
+		}
+		if (!phoneVerified) {
+			toast.error("Verify your phone number before completing registration.");
 			return;
 		}
 		setSubmitting(true);
 		try {
-			const res = await http.post("sign-up/", {
-				full_name: fullName,
-				email,
-				phone,
-				password,
-				confirm_password: confirmPassword,
-				account_type: accountType,
-				organisation,
-				rc_number: rcNumber,
-				tin,
-				role,
-				agreed,
-				verification_code: verificationCode,
-				registration_ref: registrationRef,
+			const form = buildFormData();
+			form.append("email_verification_code", emailOtp);
+			form.append("phone_verification_code", phoneOtp);
+			form.append("registration_ref", registrationRef);
+
+			const res = await http.post("sign-up/", form, {
+				headers: { "Content-Type": "multipart/form-data" },
 			});
-			const resp:Resp = res.data;
+			const resp: Resp = res.data;
 			if (resp?.error) {
 				toast.error(resp.data || "Registration failed. Please try again.");
 			} else {
@@ -260,7 +499,7 @@ export default function RegisterPage() {
 										Reference
 									</p>
 									<p className="mt-2 font-mono text-lg font-bold text-ink">
-										TRN-REG-2026-00417
+										{registrationRef || "TRN-REG-2026-00417"}
 									</p>
 								</div>
 
@@ -316,9 +555,9 @@ export default function RegisterPage() {
 								{[
 									{
 										icon: ShieldCheck,
-										label: "Reviewed before access",
+										label: "KYC before approval",
 										detail:
-											"Registration is reviewed so the operating record stays dependable.",
+											"CAC, TIN, licences, and authorised signatory verified before access.",
 									},
 									{
 										icon: FileCheck2,
@@ -358,6 +597,10 @@ export default function RegisterPage() {
 									[
 										"Submit your details",
 										"Tell us who you are and what your organisation does.",
+									],
+									[
+										"Upload KYC documents",
+										"CAC certificate, TIN, operational licences, and authorised signatory ID.",
 									],
 									[
 										"Organisation review",
@@ -433,7 +676,7 @@ export default function RegisterPage() {
 								</div>
 							</div>
 
-							{step < 2 && (
+							{step < 3 && (
 								<form
 									onSubmit={(e) => {
 										e.preventDefault();
@@ -619,11 +862,10 @@ export default function RegisterPage() {
 												<label className="block">
 													<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 														RC number
-														{accountType === "agent" && (
-															<span className="ml-1 text-orange">*</span>
-														)}
+														<span className="ml-1 text-orange">*</span>
 													</span>
 													<Input
+														required
 														placeholder="e.g. RC-1284921"
 														value={rcNumber}
 														onChange={(e) => setRcNumber(e.target.value)}
@@ -663,8 +905,12 @@ export default function RegisterPage() {
 												<ul className="mt-3 space-y-2 text-[12px] leading-5 text-ink-soft">
 													<li className="flex items-start gap-2">
 														<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
+														You'll upload KYC documents on the next step.
+													</li>
+													<li className="flex items-start gap-2">
+														<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
 														We verify your organisation details and licence
-														references where applicable.
+														references.
 													</li>
 													<li className="flex items-start gap-2">
 														<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
@@ -696,6 +942,250 @@ export default function RegisterPage() {
 										</div>
 									)}
 
+									{step === 2 && (
+										<div className="space-y-5">
+											<p className="text-[13px] leading-6 text-ink-soft">
+												Upload the documents we use to verify your organisation.
+												Files are reviewed before access is granted and stored
+												securely.
+											</p>
+
+											<div className="space-y-3">
+												{documentSlots.map((slot) => {
+													const file = documents[slot.key];
+													return (
+														<div
+															key={slot.key}
+															className="rounded-xl bg-sand p-4 ring-1 ring-line"
+														>
+															<div className="flex items-start gap-3">
+																<div className="grid size-9 shrink-0 place-items-center rounded-md bg-orange text-white">
+																	<FileText className="size-4" />
+																</div>
+																<div className="min-w-0">
+																	<p className="text-sm font-semibold text-ink">
+																		{slot.label}
+																		<span className="ml-1 text-orange">*</span>
+																	</p>
+																	<p className="mt-0.5 text-[11px] leading-5 text-ink-soft">
+																		{slot.detail}
+																	</p>
+																</div>
+															</div>
+
+															{file ? (
+																<div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-paper px-3 py-2 ring-1 ring-line">
+																	<div className="flex min-w-0 items-center gap-2">
+																		<Paperclip className="size-3.5 shrink-0 text-orange" />
+																		<span className="truncate font-mono text-[11px] text-ink">
+																			{file.name}
+																		</span>
+																		<span className="shrink-0 font-mono text-[10px] text-ink-soft">
+																			{(file.size / 1024).toFixed(0)} KB
+																		</span>
+																	</div>
+																	<button
+																		type="button"
+																		onClick={() => pickDocument(slot.key, null)}
+																		aria-label={`Remove ${slot.label}`}
+																		className="grid size-7 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
+																	>
+																		<Trash2 className="size-3.5" />
+																	</button>
+																</div>
+															) : (
+																<label className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-md border border-dashed border-line bg-paper px-3 py-3 text-[12px] text-ink-soft transition-colors hover:border-orange/40 hover:bg-orange/5 hover:text-orange">
+																	<span className="inline-flex items-center gap-2">
+																		<Upload className="size-3.5" />
+																		Choose file
+																	</span>
+																	<span className="font-mono text-[10px] text-ink-soft">
+																		PDF, JPG, PNG · max 5MB
+																	</span>
+																	<input
+																		type="file"
+																		accept={slot.accept}
+																		onChange={(e) => {
+																			const picked = e.target.files?.[0] ?? null;
+																			e.target.value = "";
+																			pickDocument(slot.key, picked);
+																		}}
+																		className="hidden"
+																	/>
+																</label>
+															)}
+														</div>
+													);
+												})}
+											</div>
+
+											<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
+												<div className="flex items-start justify-between gap-3">
+													<div className="flex items-start gap-3">
+														<div className="grid size-9 shrink-0 place-items-center rounded-md bg-orange text-white">
+															<Award className="size-4" />
+														</div>
+														<div className="min-w-0">
+															<p className="text-sm font-semibold text-ink">
+																Operational licences
+																{accountType === "agent" && (
+																	<span className="ml-1 text-orange">*</span>
+																)}
+															</p>
+															<p className="mt-0.5 text-[11px] leading-5 text-ink-soft">
+																{accountType === "agent"
+																	? "Add each licence your organisation holds. NCS Customs Agent Licence is required for agents."
+																	: "Add any operational licences your organisation holds (NAFDAC, SON, NAQS, SONCAP, or others). Optional for importers at registration."}
+															</p>
+														</div>
+													</div>
+													<Button
+														type="button"
+														variant="outline"
+														size="sm"
+														onClick={addLicence}
+														className="border-line bg-paper text-ink hover:bg-sand-2"
+													>
+														<Plus className="size-3.5" />
+														Add licence
+													</Button>
+												</div>
+
+												<div className="mt-4 space-y-3">
+													{licences.length === 0 && (
+														<div className="rounded-md border border-dashed border-line bg-paper px-3 py-4 text-center text-[12px] text-ink-soft">
+															No licences added yet.
+														</div>
+													)}
+
+													{licences.map((licence, index) => (
+														<div
+															key={licence.id}
+															className="rounded-lg bg-paper p-3 ring-1 ring-line"
+														>
+															<div className="flex items-center justify-between gap-3">
+																<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+																	Licence {index + 1}
+																</p>
+																<button
+																	type="button"
+																	onClick={() => removeLicence(licence.id)}
+																	aria-label="Remove licence"
+																	className="grid size-7 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
+																>
+																	<Trash2 className="size-3.5" />
+																</button>
+															</div>
+
+															<div className="mt-3 grid gap-3 sm:grid-cols-2">
+																<label className="block">
+																	<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+																		Licence type
+																	</span>
+																	<select
+																		value={licence.type}
+																		onChange={(e) =>
+																			updateLicence(licence.id, {
+																				type: e.target.value as LicenceType,
+																			})
+																		}
+																		className="mt-2 h-11 w-full rounded-md border border-line bg-sand px-3 text-sm text-ink"
+																	>
+																		<option value="">Select a licence type…</option>
+																		{licenceTypes.map((t) => (
+																			<option key={t.key} value={t.key}>
+																				{t.label}
+																			</option>
+																		))}
+																	</select>
+																</label>
+
+																<label className="block">
+																	<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+																		Licence reference number
+																	</span>
+																	<Input
+																		placeholder="e.g. NCS/AG/2026/00123"
+																		value={licence.reference}
+																		onChange={(e) =>
+																			updateLicence(licence.id, {
+																				reference: e.target.value,
+																			})
+																		}
+																		className="mt-2 h-11 border-line bg-sand font-mono text-ink"
+																	/>
+																</label>
+															</div>
+
+															{licence.file ? (
+																<div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-sand px-3 py-2 ring-1 ring-line">
+																	<div className="flex min-w-0 items-center gap-2">
+																		<Paperclip className="size-3.5 shrink-0 text-orange" />
+																		<span className="truncate font-mono text-[11px] text-ink">
+																			{licence.file.name}
+																		</span>
+																		<span className="shrink-0 font-mono text-[10px] text-ink-soft">
+																			{(licence.file.size / 1024).toFixed(0)} KB
+																		</span>
+																	</div>
+																	<button
+																		type="button"
+																		onClick={() => pickLicenceFile(licence.id, null)}
+																		aria-label="Remove licence file"
+																		className="grid size-7 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
+																	>
+																		<Trash2 className="size-3.5" />
+																	</button>
+																</div>
+															) : (
+																<label className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-md border border-dashed border-line bg-sand px-3 py-3 text-[12px] text-ink-soft transition-colors hover:border-orange/40 hover:bg-orange/5 hover:text-orange">
+																	<span className="inline-flex items-center gap-2">
+																		<Upload className="size-3.5" />
+																		Upload licence document
+																	</span>
+																	<span className="font-mono text-[10px] text-ink-soft">
+																		PDF, JPG, PNG · max 5MB
+																	</span>
+																	<input
+																		type="file"
+																		accept="application/pdf,image/*"
+																		onChange={(e) => {
+																			const picked = e.target.files?.[0] ?? null;
+																			e.target.value = "";
+																			pickLicenceFile(licence.id, picked);
+																		}}
+																		className="hidden"
+																	/>
+																</label>
+															)}
+														</div>
+													))}
+												</div>
+											</div>
+
+											<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
+												<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+													File requirements
+												</p>
+												<ul className="mt-3 space-y-2 text-[12px] leading-5 text-ink-soft">
+													<li className="flex items-start gap-2">
+														<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
+														PDF, JPG, PNG, or WebP · max 5MB per file.
+													</li>
+													<li className="flex items-start gap-2">
+														<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
+														Documents must be current and legible.
+													</li>
+													<li className="flex items-start gap-2">
+														<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
+														Additional licences can be added during onboarding if not
+														available now.
+													</li>
+												</ul>
+											</div>
+										</div>
+									)}
+
 									<div className="mt-6 flex items-center justify-between gap-3 border-t border-line pt-5">
 										<Button
 											type="button"
@@ -716,7 +1206,7 @@ export default function RegisterPage() {
 								</form>
 							)}
 
-							{step === 2 && (
+							{step === 3 && (
 								<form onSubmit={handleSubmit} className="p-5 sm:p-7">
 									<input
 										type="text"
@@ -729,86 +1219,171 @@ export default function RegisterPage() {
 										className="hidden"
 									/>
 
-									<p className="text-[13px] leading-6 text-ink-soft">
-										We'll send a 6-digit verification code to{" "}
-										<span className="font-mono text-ink">{email || "your email"}</span>.
-										Enter it below to confirm and complete registration.
-									</p>
+									{/* EMAIL VERIFICATION */}
+									<div
+										className={
+											"rounded-xl p-4 ring-1 transition-colors " +
+											(emailVerified
+												? "bg-orange/5 ring-orange/25"
+												: "bg-sand ring-line")
+										}
+									>
+										<div className="flex items-start gap-3">
+											<div
+												className={
+													"grid size-9 shrink-0 place-items-center rounded-md text-white " +
+													(emailVerified ? "bg-orange" : "bg-ink")
+												}
+											>
+												<Mail className="size-4" />
+											</div>
+											<div className="min-w-0 flex-1">
+												<div className="flex flex-wrap items-center gap-2">
+													<p className="text-sm font-semibold text-ink">
+														Email verification
+													</p>
+													{emailVerified && (
+														<span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-orange">
+															<Check className="size-3" />
+															Verified
+														</span>
+													)}
+												</div>
+												<p className="mt-0.5 truncate font-mono text-[11px] text-ink-soft">
+													{email || "your email"}
+												</p>
+											</div>
+										</div>
 
-									<div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
-										<Button
-											type="button"
-											onClick={handleSendOtp}
-											disabled={otpSending || otpVerified}
-											variant={otpSent ? "outline" : "default"}
-											className={
-												otpSent
-													? "border-line bg-paper text-ink hover:bg-sand"
-													: "bg-orange text-white hover:bg-orange-deep"
-											}
-										>
-											{otpSending
-												? "Sending code…"
-												: otpVerified
-												? "Code verified"
-												: otpSent
-												? "Resend code"
-												: "Send verification code"}
-										</Button>
-										{otpVerified && (
-											<span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-orange">
-												<Check className="size-3.5" />
-												Email verified
-											</span>
+										{!emailVerified && (
+											<div className="mt-4 space-y-3">
+												<Button
+													type="button"
+													onClick={handleSendEmailOtp}
+													disabled={emailOtpSending}
+													variant={emailOtpSent ? "outline" : "default"}
+													className={
+														emailOtpSent
+															? "border-line bg-paper text-ink hover:bg-sand"
+															: "bg-orange text-white hover:bg-orange-deep"
+													}
+												>
+													{emailOtpSending
+														? "Sending code…"
+														: emailOtpSent
+														? "Resend email code"
+														: "Send email code"}
+												</Button>
+
+												<div className="flex flex-col gap-2 sm:flex-row">
+													<Input
+														required
+														inputMode="numeric"
+														autoComplete="one-time-code"
+														placeholder="000000"
+														maxLength={6}
+														value={emailOtp}
+														onChange={(e) => setEmailOtp(e.target.value)}
+														className="h-12 border-line bg-paper text-center font-mono text-lg tracking-[0.4em] text-ink"
+													/>
+													<Button
+														type="button"
+														onClick={handleVerifyEmailOtp}
+														disabled={emailOtpVerifying || !emailOtp.trim()}
+														className="h-12 bg-orange text-white hover:bg-orange-deep"
+													>
+														{emailOtpVerifying ? "Verifying…" : "Verify email"}
+													</Button>
+												</div>
+											</div>
 										)}
 									</div>
 
-									<label className="mt-5 block">
-										<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-											Verification code
-										</span>
-										<div className="mt-2 flex flex-col gap-2 sm:flex-row">
-											<Input
-												required
-												inputMode="numeric"
-												autoComplete="one-time-code"
-												placeholder="000000"
-												maxLength={6}
-												value={verificationCode}
-												onChange={(e) => {
-													setVerificationCode(e.target.value);
-													setOtpVerified(false);
-												}}
-												className="h-12 border-line bg-sand text-center font-mono text-lg tracking-[0.4em] text-ink"
-											/>
-											<Button
-												type="button"
-												onClick={handleVerifyOtp}
-												disabled={otpVerifying || otpVerified || !verificationCode.trim()}
-												className="h-12 bg-orange text-white hover:bg-orange-deep"
+									{/* PHONE VERIFICATION */}
+									<div
+										className={
+											"mt-4 rounded-xl p-4 ring-1 transition-colors " +
+											(phoneVerified
+												? "bg-orange/5 ring-orange/25"
+												: "bg-sand ring-line")
+										}
+									>
+										<div className="flex items-start gap-3">
+											<div
+												className={
+													"grid size-9 shrink-0 place-items-center rounded-md text-white " +
+													(phoneVerified ? "bg-orange" : "bg-ink")
+												}
 											>
-												{otpVerifying
-													? "Verifying…"
-													: otpVerified
-													? "Verified"
-													: "Verify code"}
-											</Button>
+												<MessageSquare className="size-4" />
+											</div>
+											<div className="min-w-0 flex-1">
+												<div className="flex flex-wrap items-center gap-2">
+													<p className="text-sm font-semibold text-ink">
+														Phone verification
+													</p>
+													{phoneVerified && (
+														<span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-orange">
+															<Check className="size-3" />
+															Verified
+														</span>
+													)}
+												</div>
+												<p className="mt-0.5 truncate font-mono text-[11px] text-ink-soft">
+													{phone || "your phone"}
+												</p>
+											</div>
 										</div>
-									</label>
+
+										{!phoneVerified && (
+											<div className="mt-4 space-y-3">
+												<Button
+													type="button"
+													onClick={handleSendPhoneOtp}
+													disabled={phoneOtpSending}
+													variant={phoneOtpSent ? "outline" : "default"}
+													className={
+														phoneOtpSent
+															? "border-line bg-paper text-ink hover:bg-sand"
+															: "bg-orange text-white hover:bg-orange-deep"
+													}
+												>
+													{phoneOtpSending
+														? "Sending SMS…"
+														: phoneOtpSent
+														? "Resend SMS code"
+														: "Send SMS code"}
+												</Button>
+
+												<div className="flex flex-col gap-2 sm:flex-row">
+													<Input
+														required
+														inputMode="numeric"
+														autoComplete="one-time-code"
+														placeholder="000000"
+														maxLength={6}
+														value={phoneOtp}
+														onChange={(e) => setPhoneOtp(e.target.value)}
+														className="h-12 border-line bg-paper text-center font-mono text-lg tracking-[0.4em] text-ink"
+													/>
+													<Button
+														type="button"
+														onClick={handleVerifyPhoneOtp}
+														disabled={phoneOtpVerifying || !phoneOtp.trim()}
+														className="h-12 bg-orange text-white hover:bg-orange-deep"
+													>
+														{phoneOtpVerifying ? "Verifying…" : "Verify phone"}
+													</Button>
+												</div>
+											</div>
+										)}
+									</div>
 
 									<div className="mt-5 rounded-xl bg-sand p-4 ring-1 ring-line">
 										<p className="text-[12px] leading-5 text-ink-soft">
-											Didn't receive a code? Check that your email address is correct,
-											or use{" "}
-											<button
-												type="button"
-												className="font-semibold text-orange"
-												onClick={handleSendOtp}
-												disabled={otpSending}
-											>
-												resend the code
-											</button>
-											.
+											Both email and phone must be verified before registration can
+											be completed. Didn't receive a code? Check the details above
+											and use the resend buttons.
 										</p>
 									</div>
 
@@ -816,14 +1391,14 @@ export default function RegisterPage() {
 										<Button
 											type="button"
 											variant="ghost"
-											onClick={() => setStep(1)}
+											onClick={() => setStep(2)}
 											className="text-ink-soft"
 										>
 											Back
 										</Button>
 										<Button
 											type="submit"
-											disabled={submitting || !otpVerified}
+											disabled={submitting || !emailVerified || !phoneVerified}
 											className="bg-orange text-white hover:bg-orange-deep disabled:opacity-60"
 										>
 											{submitting ? "Submitting…" : "Complete registration"}{" "}

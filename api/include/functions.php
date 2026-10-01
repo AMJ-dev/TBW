@@ -2,6 +2,9 @@
     use PHPMailer\PHPMailer\PHPMailer;
     use PHPMailer\PHPMailer\Exception;
     use PHPMailer\PHPMailer\SMTP;
+    
+    use Twilio\Rest\Client;
+    require __DIR__ . "/Twilio/autoload.php";
 
     function encrypt_pass($pass){
         return password_hash($pass, PASSWORD_ARGON2I);
@@ -26,12 +29,7 @@
     function humandatetime($timestamp){
         return date("F jS, Y h:i A", strtotime($timestamp));
     }
-    function get_expires(){
-        global $date_time, $otp_expires;
-        return date("Y-m-d H:i:s", strtotime("+$otp_expires", strtotime($date_time)));
-    }
 
-    $img_accept = array("image/jpeg", "image/jpg", "image/png", "image/x-png", "image/pjpeg", "image/svg+xml");
     function rm_special_char($char){
         return preg_replace("/[^a-zA-Z0-9\.]/", "1", $char);
     }
@@ -61,30 +59,49 @@
             $error=false;
         } else $data="Invalid file";
         return ["error"=>$error, "data"=>$data];
-    }
-    function verify_otp(){
-        global $conn, $date_time, $error, $data;
-        $otp = strtoupper($_POST["otp"]); 
-        $user_id = isset($_SESSION["reset_id"])?"reset_id":"login_id";
-        if(isset($_SESSION[$user_id])){
-            $check_otp = $conn->prepare('SELECT expire_date FROM email_otp WHERE user_id=:user_id && otp=:otp');
-            $check_otp->bindValue(':user_id', $_SESSION[$user_id]);
-            $check_otp->bindValue(':otp', $otp);
-            $check_otp->execute();
-            if ($check_otp->rowCount() > 0) {
-                $otp_data = $check_otp->fetch(PDO::FETCH_ASSOC);    
-                if(strtotime($date_time) < strtotime($otp_data["expire_date"])){  
-                    
-                    $update_otp = $conn->prepare("UPDATE email_otp set otp=:otp, expire_date=:expire_date WHERE user_id=:user_id");
-                    $update_otp->bindValue(":otp", "");
-                    $update_otp->bindValue(":expire_date", "");
-                    $update_otp->bindValue(":user_id", $_SESSION[$user_id]);
-                    if($update_otp->execute()) $error = false;
-                }else $data = "OTP has expired, Please try again later";
-            }else $data = "OTP Invalid";
+    }    
+    function send_sms(string $to, string $body): array {
+        global $sms_api_token, $sms_sender;
+        $url = "https://www.bulksmsnigeria.com/api/v2/sms";
+        
+        $payload = [
+            "from" => $sms_sender,
+            "to" => $to,
+            "body" => $body,
+            "gateway" => "direct-corporate"
+        ];
+
+        $ch = curl_init($url);
+        
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Authorization: Bearer " . $sms_api_token,
+            "Content-Type: application/json",
+            "Accept: application/json"
+        ]);
+
+        $response = curl_exec($ch);
+        $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        
+        curl_close($ch);
+
+        if ($error) {
+            return [
+                "success" => false,
+                "status_code" => $statusCode,
+                "response" => "cURL Error: " . $error
+            ];
         }
-        return ["error"=>$error, "data"=>$data];
-    } 
+
+        return [
+            "success" => ($statusCode >= 200 && $statusCode < 300),
+            "status_code" => $statusCode,
+            "response" => json_decode($response, true) ?? $response
+        ];
+    }
     function send_email($to, $name, $subject, $message, $reply_to="", $reply_name="", $attachment=[]){
         global $baseURL, $AppName, $sender_email, $comp_logo, $email_host, $email_port, $email_user, $email_password;  
    
@@ -137,24 +154,12 @@
             echo "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
         }
     }
-    function calculate_read_time(string $content): string {
-        $text = html_entity_decode(strip_tags($content));
-        $words = str_word_count($text);
-        $minutes = max(1, ceil($words / 200));
-        return $minutes . ' min read';
-    }
     function generateId(){
         $bytes = random_bytes(16);
         $bytes[6] = chr((ord($bytes[6]) & 0x0f) | 0x40);
         $bytes[8] = chr((ord($bytes[8]) & 0x3f) | 0x80);
         $hex = bin2hex($bytes);
         return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split($hex, 4));
-    }
-    function generate_excerpt(string $content, int $limit = 180): string {
-        $text = html_entity_decode(strip_tags($content));
-        $text = preg_replace('/\s+/', ' ', trim($text));
-        if (mb_strlen($text) <= $limit) return $text;
-        return mb_substr($text, 0, $limit) . '...';
     }
     function delete_file($file){
         if(!empty($file)){
@@ -190,15 +195,6 @@
     function gen_random_strings(){
         return bin2hex(openssl_random_pseudo_bytes(rand(15, 80)));
     } 
-    function generate_reset_link(){
-        return bin2hex(openssl_random_pseudo_bytes(100));
-    }
-    function generate_otp(){
-        // return strtoupper(substr(bin2hex(openssl_random_pseudo_bytes(40)), 0, 6));        
-        $digits = '';
-        for ($i = 0; $i < 6; $i++) $digits .= random_int(0, 9);
-        return $digits;
-    }
     function gen_password(){
         return bin2hex(openssl_random_pseudo_bytes(8));
     }

@@ -2230,3 +2230,24 @@ ALTER TABLE otp_codes
 ADD COLUMN mfa_token_hash VARCHAR(255) NULL AFTER otp_hash;
 
 ALTER TABLE `users` ADD `pics` VARCHAR(200) NOT NULL DEFAULT 'avatar.png' AFTER `phone`;
+
+CREATE TABLE `registration_documents` (
+  `id` char(36) NOT NULL,
+  `registration_request_id` char(36) NOT NULL,
+  `document_type` enum('cac','tin','signatory_id','licence') NOT NULL,
+  `licence_type` varchar(80) DEFAULT NULL,
+  `licence_reference` varchar(150) DEFAULT NULL,
+  `file_path` varchar(255) NOT NULL,
+  `original_name` varchar(255) NOT NULL,
+  `mime_type` varchar(100) NOT NULL,
+  `file_size` bigint unsigned NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_registration_document_request` (`registration_request_id`),
+  KEY `idx_registration_document_type` (`document_type`),
+  KEY `idx_registration_document_licence` (`licence_type`),
+  CONSTRAINT `fk_registration_document_request`
+    FOREIGN KEY (`registration_request_id`)
+    REFERENCES `registration_requests` (`id`)
+    ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
