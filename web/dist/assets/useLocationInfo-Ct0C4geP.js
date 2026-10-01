@@ -1,0 +1,1 @@
+var e=()=>({locationInfo:{ip:`Not collected`,country:`Nigeria`,region:`FCT`,city:`Abuja`,timezone:`Africa/Lagos`,isp:`Not collected`},loading:!1,error:null});export{e as t};
