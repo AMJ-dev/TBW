@@ -4,7 +4,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import {
 	AlertTriangle,
 	ArrowLeft,
-	ArrowRight,
 	Building2,
 	Calendar,
 	Check,
@@ -15,13 +14,9 @@ import {
 	FileText,
 	Mail,
 	MapPin,
-	Package,
 	Phone,
-	Plus,
 	ShieldCheck,
 	ShieldX,
-	Trash2,
-	User,
 	UsersRound,
 	X,
 	XCircle,
@@ -29,7 +24,6 @@ import {
 import { toast } from "sonner";
 import { AppShell, StatusBadge, Metric, statusTone } from "@/components/shell";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
 import { resolveSrc } from "@/lib/functions";
@@ -95,6 +89,13 @@ interface OrgContainer {
 	arrived_at?: string;
 }
 
+interface OrgDetailPayload {
+	organization?: OrgDetail;
+	staff?: OrgStaff[];
+	documents?: OrgDocument[];
+	containers?: OrgContainer[];
+}
+
 const tabs = [
 	{ key: "overview", label: "Overview", icon: Building2 },
 	{ key: "staff", label: "Staff", icon: UsersRound },
@@ -110,6 +111,22 @@ const statusLabel: Record<Status, string> = {
 	under_review: "Under Review",
 	rejected: "Rejected",
 	suspended: "Suspended",
+};
+
+const extractPayload = (raw: any): OrgDetailPayload => {
+	if (!raw || typeof raw !== "object") return {};
+	if (raw.organization || raw.staff || raw.documents || raw.containers) {
+		return raw as OrgDetailPayload;
+	}
+	if (raw.organisation || raw.org) {
+		return {
+			organization: raw.organisation ?? raw.org,
+			staff: raw.staff ?? [],
+			documents: raw.documents ?? [],
+			containers: raw.containers ?? [],
+		};
+	}
+	return { organization: raw as OrgDetail, staff: [], documents: [], containers: [] };
 };
 
 export default function AdminOrganizationDetailsPage() {
@@ -142,23 +159,17 @@ export default function AdminOrganizationDetailsPage() {
 		setLoading(true);
 		setError("");
 		try {
-			const [orgRes, staffRes, docsRes, containersRes] = await Promise.all([
-				http.get(`admin/organizations/${id}/`),
-				http.get(`admin/organizations/${id}/staff/`),
-				http.get(`admin/organizations/${id}/documents/`),
-				http.get(`admin/organizations/${id}/containers/`),
-			]);
-
-			const orgResp: Resp = orgRes.data;
-			if (orgResp.error) {
-				setError(orgResp.data || "Could not load this organisation.");
+			const res = await http.get(`admin/organizations/${id}/`);
+			const resp: Resp = res.data;
+			if (resp.error) {
+				setError(resp.data || "Could not load this organisation.");
 				return;
 			}
-
-			setOrg(orgResp.code ?? null);
-			setStaff(staffRes.data?.code ?? staffRes.data?.data ?? []);
-			setDocuments(docsRes.data?.code ?? docsRes.data?.data ?? []);
-			setContainers(containersRes.data?.code ?? containersRes.data?.data ?? []);
+			const payload = extractPayload(resp.code);
+			setOrg(payload.organization ?? null);
+			setStaff(payload.staff ?? []);
+			setDocuments(payload.documents ?? []);
+			setContainers(payload.containers ?? []);
 		} catch (err: any) {
 			setError(err?.response?.data?.message || "Could not load this organisation.");
 		} finally {
@@ -175,7 +186,7 @@ export default function AdminOrganizationDetailsPage() {
 		if (!id || approving) return;
 		setApproving(true);
 		try {
-			const res = await http.post(`admin/organizations/${id}/approve/`);
+			const res = await http.post(`admin/organizations/approve/${id}/`);
 			const resp: Resp = res.data;
 			if (resp.error) {
 				toast.error(resp.data || "Could not approve this organisation.");
@@ -199,7 +210,7 @@ export default function AdminOrganizationDetailsPage() {
 		}
 		setRejecting(true);
 		try {
-			const res = await http.post(`admin/organizations/${id}/reject/`, {
+			const res = await http.post(`admin/organizations/reject/${id}/`, {
 				reason: rejectReason.trim(),
 			});
 			const resp: Resp = res.data;
@@ -231,8 +242,8 @@ export default function AdminOrganizationDetailsPage() {
 		try {
 			const endpoint =
 				documentReview.mode === "approve"
-					? `admin/organizations/${id}/documents/${documentReview.doc.id}/approve/`
-					: `admin/organizations/${id}/documents/${documentReview.doc.id}/reject/`;
+					? `admin/organizations/documents/approve/${id}/${documentReview.doc.id}/`
+					: `admin/organizations/documents/reject/${id}/${documentReview.doc.id}/`;
 
 			const payload =
 				documentReview.mode === "approve"
@@ -398,7 +409,10 @@ export default function AdminOrganizationDetailsPage() {
 						<ShieldX className="mt-0.5 size-4 shrink-0 text-carmine" />
 						<div>
 							<p className="font-display text-sm font-bold text-ink">
-								Rejected {org.verified_at ? `on ${new Date(org.verified_at).toLocaleDateString("en-NG")}` : ""}
+								Rejected{" "}
+								{org.verified_at
+									? `on ${new Date(org.verified_at).toLocaleDateString("en-NG")}`
+									: ""}
 							</p>
 							<p className="mt-1 text-[13px] leading-6 text-ink-soft">
 								{org.rejection_reason}
@@ -412,7 +426,9 @@ export default function AdminOrganizationDetailsPage() {
 				<Metric
 					label="Staff accounts"
 					value={String(staff.length)}
-					detail={staff.filter((s) => s.account_status === "active").length + " active"}
+					detail={
+						staff.filter((s) => s.account_status === "active").length + " active"
+					}
 					tone="info"
 					icon={UsersRound}
 				/>
@@ -420,9 +436,7 @@ export default function AdminOrganizationDetailsPage() {
 					label="Documents"
 					value={String(documents.length)}
 					detail={
-						pendingDocs > 0
-							? `${pendingDocs} pending review`
-							: "All reviewed"
+						pendingDocs > 0 ? `${pendingDocs} pending review` : "All reviewed"
 					}
 					tone={pendingDocs > 0 ? "warning" : "success"}
 					icon={FileText}
@@ -437,7 +451,9 @@ export default function AdminOrganizationDetailsPage() {
 				<Metric
 					label="Account status"
 					value={statusLabel[org.status]}
-					detail={org.verified_by ? `Reviewed by ${org.verified_by}` : "Awaiting review"}
+					detail={
+						org.verified_by ? `Reviewed by ${org.verified_by}` : "Awaiting review"
+					}
 					tone={
 						org.status === "verified"
 							? "success"
@@ -497,10 +513,25 @@ export default function AdminOrganizationDetailsPage() {
 							Contact details
 						</p>
 						<dl className="mt-4 grid gap-4 sm:grid-cols-2">
-							<Field icon={Mail} label="Contact email" value={org.contact_email ?? "—"} mono />
-							<Field icon={Phone} label="Contact phone" value={org.contact_phone ?? "—"} mono />
+							<Field
+								icon={Mail}
+								label="Contact email"
+								value={org.contact_email ?? "—"}
+								mono
+							/>
+							<Field
+								icon={Phone}
+								label="Contact phone"
+								value={org.contact_phone ?? "—"}
+								mono
+							/>
 							<Field icon={MapPin} label="Address" value={org.address ?? "—"} full />
-							<Field icon={FileText} label="RC number" value={org.rc_number ?? "—"} mono />
+							<Field
+								icon={FileText}
+								label="RC number"
+								value={org.rc_number ?? "—"}
+								mono
+							/>
 							<Field icon={FileText} label="TIN" value={org.tin ?? "—"} mono />
 							<Field icon={Building2} label="Account type" value={org.type} />
 							<Field
@@ -680,10 +711,7 @@ export default function AdminOrganizationDetailsPage() {
 					) : (
 						<ul className="divide-y divide-line">
 							{documents.map((d) => (
-								<li
-									key={d.id}
-									className="flex flex-wrap items-center gap-4 px-5 py-4"
-								>
+								<li key={d.id} className="flex flex-wrap items-center gap-4 px-5 py-4">
 									<div className="grid size-11 shrink-0 place-items-center rounded-xl bg-orange text-white">
 										<FileText className="size-5" />
 									</div>
@@ -726,7 +754,11 @@ export default function AdminOrganizationDetailsPage() {
 									</div>
 									<div className="ml-auto flex flex-wrap gap-2">
 										{d.file_url && (
-											<a href={resolveSrc(d.file_url)} target="_blank" rel="noopener noreferrer">
+											<a
+												href={resolveSrc(d.file_url)}
+												target="_blank"
+												rel="noopener noreferrer"
+											>
 												<Button
 													variant="outline"
 													size="sm"
@@ -892,7 +924,7 @@ export default function AdminOrganizationDetailsPage() {
 								/>
 								<p className="mt-2 text-[11px] text-ink-soft">
 									Minimum 5 characters. Be specific so the applicant can respond.
-								</p>
+									</p>
 							</label>
 
 							<div className="mt-5 flex items-center justify-end gap-2 border-t border-line pt-4">
@@ -937,7 +969,9 @@ export default function AdminOrganizationDetailsPage() {
 								<div
 									className={cn(
 										"grid size-10 shrink-0 place-items-center rounded-md text-white",
-										documentReview.mode === "approve" ? "bg-orange" : "bg-carmine"
+										documentReview.mode === "approve"
+											? "bg-orange"
+											: "bg-carmine"
 									)}
 								>
 									{documentReview.mode === "approve" ? (
@@ -950,7 +984,9 @@ export default function AdminOrganizationDetailsPage() {
 									<p
 										className={cn(
 											"font-mono text-[10px] uppercase tracking-[0.16em]",
-											documentReview.mode === "approve" ? "text-orange" : "text-carmine"
+											documentReview.mode === "approve"
+												? "text-orange"
+												: "text-carmine"
 										)}
 									>
 										{documentReview.mode === "approve"
@@ -1060,7 +1096,12 @@ function Field({
 				<Icon className="size-3.5 text-orange" />
 				{label}
 			</dt>
-			<dd className={cn("mt-2 text-[14px]", mono ? "font-mono text-ink" : "font-medium text-ink")}>
+			<dd
+				className={cn(
+					"mt-2 text-[14px]",
+					mono ? "font-mono text-ink" : "font-medium text-ink"
+				)}
+			>
 				{value}
 			</dd>
 		</div>
