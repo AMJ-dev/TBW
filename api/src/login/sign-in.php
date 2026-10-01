@@ -249,7 +249,7 @@
             exit;
         }
 
-        if ($user["account_status"] !== "active") {
+        if (!in_array($user["account_status"], ['active', 'rejected'])) {
 
             $attempt_id = generateId();
 

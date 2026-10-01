@@ -70,7 +70,8 @@ export default function UserProvider({ children }: PropsWithChildren) {
             pics: data.user.pics,
             phone: data.user.phone,
             full_name: data.user.full_name,
-            account_type: data.user.account_type
+            account_type: data.user.account_type,
+            account_status: data.user.account_status
         };
 
         const userRole: UserRole = {

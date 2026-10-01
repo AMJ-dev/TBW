@@ -92,12 +92,12 @@ const stages: readonly Stage[] = [
 		phase: "Digital Ledger",
 		short: "Ingestion & reconciliation",
 		detail:
-			"Upon gate entry, the unit's bill of lading, manifest serials, and carrier electronic manifests are matched and ingested into the TRÏNŪ Terminal Operating System (TOS) and synchronized with the Nigeria Customs Service ASYCUDA World database.",
+			"Upon gate entry, the unit's bill of lading, manifest serials, and carrier electronic manifests are matched and ingested into the TRÏNŪ Terminal Operating System (TOS) and synchronized with the Nigeria Customs Service B'Odogwu unified customs management system.",
 		action:
 			"Single Goods Declaration (SGD) reconciliation, Form M validation, and generation of the immutable TRN Unique Consignment Identifier for real-time tracking.",
 		actionTitle: "Checkpoint & Verification Action",
-		metricTitle: "ASYCUDA Node Status",
-		metricStatus: "ASYCUDA ++ Live",
+		metricTitle: "B'Odogwu Node Status",
+		metricStatus: "B'Odogwu++ Live",
 		footer: {
 			left: "Customer Status:",
 			leftStrong: "",

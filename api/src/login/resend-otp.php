@@ -52,7 +52,7 @@
             exit;
         }
 
-        if ($user["account_status"] !== "active") {
+        if (!in_array($user["account_status"], ["active", "rejected"], true)) {
             echo json_encode([
                 "error" => true,
                 "data" => "Your account is not currently active.",

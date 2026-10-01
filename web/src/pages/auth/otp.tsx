@@ -111,7 +111,8 @@ export default function OtpPage() {
 					privileges: resp.code.privileges,
 					permissions: resp.code.permissions
 				});
-				startTransition(() => navigate(resp.code.route, { replace: true }))
+				const route = resp.code.user.account_status === 'rejected' ? '/organisation-resubmit' : resp.code.route;
+				startTransition(() => navigate(route, { replace: true }))
 			}
 		} catch (error: any) {
 			console.error(error)

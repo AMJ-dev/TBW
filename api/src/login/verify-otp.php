@@ -1,5 +1,7 @@
 <?php
-    use \Firebase\JWT\JWT;
+
+    use Firebase\JWT\JWT;
+
     require_once dirname(__DIR__, 2) . "/include/set-header.php";
 
     $email = strtolower(trim($_POST["email"] ?? ""));
@@ -16,6 +18,7 @@
             "data" => "Email and verification code are required.",
             "code" => []
         ]);
+
         exit;
     }
 
@@ -25,6 +28,7 @@
             "data" => "Invalid email address.",
             "code" => []
         ]);
+
         exit;
     }
 
@@ -34,11 +38,11 @@
             "data" => "Enter a valid 6-digit verification code.",
             "code" => []
         ]);
+
         exit;
     }
 
     try {
-
         $conn->beginTransaction();
 
         $stmt = $conn->prepare("
@@ -47,9 +51,10 @@
                 full_name,
                 email,
                 account_type,
+                account_status,
                 phone,
                 system_role_id,
-                account_status,
+                organisation_id,
                 email_verified_at
             FROM users
             WHERE email = :email
@@ -71,12 +76,13 @@
                 "data" => "Invalid verification request.",
                 "code" => []
             ]);
+
             exit;
         }
 
         $user_id = $user["id"];
 
-        if ($user["account_status"] !== "active") {
+        if (!in_array($user["account_status"], ["active", "rejected"], true)) {
             $conn->rollBack();
 
             echo json_encode([
@@ -84,6 +90,7 @@
                 "data" => "Your account is not currently active.",
                 "code" => []
             ]);
+
             exit;
         }
 
@@ -95,6 +102,7 @@
                 "data" => "Your email address has not been verified.",
                 "code" => []
             ]);
+
             exit;
         }
 
@@ -130,11 +138,11 @@
                 "data" => "Verification code not found. Please request a new code.",
                 "code" => []
             ]);
+
             exit;
         }
 
         if (strtotime($otp_record["expires_at"]) <= time()) {
-
             $stmt = $conn->prepare("
                 UPDATE otp_codes
                 SET revoked_at = NOW()
@@ -152,11 +160,11 @@
                 "data" => "This verification code has expired. Please request a new code.",
                 "code" => []
             ]);
+
             exit;
         }
 
         if ((int)$otp_record["attempts"] >= (int)$otp_record["max_attempts"]) {
-
             $stmt = $conn->prepare("
                 UPDATE otp_codes
                 SET revoked_at = NOW()
@@ -174,15 +182,14 @@
                 "data" => "Too many verification attempts. Please request a new code.",
                 "code" => []
             ]);
+
             exit;
         }
 
         if (!password_verify($otp, $otp_record["otp_hash"])) {
-
             $attempts = (int)$otp_record["attempts"] + 1;
 
             if ($attempts >= (int)$otp_record["max_attempts"]) {
-
                 $stmt = $conn->prepare("
                     UPDATE otp_codes
                     SET
@@ -195,9 +202,7 @@
                     ":attempts" => $attempts,
                     ":id" => $otp_record["id"]
                 ]);
-
             } else {
-
                 $stmt = $conn->prepare("
                     UPDATE otp_codes
                     SET attempts = :attempts
@@ -221,7 +226,8 @@
                     user_agent,
                     outcome,
                     reason
-                ) VALUES (
+                )
+                VALUES (
                     :id,
                     :email,
                     :user_id,
@@ -255,6 +261,7 @@
                     )
                 ]
             ]);
+
             exit;
         }
 
@@ -267,6 +274,45 @@
         $stmt->execute([
             ":id" => $otp_record["id"]
         ]);
+
+        $organisation = null;
+
+        if (
+            $user["account_type"] === "organisation" &&
+            !empty($user["organisation_id"])
+        ) {
+            $stmt = $conn->prepare("
+                SELECT
+                    id,
+                    organisation_name,
+                    organisation_type,
+                    verification_status,
+                    rejection_reason,
+                    verified_by,
+                    verified_at
+                FROM organisations
+                WHERE id = :id
+                LIMIT 1
+            ");
+
+            $stmt->execute([
+                ":id" => $user["organisation_id"]
+            ]);
+
+            $organisation = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$organisation) {
+                $conn->rollBack();
+
+                echo json_encode([
+                    "error" => true,
+                    "data" => "Organisation associated with this account was not found.",
+                    "code" => []
+                ]);
+
+                exit;
+            }
+        }
 
         $session_id = generateId();
 
@@ -293,7 +339,8 @@
                 mfa_verified,
                 last_active_at,
                 expires_at
-            ) VALUES (
+            )
+            VALUES (
                 :id,
                 :user_id,
                 :session_token_hash,
@@ -344,7 +391,8 @@
                 user_agent,
                 outcome,
                 reason
-            ) VALUES (
+            )
+            VALUES (
                 :id,
                 :email,
                 :user_id,
@@ -367,7 +415,6 @@
         $role = null;
 
         if ($user["account_type"] === "system") {
-
             if (empty($user["system_role_id"])) {
                 $conn->rollBack();
 
@@ -376,6 +423,7 @@
                     "data" => "Your system account does not have an assigned role.",
                     "code" => []
                 ]);
+
                 exit;
             }
 
@@ -399,7 +447,6 @@
             $role = $stmt->fetch(PDO::FETCH_ASSOC);
 
         } else {
-
             $stmt = $conn->prepare("
                 SELECT
                     r.id,
@@ -407,9 +454,10 @@
                     r.role_name,
                     r.scope
                 FROM organisation_members om
-                INNER JOIN roles r ON r.id = om.role_id
+                INNER JOIN roles r
+                    ON r.id = om.role_id
                 WHERE om.user_id = :user_id
-                AND om.membership_status = 'active'
+                AND om.membership_status != 'revoked'
                 AND r.is_active = 1
                 AND r.scope = 'organisation'
                 ORDER BY
@@ -444,6 +492,7 @@
                 "data" => "Your account does not have an active role.",
                 "code" => []
             ]);
+
             exit;
         }
 
@@ -458,7 +507,8 @@
                 p.module,
                 p.action
             FROM role_permissions rp
-            INNER JOIN permissions p ON p.id = rp.permission_id
+            INNER JOIN permissions p
+                ON p.id = rp.permission_id
             WHERE rp.role_id = :role_id
             ORDER BY p.module, p.action
         ");
@@ -473,7 +523,6 @@
         $privileges = [];
 
         foreach ($permission_rows as $permission) {
-
             $permissions[] = $permission["permission_key"];
 
             if (!in_array($permission["module"], $privileges, true)) {
@@ -481,23 +530,35 @@
             }
         }
 
-        $route = $route_map[$role_key] ?? "/portal";
+        if (
+            $user["account_type"] === "organisation" &&
+            $organisation &&
+            $organisation["verification_status"] === "rejected"
+        ) {
+            $route = "/organisation/review";
+        } else {
+            $route = $route_map[$role_key] ?? "/portal";
+        }
 
         $conn->commit();
 
-        $token= ["id"=>$user_id, "session_id"=>$session_id];
-        $jwt = JWT::encode($token, $privateKey, 'RS256');
+        $token = [
+            "id" => $user_id,
+            "session_id" => $session_id
+        ];
+
+        $jwt = JWT::encode($token, $privateKey, "RS256");
 
         setcookie(
-            'token',                   
-            $jwt,                       
+            "token",
+            $jwt,
             [
-                'expires'  => time() + 86400,
-                'path'     => '/',
-                'domain'   => '',         
-                'secure'   => str_starts_with(strtolower($baseURL), 'https://'),       
-                'httponly' => true,       
-                'samesite' => 'Lax'        
+                "expires" => time() + 86400,
+                "path" => "/",
+                "domain" => "",
+                "secure" => str_starts_with(strtolower($baseURL), "https://"),
+                "httponly" => true,
+                "samesite" => "Lax"
             ]
         );
 
@@ -512,8 +573,10 @@
                     "email" => $user["email"],
                     "full_name" => $user["full_name"],
                     "phone" => $user["phone"],
-                    "account_type" => $user["account_type"]
+                    "account_type" => $user["account_type"],
+                    "account_status" => $user["account_status"],
                 ],
+                "organisation" => $organisation,
                 "role" => [
                     "id" => $role_id,
                     "key" => $role_key,

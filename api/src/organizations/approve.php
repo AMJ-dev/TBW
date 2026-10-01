@@ -70,7 +70,7 @@
 
         $conn->beginTransaction();
 
-        $update = $conn->prepare("
+        $stmt = $conn->prepare("
             UPDATE organisations
             SET
                 verification_status = 'verified',
@@ -80,12 +80,12 @@
             WHERE id = :id
         ");
 
-        $update->execute([
+        $stmt->execute([
             ":verified_by" => $my_details->id,
             ":id" => $id
         ]);
 
-        $userUpdate = $conn->prepare("
+        $stmt = $conn->prepare("
             UPDATE users
             SET
                 account_status = 'active'
@@ -93,11 +93,11 @@
             AND account_status = 'pending_approval'
         ");
 
-        $userUpdate->execute([
+        $stmt->execute([
             ":organisation_id" => $id
         ]);
 
-        $memberUpdate = $conn->prepare("
+        $stmt = $conn->prepare("
             UPDATE organisation_members
             SET
                 membership_status = 'active',
@@ -106,39 +106,90 @@
             AND membership_status = 'pending'
         ");
 
-        $memberUpdate->execute([
+        $stmt->execute([
             ":organisation_id" => $id
         ]);
 
-        $documentSelect = $conn->prepare("
+        $stmt = $conn->prepare("
             SELECT
-                odr.id,
-                odr.registration_document_id
-            FROM organisation_document_reviews odr
-            WHERE odr.organisation_id = :organisation_id
+                rd.id
+            FROM registration_documents rd
+            INNER JOIN registration_requests rr
+                ON rr.id = rd.registration_request_id
+            INNER JOIN users u
+                ON u.id = rr.completed_user_id
+            WHERE u.organisation_id = :organisation_id
         ");
 
-        $documentSelect->execute([
+        $stmt->execute([
             ":organisation_id" => $id
         ]);
 
-        $documentReviews = $documentSelect->fetchAll(PDO::FETCH_ASSOC);
+        $documents = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-        if (!empty($documentReviews)) {
-            $documentUpdate = $conn->prepare("
-                UPDATE organisation_document_reviews
-                SET
-                    status = 'approved',
-                    rejection_reason = NULL,
-                    reviewed_by = :reviewed_by,
-                    reviewed_at = NOW()
-                WHERE organisation_id = :organisation_id
+        $approvedDocuments = 0;
+
+        foreach ($documents as $documentId) {
+            $stmt = $conn->prepare("
+                SELECT id
+                FROM organisation_document_reviews
+                WHERE registration_document_id = :document_id
+                LIMIT 1
             ");
 
-            $documentUpdate->execute([
-                ":reviewed_by" => $my_details->id,
-                ":organisation_id" => $id
+            $stmt->execute([
+                ":document_id" => $documentId
             ]);
+
+            $review = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($review) {
+                $stmt = $conn->prepare("
+                    UPDATE organisation_document_reviews
+                    SET
+                        organisation_id = :organisation_id,
+                        status = 'approved',
+                        rejection_reason = NULL,
+                        reviewed_by = :reviewed_by,
+                        reviewed_at = NOW()
+                    WHERE registration_document_id = :document_id
+                ");
+
+                $stmt->execute([
+                    ":organisation_id" => $id,
+                    ":reviewed_by" => $my_details->id,
+                    ":document_id" => $documentId
+                ]);
+            } else {
+                $stmt = $conn->prepare("
+                    INSERT INTO organisation_document_reviews (
+                        id,
+                        registration_document_id,
+                        organisation_id,
+                        status,
+                        rejection_reason,
+                        reviewed_by,
+                        reviewed_at
+                    )
+                    VALUES (
+                        UUID(),
+                        :document_id,
+                        :organisation_id,
+                        'approved',
+                        NULL,
+                        :reviewed_by,
+                        NOW()
+                    )
+                ");
+
+                $stmt->execute([
+                    ":document_id" => $documentId,
+                    ":organisation_id" => $id,
+                    ":reviewed_by" => $my_details->id
+                ]);
+            }
+
+            $approvedDocuments++;
         }
 
         $conn->commit();
@@ -151,7 +202,7 @@
                 "status" => "verified",
                 "documents" => [
                     "status" => "approved",
-                    "count" => count($documentReviews)
+                    "count" => $approvedDocuments
                 ]
             ]
         ]);

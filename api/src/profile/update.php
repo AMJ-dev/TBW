@@ -100,6 +100,7 @@
                 "phone" => $profile["phone"],
                 "pics" => $profile["pics"],
                 "account_type" => $profile["account_type"],
+                "account_status" => $profile["account_status"],
                 "role_in_org" => $profile["role_in_org"],
                 "organisation_name" => $profile["organisation_name"],
                 "organisation_type" => $profile["organisation_type"],

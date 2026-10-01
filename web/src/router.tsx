@@ -62,6 +62,7 @@ const ChangePasswordPage = lazy(() => import("@/pages/profile/change-password"))
 const MfaSetupPage = lazy(() => import("@/pages/auth/mfa-setup"));
 const MfaChallengePage = lazy(() => import("@/pages/auth/mfa-challenge"));
 const OtpPage = lazy(() => import("@/pages/auth/otp"));
+const OrganisationResubmitPage = lazy(() => import("@/pages/organisation-resubmit"));
 
 const MyProfilePage = lazy(() => import("@/pages/profile/my"));
 const EditProfilePage = lazy(() => import("@/pages/profile/edit"));
@@ -242,8 +243,11 @@ export default function Routers() {
 							<Route path="/reports/operations" element={<ReportsOperationsPage />} />
 							<Route path="/reports/financial" element={<ReportsFinancialPage />} />
 							<Route path="/reports/compliance" element={<ReportsCompliancePage />} />
+							
+						    <Route path="/organisation-resubmit" element={<OrganisationResubmitPage />} />
 						</Route>
 
+						<Route path="/404" element={<NotFoundPage />} />
 						<Route path="/403" element={<ForbiddenPage />} />
 						<Route path="/429" element={<RateLimitedPage />} />
 						<Route path="/500" element={<ServerErrorPage />} />

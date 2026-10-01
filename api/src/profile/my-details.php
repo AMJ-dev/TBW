@@ -83,6 +83,7 @@
                 "phone" => $user["phone"],
                 "pics" => $user["pics"],
                 "account_type" => $user["account_type"],
+                "account_status" => $user["account_status"],
                 "role_in_org" => $user["job_title"] ?? null,
                 "organisation_name" => $user["organisation_name"] ?? null,
                 "organisation_type" => $user["organisation_type"] ?? null,

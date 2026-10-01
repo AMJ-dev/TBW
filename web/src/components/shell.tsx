@@ -295,6 +295,72 @@ const sections = [
 	},
 ];
 
+function RejectedPanel() {
+	return (
+		<div className="space-y-3 px-2 py-6">
+			<div className="flex items-center gap-2 rounded-md bg-coral/10 px-3 py-2 ring-1 ring-coral/25">
+				<AlertTriangle className="size-4 shrink-0 text-coral" />
+				<p className="font-display text-[13px] font-semibold text-coral">
+					Account rejected
+				</p>
+			</div>
+			<p className="text-[12px] leading-5 text-ink-soft">
+				Your registration was not approved. This usually means the details
+				submitted during onboarding could not be verified, or a required
+				document was missing or expired.
+			</p>
+			<div className="rounded-md bg-sand-2 px-3 py-2.5 ring-1 ring-line">
+				<p className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-soft">
+					Next step
+				</p>
+				<p className="mt-1 text-[12px] text-ink">
+					Contact the terminal operations team to correct your details and
+					request a review.
+				</p>
+			</div>
+			<a
+				href="mailto:operations@trinu.ng"
+				className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-orange-deep hover:underline"
+			>
+				Contact operations <ArrowRight className="size-3.5" />
+			</a>
+		</div>
+	);
+}
+
+function PendingPanel() {
+	return (
+		<div className="space-y-3 px-2 py-6">
+			<div className="flex items-center gap-2 rounded-md bg-orange/10 px-3 py-2 ring-1 ring-orange/25">
+				<Clock3 className="size-4 shrink-0 text-orange-deep" />
+				<p className="font-display text-[13px] font-semibold text-orange-deep">
+					Approval in progress
+				</p>
+			</div>
+			<p className="text-[12px] leading-5 text-ink-soft">
+				Your account is being reviewed. Access to portal and operations
+				modules will unlock once your organisation and documents are
+				verified.
+			</p>
+			<div className="rounded-md bg-sand-2 px-3 py-2.5 ring-1 ring-line">
+				<p className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-soft">
+					Need it faster?
+				</p>
+				<p className="mt-1 text-[12px] text-ink">
+					Email your onboarding documents to the operations desk so we can
+					complete verification.
+				</p>
+			</div>
+			<a
+				href="mailto:operations@trinu.ng"
+				className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-orange-deep hover:underline"
+			>
+				Contact operations <ArrowRight className="size-3.5" />
+			</a>
+		</div>
+	);
+}
+
 export function AppShell({ children, title, eyebrow }: { children: ReactNode; title: string; eyebrow?: string }) {
 	const { pathname } = useLocation();
 	const navigate = useNavigate();
@@ -312,8 +378,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 			.some((value) => value.toLowerCase().includes(searchQuery.trim().toLowerCase()))
 	);
 
-	const isActive = (to: string, exact = false) =>
-		exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
+	const isActive = (to: string, exact = false) => exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
 
 	const handleLogout = async () => {
 		if (loggingOut) return;
@@ -340,11 +405,21 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 	};
 
 	useEffect(() => {
+		console.log(my_details?.account_status);
 		if (!userMenuOpen) return;
 		const close = () => setUserMenuOpen(false);
 		window.addEventListener("click", close);
 		return () => window.removeEventListener("click", close);
 	}, [userMenuOpen]);
+
+	useEffect(() => {
+		if (my_details?.account_status === "rejected") {
+			toast.error("Your account has been rejected. Contact operations.");
+		}
+		if (my_details?.account_status === "active") {
+			toast.success("Account approved. Full access enabled.");
+		}
+	}, [my_details?.account_status]);
 
 	return (
 		<div className="min-h-screen bg-sand font-sans text-ink">
@@ -393,42 +468,48 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 						</div>
 					)}
 					<nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
-						{sections.map((section) => (
-							role && section.permission_key.includes(role.key) && (
-								<div key={section.title}>
-									<p
-										className={cn(
-											"px-2 pb-1 font-mono text-[9px] uppercase tracking-[0.2em] text-ink-soft/70",
-											collapsed ? "lg:hidden" : ""
-										)}
-									>
-										{section.title}
-									</p>
-									{section.items.map((item) => {
-										const { label, to, icon: Icon } = item;
-										const active = isActive(to, "exact" in item && item.exact);
-										return (
-											<Link
-												key={to}
-												to={to}
-												onClick={() => setMobileOpen(false)}
-												className={cn(
-													"group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[12px] transition-colors",
-													active
-														? "bg-ink text-sand shadow-sm"
-														: "text-ink-soft hover:bg-sand-2 hover:text-ink",
-													collapsed ? "lg:justify-center lg:px-0" : ""
-												)}
-												title={collapsed ? label : undefined}
-											>
-												<Icon className="size-4 shrink-0" />
-												<span className={collapsed ? "lg:hidden" : ""}>{label}</span>
-											</Link>
-										);
-									})}
-								</div>
-							)
-						))}
+						{my_details?.account_status === "active" ? (
+							sections.map((section) => (
+								role && section.permission_key.includes(role.key) && (
+									<div key={section.title}>
+										<p
+											className={cn(
+												"px-2 pb-1 font-mono text-[9px] uppercase tracking-[0.2em] text-ink-soft/70",
+												collapsed ? "lg:hidden" : ""
+											)}
+										>
+											{section.title}
+										</p>
+										{section.items.map((item) => {
+											const { label, to, icon: Icon } = item;
+											const active = isActive(to, "exact" in item && item.exact);
+											return (
+												<Link
+													key={to}
+													to={to}
+													onClick={() => setMobileOpen(false)}
+													className={cn(
+														"group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[12px] transition-colors",
+														active
+															? "bg-ink text-sand shadow-sm"
+															: "text-ink-soft hover:bg-sand-2 hover:text-ink",
+														collapsed ? "lg:justify-center lg:px-0" : ""
+													)}
+													title={collapsed ? label : undefined}
+												>
+													<Icon className="size-4 shrink-0" />
+													<span className={collapsed ? "lg:hidden" : ""}>{label}</span>
+												</Link>
+											);
+										})}
+									</div>
+								)
+							))
+						) : my_details?.account_status === "rejected" ? (
+							<RejectedPanel />
+						) : (
+							<PendingPanel />
+						)}
 					</nav>
 
 					<div className="relative border-t border-line p-4">

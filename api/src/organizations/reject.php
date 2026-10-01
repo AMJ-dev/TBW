@@ -2,151 +2,221 @@
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
     $id = trim($_GET["id"] ?? "");
-    $generalReason = trim($_POST["reason"] ?? "");
-    $documents = $_POST["documents"] ?? [];
 
     if ($id === "") {
+        http_response_code(400);
+
         echo json_encode([
             "error" => true,
-            "data" => "Organisation ID is required."
+            "data" => "Invalid organisation ID",
+            "code" => null
         ]);
+
         exit;
     }
 
-    if (!is_array($documents) || empty($documents)) {
+    if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+        http_response_code(405);
+
         echo json_encode([
             "error" => true,
-            "data" => "At least one document must be rejected."
+            "data" => "Method not allowed",
+            "code" => null
         ]);
+
         exit;
+    }
+
+    $reason = trim($_POST["reason"] ?? "");
+    $documents = $_POST["documents"] ?? [];
+
+    if ($reason === "") {
+        http_response_code(400);
+
+        echo json_encode([
+            "error" => true,
+            "data" => "Rejection reason is required",
+            "code" => null
+        ]);
+
+        exit;
+    }
+
+    if (!is_array($documents)) {
+        $documents = [];
     }
 
     try {
-        $pdo->beginTransaction();
 
-        $stmt = $pdo->prepare("
+        $stmt = $conn->prepare("
             SELECT
                 id,
                 organisation_name,
                 verification_status
             FROM organisations
-            WHERE id = ?
+            WHERE id = :id
             LIMIT 1
         ");
 
-        $stmt->execute([$id]);
+        $stmt->execute([
+            ":id" => $id
+        ]);
 
         $organisation = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$organisation) {
-            $pdo->rollBack();
+            http_response_code(404);
 
             echo json_encode([
                 "error" => true,
-                "data" => "Organisation not found."
+                "data" => "Organisation not found",
+                "code" => null
             ]);
+
             exit;
         }
+
+        if (in_array($organisation["verification_status"], ["verified", "suspended"], true)) {
+            http_response_code(400);
+
+            echo json_encode([
+                "error" => true,
+                "data" => "Organisation cannot be rejected from its current status",
+                "code" => null
+            ]);
+
+            exit;
+        }
+
+        $conn->beginTransaction();
+
+        $stmt = $conn->prepare("
+            UPDATE organisations
+            SET
+                verification_status = 'rejected',
+                rejection_reason = :rejection_reason,
+                verified_by = :verified_by,
+                verified_at = NOW()
+            WHERE id = :id
+        ");
+
+        $stmt->execute([
+            ":rejection_reason" => $reason,
+            ":verified_by" => $my_details->id,
+            ":id" => $id
+        ]);
 
         $processedDocuments = [];
 
         foreach ($documents as $document) {
+
             if (!is_array($document)) {
                 continue;
             }
 
             $documentId = trim($document["id"] ?? "");
             $status = trim($document["status"] ?? "");
-            $reason = trim($document["reason"] ?? "");
+            $documentReason = trim($document["reason"] ?? "");
 
             if ($documentId === "") {
                 continue;
             }
 
-            if ($status !== "rejected") {
+            if (!in_array($status, ["approved", "rejected"], true)) {
                 continue;
             }
 
-            if ($reason === "") {
-                $pdo->rollBack();
+            if ($status === "rejected" && $documentReason === "") {
+                $conn->rollBack();
+
+                http_response_code(400);
 
                 echo json_encode([
                     "error" => true,
-                    "data" => "A rejection reason is required for every rejected document."
+                    "data" => "A rejection reason is required for every rejected document",
+                    "code" => [
+                        "document_id" => $documentId
+                    ]
                 ]);
+
                 exit;
             }
 
-            $stmt = $pdo->prepare("
+            $stmt = $conn->prepare("
                 SELECT
                     rd.id,
-                    rd.registration_request_id,
                     rd.document_type,
-                    rd.licence_type,
-                    rd.licence_reference,
-                    rd.file_path,
-                    rd.original_name,
-                    rd.mime_type,
-                    rd.file_size
+                    rd.original_name
                 FROM registration_documents rd
                 INNER JOIN registration_requests rr
                     ON rr.id = rd.registration_request_id
                 INNER JOIN users u
                     ON u.id = rr.completed_user_id
-                WHERE rd.id = ?
-                AND u.organisation_id = ?
+                WHERE rd.id = :document_id
+                AND u.organisation_id = :organisation_id
                 LIMIT 1
             ");
 
             $stmt->execute([
-                $documentId,
-                $id
+                ":document_id" => $documentId,
+                ":organisation_id" => $id
             ]);
 
-            $dbDocument = $stmt->fetch(PDO::FETCH_ASSOC);
+            $documentRecord = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$dbDocument) {
-                $pdo->rollBack();
+            if (!$documentRecord) {
+                $conn->rollBack();
+
+                http_response_code(400);
 
                 echo json_encode([
                     "error" => true,
-                    "data" => "Document not found or does not belong to this organisation.",
-                    "document_id" => $documentId
+                    "data" => "Document does not belong to this organisation",
+                    "code" => [
+                        "document_id" => $documentId
+                    ]
                 ]);
+
                 exit;
             }
 
-            $stmt = $pdo->prepare("
+            $stmt = $conn->prepare("
                 SELECT id
                 FROM organisation_document_reviews
-                WHERE registration_document_id = ?
+                WHERE registration_document_id = :document_id
                 LIMIT 1
             ");
 
-            $stmt->execute([$documentId]);
+            $stmt->execute([
+                ":document_id" => $documentId
+            ]);
 
             $review = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($review) {
-                $stmt = $pdo->prepare("
+
+                $stmt = $conn->prepare("
                     UPDATE organisation_document_reviews
                     SET
-                        organisation_id = ?,
-                        status = 'rejected',
-                        rejection_reason = ?,
-                        reviewed_by = ?,
+                        organisation_id = :organisation_id,
+                        status = :status,
+                        rejection_reason = :rejection_reason,
+                        reviewed_by = :reviewed_by,
                         reviewed_at = NOW()
-                    WHERE registration_document_id = ?
+                    WHERE registration_document_id = :document_id
                 ");
 
                 $stmt->execute([
-                    $id,
-                    $reason,
-                    $my_details->id,
-                    $documentId
+                    ":organisation_id" => $id,
+                    ":status" => $status,
+                    ":rejection_reason" => $status === "rejected" ? $documentReason : null,
+                    ":reviewed_by" => $my_details->id,
+                    ":document_id" => $documentId
                 ]);
+
             } else {
-                $stmt = $pdo->prepare("
+
+                $stmt = $conn->prepare("
                     INSERT INTO organisation_document_reviews (
                         id,
                         registration_document_id,
@@ -158,90 +228,57 @@
                     )
                     VALUES (
                         UUID(),
-                        ?,
-                        ?,
-                        'rejected',
-                        ?,
-                        ?,
+                        :document_id,
+                        :organisation_id,
+                        :status,
+                        :rejection_reason,
+                        :reviewed_by,
                         NOW()
                     )
                 ");
 
                 $stmt->execute([
-                    $documentId,
-                    $id,
-                    $reason,
-                    $my_details->id
+                    ":document_id" => $documentId,
+                    ":organisation_id" => $id,
+                    ":status" => $status,
+                    ":rejection_reason" => $status === "rejected" ? $documentReason : null,
+                    ":reviewed_by" => $my_details->id
                 ]);
             }
 
             $processedDocuments[] = [
-                "id" => $dbDocument["id"],
-                "document_type" => $dbDocument["document_type"],
-                "licence_type" => $dbDocument["licence_type"],
-                "licence_reference" => $dbDocument["licence_reference"],
-                "file_path" => $dbDocument["file_path"],
-                "original_name" => $dbDocument["original_name"],
-                "mime_type" => $dbDocument["mime_type"],
-                "file_size" => $dbDocument["file_size"],
-                "status" => "rejected",
-                "reason" => $reason
+                "id" => $documentRecord["id"],
+                "document_type" => $documentRecord["document_type"],
+                "original_name" => $documentRecord["original_name"],
+                "status" => $status,
+                "reason" => $status === "rejected" ? $documentReason : null
             ];
         }
 
-        if (empty($processedDocuments)) {
-            $pdo->rollBack();
-
-            echo json_encode([
-                "error" => true,
-                "data" => "No valid rejected documents were supplied."
-            ]);
-            exit;
-        }
-
-        if ($generalReason === "") {
-            $generalReason = "One or more submitted documents require replacement.";
-        }
-
-        $stmt = $pdo->prepare("
-            UPDATE organisations
-            SET
-                verification_status = 'rejected',
-                rejection_reason = ?,
-                verified_by = ?,
-                verified_at = NOW()
-            WHERE id = ?
-        ");
-
-        $stmt->execute([
-            $generalReason,
-            $my_details->id,
-            $id
-        ]);
-
-        $pdo->commit();
+        $conn->commit();
 
         echo json_encode([
             "error" => false,
-            "data" => "Organisation rejected successfully.",
+            "data" => "Organisation rejected successfully",
             "code" => [
-                "organisation" => [
-                    "id" => $organisation["id"],
-                    "organisation_name" => $organisation["organisation_name"],
-                    "verification_status" => "rejected",
-                    "rejection_reason" => $generalReason
-                ],
+                "id" => $id,
+                "status" => "rejected",
+                "rejection_reason" => $reason,
                 "documents" => $processedDocuments
             ]
         ]);
 
     } catch (Throwable $e) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
+
+        if ($conn->inTransaction()) {
+            $conn->rollBack();
         }
+
+        http_response_code(500);
 
         echo json_encode([
             "error" => true,
-            "data" => "Unable to reject organisation."
+            "data" => $e->getMessage(),
+            "code" => null
         ]);
     }

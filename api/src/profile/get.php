@@ -1,5 +1,6 @@
 <?php
-    require_once dirname(__DIR__, 2)."/include/verify-user.php";
+
+    require_once dirname(__DIR__, 2)."/include/check-user.php";
 
     if ($my_details->account_type === "system") {
 
@@ -25,11 +26,45 @@
             LIMIT 1
         ");
 
-        $stmt->execute([":role_id" => $my_details->system_role_id]);
+        $stmt->execute([
+            ":role_id" => $my_details->system_role_id
+        ]);
 
         $role = $stmt->fetch(PDO::FETCH_ASSOC);
 
+        $organisation = null;
+
     } else {
+
+        $stmt = $conn->prepare("
+            SELECT
+                id,
+                organisation_name,
+                organisation_type,
+                verification_status,
+                rejection_reason,
+                verified_by,
+                verified_at
+            FROM organisations
+            WHERE id = :organisation_id
+            LIMIT 1
+        ");
+
+        $stmt->execute([
+            ":organisation_id" => $my_details->organisation_id
+        ]);
+
+        $organisation = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$organisation) {
+            echo json_encode([
+                "error" => true,
+                "data" => "Your organisation could not be found.",
+                "code" => []
+            ]);
+            http_response_code(401);
+            exit;
+        }
 
         $stmt = $conn->prepare("
             SELECT
@@ -40,7 +75,7 @@
             FROM organisation_members om
             INNER JOIN roles r ON r.id = om.role_id
             WHERE om.user_id = :user_id
-            AND om.membership_status = 'active'
+            AND om.membership_status != 'revoked'
             AND r.is_active = 1
             AND r.scope = 'organisation'
             ORDER BY
@@ -61,14 +96,13 @@
         ");
 
         $stmt->execute([
-            ":user_id" => $user_id
+            ":user_id" => $my_details->id
         ]);
 
         $role = $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
     if (!$role) {
-        $conn->rollBack();
         echo json_encode([
             "error" => true,
             "data" => "Your account does not have an active role.",
@@ -94,7 +128,9 @@
         ORDER BY p.module, p.action
     ");
 
-    $stmt->execute([":role_id" => $role_id]);
+    $stmt->execute([
+        ":role_id" => $role_id
+    ]);
 
     $permission_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -103,11 +139,21 @@
 
     foreach ($permission_rows as $permission) {
         $permissions[] = $permission["permission_key"];
-        if (!in_array($permission["module"], $privileges, true)) $privileges[] = $permission["module"];
+
+        if (!in_array($permission["module"], $privileges, true)) {
+            $privileges[] = $permission["module"];
+        }
     }
 
-    $route = $route_map[$role_key] ?? "/portal";
-
+    if (
+        $my_details->account_type === "organisation" &&
+        $organisation &&
+        $organisation["verification_status"] === "rejected"
+    ) {
+        $route = "/organisation/review";
+    } else {
+        $route = $route_map[$role_key] ?? "/portal";
+    }
 
     echo json_encode([
         "error" => false,
@@ -120,8 +166,10 @@
                 "full_name" => $my_details->full_name,
                 "phone" => $my_details->phone,
                 "pics" => $my_details->pics,
-                "account_type" => $my_details->account_type
+                "account_type" => $my_details->account_type,
+                "account_status" => $my_details->account_status
             ],
+            "organisation" => $organisation,
             "role" => [
                 "id" => $role_id,
                 "key" => $role_key,
@@ -131,5 +179,5 @@
             "route" => $route,
             "privileges" => $privileges,
             "permissions" => $permissions
-        ],
+        ]
     ]);
