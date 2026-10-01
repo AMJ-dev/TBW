@@ -54,7 +54,7 @@ const heroStats = [
 	["NG", "Naira-based pricing"],
 ] as const;
 
-export function ServicesPage() {
+export default function ServicesPage() {
 	return (
 		<PublicFrame>
 			<main>

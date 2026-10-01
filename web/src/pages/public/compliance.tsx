@@ -117,7 +117,7 @@ const publicTrackingExcluded = [
 	"Exact storage position",
 ];
 
-export function CompliancePage() {
+export default function CompliancePage() {
 	return (
 		<PublicFrame>
 			<main>

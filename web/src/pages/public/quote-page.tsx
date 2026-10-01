@@ -34,7 +34,7 @@ const cargoCategories = [
 	"Project cargo",
 ] as const;
 
-export function QuotePage() {
+export default function QuotePage() {
 	const [step, setStep] = useState(0);
 	const [submitted, setSubmitted] = useState(false);
 	const [company, setCompany] = useState("");
@@ -73,7 +73,7 @@ export function QuotePage() {
 					</p>
 					<div className="mt-7 rounded-xl bg-sand p-5 ring-1 ring-line">
 						<p className="font-mono text-[12px] uppercase tracking-[0.14em] text-orange">
-							Demo reference · not submitted
+							Reference · not submitted
 						</p>
 						<p className="mt-2 font-display text-2xl font-bold text-ink">TRN-Q-2026-004821</p>
 					</div>

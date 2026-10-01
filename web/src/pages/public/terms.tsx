@@ -188,7 +188,7 @@ const sections = [
 	},
 ] as const;
 
-export function TermsPage() {
+export default function TermsPage() {
 	return (
 		<PublicFrame>
 			<main>

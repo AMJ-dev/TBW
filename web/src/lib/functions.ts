@@ -1,9 +1,28 @@
+import { useContext } from "react";
 import moment from "moment";
+import UserContext from "@/lib/userContext";
+import { api_url } from "@/lib/constants";
 
+export const check_login = ()=>{
+	const {login} = useContext(UserContext);
+	return new Promise((resolve, reject)=>{
+		resolve(true);
+	})
+}
+export const get_token = ()=>{
+    const remember = localStorage.getItem("remember");
+    const token = remember === "1" 
+        ? localStorage.getItem("token")
+        : sessionStorage.getItem("token");
+    
+    return token;
+}
 export const resolveSrc = (s: string) => {
-	if (!s) return s;
-	if (/^(?:https?:|blob:|data:)/i.test(s)) return s;
-    return s.startsWith('/') ? s : `/${s}`;
+    const ASSET_BASE = (api_url as string)?.replace(/\/+$/, "") || "";
+    if (!s) return s;
+    if (/^(?:https?:|blob:|data:)/i.test(s)) return s;
+    if (s.startsWith("/")) return `${ASSET_BASE}${s}`;
+    return ASSET_BASE ? `${ASSET_BASE}/${s}` : `/${s}`;
 };
 export function truncate_string (string:string){   
     const max_length = 70;

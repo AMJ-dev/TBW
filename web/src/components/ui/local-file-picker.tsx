@@ -52,7 +52,7 @@ export function LocalFilePicker({
 			<Button type="button" variant="outline" className="border-line bg-paper text-ink" onClick={() => inputRef.current?.click()}>
 				<Upload className="size-4" /> {buttonLabel}
 			</Button>
-			<p className="mt-2 text-[11px] text-ink-soft">Selected files stay in this browser demo. Nothing is uploaded. Maximum 10 MB per file.</p>
+			<p className="mt-2 text-[11px] text-ink-soft">Selected files stay in this browser. Nothing is uploaded. Maximum 10 MB per file.</p>
 			{error && <p role="alert" className="mt-2 text-xs text-coral">{error}</p>}
 			{files.length > 0 && (
 				<ul className="mt-3 space-y-2">

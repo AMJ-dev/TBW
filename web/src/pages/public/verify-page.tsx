@@ -65,7 +65,7 @@ const verifiedDocuments: Record<string, VerifiedDocument> = {
 	},
 };
 
-export function VerifyPage() {
+export default function VerifyPage() {
 	const [code, setCode] = useState(
 		new URLSearchParams(window.location.search).get("code") ?? ""
 	);
@@ -240,7 +240,7 @@ export function VerifyPage() {
 											<div className="flex flex-wrap items-center gap-2">
 												<PublicStatus label="Document verified" tone="success" />
 												<span className="font-mono text-[12px] uppercase tracking-[0.12em] text-ink-soft">
-													Local demo record
+													Local record
 												</span>
 											</div>
 											<h2 className="mt-2 font-display text-xl font-bold text-ink sm:text-2xl">
@@ -404,7 +404,7 @@ export function VerifyPage() {
 							<div className="mt-6 rounded-2xl bg-paper p-6 ring-1 ring-line sm:p-7">
 								<PublicKicker>Integrity architecture</PublicKicker>
 								<h2 className="mt-2 font-display text-lg font-bold text-ink">
-									How the demo code match works
+									How the code match works
 								</h2>
 								<div className="mt-5 grid gap-5 sm:grid-cols-3">
 									{[
@@ -453,7 +453,7 @@ export function VerifyPage() {
 									</div>
 									<div>
 										<p className="font-display text-base font-bold text-ink">
-											No matching demo document
+											No matching document
 										</p>
 										<p className="mt-1 text-sm leading-6 text-ink-soft">
 											Check the code and try one of the supplied samples.

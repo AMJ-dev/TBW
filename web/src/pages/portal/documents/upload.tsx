@@ -144,8 +144,8 @@ export default function DocumentUploadRoute() {
 						We have your documents.
 					</h2>
 					<p className="mx-auto mt-4 max-w-md leading-7 text-ink-soft">
-										Your demo upload is complete. The selected filenames were displayed in this screen only;
-										nothing was sent or stored.
+						Your upload is complete. The selected filenames were displayed in this screen only;
+						nothing was sent or stored.
 					</p>
 
 					<div className="mx-auto mt-7 max-w-md rounded-xl bg-sand p-5 ring-1 ring-line">
@@ -170,8 +170,7 @@ export default function DocumentUploadRoute() {
 					</div>
 
 					<p className="mx-auto mt-6 max-w-md text-[12px] leading-5 text-ink-soft">
-								This is a UI-only demonstration. No file is uploaded, scanned, or sent outside
-								your browser.
+						No file is uploaded, scanned, or sent outside your browser.
 					</p>
 
 					<div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -325,7 +324,7 @@ export default function DocumentUploadRoute() {
 							</p>
 							<p className="mx-auto mt-2 max-w-sm text-[12px] leading-5 text-ink-soft">
 								PDF, JPG, PNG, DOC, DOCX, XLSX. Maximum 10 MB per file. Files stay in this
-								browser demo and are not uploaded.
+								browser and are not uploaded.
 							</p>
 							<input
 								ref={fileInput}
@@ -405,7 +404,7 @@ export default function DocumentUploadRoute() {
 							<ShieldCheck className="mt-0.5 size-4 shrink-0 text-orange" />
 							<div>
 								<p className="text-[13px] font-semibold text-ink">
-										Demo privacy
+									Privacy
 								</p>
 								<p className="mt-1 text-[12px] leading-5 text-ink-soft">
 									Selected file names and sizes stay in this screen's local state. Nothing is

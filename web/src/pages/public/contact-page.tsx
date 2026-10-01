@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
 
-export function ContactPage() {
+export default function ContactPage() {
 	const [sent, setSent] = useState(false);
 	const submit = (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -92,8 +92,7 @@ export function ContactPage() {
 									For pricing and service planning, use the quote form.
 								</p>
 								<p className="mt-2 text-sm leading-6 text-sand/75">
-									Share cargo, timing, and service needs to preview the quote workflow. This demo
-									does not send details to a coordinator.
+									Share cargo, timing, and service needs to preview the quote workflow.
 								</p>
 								<Link to="/quote">
 									<Button className="mt-5 bg-orange text-white hover:bg-orange-deep">

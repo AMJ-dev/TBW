@@ -474,7 +474,7 @@ export default function KycRoute() {
 								inline
 							/>
 							<p className="text-[13px] leading-6 text-ink-soft">
-								Select demo files below. File names stay in this browser and are not uploaded
+								Select files below. File names stay in this browser and are not uploaded
 								or scanned by a service.
 							</p>
 

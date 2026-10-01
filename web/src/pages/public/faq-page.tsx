@@ -33,11 +33,11 @@ const faqs = [
 		category: "Documents",
 		question: "How can I check a TRÏNŪ document?",
 		answer:
-			"Enter its verification code on the public verification page to compare it with the controlled demo record.",
+			"Enter its verification code on the public verification page to compare it with the controlled record.",
 	},
 ] as const;
 
-export function FaqPage() {
+export default function FaqPage() {
 	const [open, setOpen] = useState<number>(0);
 
 	return (

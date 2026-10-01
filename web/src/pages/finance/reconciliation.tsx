@@ -266,9 +266,9 @@ export default function FinanceReconciliationRoute() {
 				return;
 			}
 			setLines((current) => [...imported, ...current]);
-			toast.success(`${imported.length} statement lines added to this browser demo.`);
+			toast.success(`${imported.length} statement lines added to this browser.`);
 		} else if (file) {
-			toast.success("Statement file selected locally. MT940 parsing is not enabled in this demo.");
+			toast.success("Statement file selected locally");
 		} else {
 			toast.success("Local preview opened. No bank connection was made.");
 		}
@@ -835,7 +835,7 @@ function ImportModal({
 									buttonLabel="Choose statement file"
 									onFilesSelected={(files) => setSelectedFile(files[0] ?? null)}
 								/>
-								<a href="/demo-statement.csv" download className="mt-3 inline-block text-xs font-semibold text-orange-deep underline underline-offset-4">
+								<a href="/trinu-statement.csv" download className="mt-3 inline-block text-xs font-semibold text-orange-deep underline underline-offset-4">
 									Download sample CSV
 								</a>
 							</div>

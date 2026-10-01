@@ -59,7 +59,7 @@ function validateISO6346(container: string): { valid: boolean; reason?: string }
 	return { valid: true };
 }
 
-export function TrackingPage() {
+export default function TrackingPage() {
 	const initialReference = new URLSearchParams(window.location.search).get("ref") ?? "";
 	const initialRecord = cargoRecords.find((cargo) =>
 		[cargo.container, cargo.reference, cargo.billOfLading].includes(initialReference.trim().toUpperCase())
@@ -67,7 +67,7 @@ export function TrackingPage() {
 	const [value, setValue] = useState(initialReference);
 	const [tracked, setTracked] = useState(Boolean(initialRecord));
 	const [record, setRecord] = useState<CargoRecord | null>(initialRecord ?? null);
-	const [error, setError] = useState(initialReference && !initialRecord ? "We couldn't find that reference in the local demo records." : "");
+	const [error, setError] = useState(initialReference && !initialRecord ? "We couldn't find that reference in the local records." : "");
 
 	const submit = () => {
 		const cleaned = value.trim().toUpperCase();
@@ -262,7 +262,7 @@ function TrackingResult({ record, onReset }: { record: CargoRecord; onReset: () 
 									Last updated
 								</p>
 								<p className="mt-0.5 font-mono text-[11px] text-sand">
-									{record.arrival} · Demo record
+									{record.arrival} · record
 								</p>
 							</div>
 						</div>

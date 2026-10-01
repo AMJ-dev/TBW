@@ -1,4 +1,4 @@
-import { useContext, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
 import { useNavigate } from "react-router-dom";
 import {
@@ -14,28 +14,41 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import UserContext from "@/lib/userContext";
+import { http, type Resp } from "@/lib/httpClient";
 
-export function LoginPage() {
+export default function LoginPage() {
 	const navigate = useNavigate();
-	const { login } = useContext(UserContext);
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [showPassword, setShowPassword] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 
-	const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		if (!email || !password) {
 			toast.error("Enter your email and password to continue.");
 			return;
 		}
 		setSubmitting(true);
-		setTimeout(() => {
-			void login({ token: "demo-session", remember: false });
-			toast.success("Demo sign-in complete. No credentials were sent or saved.");
-			navigate("/portal");
-		}, 700);
+		try {
+			let res = await http.post("sign-in/",{ email, password});
+			const resp:Resp = res.data;
+			if (resp?.error){
+				toast.error(resp?.data || "Login failed. Check the credentials and try again.")
+				return
+			}
+			toast.success(resp.data);
+			sessionStorage.setItem('remember', 'true')
+			sessionStorage.setItem('expires_in', String(resp.code?.expires_in ?? 300))
+			sessionStorage.setItem('email', String(email.trim()))
+			const isMfaEnabled = String(resp.code?.mfa_enabled) === "1" || resp.code?.mfa_enabled === true;
+			if(isMfaEnabled) sessionStorage.setItem('mfa_token', String(resp.code?.mfa_token));
+			navigate(isMfaEnabled ? "/mfa" : "/otp");
+		} catch (error) {
+			toast.error("Could not complete login. Try again later.")
+		}finally{
+			setSubmitting(false);
+		}
 	};
 
 	return (
@@ -89,7 +102,7 @@ export function LoginPage() {
 					<div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
 						<span className="inline-flex items-center gap-2">
 							<span className="size-1.5 rounded-full bg-orange" />
-							Demo session · no credentials sent
+							No credentials sent
 						</span>
 						<span>TRINŪ · Abuja Flagship Facility</span>
 					</div>
@@ -117,14 +130,14 @@ export function LoginPage() {
 										<Lock className="size-4" />
 									</div>
 									<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
-										Local demo sign-in
+										Sign in
 									</p>
 								</div>
 								<h2 className="mt-4 font-display text-2xl font-bold text-ink">
 									Welcome back
 								</h2>
 								<p className="mt-1 text-[12px] text-ink-soft">
-										Enter any valid email and password to preview the portal. Nothing is transmitted.
+									Enter any valid email and password to preview the portal.
 								</p>
 							</div>
 
@@ -199,28 +212,6 @@ export function LoginPage() {
 									{submitting ? "Signing in…" : "Sign in"}
 									{!submitting && <ArrowRight />}
 								</Button>
-
-								<div className="mt-6 flex items-center gap-3">
-									<span className="h-px flex-1 bg-line" />
-									<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										or
-									</span>
-									<span className="h-px flex-1 bg-line" />
-								</div>
-
-								<div className="mt-6 grid gap-2">
-									<Button
-										type="button"
-										variant="outline"
-										className="border-line bg-paper text-ink hover:bg-sand"
-										onClick={() =>
-											toast.success("Single sign-on is available on production accounts.")
-										}
-									>
-										<ShieldCheck className="mr-2 size-4 text-orange" />
-										Continue with organisation SSO
-									</Button>
-								</div>
 
 								<p className="mt-6 text-center text-[12px] text-ink-soft">
 									New to TRINŪ?{" "}

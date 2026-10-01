@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import type { router as appRouter } from "@/router";
+import { useEffect } from "react";
+import { useLocation } from "react-router-dom";
 
 const defaultSeo = {
 	title: "TRÏNŪ Bonded Warehouse",
@@ -113,8 +113,7 @@ const seoByPath: Record<string, { title: string; description: string }> = {
 	},
 	"/account": {
 		title: "Account Security | TRÏNŪ",
-		description:
-			"Session and device management for your TRÏNŪ account.",
+		description: "Session and device management for your TRÏNŪ account.",
 	},
 	"/for/importers": {
 		title: "For Importers & Traders | TRÏNŪ",
@@ -136,15 +135,16 @@ const seoByPath: Record<string, { title: string; description: string }> = {
 		description:
 			"Plan appointments and gate movements around confirmed cargo readiness — not around a phone call and a hope.",
 	},
+	"/how-it-works": {
+		title: "How It Works | TRÏNŪ",
+		description:
+			"Seven stages from port to release. A transparent, compliant inland cargo transit protocol for the Federal Capital Territory.",
+	},
 };
 
-export function Seo({ router }: { router: typeof appRouter }) {
-	const [pathname, setPathname] = useState(window.location.pathname);
+export function Seo() {
+	const { pathname } = useLocation();
 	const seo = seoByPath[pathname] ?? defaultSeo;
-
-	useEffect(() => {
-		return router.subscribe((state) => setPathname(state.location.pathname));
-	}, [router]);
 
 	useEffect(() => {
 		document.title = seo.title;

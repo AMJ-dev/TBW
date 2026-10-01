@@ -33,7 +33,7 @@ interface AudienceConfig {
 
 const audienceConfig: Record<AudienceKey, AudienceConfig> = {
 	importers: {
-		kicker: "For importers & traders",
+		kicker: "importers & traders",
 		title: "Clear your goods",
 		titleAccent: "closer to home.",
 		intro:
@@ -97,7 +97,7 @@ const audienceConfig: Record<AudienceKey, AudienceConfig> = {
 		ctaSecondary: { label: "Track cargo", to: "/tracking" },
 	},
 	agents: {
-		kicker: "For forwarders & licensed agents",
+		kicker: "forwarders & licensed agents",
 		title: "A facility you",
 		titleAccent: "plug into.",
 		intro:
@@ -161,7 +161,7 @@ const audienceConfig: Record<AudienceKey, AudienceConfig> = {
 		ctaSecondary: { label: "Contact operations", to: "/contact" },
 	},
 	"shipping-lines": {
-		kicker: "For shipping lines & agents",
+		kicker: "shipping lines & agents",
 		title: "Manifest, container, and",
 		titleAccent: "equipment visibility.",
 		intro:
@@ -225,7 +225,7 @@ const audienceConfig: Record<AudienceKey, AudienceConfig> = {
 		ctaSecondary: { label: "About TRÏNŪ", to: "/about" },
 	},
 	transporters: {
-		kicker: "For transporters & haulage",
+		kicker: "transporters & haulage",
 		title: "Plan around",
 		titleAccent: "confirmed readiness.",
 		intro:
@@ -297,7 +297,7 @@ const audiences = [
 	{ key: "transporters", label: "Transporters", icon: Truck },
 ] as const;
 
-export function AudiencePage({ audience }: { audience?: AudienceKey }) {
+export default function AudiencePage({ audience }: { audience?: AudienceKey }) {
 	const params = useParams<{ audience?: string }>();
 	const key = (audience ?? (params.audience as AudienceKey) ?? "importers") as AudienceKey;
 	const config = audienceConfig[key];

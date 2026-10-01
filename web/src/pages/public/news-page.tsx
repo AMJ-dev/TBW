@@ -29,7 +29,7 @@ const notices = [
 const categories = ["All", "Examination", "Gate", "Documents"] as const;
 type Category = (typeof categories)[number];
 
-export function NewsPage() {
+export default function NewsPage() {
 	const [activeCategory, setActiveCategory] = useState<Category>("All");
 
 	const filteredNotices = useMemo(() => {
