@@ -18,6 +18,15 @@
         echo json_encode(["error"=>true, "data"=>"Invalid Token"]);
         die(); 
     }
+    function account_suspended() { 
+        header($_SERVER['SERVER_PROTOCOL'] . ' 403 Forbidden');
+        echo json_encode([
+            "error" => true, 
+            "code" => "ACCOUNT_SUSPENDED",
+            "data" => "Account Suspended"
+        ]);
+        die(); 
+    }
     function no_permision(){ 
         header($_SERVER['SERVER_PROTOCOL'] . ' 403 Forbidden');
         echo json_encode(["error"=>true, "data"=>"You don't have enough permission to access this Resources"]);

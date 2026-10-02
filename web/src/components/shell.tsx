@@ -413,12 +413,12 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 	}, [userMenuOpen]);
 
 	useEffect(() => {
-		if (my_details?.account_status === "rejected") {
-			toast.error("Your account has been rejected. Contact operations.");
-		}
-		if (my_details?.account_status === "active") {
-			toast.success("Account approved. Full access enabled.");
-		}
+		// if (my_details?.account_status === "rejected") {
+		// 	toast.error("Your account has been rejected. Contact operations.");
+		// }
+		// if (my_details?.account_status === "active") {
+		// 	toast.success("Account approved. Full access enabled.");
+		// }
 	}, [my_details?.account_status]);
 
 	return (

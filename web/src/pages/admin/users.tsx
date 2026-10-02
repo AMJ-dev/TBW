@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import {
+	AlertTriangle,
 	Download,
 	Filter,
 	KeyRound,
@@ -12,9 +13,11 @@ import {
 	Users,
 	X,
 } from "lucide-react";
+import { Link } from "@/components/router-link";
 import { AppShell, StatusBadge, statusTone, Metric } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { http, type Resp } from "@/lib/httpClient";
 
 interface UserRecord {
 	id: string;
@@ -22,76 +25,107 @@ interface UserRecord {
 	email: string;
 	role: string;
 	organization: string;
-	status: "Active" | "Pending" | "Suspended";
+	status: string;
 	lastLogin: string;
 	twoFactor: boolean;
 }
 
-const initialUsers: UserRecord[] = [
-	{
-		id: "usr-1",
-		name: "D. Okafor",
-		email: "d.okafor@trinu.ng",
-		role: "Terminal Operations Manager",
-		organization: "TRÏNŪ Flagship Facility",
-		status: "Active",
-		lastLogin: "12 mins ago",
-		twoFactor: true,
-	},
-	{
-		id: "usr-2",
-		name: "A. Balogun",
-		email: "a.balogun@meridiancustoms.ng",
-		role: "Licensed Customs Broker",
-		organization: "Meridian Customs Services",
-		status: "Active",
-		lastLogin: "1 hour ago",
-		twoFactor: true,
-	},
-	{
-		id: "usr-3",
-		name: "Chukwuma Eze",
-		email: "c.eze@atlantictrade.com",
-		role: "Consignee Agent",
-		organization: "Atlantic Trade Nigeria Ltd",
-		status: "Active",
-		lastLogin: "Yesterday · 16:30",
-		twoFactor: true,
-	},
-	{
-		id: "usr-4",
-		name: "Ibrahim Musa",
-		email: "i.musa@meridiancustoms.ng",
-		role: "Licensed Customs Broker",
-		organization: "Meridian Customs Services",
-		status: "Active",
-		lastLogin: "2 days ago",
-		twoFactor: false,
-	},
-	{
-		id: "usr-5",
-		name: "Khadija Sani",
-		email: "k.sani@trinu.ng",
-		role: "Finance & Tariff Officer",
-		organization: "TRINU Finance Desk",
-		status: "Active",
-		lastLogin: "3 hours ago",
-		twoFactor: true,
-	},
-	{
-		id: "usr-6",
-		name: "Oluwaseun Adeleke",
-		email: "o.adeleke@apexhaulage.com",
-		role: "Truck Fleet Dispatcher",
-		organization: "Apex Haulage Logistics",
-		status: "Pending",
-		lastLogin: "Never",
-		twoFactor: false,
-	},
-];
+interface ApiUser {
+	id: string;
+	full_name?: string;
+	name?: string;
+	email: string;
+	role?: string | { name?: string };
+	role_in_org?: string;
+	organization?: string | { name?: string };
+	org_name?: string;
+	account_status?: string;
+	status?: string;
+	last_login_at?: string | null;
+	mfa_enabled?: boolean;
+	two_factor_enabled?: boolean;
+	email_verified_at?: string | null;
+}
+
+interface UsersMetrics {
+	total: number;
+	active: number;
+	pending: number;
+	two_factor_pct: number | null;
+}
+
+const statusLabel: Record<string, string> = {
+	active: "Active",
+	pending: "Pending",
+	suspended: "Suspended",
+	rejected: "Rejected",
+	inactive: "Inactive",
+	approved: "Approved",
+	invited: "Invited",
+};
+
+const formatLastLogin = (input?: string | null) => {
+	if (!input) return "Never";
+	const date = new Date(input);
+	if (Number.isNaN(date.getTime())) return "—";
+	const now = new Date();
+	const diffMs = now.getTime() - date.getTime();
+	const diffMin = Math.floor(diffMs / 60000);
+	if (diffMin < 1) return "Just now";
+	if (diffMin < 60) return `${diffMin} min${diffMin === 1 ? "" : "s"} ago`;
+	const diffHr = Math.floor(diffMin / 60);
+	if (diffHr < 24) return `${diffHr} hour${diffHr === 1 ? "" : "s"} ago`;
+	const diffDay = Math.floor(diffHr / 24);
+	if (diffDay < 7) return `${diffDay} day${diffDay === 1 ? "" : "s"} ago`;
+	return date.toLocaleDateString("en-NG", {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+	});
+};
+
+const extractUser = (raw: ApiUser): UserRecord => {
+	const name =
+		raw.full_name?.trim() ||
+		raw.name?.trim() ||
+		raw.email.split("@")[0] ||
+		"Unknown user";
+
+	const role =
+		typeof raw.role === "string"
+			? raw.role
+			: raw.role?.name?.trim() ||
+			  raw.role_in_org?.trim() ||
+			  "—";
+
+	const organization =
+		typeof raw.organization === "string"
+			? raw.organization
+			: raw.organization?.name?.trim() ||
+			  raw.org_name?.trim() ||
+			  "—";
+
+	const status = (raw.account_status ?? raw.status ?? "pending").toString();
+	const twoFactor = Boolean(raw.mfa_enabled ?? raw.two_factor_enabled ?? false);
+
+	return {
+		id: raw.id,
+		name,
+		email: raw.email,
+		role,
+		organization,
+		status,
+		lastLogin: formatLastLogin(raw.last_login_at ?? null),
+		twoFactor,
+	};
+};
 
 export default function AdminUsersRoute() {
-	const [users, setUsers] = useState<UserRecord[]>(initialUsers);
+	const [users, setUsers] = useState<UserRecord[]>([]);
+	const [metrics, setMetrics] = useState<UsersMetrics | null>(null);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState("");
+
 	const [searchQuery, setSearchQuery] = useState("");
 	const [roleFilter, setRoleFilter] = useState("ALL");
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -101,22 +135,79 @@ export default function AdminUsersRoute() {
 	const [newRole, setNewRole] = useState("Consignee Agent");
 	const [newOrg, setNewOrg] = useState("");
 
+	const fetchUsers = async () => {
+		setLoading(true);
+		setError("");
+		try {
+			const res = await http.get("admin/users/");
+			const resp: Resp = res.data;
+			if (resp.error) {
+				setError(resp.data || "Could not load users.");
+				setUsers([]);
+				setMetrics(null);
+				return;
+			}
+
+			const payload: any = resp.code ?? {};
+			const list: ApiUser[] = Array.isArray(payload)
+				? payload
+				: Array.isArray(payload.results)
+				? payload.results
+				: Array.isArray(payload.users)
+				? payload.users
+				: [];
+
+			const normalized = list.map(extractUser);
+			setUsers(normalized);
+
+			const computedMetrics: UsersMetrics =
+				payload.metrics ?? {
+					total: normalized.length,
+					active: normalized.filter((u) => u.status === "active").length,
+					pending: normalized.filter((u) => u.status === "pending").length,
+					two_factor_pct:
+						normalized.length === 0
+							? null
+							: Math.round(
+									(normalized.filter((u) => u.twoFactor).length /
+										normalized.length) *
+										100
+							  ),
+				};
+			setMetrics(computedMetrics);
+		} catch (err: any) {
+			setError(err?.response?.data?.message || "Could not load users.");
+			setUsers([]);
+			setMetrics(null);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		void fetchUsers();
+	}, []);
+
 	const filteredUsers = useMemo(() => {
 		return users.filter((u) => {
+			const q = searchQuery.trim().toLowerCase();
 			const matchQuery =
-				u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				u.organization.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				u.role.toLowerCase().includes(searchQuery.toLowerCase());
+				!q ||
+				u.name.toLowerCase().includes(q) ||
+				u.email.toLowerCase().includes(q) ||
+				u.organization.toLowerCase().includes(q) ||
+				u.role.toLowerCase().includes(q);
 
 			const matchRole =
-				roleFilter === "ALL" ? true : u.role.toLowerCase().includes(roleFilter.toLowerCase());
+				roleFilter === "ALL"
+					? true
+					: u.role.toLowerCase().includes(roleFilter.toLowerCase());
 
 			return matchQuery && matchRole;
 		});
 	}, [users, searchQuery, roleFilter]);
 
-	const handleAddUser = (e: React.FormEvent) => {
+	const handleAddUser = (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		if (!newName || !newEmail || !newOrg) {
 			toast.error("Please fill in all required fields.");
@@ -129,7 +220,7 @@ export default function AdminUsersRoute() {
 			email: newEmail,
 			role: newRole,
 			organization: newOrg,
-			status: "Pending",
+			status: "pending",
 			lastLogin: "Never",
 			twoFactor: false,
 		};
@@ -147,12 +238,12 @@ export default function AdminUsersRoute() {
 			["Name", "Email", "Role", "Organization", "Status", "Last Login", "2FA"].join(","),
 			...users.map((u) =>
 				[
-					u.name,
+					`"${u.name}"`,
 					u.email,
 					`"${u.role}"`,
 					`"${u.organization}"`,
-					u.status,
-					u.lastLogin,
+					statusLabel[u.status] ?? u.status,
+					`"${u.lastLogin}"`,
 					u.twoFactor ? "Yes" : "No",
 				].join(",")
 			),
@@ -167,6 +258,17 @@ export default function AdminUsersRoute() {
 		URL.revokeObjectURL(url);
 		toast.success("User directory exported locally.");
 	};
+
+	const activeCount =
+		metrics?.active ??
+		users.filter((u) => u.status === "active").length;
+	const pendingCount =
+		metrics?.pending ??
+		users.filter((u) => u.status === "pending").length;
+	const twoFactorPct =
+		metrics?.two_factor_pct === null || metrics?.two_factor_pct === undefined
+			? "—"
+			: `${metrics.two_factor_pct}%`;
 
 	return (
 		<AppShell title="Users & Access" eyebrow="Administration · Identity Management">
@@ -184,7 +286,12 @@ export default function AdminUsersRoute() {
 					</p>
 				</div>
 				<div className="flex flex-wrap items-center gap-2">
-					<Button variant="outline" className="border-line bg-paper text-ink" onClick={handleExportUsers}>
+					<Button
+						variant="outline"
+						className="border-line bg-paper text-ink"
+						onClick={handleExportUsers}
+						disabled={users.length === 0}
+					>
 						<Download className="size-4" /> Export CSV
 					</Button>
 					<Button
@@ -199,21 +306,21 @@ export default function AdminUsersRoute() {
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 				<Metric
 					label="Active Users"
-					value={String(users.filter((u) => u.status === "Active").length)}
+					value={String(activeCount)}
 					detail="Across registered organizations"
 					tone="success"
 					icon={Users}
 				/>
 				<Metric
 					label="Pending Invites"
-					value={String(users.filter((u) => u.status === "Pending").length)}
+					value={String(pendingCount)}
 					detail="Awaiting onboarding"
 					tone="warning"
 					icon={UserCheck}
 				/>
 				<Metric
 					label="2FA Enrollment"
-					value="84%"
+					value={twoFactorPct}
 					detail="Strongly encouraged for trade users"
 					tone="info"
 					icon={KeyRound}
@@ -259,56 +366,100 @@ export default function AdminUsersRoute() {
 					</div>
 				</div>
 
-				<div className="overflow-x-auto">
-					<table className="w-full min-w-[850px] text-left text-sm">
-						<thead>
-							<tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-								<th className="px-4 py-3 font-medium">User / Email</th>
-								<th className="px-4 py-3 font-medium">Role</th>
-								<th className="px-4 py-3 font-medium">Organization</th>
-								<th className="px-4 py-3 font-medium">2FA</th>
-								<th className="px-4 py-3 font-medium">Last Login</th>
-								<th className="px-4 py-3 font-medium">Status</th>
-								<th className="px-4 py-3 font-medium text-right">Action</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-line">
-							{filteredUsers.map((u) => (
-								<tr key={u.id} className="transition-colors hover:bg-sand/60">
-									<td className="px-4 py-3.5">
-										<p className="font-semibold text-ink">{u.name}</p>
-										<p className="font-mono text-xs text-ink-soft">{u.email}</p>
-									</td>
-									<td className="px-4 py-3.5 text-xs text-ink">{u.role}</td>
-									<td className="px-4 py-3.5 text-xs text-ink-soft">{u.organization}</td>
-									<td className="px-4 py-3.5">
-										{u.twoFactor ? (
-											<span className="inline-flex items-center gap-1 font-mono text-[10px] text-teal-deep">
-												<KeyRound className="size-3" /> Enabled
-											</span>
-										) : (
-											<span className="font-mono text-[10px] text-orange-deep">Not enrolled</span>
-										)}
-									</td>
-									<td className="px-4 py-3.5 text-xs text-ink-soft">{u.lastLogin}</td>
-									<td className="px-4 py-3.5">
-										<StatusBadge label={u.status} tone={statusTone(u.status)} />
-									</td>
-									<td className="px-4 py-3.5 text-right">
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => toast.success(`Viewing permissions for ${u.name}`)}
-											className="text-xs font-semibold text-orange-deep hover:bg-orange/10"
-										>
-											Manage
-										</Button>
-									</td>
+				{loading ? (
+					<div className="flex items-center justify-center p-10">
+						<span className="size-6 animate-spin rounded-full border-2 border-orange/25 border-t-orange" />
+					</div>
+				) : error ? (
+					<div className="p-6 sm:p-8">
+						<div className="flex items-start gap-3">
+							<div className="grid size-10 shrink-0 place-items-center rounded-md bg-carmine text-white">
+								<AlertTriangle className="size-5" />
+							</div>
+							<div>
+								<p className="font-display text-base font-bold text-ink">
+									Could not load users
+								</p>
+								<p className="mt-1 text-sm leading-6 text-ink-soft">{error}</p>
+							</div>
+						</div>
+						<div className="mt-5">
+							<Button
+								onClick={() => void fetchUsers()}
+								className="bg-orange text-white hover:bg-orange-deep"
+							>
+								Try again
+							</Button>
+						</div>
+					</div>
+				) : filteredUsers.length === 0 ? (
+					<div className="p-8 text-center text-sm text-ink-soft">
+						{users.length === 0
+							? "No user accounts registered yet."
+							: "No users match your filters."}
+					</div>
+				) : (
+					<div className="overflow-x-auto">
+						<table className="w-full min-w-[850px] text-left text-sm">
+							<thead>
+								<tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+									<th className="px-4 py-3 font-medium">User / Email</th>
+									<th className="px-4 py-3 font-medium">Role</th>
+									<th className="px-4 py-3 font-medium">Organization</th>
+									<th className="px-4 py-3 font-medium">2FA</th>
+									<th className="px-4 py-3 font-medium">Last Login</th>
+									<th className="px-4 py-3 font-medium">Status</th>
+									<th className="px-4 py-3 font-medium text-right">Action</th>
 								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
+							</thead>
+							<tbody className="divide-y divide-line">
+								{filteredUsers.map((u) => (
+									<tr key={u.id} className="transition-colors hover:bg-sand/60">
+										<td className="px-4 py-3.5">
+											<p className="font-semibold text-ink">{u.name}</p>
+											<p className="font-mono text-xs text-ink-soft">{u.email}</p>
+										</td>
+										<td className="px-4 py-3.5 text-xs text-ink">{u.role}</td>
+										<td className="px-4 py-3.5 text-xs text-ink-soft">
+											{u.organization}
+										</td>
+										<td className="px-4 py-3.5">
+											{u.twoFactor ? (
+												<span className="inline-flex items-center gap-1 font-mono text-[10px] text-teal-deep">
+													<KeyRound className="size-3" /> Enabled
+												</span>
+											) : (
+												<span className="font-mono text-[10px] text-orange-deep">
+													Not enrolled
+												</span>
+											)}
+										</td>
+										<td className="px-4 py-3.5 text-xs text-ink-soft">
+											{u.lastLogin}
+										</td>
+										<td className="px-4 py-3.5">
+											<StatusBadge
+												label={statusLabel[u.status] ?? u.status}
+												tone={statusTone(u.status)}
+											/>
+										</td>
+										<td className="px-4 py-3.5 text-right">
+											<Link to={`/admin/users/${u.id}`}>
+												<Button
+													variant="ghost"
+													size="sm"
+													className="text-xs font-semibold text-orange-deep hover:bg-orange/10"
+												>
+													Manage
+												</Button>
+											</Link>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
 
 				<div className="flex items-center justify-between border-t border-line px-4 py-3 font-mono text-[10px] text-ink-soft">
 					<span>
@@ -333,7 +484,11 @@ export default function AdminUsersRoute() {
 									Create User Account
 								</h3>
 							</div>
-							<Button variant="ghost" size="icon" onClick={() => setIsAddModalOpen(false)}>
+							<Button
+								variant="ghost"
+								size="icon"
+								onClick={() => setIsAddModalOpen(false)}
+							>
 								<X />
 							</Button>
 						</div>
@@ -399,10 +554,17 @@ export default function AdminUsersRoute() {
 							</div>
 
 							<div className="flex justify-end gap-2 border-t border-line pt-4">
-								<Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>
+								<Button
+									type="button"
+									variant="outline"
+									onClick={() => setIsAddModalOpen(false)}
+								>
 									Cancel
 								</Button>
-								<Button type="submit" className="bg-orange text-white hover:bg-orange-deep">
+								<Button
+									type="submit"
+									className="bg-orange text-white hover:bg-orange-deep"
+								>
 									Add User
 								</Button>
 							</div>

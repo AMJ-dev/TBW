@@ -1,19 +1,10 @@
-import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    type PropsWithChildren
-} from "react";
-import UserContext, {
-    type User,
-    type UserRole,
-    type LoginData
-} from "@/lib/userContext";
+import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
+import UserContext, { type User, type UserRole, type LoginData } from "@/lib/userContext";
+import { useLocation } from 'react-router-dom';
 import { http, type Resp } from "@/lib/httpClient";
 
 export default function UserProvider({ children }: PropsWithChildren) {
+    const location = useLocation();
     const [hydrated, setHydrated] = useState(false);
     const [detailsReady, setDetailsReady] = useState(false);
     const [auth, setAuth] = useState(false);
@@ -109,9 +100,9 @@ export default function UserProvider({ children }: PropsWithChildren) {
     }, [getStorage]);
 
     const fetchUser = useCallback(async () => {
-        if (fetchingProfile.current) {
-            return;
-        }
+        const excludedPaths = ['/unauthorized', '/account-suspended', '/401', '/403', '/404', '/429', '/500'];
+
+        if (fetchingProfile.current || excludedPaths.includes(location.pathname)) return;
 
         const storage = getStorage();
         const storedUser = storage.getItem("user");
