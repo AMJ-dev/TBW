@@ -10,6 +10,7 @@
  
     try { 
         $decoded = JWT::decode($token, $publicKey, array('RS256')); 
+        print_r($decoded->id);
         $my_details = get_user($decoded->id); 
         if(empty($my_details) || $my_details==false) invalid_token();
         if($my_details->account_status=="suspended") account_suspended();
