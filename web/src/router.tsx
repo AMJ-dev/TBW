@@ -31,6 +31,7 @@ const MfaSetupPage = lazy(() => import("@/pages/auth/mfa-setup"));
 const MfaChallengePage = lazy(() => import("@/pages/auth/mfa-challenge"));
 const OtpPage = lazy(() => import("@/pages/auth/otp"));
 const OrganisationResubmitPage = lazy(() => import("@/pages/organisation-resubmit"));
+const InvitationPage = lazy(() => import("@/pages/auth/invitation"));
 
 const MyProfilePage = lazy(() => import("@/pages/profile/my"));
 const EditProfilePage = lazy(() => import("@/pages/profile/edit"));

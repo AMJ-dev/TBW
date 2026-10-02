@@ -2279,3 +2279,27 @@ CREATE TABLE organisation_document_reviews (
         REFERENCES users(id)
         ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE user_invitations (
+    id char(36) NOT NULL,
+    user_id char(36) NOT NULL,
+    token_hash varchar(255) NOT NULL,
+    expires_at datetime NOT NULL,
+    accepted_at datetime DEFAULT NULL,
+    revoked_at datetime DEFAULT NULL,
+    invited_by char(36) DEFAULT NULL,
+    created_at timestamp NOT NULL DEFAULT current_timestamp(),
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_invitation_token (token_hash),
+    KEY idx_invitation_user (user_id),
+    KEY idx_invitation_expiry (expires_at),
+    KEY idx_invitation_invited_by (invited_by),
+    CONSTRAINT fk_invitation_user
+        FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_invitation_invited_by
+        FOREIGN KEY (invited_by) REFERENCES users(id)
+        ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ALTER TABLE otp_codes
+MODIFY purpose ENUM('login_mfa', 'password_reset', 'phone_verify', 'email_verify', 'regulator_access') NOT NULL;

@@ -48,9 +48,14 @@ RewriteRule ^admin/organizations/approve/([0-9a-zA-Z-]+)/$ src/organizations/app
 
 RewriteRule ^admin/roles/$ src/roles/get.php [NC]
 
+RewriteRule ^admin/users/invite/$ src/users/invite.php [NC]
+RewriteRule ^auth/invite/complete/$ src/invite/complete.php [NC]
+RewriteRule ^auth/invite/resend-phone/$ src/invite/resend-phone.php [NC]
+RewriteRule ^auth/invite/verify-phone/$ src/invite/verify-phone.php [NC]
+RewriteRule ^auth/invite/([0-9a-zA-Z-]+)/$ src/invite/get.php?token=$1 [NC]
 
 RewriteRule ^admin/users/$ src/users/all.php [NC]
-RewriteRule ^admin/users/([0-9a-zA-Z-]+)/$ src/users/single.php?id=$1 [NC]
+# RewriteRule ^admin/users/([0-9a-zA-Z-]+)/$ src/users/single.php?id=$1 [NC]
 RewriteRule ^admin/users/suspend/([0-9a-zA-Z-]+)/$ src/users/suspend.php?id=$1 [NC]
 RewriteRule ^admin/users/reactivate/([0-9a-zA-Z-]+)/$ src/users/reactivate.php?id=$1 [NC]
 RewriteRule ^admin/users/reset-mfa/([0-9a-zA-Z-]+)/$ src/users/reset-mfa.php?id=$1 [NC]

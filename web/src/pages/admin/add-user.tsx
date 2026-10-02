@@ -218,7 +218,17 @@ export default function AdminAddUsersPage() {
 		if (sending) return;
 		setSending(true);
 		try {
-			const payload: Record<string, any> = {
+			interface InvitePayload {
+				account_type: "system" | "organisation";
+				full_name: string;
+				email: string;
+				phone: string;
+				role_id: string;
+				organisation_id?: string;
+				job_title?: string;
+			}
+ 
+			const payload: InvitePayload = {
 				account_type: accountType,
 				full_name: fullName.trim(),
 				email: email.trim().toLowerCase(),
