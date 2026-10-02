@@ -294,12 +294,12 @@ export default function AdminUsersRoute() {
 					>
 						<Download className="size-4" /> Export CSV
 					</Button>
-					<Button
-						className="bg-orange text-white hover:bg-orange-deep"
-						onClick={() => setIsAddModalOpen(true)}
-					>
-						<UserPlus className="size-4" /> Add User
-					</Button>
+					<Link to="/admin/user/add">
+						<Button
+							className="bg-orange text-white hover:bg-orange-deep" >
+							<UserPlus className="size-4" /> Add User
+						</Button>
+					</Link>
 				</div>
 			</div>
 
@@ -468,110 +468,6 @@ export default function AdminUsersRoute() {
 					<span>Role-based access control</span>
 				</div>
 			</section>
-
-			{isAddModalOpen && (
-				<div
-					className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4 backdrop-blur-sm"
-					onMouseDown={(e) => e.target === e.currentTarget && setIsAddModalOpen(false)}
-				>
-					<div className="w-full max-w-lg rounded-xl bg-paper p-6 shadow-2xl ring-1 ring-line">
-						<div className="flex items-center justify-between border-b border-line pb-4">
-							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-deep">
-									Identity Provisioning
-								</p>
-								<h3 className="mt-1 font-display text-xl font-bold text-ink">
-									Create User Account
-								</h3>
-							</div>
-							<Button
-								variant="ghost"
-								size="icon"
-								onClick={() => setIsAddModalOpen(false)}
-							>
-								<X />
-							</Button>
-						</div>
-
-						<form onSubmit={handleAddUser} className="mt-5 space-y-4">
-							<div>
-								<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-									Full Name
-								</label>
-								<Input
-									required
-									placeholder="e.g. Tunde Lawal"
-									value={newName}
-									onChange={(e) => setNewName(e.target.value)}
-									className="mt-1.5 border-line bg-sand text-ink"
-								/>
-							</div>
-
-							<div>
-								<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-									Work Email Address
-								</label>
-								<Input
-									required
-									type="email"
-									placeholder="e.g. tunde@atlantictrade.com"
-									value={newEmail}
-									onChange={(e) => setNewEmail(e.target.value)}
-									className="mt-1.5 border-line bg-sand text-ink"
-								/>
-							</div>
-
-							<div className="grid grid-cols-2 gap-3">
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Assigned Role
-									</label>
-									<select
-										value={newRole}
-										onChange={(e) => setNewRole(e.target.value)}
-										className="mt-1.5 h-10 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none"
-									>
-										<option>Consignee Agent</option>
-										<option>Licensed Customs Broker</option>
-										<option>Terminal Operations Staff</option>
-										<option>Finance Officer</option>
-										<option>Transporter Dispatcher</option>
-									</select>
-								</div>
-
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Organization
-									</label>
-									<Input
-										required
-										placeholder="e.g. Atlantic Trade Ltd"
-										value={newOrg}
-										onChange={(e) => setNewOrg(e.target.value)}
-										className="mt-1.5 border-line bg-sand text-ink"
-									/>
-								</div>
-							</div>
-
-							<div className="flex justify-end gap-2 border-t border-line pt-4">
-								<Button
-									type="button"
-									variant="outline"
-									onClick={() => setIsAddModalOpen(false)}
-								>
-									Cancel
-								</Button>
-								<Button
-									type="submit"
-									className="bg-orange text-white hover:bg-orange-deep"
-								>
-									Add User
-								</Button>
-							</div>
-						</form>
-					</div>
-				</div>
-			)}
 		</AppShell>
 	);
 }

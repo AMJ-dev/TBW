@@ -46,7 +46,7 @@ RewriteRule ^admin/organizations/([0-9a-zA-Z-]+)/$ src/organizations/details.php
 RewriteRule ^admin/organizations/reject/([0-9a-zA-Z-]+)/$ src/organizations/reject.php?id=$1 [NC]
 RewriteRule ^admin/organizations/approve/([0-9a-zA-Z-]+)/$ src/organizations/approve.php?id=$1 [NC]
 
-
+RewriteRule ^admin/roles/$ src/roles/get.php [NC]
 
 
 RewriteRule ^admin/users/$ src/users/all.php [NC]

@@ -42,6 +42,7 @@ const AdminOrganizationsPage = lazy(() => import("@/pages/admin/organizations"))
 const AdminOrganizationDetailsPage = lazy(() => import("@/pages/admin/organization-details"));
 const AdminRolesPage = lazy(() => import("@/pages/admin/roles"));
 const AdminUsersPage = lazy(() => import("@/pages/admin/users"));
+const AdminAddUsersPage = lazy(() => import("@/pages/admin/add-user"));
 const AdminUserDetailsPage = lazy(() => import("@/pages/admin/user-details"));
 
 const FinancePage = lazy(() => import("@/pages/finance"));
@@ -153,6 +154,7 @@ export default function Routers() {
 						<Route path="/admin/organizations/:id" element={<AdminOrganizationDetailsPage />} />
 						<Route path="/admin/roles" element={<AdminRolesPage />} />
 						<Route path="/admin/users" element={<AdminUsersPage />} />
+						<Route path="/admin/user/add" element={<AdminAddUsersPage />} />
 						<Route path="/admin/users/:id" element={<AdminUserDetailsPage />} />
 
 						<Route path="/finance" element={<FinancePage />} />
