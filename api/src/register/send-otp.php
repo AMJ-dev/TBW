@@ -203,7 +203,7 @@ try {
 
     $sent = send_email(
         $email,
-        "",
+        $AppName,
         $subject,
         $email_message
     );

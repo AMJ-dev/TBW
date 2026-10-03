@@ -161,7 +161,7 @@
                 $mail->clearCustomHeaders();
                 return $is_send;
             } catch (\Throwable $th) {
-                //throw $th;
+                throw $th;
             }
         } catch (Exception $e) {
             echo "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";

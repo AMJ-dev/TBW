@@ -1,86 +1,185 @@
-import { useState, useEffect, useContext, useRef, startTransition, type FormEvent } from "react";
+import {
+	useState,
+	useEffect,
+	useContext,
+	startTransition,
+	useRef,
+	type FormEvent,
+	type ChangeEvent,
+	type KeyboardEvent,
+	type ClipboardEvent,
+} from "react";
 import { Link } from "@/components/router-link";
 import { useNavigate } from "react-router-dom";
-import {
-	ArrowRight,
-	Check,
-	KeyRound,
-	ShieldCheck,
-} from "lucide-react";
-import { http, type Resp } from '@/lib/httpClient'
-import userContext from '@/lib/userContext'
-import { useDeviceInfo } from '@/hooks/useDeviceInfo'
-import { useLocationInfo } from '@/hooks/useLocationInfo'
+import { ArrowRight, Check, KeyRound, ShieldCheck } from "lucide-react";
+import { http, type Resp } from "@/lib/httpClient";
+import userContext from "@/lib/userContext";
+import { useDeviceInfo } from "@/hooks/useDeviceInfo";
+import { useLocationInfo } from "@/hooks/useLocationInfo";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export default function OtpPage() {
-	const navigate = useNavigate()
-	const { login } = useContext(userContext)
-	const deviceInfo = useDeviceInfo()
-	const { locationInfo, loading: locationLoading } = useLocationInfo()
-	const [expiresIn, setExpiresIn] = useState<number>(300)
-	const [remember, setRemember] = useState<boolean>(false)
+	const navigate = useNavigate();
+	const { login } = useContext(userContext);
+	const deviceInfo = useDeviceInfo();
+	const { locationInfo } = useLocationInfo();
+
+	const [expiresIn, setExpiresIn] = useState<number>(300);
+	const [remember, setRemember] = useState<boolean>(false);
 	const [code, setCode] = useState("");
 	const [trustDevice, setTrustDevice] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
-	const [mounted, setMounted] = useState(false)
-	const [email, setEmail] = useState<string>('')
-	const [countdown, setCountdown] = useState<number>(120)
-	const [canResend, setCanResend] = useState<boolean>(false)
-	const [sending, setSending] = useState<boolean>(false)
-	const codeInputRef = useRef<HTMLInputElement | null>(null);
+	const [mounted, setMounted] = useState(false);
+	const [email, setEmail] = useState<string>("");
+	const [countdown, setCountdown] = useState<number>(120);
+	const [canResend, setCanResend] = useState<boolean>(false);
+	const [sending, setSending] = useState<boolean>(false);
+
+	const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
+
 	const digits = code.replace(/\D/g, "").slice(0, 6);
 	const complete = digits.length === 6;
 
 	useEffect(() => {
-		const ExpiresIn = sessionStorage.getItem('expires_in')
-		const Email = sessionStorage.getItem('email')
-		const Remember = sessionStorage.getItem('remember')
+		const ExpiresIn = sessionStorage.getItem("expires_in");
+		const Email = sessionStorage.getItem("email");
+		const Remember = sessionStorage.getItem("remember");
 		if (!ExpiresIn || !Email) {
-			startTransition(() => navigate('/login', { replace: true }))
-			return
+			startTransition(() => navigate("/login", { replace: true }));
+			return;
 		}
-		setExpiresIn(Number(ExpiresIn))
-		setEmail(Email)
-		setRemember(Remember === 'true')
-		setMounted(true)
-	}, [navigate])
+		setExpiresIn(Number(ExpiresIn));
+		setEmail(Email);
+		setRemember(Remember === "true");
+		setMounted(true);
+	}, [navigate]);
 
 	useEffect(() => {
-		if (!mounted) return
+		if (!mounted) return;
 		if (countdown > 0 && !canResend) {
-			const t = setTimeout(() => setCountdown(prev => prev - 1), 1000)
-			return () => clearTimeout(t)
-		} else if (countdown === 0 && !canResend) setCanResend(true)
-	}, [countdown, canResend, mounted])
+			const t = setTimeout(() => setCountdown((prev) => prev - 1), 1000);
+			return () => clearTimeout(t);
+		} else if (countdown === 0 && !canResend) setCanResend(true);
+	}, [countdown, canResend, mounted]);
 
-	const formatDeviceInfo = () => `${deviceInfo.browser} on ${deviceInfo.os} (${deviceInfo.deviceType})`
-	const formatLocationInfo = () => (locationInfo ? `${locationInfo.city}, ${locationInfo.region}, ${locationInfo.country}` : 'Location information not available')
+	// Auto-focus the first box on mount.
+	useEffect(() => {
+		if (!mounted) return;
+		const t = setTimeout(() => inputsRef.current[0]?.focus(), 50);
+		return () => clearTimeout(t);
+	}, [mounted]);
+
+	const formatDeviceInfo = () =>
+		`${deviceInfo.browser} on ${deviceInfo.os} (${deviceInfo.deviceType})`;
+
+	const formatLocationInfo = () =>
+		locationInfo
+			? `${locationInfo.city}, ${locationInfo.region}, ${locationInfo.country}`
+			: "Location information not available";
 
 	const handleResend = async () => {
-		if (!canResend || sending || !email) return
-		setSending(true)
+		if (!canResend || sending || !email) return;
+		setSending(true);
 		try {
-			const res = await http.post('login-resend-otp/', { email })
-			const resp: Resp = res.data
+			const res = await http.post("login-resend-otp/", { email });
+			const resp: Resp = res.data;
 			if (resp.error) {
-				toast.error(resp.data || 'Could not resend code. Please try again.')
+				toast.error(resp.data || "Could not resend code. Please try again.");
 			} else {
-				toast.success(resp.data || 'A new code has been sent.')
-				setCode('')
-				setCountdown(120)
-				setCanResend(false)
+				toast.success(resp.data || "A new code has been sent.");
+				setCode("");
+				setCountdown(120);
+				setCanResend(false);
+				inputsRef.current[0]?.focus();
 			}
 		} catch (error: any) {
-			console.error(error)
-			toast.error(error?.response?.data?.message || 'Could not resend code. Please try again.')
+			console.error(error);
+			toast.error(
+				error?.response?.data?.message ||
+					"Could not resend code. Please try again."
+			);
 		} finally {
-			setSending(false)
+			setSending(false);
 		}
-	}
+	};
+
+	const handleChange = (index: number, e: ChangeEvent<HTMLInputElement>) => {
+		const raw = e.target.value.replace(/\D/g, "");
+		if (!raw) return;
+
+		const next = digits.split("");
+		// If user pastes multiple digits into one box, spread them.
+		if (raw.length > 1) {
+			const spread = raw.slice(0, 6 - index).split("");
+			spread.forEach((d, i) => {
+				next[index + i] = d;
+			});
+			const joined = next.join("").slice(0, 6);
+			setCode(joined);
+			const focusIdx = Math.min(index + spread.length, 5);
+			inputsRef.current[focusIdx]?.focus();
+			return;
+		}
+
+		next[index] = raw[0];
+		const joined = next.join("").slice(0, 6);
+		setCode(joined);
+		if (index < 5) inputsRef.current[index + 1]?.focus();
+	};
+
+	const handleKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
+		if (e.key === "Backspace") {
+			e.preventDefault();
+			const next = digits.split("");
+			if (next[index]) {
+				// Clear current box
+				next[index] = "";
+				setCode(next.join(""));
+			} else if (index > 0) {
+				// Move back and clear previous
+				next[index - 1] = "";
+				setCode(next.join(""));
+				inputsRef.current[index - 1]?.focus();
+			}
+			return;
+		}
+		if (e.key === "ArrowLeft" && index > 0) {
+			e.preventDefault();
+			inputsRef.current[index - 1]?.focus();
+		}
+		if (e.key === "ArrowRight" && index < 5) {
+			e.preventDefault();
+			inputsRef.current[index + 1]?.focus();
+		}
+		if (e.key === "Delete") {
+			e.preventDefault();
+			const next = digits.split("");
+			next[index] = "";
+			setCode(next.join(""));
+		}
+	};
+
+	const handlePaste = (
+		index: number,
+		e: ClipboardEvent<HTMLInputElement>
+	) => {
+		e.preventDefault();
+		const pasted = e.clipboardData
+			.getData("text")
+			.replace(/\D/g, "")
+			.slice(0, 6);
+		if (!pasted) return;
+		const next = digits.split("");
+		pasted.split("").forEach((d, i) => {
+			if (index + i < 6) next[index + i] = d;
+		});
+		const joined = next.join("").slice(0, 6);
+		setCode(joined);
+		const focusIdx = Math.min(index + pasted.length, 5);
+		inputsRef.current[focusIdx]?.focus();
+	};
 
 	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -90,36 +189,51 @@ export default function OtpPage() {
 		}
 		setSubmitting(true);
 
-		const formData = { email, otp: digits, deviceInfo: formatDeviceInfo(), locationInfo: formatLocationInfo() }
+		const formData = {
+			email,
+			otp: digits,
+			deviceInfo: formatDeviceInfo(),
+			locationInfo: formatLocationInfo(),
+		};
 		try {
-			const res = await http.post('login-verify-otp/', formData)
-			const resp: Resp = res.data
-			if (resp.error) toast.error(resp.data || 'Invalid OTP. Please try again.')
-			else {
-				sessionStorage.removeItem('jwt')
-				sessionStorage.removeItem('email')
-				toast.success(resp.data)
+			const res = await http.post("login-verify-otp/", formData);
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Invalid OTP. Please try again.");
+				setCode("");
+				inputsRef.current[0]?.focus();
+			} else {
+				sessionStorage.removeItem("jwt");
+				sessionStorage.removeItem("email");
+				toast.success(resp.data);
 				login({
 					remember,
 					user: {
 						id: resp.code.user.id,
 						email: resp.code.user.email,
 						full_name: resp.code.user.full_name,
-						account_type: resp.code.user.account_type
+						account_type: resp.code.user.account_type,
 					},
 					role: resp.code.role,
 					route: resp.code.route,
 					privileges: resp.code.privileges,
-					permissions: resp.code.permissions
+					permissions: resp.code.permissions,
 				});
-				const route = resp.code.user.account_status === 'rejected' ? '/organisation-resubmit' : resp.code.route;
-				startTransition(() => navigate(route, { replace: true }))
+				const route =
+					resp.code.user.account_status === "rejected"
+						? "/organisation-resubmit"
+						: resp.code.route;
+				startTransition(() => navigate(route, { replace: true }));
 			}
 		} catch (error: any) {
-			console.error(error)
-			toast.error(error?.response?.data?.message || 'Invalid OTP. Please try again.')
+			console.error(error);
+			toast.error(
+				error?.response?.data?.message || "Invalid OTP. Please try again."
+			);
+			setCode("");
+			inputsRef.current[0]?.focus();
 		} finally {
-			setSubmitting(false)
+			setSubmitting(false);
 		}
 	};
 
@@ -150,8 +264,7 @@ export default function OtpPage() {
 						Enter your 6-digit code
 					</h2>
 					<p className="mt-1 text-[12px] text-ink-soft">
-						Signing in as{" "}
-						<span className="font-mono text-ink">{email}</span>
+						Signing in as <span className="font-mono text-ink">{email}</span>
 					</p>
 				</div>
 
@@ -161,39 +274,37 @@ export default function OtpPage() {
 							One-time code
 						</span>
 
-						{/* Clickable six-box grid that focuses the hidden input */}
-						<button
-							type="button"
-							onClick={() => codeInputRef.current?.focus()}
-							className="mt-3 grid w-full grid-cols-6 gap-2 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-orange/40"
-							aria-label="Enter the six-digit code"
-						>
+						<div className="mt-3 grid grid-cols-6 gap-2">
 							{Array.from({ length: 6 }).map((_, i) => (
-								<div
+								<input
 									key={i}
+									ref={(el) => {
+										inputsRef.current[i] = el;
+									}}
+									type="text"
+									inputMode="numeric"
+									autoComplete={i === 0 ? "one-time-code" : "off"}
+									pattern="[0-9]*"
+									maxLength={1}
+									value={digits[i] ?? ""}
+									onChange={(e) => handleChange(i, e)}
+									onKeyDown={(e) => handleKeyDown(i, e)}
+									onPaste={(e) => handlePaste(i, e)}
+									onFocus={(e) => e.target.select()}
+									aria-label={`Digit ${i + 1}`}
 									className={cn(
-										"grid h-12 place-items-center rounded-md border border-line bg-sand font-mono text-lg font-semibold text-ink transition-colors",
-										digits[i] ? "border-orange/50 bg-orange/10 text-orange" : ""
+										"h-12 w-full rounded-md border border-line bg-sand text-center font-mono text-lg font-semibold text-ink outline-none transition-colors",
+										"focus:border-orange focus:bg-paper focus:ring-2 focus:ring-orange/25",
+										digits[i] &&
+											"border-orange/50 bg-orange/10 text-orange"
 									)}
-								>
-									{digits[i] ?? ""}
-								</div>
+								/>
 							))}
-						</button>
+						</div>
 
-						{/* Hidden but real input for paste, autofill, and mobile keyboards */}
-						<input
-							ref={codeInputRef}
-							autoFocus
-							inputMode="numeric"
-							autoComplete="one-time-code"
-							pattern="[0-9]*"
-							maxLength={6}
-							value={digits}
-							onChange={(e) => setCode(e.target.value)}
-							aria-label="One-time code"
-							className="sr-only"
-						/>
+						<p className="mt-3 text-[11px] leading-5 text-ink-soft">
+							Type or paste the six-digit code. It refreshes every 30 seconds.
+						</p>
 					</div>
 
 					<label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl bg-sand p-4 ring-1 ring-line">
@@ -245,10 +356,7 @@ export default function OtpPage() {
 								</span>
 							</span>
 						)}
-						<Link
-							to="/login"
-							className="text-ink-soft hover:text-orange"
-						>
+						<Link to="/login" className="text-ink-soft hover:text-orange">
 							Use a different account
 						</Link>
 					</div>
@@ -300,7 +408,11 @@ function AuthShell({
 			<div className="relative mx-auto grid min-h-screen max-w-7xl grid-cols-1 gap-0 px-5 py-10 lg:grid-cols-[1fr_520px] lg:gap-16 lg:px-8 lg:py-14">
 				<div className="hidden min-w-0 flex-col justify-between lg:flex">
 					<Link to="/" aria-label="TRINU home" className="inline-flex">
-						<img src="/logo.png" alt="TRINU Bonded Terminal" className="h-14 w-14" />
+						<img
+							src="/logo.png"
+							alt="TRINU Bonded Terminal"
+							className="h-14 w-14"
+						/>
 					</Link>
 
 					<div className="max-w-lg">
@@ -320,7 +432,10 @@ function AuthShell({
 
 						<ul className="mt-9 space-y-3">
 							{leftBullets.map((item) => (
-								<li key={item} className="flex items-start gap-3 text-sm text-ink">
+								<li
+									key={item}
+									className="flex items-start gap-3 text-sm text-ink"
+								>
 									<span className="mt-1 grid size-5 shrink-0 place-items-center rounded-full bg-orange text-white">
 										<Check className="size-3" />
 									</span>
@@ -339,9 +454,16 @@ function AuthShell({
 					<div className="w-full min-w-0 max-w-lg">
 						<div className="mb-8 flex items-center justify-between lg:hidden">
 							<Link to="/" aria-label="TRINU home" className="inline-flex">
-								<img src="/logo.png" alt="TRINU Bonded Terminal" className="h-12 w-12" />
+								<img
+									src="/logo.png"
+									alt="TRINU Bonded Terminal"
+									className="h-12 w-12"
+								/>
 							</Link>
-							<Link to="/login" className="text-[12px] font-semibold text-orange">
+							<Link
+								to="/login"
+								className="text-[12px] font-semibold text-orange"
+							>
 								Back to sign-in
 							</Link>
 						</div>
