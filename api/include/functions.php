@@ -27,6 +27,10 @@
         ]);
         die(); 
     }
+    function is_valid_phone(string $phone): bool {
+        $cleaned = preg_replace('/[^\d+]/', '', $phone);
+        return (bool) preg_match('/^(?:\+234|234|0)[789]\d{9}$|^\+?[1-9]\d{1,14}$/', $cleaned);
+    }
     function no_permision(){ 
         header($_SERVER['SERVER_PROTOCOL'] . ' 403 Forbidden');
         echo json_encode(["error"=>true, "data"=>"You don't have enough permission to access this Resources"]);
@@ -239,8 +243,15 @@
         $len  = floor(strlen($name)/2);
         return substr($name,0, $len) . str_repeat('*', $len) . "@" . end($em);
     }
-
-
+    function hide_phone(string $phone): string {
+        $cleaned = preg_replace('/[^\d+]/', '', $phone);
+        $len = strlen($cleaned);
+        if ($len <= 4) return str_repeat('*', $len);
+        $visible_tail = substr($cleaned, -3);
+        $masked_part = str_repeat('*', $len - 3);
+        
+        return $masked_part . $visible_tail;
+    }
     function getUserIP(): string {
         $keys = [
             'HTTP_CF_CONNECTING_IP',   // Cloudflare

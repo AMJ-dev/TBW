@@ -2303,3 +2303,31 @@ CREATE TABLE user_invitations (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 ALTER TABLE otp_codes
 MODIFY purpose ENUM('login_mfa', 'password_reset', 'phone_verify', 'email_verify', 'regulator_access') NOT NULL;
+
+ALTER TABLE organisations
+ADD COLUMN date_of_incorporation date DEFAULT NULL AFTER tin,
+ADD COLUMN sector varchar(150) DEFAULT NULL AFTER date_of_incorporation,
+ADD COLUMN registered_address text DEFAULT NULL AFTER sector,
+ADD COLUMN website varchar(255) DEFAULT NULL AFTER registered_address;
+
+ALTER TABLE registration_requests
+ADD COLUMN date_of_incorporation date DEFAULT NULL AFTER tin,
+ADD COLUMN sector varchar(150) DEFAULT NULL AFTER date_of_incorporation,
+ADD COLUMN registered_address text DEFAULT NULL AFTER sector,
+ADD COLUMN website varchar(255) DEFAULT NULL AFTER registered_address;
+
+ALTER TABLE registration_requests
+    DROP COLUMN account_type,
+    DROP COLUMN full_name,
+    DROP COLUMN phone,
+    DROP COLUMN password_hash,
+    DROP COLUMN organisation_name,
+    DROP COLUMN rc_number,
+    DROP COLUMN tin,
+    DROP COLUMN job_title,
+    DROP COLUMN terms_accepted,
+    DROP COLUMN privacy_accepted,
+    DROP COLUMN terms_version,
+    DROP COLUMN privacy_version,
+    DROP COLUMN ip_address,
+    DROP COLUMN user_agent;

@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -12,11 +12,13 @@ import {
 	Container,
 	Download,
 	FileText,
+	Globe,
 	Mail,
 	MapPin,
 	Phone,
 	ShieldCheck,
 	ShieldX,
+	User,
 	UsersRound,
 	X,
 	XCircle,
@@ -28,54 +30,85 @@ import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
 import { resolveSrc } from "@/lib/functions";
 
-type Status =
-	| "pending"
-	| "verified"
-	| "under_review"
-	| "rejected"
-	| "suspended";
+type Status = "pending" | "verified" | "under_review" | "rejected" | "suspended";
 
 interface OrgDetail {
 	id: string;
 	name: string;
 	type: string;
-	rc_number?: string;
-	tin?: string;
-	contact_email?: string;
-	contact_phone?: string;
-	address?: string;
+	rc_number?: string | null;
+	tin?: string | null;
+	date_of_incorporation?: string | null;
+	sector?: string | null;
+	registered_address?: string | null;
+	website?: string | null;
+	contact_email?: string | null;
+	contact_phone?: string | null;
+	address?: string | null;
 	status: Status;
 	rejection_reason?: string | null;
 	verified_by?: string | null;
 	verified_at?: string | null;
-	created_at?: string;
-	updated_at?: string;
+	created_at?: string | null;
+	updated_at?: string | null;
+	owner_id?: string | null;
+	owner_name?: string | null;
+	owner_pics?: string | null;
+	owner_account_status?: string | null;
+	owner_email_verified_at?: string | null;
+	owner_phone_verified_at?: string | null;
+	owner_last_login_at?: string | null;
+	owner_job_title?: string | null;
 }
 
 interface OrgStaff {
+	membership_id?: string;
 	id: string;
 	full_name: string;
 	email: string;
-	phone?: string;
-	role_in_org?: string;
-	pics?: string;
-	account_status?: string;
+	phone?: string | null;
+	role_in_org?: string | null;
+	pics?: string | null;
+	account_type?: string | null;
+	account_status?: string | null;
 	email_verified_at?: string | null;
+	phone_verified_at?: string | null;
+	mfa_enabled?: number | boolean;
 	last_login_at?: string | null;
-	created_at?: string;
+	password_changed_at?: string | null;
+	user_created_at?: string | null;
+	user_updated_at?: string | null;
+	role_id?: string | null;
+	role_key?: string | null;
+	role_name?: string | null;
+	role_scope?: string | null;
+	role_description?: string | null;
+	job_title?: string | null;
+	membership_status?: string | null;
+	invited_by?: string | null;
+	joined_at?: string | null;
+	membership_created_at?: string | null;
 }
 
 interface OrgDocument {
 	id: string;
+	registration_request_id?: string;
 	kind: string;
 	label: string;
-	file_name?: string;
-	file_url?: string;
+	licence_type?: string | null;
+	licence_reference?: string | null;
+	file_name?: string | null;
+	file_url?: string | null;
+	mime_type?: string | null;
+	file_size?: number | null;
 	status: "pending" | "approved" | "rejected";
+	review_id?: string | null;
 	rejection_reason?: string | null;
 	reviewed_by?: string | null;
+	reviewed_by_name?: string | null;
+	reviewed_by_email?: string | null;
 	reviewed_at?: string | null;
-	uploaded_at?: string;
+	uploaded_at?: string | null;
 }
 
 interface OrgContainer {
@@ -89,10 +122,66 @@ interface OrgContainer {
 	arrived_at?: string;
 }
 
+interface DocSummary {
+	total: number | string;
+	pending: number | string;
+	approved: number | string;
+	rejected: number | string;
+}
+
+interface MemberSummary {
+	total: number | string;
+	active: number | string;
+	pending: number | string;
+	active_accounts: number | string;
+	pending_accounts: number | string;
+	suspended_accounts: number | string;
+	locked_accounts: number | string;
+}
+
+interface RegistrationRow {
+	id: string;
+	registration_ref: string;
+	account_type: string;
+	full_name: string;
+	email: string;
+	phone: string;
+	organisation_name: string;
+	rc_number?: string | null;
+	tin?: string | null;
+	job_title?: string | null;
+	status: string;
+	email_verified_at?: string | null;
+	phone_verified_at?: string | null;
+	terms_accepted?: number | boolean;
+	privacy_accepted?: number | boolean;
+	terms_version?: string | null;
+	privacy_version?: string | null;
+	ip_address?: string | null;
+	user_agent?: string | null;
+	expires_at?: string | null;
+	completed_user_id?: string | null;
+	created_at?: string | null;
+	updated_at?: string | null;
+}
+
+interface RoleRow {
+	id: string;
+	role_key: string;
+	role_name: string;
+	scope: string;
+	description?: string;
+	is_active?: number | boolean;
+}
+
 interface OrgDetailPayload {
 	organization?: OrgDetail;
 	staff?: OrgStaff[];
 	documents?: OrgDocument[];
+	document_summary?: DocSummary;
+	registrations?: RegistrationRow[];
+	member_summary?: MemberSummary;
+	roles?: RoleRow[];
 	containers?: OrgContainer[];
 }
 
@@ -101,32 +190,115 @@ const tabs = [
 	{ key: "staff", label: "Staff", icon: UsersRound },
 	{ key: "documents", label: "Documents", icon: FileText },
 	{ key: "containers", label: "Containers", icon: Container },
+	{ key: "registrations", label: "Registration", icon: User },
 ] as const;
 
 type TabKey = (typeof tabs)[number]["key"];
 
-const statusLabel: Record<Status, string> = {
+const statusLabel: Record<string, string> = {
 	pending: "Pending",
+	pending_approval: "Pending approval",
 	verified: "Verified",
-	under_review: "Under Review",
+	under_review: "Under review",
 	rejected: "Rejected",
 	suspended: "Suspended",
+	active: "Active",
+	locked: "Locked",
+	completed: "Completed",
+	expired: "Expired",
+	cancelled: "Cancelled",
+};
+
+const licenceLabels: Record<string, string> = {
+	ncs_customs_agent: "NCS Customs Agent Licence",
+	nafdac: "NAFDAC Permit",
+	son: "SON",
+	naqs: "NAQS",
+	soncap: "SONCAP Certificate",
+	other: "Other operational licence",
+};
+
+const docKindLabel = (kind: string) => {
+	switch (kind) {
+		case "cac":
+			return "CAC Certificate";
+		case "tin":
+			return "Tax Identification";
+		case "signatory_id":
+			return "Authorised Signatory ID";
+		case "directors_list":
+			return "Directors & Shareholders List";
+		case "utility_bill":
+			return "Utility Bill (Proof of Address)";
+		case "licence":
+			return "Operational Licence";
+		default:
+			return kind || "Document";
+	}
+};
+
+const documentName = (doc: OrgDocument) => {
+	if (doc.kind === "licence") {
+		if (doc.licence_type && licenceLabels[doc.licence_type]) {
+			return `Licence - ${licenceLabels[doc.licence_type]}`;
+		}
+		return doc.label || "Operational Licence";
+	}
+	if (!doc.kind) return doc.label || doc.file_name || "Document";
+	return docKindLabel(doc.kind);
+};
+
+const formatDate = (input?: string | null) => {
+	if (!input) return "—";
+	const d = new Date(input);
+	if (Number.isNaN(d.getTime())) return "—";
+	return d.toLocaleDateString("en-NG", {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+	});
+};
+
+const formatDateTime = (input?: string | null) => {
+	if (!input) return "—";
+	const d = new Date(input);
+	if (Number.isNaN(d.getTime())) return "—";
+	return d.toLocaleString("en-NG", {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+};
+
+const formatBytes = (bytes?: number | null) => {
+	if (bytes == null) return "—";
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const extractPayload = (raw: any): OrgDetailPayload => {
 	if (!raw || typeof raw !== "object") return {};
-	if (raw.organization || raw.staff || raw.documents || raw.containers) {
-		return raw as OrgDetailPayload;
-	}
-	if (raw.organisation || raw.org) {
+	if (raw.organization || raw.organisation || raw.org) {
 		return {
-			organization: raw.organisation ?? raw.org,
+			organization: raw.organization ?? raw.organisation ?? raw.org,
 			staff: raw.staff ?? [],
 			documents: raw.documents ?? [],
+			document_summary: raw.document_summary,
+			registrations: raw.registrations ?? [],
+			member_summary: raw.member_summary,
+			roles: raw.roles ?? [],
 			containers: raw.containers ?? [],
 		};
 	}
-	return { organization: raw as OrgDetail, staff: [], documents: [], containers: [] };
+	return {
+		organization: raw as OrgDetail,
+		staff: [],
+		documents: [],
+		containers: [],
+	};
 };
 
 export default function AdminOrganizationDetailsPage() {
@@ -138,6 +310,10 @@ export default function AdminOrganizationDetailsPage() {
 	const [staff, setStaff] = useState<OrgStaff[]>([]);
 	const [documents, setDocuments] = useState<OrgDocument[]>([]);
 	const [containers, setContainers] = useState<OrgContainer[]>([]);
+	const [registrations, setRegistrations] = useState<RegistrationRow[]>([]);
+	const [roles, setRoles] = useState<RoleRow[]>([]);
+	const [docSummary, setDocSummary] = useState<DocSummary | null>(null);
+	const [memberSummary, setMemberSummary] = useState<MemberSummary | null>(null);
 
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState("");
@@ -165,8 +341,14 @@ export default function AdminOrganizationDetailsPage() {
 			setStaff(payload.staff ?? []);
 			setDocuments(payload.documents ?? []);
 			setContainers(payload.containers ?? []);
+			setRegistrations(payload.registrations ?? []);
+			setRoles(payload.roles ?? []);
+			setDocSummary(payload.document_summary ?? null);
+			setMemberSummary(payload.member_summary ?? null);
 		} catch (err: any) {
-			setError(err?.response?.data?.message || "Could not load this organisation.");
+			setError(
+				err?.response?.data?.message || "Could not load this organisation."
+			);
 		} finally {
 			setLoading(false);
 		}
@@ -185,7 +367,10 @@ export default function AdminOrganizationDetailsPage() {
 	}, [rejectMode]);
 
 	const initialiseRejectDecisions = () => {
-		const next: Record<string, { mode: "approve" | "reject"; reason: string }> = {};
+		const next: Record<
+			string,
+			{ mode: "approve" | "reject"; reason: string }
+		> = {};
 		documents.forEach((d) => {
 			next[d.id] = {
 				mode: d.status === "rejected" ? "reject" : "approve",
@@ -206,7 +391,8 @@ export default function AdminOrganizationDetailsPage() {
 			...prev,
 			[docId]: {
 				mode,
-				reason: reason ?? (mode === "reject" ? prev[docId]?.reason ?? "" : ""),
+				reason:
+					reason ?? (mode === "reject" ? prev[docId]?.reason ?? "" : ""),
 			},
 		}));
 	};
@@ -234,7 +420,9 @@ export default function AdminOrganizationDetailsPage() {
 			toast.success("Organisation approved.");
 			await fetchAll();
 		} catch (err: any) {
-			toast.error(err?.response?.data?.message || "Could not approve this organisation.");
+			toast.error(
+				err?.response?.data?.message || "Could not approve this organisation."
+			);
 		} finally {
 			setWorking(false);
 		}
@@ -245,7 +433,9 @@ export default function AdminOrganizationDetailsPage() {
 		if (!id || working || !org) return;
 
 		if (generalReason.trim().length < 5) {
-			toast.error("Enter an organisation-level reason of at least 5 characters.");
+			toast.error(
+				"Enter an organisation-level reason of at least 5 characters."
+			);
 			return;
 		}
 
@@ -255,7 +445,9 @@ export default function AdminOrganizationDetailsPage() {
 
 		const missingReason = rejectedDocs.find((d) => d.reason.length < 5);
 		if (missingReason) {
-			toast.error("Every rejected document needs a reason of at least 5 characters.");
+			toast.error(
+				"Every rejected document needs a reason of at least 5 characters."
+			);
 			return;
 		}
 
@@ -283,11 +475,56 @@ export default function AdminOrganizationDetailsPage() {
 			setRejectMode(false);
 			await fetchAll();
 		} catch (err: any) {
-			toast.error(err?.response?.data?.message || "Could not reject this organisation.");
+			toast.error(
+				err?.response?.data?.message || "Could not reject this organisation."
+			);
 		} finally {
 			setWorking(false);
 		}
 	};
+
+	const numericDocSummary = useMemo(() => {
+		if (docSummary) {
+			return {
+				total: Number(docSummary.total) || 0,
+				pending: Number(docSummary.pending) || 0,
+				approved: Number(docSummary.approved) || 0,
+				rejected: Number(docSummary.rejected) || 0,
+			};
+		}
+		return {
+			total: documents.length,
+			pending: documents.filter((d) => d.status === "pending").length,
+			approved: documents.filter((d) => d.status === "approved").length,
+			rejected: documents.filter((d) => d.status === "rejected").length,
+		};
+	}, [docSummary, documents]);
+
+	const numericMemberSummary = useMemo(() => {
+		if (memberSummary) {
+			return {
+				total: Number(memberSummary.total) || 0,
+				active: Number(memberSummary.active) || 0,
+				pending: Number(memberSummary.pending) || 0,
+				activeAccounts: Number(memberSummary.active_accounts) || 0,
+				pendingAccounts: Number(memberSummary.pending_accounts) || 0,
+				suspendedAccounts: Number(memberSummary.suspended_accounts) || 0,
+				lockedAccounts: Number(memberSummary.locked_accounts) || 0,
+			};
+		}
+		return {
+			total: staff.length,
+			active: staff.filter((s) => s.membership_status === "active").length,
+			pending: staff.filter((s) => s.membership_status === "pending").length,
+			activeAccounts: staff.filter((s) => s.account_status === "active").length,
+			pendingAccounts: staff.filter(
+				(s) => s.account_status === "pending_approval"
+			).length,
+			suspendedAccounts: staff.filter((s) => s.account_status === "suspended")
+				.length,
+			lockedAccounts: staff.filter((s) => s.account_status === "locked").length,
+		};
+	}, [memberSummary, staff]);
 
 	if (loading) {
 		return (
@@ -338,8 +575,8 @@ export default function AdminOrganizationDetailsPage() {
 
 	const canApprove = org.status === "pending" || org.status === "under_review";
 	const canReject = org.status === "pending" || org.status === "under_review";
-	const pendingDocs = documents.filter((d) => d.status === "pending").length;
-	const rejectedDocs = documents.filter((d) => d.status === "rejected").length;
+	const pendingDocs = numericDocSummary.pending;
+	const rejectedDocs = numericDocSummary.rejected;
 
 	return (
 		<AppShell title={org.name} eyebrow="Administration · Organisation">
@@ -357,7 +594,7 @@ export default function AdminOrganizationDetailsPage() {
 							{org.name}
 						</h2>
 						<StatusBadge
-							label={statusLabel[org.status]}
+							label={statusLabel[org.status] ?? org.status}
 							tone={statusTone(org.status)}
 						/>
 					</div>
@@ -369,7 +606,7 @@ export default function AdminOrganizationDetailsPage() {
 						{org.rc_number && (
 							<span className="inline-flex items-center gap-1.5">
 								<FileText className="size-3.5" />
-								RC {org.rc_number}
+								{org.rc_number}
 							</span>
 						)}
 						{org.tin && (
@@ -378,15 +615,16 @@ export default function AdminOrganizationDetailsPage() {
 								TIN {org.tin}
 							</span>
 						)}
+						{org.sector && (
+							<span className="inline-flex items-center gap-1.5">
+								<Building2 className="size-3.5" />
+								{org.sector}
+							</span>
+						)}
 						{org.created_at && (
 							<span className="inline-flex items-center gap-1.5">
 								<Calendar className="size-3.5" />
-								Joined{" "}
-								{new Date(org.created_at).toLocaleDateString("en-NG", {
-									day: "numeric",
-									month: "short",
-									year: "numeric",
-								})}
+								Joined {formatDate(org.created_at)}
 							</span>
 						)}
 					</p>
@@ -443,10 +681,12 @@ export default function AdminOrganizationDetailsPage() {
 						<div className="min-w-0">
 							<p className="font-display text-sm font-bold text-ink">
 								Previously rejected
-								{org.verified_at
-									? ` on ${new Date(org.verified_at).toLocaleDateString("en-NG")}`
+								{org.verified_at ? ` on ${formatDate(org.verified_at)}` : ""}
+								{rejectedDocs > 0
+									? ` · ${rejectedDocs} document${
+											rejectedDocs === 1 ? "" : "s"
+									  }`
 									: ""}
-								{rejectedDocs > 0 ? ` · ${rejectedDocs} document${rejectedDocs === 1 ? "" : "s"}` : ""}
 							</p>
 							{org.rejection_reason && (
 								<p className="mt-1 text-[13px] leading-6 text-ink-soft">
@@ -454,7 +694,8 @@ export default function AdminOrganizationDetailsPage() {
 								</p>
 							)}
 							<p className="mt-2 text-[11px] leading-5 text-ink-soft">
-								The applicant has been notified and can re-upload the rejected items.
+								The applicant has been notified and can re-upload the rejected
+								items.
 							</p>
 						</div>
 					</div>
@@ -479,9 +720,9 @@ export default function AdminOrganizationDetailsPage() {
 									Review each document, then reject the organisation
 								</p>
 								<p className="mt-1 max-w-2xl text-[12px] leading-5 text-ink-soft">
-									Mark each document as approved or rejected and give a reason for
-									every rejected document. The applicant will see these reasons and
-									can re-upload only the rejected items.
+									Mark each document as approved or rejected and give a reason
+									for every rejected document. The applicant will see these
+									reasons and can re-upload only the rejected items.
 								</p>
 							</div>
 						</div>
@@ -490,8 +731,8 @@ export default function AdminOrganizationDetailsPage() {
 					<div className="divide-y divide-line">
 						{documents.length === 0 && (
 							<div className="p-6 text-center text-sm text-ink-soft">
-								No documents on file for this organisation. You can still reject
-								the organisation with a general reason below.
+								No documents on file for this organisation. You can still
+								reject the organisation with a general reason below.
 							</div>
 						)}
 
@@ -508,7 +749,9 @@ export default function AdminOrganizationDetailsPage() {
 										</div>
 										<div className="min-w-[200px] flex-1">
 											<div className="flex flex-wrap items-center gap-2">
-												<p className="text-sm font-semibold text-ink">{d.label}</p>
+												<p className="text-sm font-semibold text-ink">
+													{documentName(d)}
+												</p>
 												<StatusBadge
 													label={d.status}
 													tone={
@@ -523,6 +766,11 @@ export default function AdminOrganizationDetailsPage() {
 											<p className="mt-0.5 font-mono text-[11px] text-ink-soft">
 												{d.file_name ?? d.kind}
 											</p>
+											{d.licence_reference && (
+												<p className="mt-0.5 font-mono text-[11px] text-ink-soft">
+													Ref: {d.licence_reference}
+												</p>
+											)}
 											{d.status === "rejected" && d.rejection_reason && (
 												<p className="mt-1 text-[11px] text-carmine">
 													Previously rejected: {d.rejection_reason}
@@ -583,7 +831,9 @@ export default function AdminOrganizationDetailsPage() {
 											</span>
 											<textarea
 												value={decision.reason}
-												onChange={(e) => setDocumentReason(d.id, e.target.value)}
+												onChange={(e) =>
+													setDocumentReason(d.id, e.target.value)
+												}
 												placeholder="e.g. The RC number is unreadable on the certificate."
 												className="mt-2 min-h-24 w-full rounded-md border border-carmine/30 bg-sand px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:ring-2 focus:ring-carmine/25"
 											/>
@@ -613,9 +863,17 @@ export default function AdminOrganizationDetailsPage() {
 
 						<div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
 							<p className="text-[11px] leading-5 text-ink-soft">
-								{Object.values(docDecisions).filter((d) => d.mode === "reject").length}{" "}
+								{
+									Object.values(docDecisions).filter(
+										(d) => d.mode === "reject"
+									).length
+								}{" "}
 								document(s) marked for rejection ·{" "}
-								{Object.values(docDecisions).filter((d) => d.mode === "approve").length}{" "}
+								{
+									Object.values(docDecisions).filter(
+										(d) => d.mode === "approve"
+									).length
+								}{" "}
 								approved
 							</p>
 							<div className="flex flex-wrap gap-2">
@@ -646,16 +904,14 @@ export default function AdminOrganizationDetailsPage() {
 					<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 						<Metric
 							label="Staff accounts"
-							value={String(staff.length)}
-							detail={
-								staff.filter((s) => s.account_status === "active").length + " active"
-							}
+							value={String(numericMemberSummary.total)}
+							detail={`${numericMemberSummary.active} active · ${numericMemberSummary.pending} pending`}
 							tone="info"
 							icon={UsersRound}
 						/>
 						<Metric
 							label="Documents"
-							value={String(documents.length)}
+							value={String(numericDocSummary.total)}
 							detail={
 								pendingDocs > 0
 									? `${pendingDocs} pending review`
@@ -681,7 +937,7 @@ export default function AdminOrganizationDetailsPage() {
 						/>
 						<Metric
 							label="Account status"
-							value={statusLabel[org.status]}
+							value={statusLabel[org.status] ?? org.status}
 							detail={
 								org.verified_by
 									? `Reviewed by ${org.verified_by}`
@@ -692,7 +948,7 @@ export default function AdminOrganizationDetailsPage() {
 									? "success"
 									: org.status === "rejected"
 									? "critical"
-									: "warning"
+										: "warning"
 							}
 							icon={ShieldCheck}
 						/>
@@ -704,11 +960,13 @@ export default function AdminOrganizationDetailsPage() {
 							const active = tab === t.key;
 							const badge =
 								t.key === "staff"
-									? staff.length
+									? numericMemberSummary.total
 									: t.key === "documents"
-									? documents.length
+									? numericDocSummary.total
 									: t.key === "containers"
 									? containers.length
+									: t.key === "registrations"
+									? registrations.length
 									: null;
 							return (
 								<button
@@ -728,7 +986,9 @@ export default function AdminOrganizationDetailsPage() {
 										<span
 											className={cn(
 												"rounded-full px-1.5 py-0.5 font-mono text-[10px]",
-												active ? "bg-orange text-white" : "bg-sand-2 text-ink-soft"
+												active
+													? "bg-orange text-white"
+													: "bg-sand-2 text-ink-soft"
 											)}
 										>
 											{badge}
@@ -741,68 +1001,129 @@ export default function AdminOrganizationDetailsPage() {
 
 					{tab === "overview" && (
 						<div className="grid gap-6 lg:grid-cols-[1.2fr_.8fr] lg:items-start">
-							<div className="rounded-2xl bg-paper p-6 ring-1 ring-line">
-								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
-									Contact details
-								</p>
-								<dl className="mt-4 grid gap-4 sm:grid-cols-2">
-									<Field
-										icon={Mail}
-										label="Contact email"
-										value={org.contact_email ?? "—"}
-										mono
-									/>
-									<Field
-										icon={Phone}
-										label="Contact phone"
-										value={org.contact_phone ?? "—"}
-										mono
-									/>
-									<Field
-										icon={MapPin}
-										label="Address"
-										value={org.address ?? "—"}
-										full
-									/>
-									<Field
-										icon={FileText}
-										label="RC number"
-										value={org.rc_number ?? "—"}
-										mono
-									/>
-									<Field icon={FileText} label="TIN" value={org.tin ?? "—"} mono />
-									<Field icon={Building2} label="Account type" value={org.type} />
-									<Field
-										icon={Calendar}
-										label="Registered"
-										value={
-											org.created_at
-												? new Date(org.created_at).toLocaleString("en-NG", {
-														day: "numeric",
-														month: "long",
-														year: "numeric",
-														hour: "2-digit",
-														minute: "2-digit",
-												  })
-												: "—"
-										}
-									/>
-									<Field
-										icon={Clock3}
-										label="Last updated"
-										value={
-											org.updated_at
-												? new Date(org.updated_at).toLocaleString("en-NG", {
-														day: "numeric",
-														month: "long",
-														year: "numeric",
-														hour: "2-digit",
-														minute: "2-digit",
-												  })
-												: "—"
-										}
-									/>
-								</dl>
+							<div className="space-y-6">
+								<section className="rounded-2xl bg-paper p-6 ring-1 ring-line">
+									<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+										Organisation details
+									</p>
+									<dl className="mt-4 grid gap-4 sm:grid-cols-2">
+										<Field
+											icon={Building2}
+											label="Legal name"
+											value={org.name}
+										/>
+										<Field
+											icon={Building2}
+											label="Account type"
+											value={org.type}
+										/>
+										<Field
+											icon={FileText}
+											label="RC number"
+											value={org.rc_number ?? "—"}
+											mono
+										/>
+										<Field
+											icon={FileText}
+											label="TIN"
+											value={org.tin ?? "—"}
+											mono
+										/>
+										<Field
+											icon={Calendar}
+											label="Date of incorporation"
+											value={org.date_of_incorporation ?? "—"}
+											mono
+										/>
+										<Field
+											icon={Building2}
+											label="Sector"
+											value={org.sector ?? "—"}
+										/>
+										<Field
+											icon={MapPin}
+											label="Registered address"
+											value={org.registered_address ?? org.address ?? "—"}
+											full
+										/>
+										<Field
+											icon={Globe}
+											label="Website"
+											value={org.website ?? "—"}
+											mono
+										/>
+									</dl>
+								</section>
+
+								<section className="rounded-2xl bg-paper p-6 ring-1 ring-line">
+									<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+										Primary contact
+									</p>
+									<dl className="mt-4 grid gap-4 sm:grid-cols-2">
+										<Field
+											icon={Mail}
+											label="Contact email"
+											value={org.contact_email ?? "—"}
+											mono
+										/>
+										<Field
+											icon={Phone}
+											label="Contact phone"
+											value={org.contact_phone ?? "—"}
+											mono
+										/>
+										<Field
+											icon={User}
+											label="Owner"
+											value={org.owner_name ?? "—"}
+										/>
+										<Field
+											icon={User}
+											label="Owner job title"
+											value={org.owner_job_title ?? "—"}
+										/>
+										<Field
+											icon={Calendar}
+											label="Registered"
+											value={formatDateTime(org.created_at)}
+										/>
+										<Field
+											icon={Clock3}
+											label="Last updated"
+											value={formatDateTime(org.updated_at)}
+										/>
+									</dl>
+								</section>
+
+								{roles.length > 0 && (
+									<section className="rounded-2xl bg-paper p-6 ring-1 ring-line">
+										<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+											Roles used in this organisation
+										</p>
+										<ul className="mt-4 space-y-3">
+											{roles.map((r) => (
+												<li
+													key={r.id}
+													className="flex flex-wrap items-start justify-between gap-3 rounded-lg bg-sand p-3 ring-1 ring-line"
+												>
+													<div>
+														<p className="text-[13px] font-semibold text-ink">
+															{r.role_name}
+														</p>
+														{r.description && (
+															<p className="mt-0.5 text-[11px] leading-5 text-ink-soft">
+																{r.description}
+															</p>
+														)}
+													</div>
+													<span className="rounded bg-paper px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-soft ring-1 ring-line">
+														{r.scope}
+													</span>
+												</li>
+											))}
+										</ul>
+									</section>
+								)}
 							</div>
 
 							<div className="rounded-2xl bg-slate p-5 text-sand ring-1 ring-slate">
@@ -816,7 +1137,9 @@ export default function AdminOrganizationDetailsPage() {
 									<StatusRow
 										icon={FileText}
 										label="Documents reviewed"
-										value={`${documents.filter((d) => d.status !== "pending").length} / ${documents.length}`}
+										value={`${
+											numericDocSummary.total - numericDocSummary.pending
+										} / ${numericDocSummary.total}`}
 										tone={
 											rejectedDocs > 0
 												? "critical"
@@ -828,7 +1151,7 @@ export default function AdminOrganizationDetailsPage() {
 									<StatusRow
 										icon={UsersRound}
 										label="Staff accounts"
-										value={`${staff.length}`}
+										value={`${numericMemberSummary.total}`}
 										tone="info"
 									/>
 									<StatusRow
@@ -840,7 +1163,7 @@ export default function AdminOrganizationDetailsPage() {
 									<StatusRow
 										icon={ShieldCheck}
 										label="Account status"
-										value={statusLabel[org.status]}
+										value={statusLabel[org.status] ?? org.status}
 										tone={
 											org.status === "verified"
 												? "success"
@@ -866,7 +1189,8 @@ export default function AdminOrganizationDetailsPage() {
 									</p>
 								</div>
 								<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
-									{staff.length} {staff.length === 1 ? "user" : "users"}
+									{numericMemberSummary.total}{" "}
+									{numericMemberSummary.total === 1 ? "user" : "users"}
 								</span>
 							</div>
 							{staff.length === 0 ? (
@@ -877,8 +1201,8 @@ export default function AdminOrganizationDetailsPage() {
 								<ul className="divide-y divide-line">
 									{staff.map((s) => (
 										<li
-											key={s.id}
-											className="flex flex-wrap items-center gap-4 px-5 py-4"
+											key={s.membership_id ?? s.id}
+											className="flex flex-wrap items-start gap-4 px-5 py-4"
 										>
 											<div className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-ink text-sand">
 												{s.pics && s.pics !== "avatar.png" ? (
@@ -893,28 +1217,61 @@ export default function AdminOrganizationDetailsPage() {
 													</span>
 												)}
 											</div>
-											<div className="min-w-[200px] flex-1">
+											<div className="min-w-[220px] flex-1">
 												<div className="flex flex-wrap items-center gap-2">
 													<p className="text-sm font-semibold text-ink">
 														{s.full_name}
 													</p>
 													{s.account_status && (
 														<StatusBadge
-															label={s.account_status}
+															label={
+																statusLabel[s.account_status] ??
+																s.account_status
+															}
 															tone={statusTone(s.account_status)}
 														/>
+													)}
+													{s.membership_status && (
+														<span className="rounded bg-sand px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">
+															Membership · {s.membership_status}
+														</span>
 													)}
 												</div>
 												<p className="mt-0.5 font-mono text-[11px] text-ink-soft">
 													{s.email}
 												</p>
+												{s.phone && (
+													<p className="mt-0.5 font-mono text-[11px] text-ink-soft">
+														{s.phone}
+													</p>
+												)}
 											</div>
-											<div className="min-w-[160px]">
+											<div className="min-w-[180px]">
 												<p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
 													Role
 												</p>
 												<p className="mt-0.5 text-[12px] text-ink">
-													{s.role_in_org ?? "—"}
+													{s.role_name ?? s.role_in_org ?? "—"}
+												</p>
+												{s.job_title && (
+													<p className="mt-0.5 text-[11px] text-ink-soft">
+														{s.job_title}
+													</p>
+												)}
+											</div>
+											<div className="min-w-[160px]">
+												<p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+													MFA
+												</p>
+												<p
+													className={cn(
+														"mt-0.5 text-[12px]",
+														s.mfa_enabled
+															? "text-teal-deep"
+															: "text-orange-deep"
+													)}
+												>
+													{s.mfa_enabled ? "Enabled" : "Not enrolled"}
 												</p>
 											</div>
 											<div className="min-w-[160px]">
@@ -923,14 +1280,7 @@ export default function AdminOrganizationDetailsPage() {
 												</p>
 												<p className="mt-0.5 text-[12px] text-ink">
 													{s.last_login_at
-														? new Date(s.last_login_at).toLocaleDateString(
-																"en-NG",
-																{
-																	day: "numeric",
-																	month: "short",
-																	year: "numeric",
-																}
-														  )
+														? formatDate(s.last_login_at)
 														: "—"}
 												</p>
 											</div>
@@ -943,7 +1293,7 @@ export default function AdminOrganizationDetailsPage() {
 
 					{tab === "documents" && (
 						<section className="rounded-2xl bg-paper ring-1 ring-line">
-							<div className="flex items-center justify-between gap-3 border-b border-line p-4">
+							<div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
 								<div>
 									<h3 className="font-display text-sm font-bold text-ink">
 										KYC documents
@@ -952,9 +1302,23 @@ export default function AdminOrganizationDetailsPage() {
 										Documents uploaded by the applicant for verification.
 									</p>
 								</div>
-								<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
-									{documents.length} {documents.length === 1 ? "file" : "files"}
-								</span>
+								<div className="flex flex-wrap gap-2">
+									{numericDocSummary.pending > 0 && (
+										<span className="rounded-full bg-sky/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-sky-deep ring-1 ring-sky/25">
+											{numericDocSummary.pending} pending
+										</span>
+									)}
+									{numericDocSummary.approved > 0 && (
+										<span className="rounded-full bg-orange/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-orange ring-1 ring-orange/25">
+											{numericDocSummary.approved} approved
+										</span>
+									)}
+									{numericDocSummary.rejected > 0 && (
+										<span className="rounded-full bg-carmine/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-carmine ring-1 ring-carmine/25">
+											{numericDocSummary.rejected} rejected
+										</span>
+									)}
+								</div>
 							</div>
 							{documents.length === 0 ? (
 								<div className="p-6 text-center text-sm text-ink-soft">
@@ -962,74 +1326,87 @@ export default function AdminOrganizationDetailsPage() {
 								</div>
 							) : (
 								<ul className="divide-y divide-line">
-									{documents.map((d) => (
-										<li
-											key={d.id}
-											className="flex flex-wrap items-center gap-4 px-5 py-4"
-										>
-											<div className="grid size-11 shrink-0 place-items-center rounded-xl bg-orange text-white">
-												<FileText className="size-5" />
-											</div>
-											<div className="min-w-[200px] flex-1">
-												<div className="flex flex-wrap items-center gap-2">
-													<p className="text-sm font-semibold text-ink">
-														{d.label}
-													</p>
-													<StatusBadge
-														label={d.status}
-														tone={
-															d.status === "approved"
-																? "success"
-																: d.status === "rejected"
-																? "critical"
-																: "warning"
-														}
-													/>
-												</div>
-												<p className="mt-0.5 font-mono text-[11px] text-ink-soft">
-													{d.file_name ?? d.kind}
-												</p>
-												{d.status === "rejected" && d.rejection_reason && (
-													<p className="mt-1 text-[11px] text-carmine">
-														Rejected: {d.rejection_reason}
-													</p>
-												)}
-											</div>
-											<div className="min-w-[150px]">
-												<p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-													Uploaded
-												</p>
-												<p className="mt-0.5 text-[12px] text-ink">
-													{d.uploaded_at
-														? new Date(d.uploaded_at).toLocaleDateString(
-																"en-NG",
-																{
-																	day: "numeric",
-																	month: "short",
-																	year: "numeric",
-																}
-														  )
-														: "—"}
-												</p>
-											</div>
-											{d.file_url && (
-												<a
-													href={resolveSrc(d.file_url)}
-													target="_blank"
-													rel="noopener noreferrer"
+									{documents.map((d) => {
+										const isRejected = d.status === "rejected";
+										return (
+											<li
+												key={d.id}
+												className="flex flex-wrap items-start gap-4 px-5 py-4"
+											>
+												<div
+													className={cn(
+														"grid size-11 shrink-0 place-items-center rounded-xl text-white",
+														isRejected ? "bg-carmine" : "bg-orange"
+													)}
 												>
-													<Button
-														variant="outline"
-														size="sm"
-														className="border-line bg-paper text-ink hover:bg-sand"
+													<FileText className="size-5" />
+												</div>
+												<div className="min-w-[220px] flex-1">
+													<div className="flex flex-wrap items-center gap-2">
+														<p className="text-sm font-semibold text-ink">
+															{documentName(d)}
+														</p>
+														<StatusBadge
+															label={d.status}
+															tone={
+																d.status === "approved"
+																	? "success"
+																	: d.status === "rejected"
+																	? "critical"
+																	: "warning"
+															}
+														/>
+													</div>
+													<p className="mt-0.5 font-mono text-[11px] text-ink-soft">
+														{d.file_name ?? d.kind}
+														{d.file_size
+															? ` · ${formatBytes(d.file_size)}`
+															: ""}
+													</p>
+													{d.licence_reference && (
+														<p className="mt-0.5 font-mono text-[11px] text-ink-soft">
+															Ref: {d.licence_reference}
+														</p>
+													)}
+													{d.rejection_reason && isRejected && (
+														<p className="mt-2 rounded-md bg-carmine/5 px-3 py-2 text-[12px] leading-5 text-carmine ring-1 ring-carmine/20">
+															{d.rejection_reason}
+														</p>
+													)}
+													{d.reviewed_by_name && (
+														<p className="mt-1 text-[11px] text-ink-soft">
+															Reviewed by {d.reviewed_by_name} ·{" "}
+															{formatDate(d.reviewed_at)}
+														</p>
+													)}
+												</div>
+												<div className="min-w-[150px]">
+													<p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+														Uploaded
+													</p>
+													<p className="mt-0.5 text-[12px] text-ink">
+														{formatDate(d.uploaded_at)}
+													</p>
+												</div>
+												{d.file_url && (
+													<a
+														href={resolveSrc(d.file_url)}
+														target="_blank"
+														rel="noopener noreferrer"
 													>
-														<FileText className="size-3.5" />
-														View file
-													</Button>
-												</a>
-											)}
-										</li>
-									))}
+														<Button
+															variant="outline"
+															size="sm"
+															className="border-line bg-paper text-ink hover:bg-sand"
+														>
+															<FileText className="size-3.5" />
+															View file
+														</Button>
+													</a>
+												)}
+											</li>
+										);
+									})}
 								</ul>
 							)}
 						</section>
@@ -1047,7 +1424,8 @@ export default function AdminOrganizationDetailsPage() {
 									</p>
 								</div>
 								<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
-									{containers.length} {containers.length === 1 ? "unit" : "units"}
+									{containers.length}{" "}
+									{containers.length === 1 ? "unit" : "units"}
 								</span>
 							</div>
 							{containers.length === 0 ? (
@@ -1098,22 +1476,116 @@ export default function AdminOrganizationDetailsPage() {
 														/>
 													</td>
 													<td className="px-4 py-3.5 font-mono text-xs text-ink-soft">
-														{c.arrived_at
-															? new Date(c.arrived_at).toLocaleDateString(
-																	"en-NG",
-																	{
-																		day: "numeric",
-																		month: "short",
-																		year: "numeric",
-																	}
-															  )
-															: "—"}
+														{formatDate(c.arrived_at)}
 													</td>
 												</tr>
 											))}
 										</tbody>
 									</table>
 								</div>
+							)}
+						</section>
+					)}
+
+					{tab === "registrations" && (
+						<section className="rounded-2xl bg-paper ring-1 ring-line">
+							<div className="flex items-center justify-between gap-3 border-b border-line p-4">
+								<div>
+									<h3 className="font-display text-sm font-bold text-ink">
+										Registration history
+									</h3>
+									<p className="text-[11px] text-ink-soft">
+										Original registration request(s) for this organisation.
+									</p>
+								</div>
+								<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange">
+									{registrations.length}{" "}
+									{registrations.length === 1 ? "request" : "requests"}
+								</span>
+							</div>
+							{registrations.length === 0 ? (
+								<div className="p-6 text-center text-sm text-ink-soft">
+									No registration records on file.
+								</div>
+							) : (
+								<ul className="divide-y divide-line">
+									{registrations.map((r) => (
+										<li key={r.id} className="space-y-4 px-5 py-4">
+											<div className="flex flex-wrap items-center justify-between gap-3">
+												<div>
+													<p className="font-mono text-[11px] text-ink-soft">
+														{r.registration_ref}
+													</p>
+													<p className="mt-1 text-sm font-semibold text-ink">
+														{r.organisation_name}
+													</p>
+												</div>
+												<StatusBadge
+													label={statusLabel[r.status] ?? r.status}
+													tone={statusTone(r.status)}
+												/>
+											</div>
+											<dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+												<Field
+													icon={User}
+													label="Applicant"
+													value={r.full_name}
+												/>
+												<Field
+													icon={Mail}
+													label="Email"
+													value={r.email}
+													mono
+												/>
+												<Field
+													icon={Phone}
+													label="Phone"
+													value={r.phone}
+													mono
+												/>
+												<Field
+													icon={FileText}
+													label="RC number"
+													value={r.rc_number ?? "—"}
+													mono
+												/>
+												<Field
+													icon={FileText}
+													label="TIN"
+													value={r.tin ?? "—"}
+													mono
+												/>
+												<Field
+													icon={User}
+													label="Job title"
+													value={r.job_title ?? "—"}
+												/>
+												<Field
+													icon={Calendar}
+													label="Submitted"
+													value={formatDateTime(r.created_at)}
+												/>
+												<Field
+													icon={Calendar}
+													label="Terms & privacy"
+													value={
+														r.terms_accepted && r.privacy_accepted
+															? `Accepted · v${r.terms_version ?? "1.0"} / v${
+																	r.privacy_version ?? "1.0"
+															  }`
+															: "Not accepted"
+													}
+												/>
+												<Field
+													icon={MapPin}
+													label="IP address"
+													value={r.ip_address ?? "—"}
+													mono
+												/>
+											</dl>
+										</li>
+									))}
+								</ul>
 							)}
 						</section>
 					)}
@@ -1185,7 +1657,9 @@ function StatusRow({
 				</span>
 			</div>
 			<div className="flex min-w-0 items-center gap-2">
-				<span className="truncate text-[12px] font-medium text-sand">{value}</span>
+				<span className="truncate text-[12px] font-medium text-sand">
+					{value}
+				</span>
 				<span className={cn("size-1.5 shrink-0 rounded-full", dotTone)} />
 			</div>
 		</div>

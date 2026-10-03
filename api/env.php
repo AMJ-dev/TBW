@@ -22,6 +22,8 @@
     $email_password='vmh;)~#TpW0GkFiV';
     $sender_email = "sender@evcarsng.com";
     $info_email = "info@evcarsng.com";
+    
+    $admin_email = "admin@trinubondedwarehouse.com";
 
     $mfa_key = "8227adcc2200e3bb07c8eb44db8eaf3de06bf261662c889a3a0f2a01963a681b";
 

@@ -477,9 +477,7 @@
                 LIMIT 1
             ");
 
-            $stmt->execute([
-                ":user_id" => $user_id
-            ]);
+            $stmt->execute([":user_id" => $user_id]);
 
             $role = $stmt->fetch(PDO::FETCH_ASSOC);
         }

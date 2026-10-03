@@ -211,23 +211,19 @@ const sections = [
 			{ label: "Value-added services", to: "/operations/value-added", icon: Settings, permission: "operations.manage" },
 			{ label: "Overrides", to: "/operations/overrides", icon: ShieldCheck, permission: "operations.manage" },
 		],
-		permission_key: ["organisation_owner", "management", "terminal_operations", "warehouse_yard_officer"],
+		permission_key: ["system_admin", "terminal_operations"],
 	},
 	{
-		title: "Cargo",
+		title: "Gate",
 		items: [
-			{ label: "Cargo records", to: "/portal/cargo", icon: Boxes, permission: "portal.cargo" },
-			{ label: "Sample consignment", to: "/portal/cargo/2481", icon: PackageCheck, permission: "portal.cargo" },
-			{ label: "Sample container", to: "/portal/containers/c-1", icon: Container, permission: "portal.cargo" },
-			{ label: "Sample package", to: "/portal/packages/p-1", icon: Package, permission: "portal.cargo" },
-			{ label: "Tracking", to: "/tracking", icon: Search, permission: "portal.cargo" },
-			{ label: "Holds & Exceptions", to: "/operations/holds", icon: AlertTriangle, permission: "operations.holds" },
+			{ label: "Gate dashboard", to: "/gate/dashboard", icon: LayoutDashboard, permission: "gate.view" },
+			{ label: "Appointments", to: "/gate/appointments", icon: Clock3, permission: "gate.bookings" },
+			{ label: "Gate Passes", to: "/gate/passes", icon: QrCode, permission: "gate.bookings" },
+			{ label: "Gate-in console", to: "/gate/in", icon: Truck, permission: "gate.admit" },
+			{ label: "Gate-out console", to: "/gate/out", icon: Truck, permission: "gate.gate_out" },
+			{ label: "Vehicle registry", to: "/gate/vehicles", icon: UsersRound, permission: "gate.bookings" },
 		],
-		permission_key: [
-			"organisation_owner", "management", "terminal_operations", "gate_officer",
-			"warehouse_yard_officer", "documentation_officer", "customer_service_sales",
-			"compliance_customs_liaison", "regulator_auditor",
-		],
+		permission_key: ["system_admin", "gate_officer"],
 	},
 	{
 		title: "Stakeholder portal",
@@ -251,18 +247,6 @@ const sections = [
 		],
 	},
 	{
-		title: "Gate",
-		items: [
-			{ label: "Gate dashboard", to: "/gate/dashboard", icon: LayoutDashboard, permission: "gate.view" },
-			{ label: "Appointments", to: "/gate/appointments", icon: Clock3, permission: "gate.bookings" },
-			{ label: "Gate Passes", to: "/gate/passes", icon: QrCode, permission: "gate.bookings" },
-			{ label: "Gate-in console", to: "/gate/in", icon: Truck, permission: "gate.admit" },
-			{ label: "Gate-out console", to: "/gate/out", icon: Truck, permission: "gate.gate_out" },
-			{ label: "Vehicle registry", to: "/gate/vehicles", icon: UsersRound, permission: "gate.bookings" },
-		],
-		permission_key: ["organisation_owner", "management", "gate_officer"],
-	},
-	{
 		title: "Finance",
 		items: [
 			{ label: "Finance dashboard", to: "/finance/dashboard", icon: BarChart3, permission: "finance.view" },
@@ -277,7 +261,7 @@ const sections = [
 			{ label: "Tax rules", to: "/finance/tax", icon: FileSpreadsheet, permission: "finance.view" },
 			{ label: "Reconciliation", to: "/finance/reconciliation", icon: ClipboardCheck, permission: "finance.reconciliation" },
 		],
-		permission_key: ["organisation_owner", "management", "finance"],
+		permission_key: ["organisation_owner"],
 	},
 	{
 		title: "Reports",
@@ -291,6 +275,22 @@ const sections = [
 			"organisation_owner", "management", "finance", "terminal_operations",
 			"gate_officer", "warehouse_yard_officer", "documentation_officer",
 			"customer_service_sales", "compliance_customs_liaison", "regulator_auditor",
+		],
+	},
+	{
+		title: "Cargo",
+		items: [
+			{ label: "Cargo records", to: "/portal/cargo", icon: Boxes, permission: "portal.cargo" },
+			{ label: "Sample consignment", to: "/portal/cargo/2481", icon: PackageCheck, permission: "portal.cargo" },
+			{ label: "Sample container", to: "/portal/containers/c-1", icon: Container, permission: "portal.cargo" },
+			{ label: "Sample package", to: "/portal/packages/p-1", icon: Package, permission: "portal.cargo" },
+			{ label: "Tracking", to: "/tracking", icon: Search, permission: "portal.cargo" },
+			{ label: "Holds & Exceptions", to: "/operations/holds", icon: AlertTriangle, permission: "operations.holds" },
+		],
+		permission_key: [
+			"organisation_owner", "management", "terminal_operations", "gate_officer",
+			"warehouse_yard_officer", "documentation_officer", "customer_service_sales",
+			"compliance_customs_liaison", "regulator_auditor",
 		],
 	},
 ];
@@ -405,21 +405,12 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 	};
 
 	useEffect(() => {
-		console.log(my_details?.account_status);
+		// console.log(my_details?.account_status);
 		if (!userMenuOpen) return;
 		const close = () => setUserMenuOpen(false);
 		window.addEventListener("click", close);
 		return () => window.removeEventListener("click", close);
 	}, [userMenuOpen]);
-
-	useEffect(() => {
-		// if (my_details?.account_status === "rejected") {
-		// 	toast.error("Your account has been rejected. Contact operations.");
-		// }
-		// if (my_details?.account_status === "active") {
-		// 	toast.success("Account approved. Full access enabled.");
-		// }
-	}, [my_details?.account_status]);
 
 	return (
 		<div className="min-h-screen bg-sand font-sans text-ink">

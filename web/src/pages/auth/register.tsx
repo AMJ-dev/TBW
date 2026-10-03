@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
 import {
 	ArrowRight,
@@ -9,6 +9,7 @@ import {
 	EyeOff,
 	FileCheck2,
 	FileText,
+	Globe,
 	Lock,
 	Mail,
 	MapPin,
@@ -50,13 +51,19 @@ const accountTypes: {
 	},
 ];
 
-type DocKey = "cac" | "tin" | "signatory_id";
+type DocKey =
+	| "cac"
+	| "tin"
+	| "signatory_id"
+	| "directors_list"
+	| "utility_bill";
 
 type DocumentSlot = {
 	key: DocKey;
 	label: string;
 	detail: string;
 	accept: string;
+	required: boolean;
 };
 
 const documentSlots: DocumentSlot[] = [
@@ -65,18 +72,35 @@ const documentSlots: DocumentSlot[] = [
 		label: "CAC certificate",
 		detail: "Certificate of incorporation or business name registration.",
 		accept: "application/pdf,image/*",
+		required: true,
 	},
 	{
 		key: "tin",
 		label: "TIN certificate",
 		detail: "Tax Identification Number certificate issued by FIRS.",
 		accept: "application/pdf,image/*",
+		required: true,
 	},
 	{
 		key: "signatory_id",
 		label: "Authorised signatory ID",
 		detail: "National ID, driver's licence, or international passport.",
 		accept: "application/pdf,image/*",
+		required: true,
+	},
+	{
+		key: "directors_list",
+		label: "Directors and shareholders list",
+		detail: "A current list of the company's directors and shareholders.",
+		accept: "application/pdf",
+		required: true,
+	},
+	{
+		key: "utility_bill",
+		label: "Utility bill (proof of address)",
+		detail: "A recent utility bill showing the organisation's registered address.",
+		accept: "application/pdf,image/*",
+		required: true,
 	},
 ];
 
@@ -104,8 +128,48 @@ type LicenceEntry = {
 	file: File | null;
 };
 
+const sectorOptions = [
+	"Agriculture & Agro-processing",
+	"Automotive & Spare Parts",
+	"Aviation & Aerospace",
+	"Chemicals & Petrochemicals",
+	"Construction & Building Materials",
+	"Consumer Goods & FMCG",
+	"E-commerce & Digital Services",
+	"Education & Training",
+	"Electronics & Technology",
+	"Energy, Power & Utilities",
+	"Engineering & Technical Services",
+	"Environment, Waste Management & Recycling",
+	"Fashion, Textiles & Apparel",
+	"Financial Services, Banking & Fintech",
+	"Food & Beverage",
+	"Healthcare & Pharmaceuticals",
+	"Hospitality, Tourism & Entertainment",
+	"Industrial & Manufacturing",
+	"Infrastructure & Real Estate",
+	"Insurance & Risk Management",
+	"Legal, Consulting & Professional Services",
+	"Logistics, Freight Forwarding & Supply Chain",
+	"Machinery & Heavy Equipment",
+	"Maritime, Shipping & Port Operations",
+	"Mining, Minerals & Metals",
+	"Oil & Gas (Upstream, Midstream & Downstream)",
+	"Packaging, Printing & Publishing",
+	"Professional, Scientific & Technical Services",
+	"Public Sector, Government & NGOs",
+	"Retail & Wholesale Distribution",
+	"Telecommunications & Media",
+	"Transportation & Fleet Management",
+	"Water Resources & Sanitation",
+	"Other",
+] as const;
+
+type Sector = (typeof sectorOptions)[number];
+
 const MAX_DOC_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+const ALLOWED_PDF_ONLY = ["application/pdf"];
 
 const steps = ["Your details", "Organisation", "Documents", "Verify"] as const;
 
@@ -124,6 +188,10 @@ export default function RegisterPage() {
 	const [organisation, setOrganisation] = useState("");
 	const [rcNumber, setRcNumber] = useState("");
 	const [tin, setTin] = useState("");
+	const [dateOfIncorporation, setDateOfIncorporation] = useState("");
+	const [sector, setSector] = useState<Sector | "">("");
+	const [registeredAddress, setRegisteredAddress] = useState("");
+	const [website, setWebsite] = useState("");
 	const [role, setRole] = useState("");
 	const [agreed, setAgreed] = useState(false);
 
@@ -131,6 +199,8 @@ export default function RegisterPage() {
 		cac: null,
 		tin: null,
 		signatory_id: null,
+		directors_list: null,
+		utility_bill: null,
 	});
 
 	const [licences, setLicences] = useState<LicenceEntry[]>([
@@ -158,17 +228,41 @@ export default function RegisterPage() {
 	const [submitted, setSubmitted] = useState(false);
 	const [registrationRef, setRegistrationRef] = useState("");
 
+	// Reset verification state whenever email or phone changes.
+	useEffect(() => {
+		setEmailVerified(false);
+		setEmailOtpSent(false);
+		setEmailOtp("");
+		setRegistrationRef("");
+	}, [email]);
+
+	useEffect(() => {
+		setPhoneVerified(false);
+		setPhoneOtpSent(false);
+		setPhoneOtp("");
+	}, [phone]);
+
 	const pickDocument = (key: DocKey, file: File | null) => {
 		if (!file) {
 			setDocuments((prev) => ({ ...prev, [key]: null }));
 			return;
 		}
+		const slot = documentSlots.find((s) => s.key === key);
+		const allowed =
+			slot?.accept.includes("pdf") && !slot?.accept.includes("image")
+				? ALLOWED_PDF_ONLY
+				: ALLOWED_MIME;
+
 		if (file.size > MAX_DOC_BYTES) {
 			toast.error("Each document must be 5MB or smaller.");
 			return;
 		}
-		if (!ALLOWED_MIME.includes(file.type)) {
-			toast.error("Only PDF, JPG, PNG, or WebP files are accepted.");
+		if (!allowed.includes(file.type)) {
+			toast.error(
+				allowed === ALLOWED_PDF_ONLY
+					? "Only PDF files are accepted for this document."
+					: "Only PDF, JPG, PNG, or WebP files are accepted."
+			);
 			return;
 		}
 		setDocuments((prev) => ({ ...prev, [key]: file }));
@@ -182,7 +276,9 @@ export default function RegisterPage() {
 	};
 
 	const updateLicence = (id: string, patch: Partial<LicenceEntry>) => {
-		setLicences((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+		setLicences((prev) =>
+			prev.map((l) => (l.id === id ? { ...l, ...patch } : l))
+		);
 	};
 
 	const removeLicence = (id: string) => {
@@ -248,6 +344,24 @@ export default function RegisterPage() {
 				toast.error("Enter your RC number to continue.");
 				return;
 			}
+			if (!dateOfIncorporation) {
+				toast.error("Select your organisation's date of incorporation.");
+				return;
+			}
+			if (!sector) {
+				toast.error("Select your organisation's sector.");
+				return;
+			}
+			if (!registeredAddress.trim()) {
+				toast.error("Enter the registered address of your organisation.");
+				return;
+			}
+			if (website.trim() && !/^https?:\/\/.+\..+/i.test(website.trim())) {
+				toast.error(
+					"Enter a valid website URL (starting with http:// or https://)."
+				);
+				return;
+			}
 			if (!agreed) {
 				toast.error("Accept the privacy notice and terms to continue.");
 				return;
@@ -259,12 +373,15 @@ export default function RegisterPage() {
 				return;
 			}
 			const missing = documentSlots
+				.filter((s) => s.required)
 				.map((s) => s.key)
 				.filter((key) => !documents[key]);
 			if (missing.length > 0) {
 				toast.error(
 					`Upload all required documents: ${missing
-						.map((k) => documentSlots.find((s) => s.key === k)?.label ?? k)
+						.map(
+							(k) => documentSlots.find((s) => s.key === k)?.label ?? k
+						)
 						.join(", ")}.`
 				);
 				return;
@@ -290,6 +407,10 @@ export default function RegisterPage() {
 		form.append("organisation", organisation);
 		form.append("rc_number", rcNumber);
 		form.append("tin", tin);
+		form.append("date_of_incorporation", dateOfIncorporation);
+		form.append("sector", sector);
+		form.append("registered_address", registeredAddress);
+		form.append("website", website.trim());
 		form.append("role", role);
 		form.append("agreed", agreed ? "1" : "0");
 
@@ -322,16 +443,22 @@ export default function RegisterPage() {
 			toast.error("Enter your email before requesting a code.");
 			return;
 		}
+		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+			toast.error("Enter a valid email address.");
+			return;
+		}
 		setEmailOtpSending(true);
 		try {
-			const res = await http.post("register-send-otp/", buildFormData(), {
-				headers: { "Content-Type": "multipart/form-data" },
-			});
+			const res = await http.post("register-send-otp/", { email, phone });
 			const resp: Resp = res.data;
 			if (resp?.error) {
 				toast.error(resp.data || "Could not send the verification code.");
 			} else {
-				setRegistrationRef(res.data?.code?.registration_ref || "");
+				const ref =
+					res.data?.code?.registration_ref ||
+					res.data?.code?.ref ||
+					"";
+				setRegistrationRef(ref);
 				toast.success("Verification code sent to your email.");
 				setEmailOtpSent(true);
 			}
@@ -360,19 +487,27 @@ export default function RegisterPage() {
 			});
 			const resp: Resp = res.data;
 			if (resp?.error) {
-				toast.error(resp.data || "Email verification failed. Check the code and try again.");
+				toast.error(
+					resp.data || "Email verification failed. Check the code and try again."
+				);
 			} else {
 				toast.success("Email verified.");
 				setEmailVerified(true);
 			}
 		} catch {
-			toast.error("Email verification failed. Check the code and try again.");
+			toast.error(
+				"Email verification failed. Check the code and try again."
+			);
 		} finally {
 			setEmailOtpVerifying(false);
 		}
 	};
 
 	const handleSendPhoneOtp = async () => {
+		if (!emailVerified) {
+			toast.error("Verify your email first before requesting a phone code.");
+			return;
+		}
 		if (honeypot.trim()) {
 			setSubmitted(true);
 			return;
@@ -383,7 +518,7 @@ export default function RegisterPage() {
 		}
 		setPhoneOtpSending(true);
 		try {
-			const res = await http.post("register/sms-send-otp/", { phone });
+			const res = await http.post("register/sms-send-otp/", { registration_ref: registrationRef, phone });
 			const resp: Resp = res.data;
 			if (resp?.error) {
 				toast.error(resp.data || "Could not send the SMS code.");
@@ -399,6 +534,10 @@ export default function RegisterPage() {
 	};
 
 	const handleVerifyPhoneOtp = async () => {
+		if (!emailVerified) {
+			toast.error("Verify your email first before verifying your phone.");
+			return;
+		}
 		if (honeypot.trim()) {
 			setSubmitted(true);
 			return;
@@ -416,13 +555,17 @@ export default function RegisterPage() {
 			});
 			const resp: Resp = res.data;
 			if (resp?.error) {
-				toast.error(resp.data || "Phone verification failed. Check the code and try again.");
+				toast.error(
+					resp.data || "Phone verification failed. Check the code and try again."
+				);
 			} else {
 				toast.success("Phone number verified.");
 				setPhoneVerified(true);
 			}
 		} catch {
-			toast.error("Phone verification failed. Check the code and try again.");
+			toast.error(
+				"Phone verification failed. Check the code and try again."
+			);
 		} finally {
 			setPhoneOtpVerifying(false);
 		}
@@ -439,7 +582,9 @@ export default function RegisterPage() {
 			return;
 		}
 		if (!phoneVerified) {
-			toast.error("Verify your phone number before completing registration.");
+			toast.error(
+				"Verify your phone number before completing registration."
+			);
 			return;
 		}
 		setSubmitting(true);
@@ -489,9 +634,9 @@ export default function RegisterPage() {
 									We'll be in touch.
 								</h1>
 								<p className="mx-auto mt-4 max-w-md leading-7 text-ink-soft">
-									Your registration has been received for review. A TRÏNŪ coordinator
-									will verify your organisation details and contact you using the
-									information provided.
+									Your registration has been received for review. A TRÏNŪ
+									coordinator will verify your organisation details and contact
+									you using the information provided.
 								</p>
 
 								<div className="mx-auto mt-7 max-w-sm rounded-xl bg-sand p-5 ring-1 ring-line">
@@ -543,12 +688,13 @@ export default function RegisterPage() {
 						<div>
 							<PublicKicker>Create an account</PublicKicker>
 							<h1 className="mt-3 max-w-lg font-display text-4xl font-bold leading-[1.05] text-ink sm:text-5xl">
-								Access the <span className="text-orange">stakeholder portal.</span>
+								Access the{" "}
+								<span className="text-orange">stakeholder portal.</span>
 							</h1>
 							<p className="mt-5 max-w-lg leading-7 text-ink-soft">
-								Register as an importer or a licensed agent to track consignments,
-								manage documents, coordinate collection, and view financial
-								obligations — all from one operating record.
+								Register as an importer or a licensed agent to track
+								consignments, manage documents, coordinate collection, and view
+								financial obligations — all from one operating record.
 							</p>
 
 							<div className="mt-10 grid gap-3">
@@ -562,12 +708,14 @@ export default function RegisterPage() {
 									{
 										icon: FileCheck2,
 										label: "Documented coordination",
-										detail: "Every handoff is timestamped, attributed, and searchable.",
+										detail:
+											"Every handoff is timestamped, attributed, and searchable.",
 									},
 									{
 										icon: MapPin,
 										label: "Abuja flagship facility",
-										detail: "The first step in a broader inland bonded network.",
+										detail:
+											"The first step in a broader inland bonded network.",
 									},
 								].map((item) => {
 									const Icon = item.icon;
@@ -616,7 +764,9 @@ export default function RegisterPage() {
 											0{i + 1}
 										</span>
 										<div>
-											<p className="text-sm font-semibold text-ink">{title}</p>
+											<p className="text-sm font-semibold text-ink">
+												{title}
+											</p>
 											<p className="mt-1 text-[12px] leading-5 text-ink-soft">
 												{detail}
 											</p>
@@ -633,14 +783,16 @@ export default function RegisterPage() {
 									</p>
 								</div>
 								<p className="mt-3 text-[12px] leading-6 text-sand/75">
-									TRÏNŪ provides facilities and coordination. Customs decisions and
-									other statutory outcomes remain with the competent authority.
+									TRÏNŪ provides facilities and coordination. Customs
+									decisions and other statutory outcomes remain with the
+									competent authority.
 								</p>
 								<Link
 									to="/compliance"
 									className="mt-4 inline-flex items-center gap-2 text-[12px] font-semibold text-orange hover:text-orange-deep"
 								>
-									Read the compliance position <ArrowRight className="size-3.5" />
+									Read the compliance position{" "}
+									<ArrowRight className="size-3.5" />
 								</Link>
 							</div>
 						</div>
@@ -808,7 +960,11 @@ export default function RegisterPage() {
 													<button
 														type="button"
 														onClick={() => setShowPassword((v) => !v)}
-														aria-label={showPassword ? "Hide password" : "Show password"}
+														aria-label={
+															showPassword
+																? "Hide password"
+																: "Show password"
+														}
 														className="absolute right-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded-md text-ink-soft transition-colors hover:bg-sand-2 hover:text-orange"
 													>
 														{showPassword ? (
@@ -832,7 +988,9 @@ export default function RegisterPage() {
 														autoComplete="new-password"
 														placeholder="Re-enter your password"
 														value={confirmPassword}
-														onChange={(e) => setConfirmPassword(e.target.value)}
+														onChange={(e) =>
+															setConfirmPassword(e.target.value)
+														}
 														className="h-11 border-line bg-sand pl-9 text-ink"
 													/>
 												</div>
@@ -886,6 +1044,86 @@ export default function RegisterPage() {
 												</label>
 											</div>
 
+											<div className="grid gap-4 sm:grid-cols-2">
+												<label className="block">
+													<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+														Date of incorporation
+														<span className="ml-1 text-orange">*</span>
+													</span>
+													<Input
+														required
+														type="date"
+														value={dateOfIncorporation}
+														onChange={(e) =>
+															setDateOfIncorporation(e.target.value)
+														}
+														className="mt-2 h-11 border-line bg-sand font-mono text-ink"
+													/>
+												</label>
+
+												<label className="block">
+													<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+														Sector
+														<span className="ml-1 text-orange">*</span>
+													</span>
+													<select
+														required
+														value={sector}
+														onChange={(e) =>
+															setSector(e.target.value as Sector)
+														}
+														className="mt-2 h-11 w-full rounded-md border border-line bg-sand px-3 text-sm text-ink"
+													>
+														<option value="">Select a sector…</option>
+														{sectorOptions.map((s) => (
+															<option key={s} value={s}>
+																{s}
+															</option>
+														))}
+													</select>
+												</label>
+											</div>
+
+											<label className="block">
+												<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+													Registered address
+													<span className="ml-1 text-orange">*</span>
+												</span>
+												<div className="relative mt-2">
+													<MapPin className="pointer-events-none absolute left-3 top-3 size-4 text-ink-soft" />
+													<textarea
+														required
+														rows={3}
+														placeholder="Street, city, state, postal code"
+														value={registeredAddress}
+														onChange={(e) =>
+															setRegisteredAddress(e.target.value)
+														}
+														className="w-full rounded-md border border-line bg-sand pl-9 pr-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:ring-2 focus:ring-orange/25"
+													/>
+												</div>
+											</label>
+
+											<label className="block">
+												<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+													Website
+													<span className="ml-1 font-mono text-[10px] text-ink-soft/70">
+														(optional)
+													</span>
+												</span>
+												<div className="relative mt-2">
+													<Globe className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
+													<Input
+														type="url"
+														inputMode="url"
+														placeholder="https://your-company.ng"
+														value={website}
+														onChange={(e) => setWebsite(e.target.value)}
+														className="h-11 border-line bg-sand pl-9 text-ink"
+													/>
+												</div>
+											</label>
+
 											<label className="block">
 												<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 													Your role in the organisation
@@ -914,8 +1152,8 @@ export default function RegisterPage() {
 													</li>
 													<li className="flex items-start gap-2">
 														<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
-														Once approved, you receive credentials and delegation
-														options.
+														Once approved, you receive credentials and
+														delegation options.
 													</li>
 												</ul>
 											</div>
@@ -929,11 +1167,17 @@ export default function RegisterPage() {
 												/>
 												<span className="text-[12px] leading-5 text-ink">
 													I accept the{" "}
-													<Link to="/terms" className="font-semibold text-orange">
+													<Link
+														to="/terms"
+														className="font-semibold text-orange"
+													>
 														terms of use
 													</Link>{" "}
 													and{" "}
-													<Link to="/privacy" className="font-semibold text-orange">
+													<Link
+														to="/privacy"
+														className="font-semibold text-orange"
+													>
 														privacy notice
 													</Link>
 													.
@@ -945,9 +1189,9 @@ export default function RegisterPage() {
 									{step === 2 && (
 										<div className="space-y-5">
 											<p className="text-[13px] leading-6 text-ink-soft">
-												Upload the documents we use to verify your organisation.
-												Files are reviewed before access is granted and stored
-												securely.
+												Upload the documents we use to verify your
+												organisation. Files are reviewed before access is
+												granted and stored securely.
 											</p>
 
 											<div className="space-y-3">
@@ -959,13 +1203,28 @@ export default function RegisterPage() {
 															className="rounded-xl bg-sand p-4 ring-1 ring-line"
 														>
 															<div className="flex items-start gap-3">
-																<div className="grid size-9 shrink-0 place-items-center rounded-md bg-orange text-white">
+																<div
+																	className={
+																		"grid size-9 shrink-0 place-items-center rounded-md text-white " +
+																		(slot.required
+																			? "bg-orange"
+																			: "bg-ink")
+																	}
+																>
 																	<FileText className="size-4" />
 																</div>
 																<div className="min-w-0">
 																	<p className="text-sm font-semibold text-ink">
 																		{slot.label}
-																		<span className="ml-1 text-orange">*</span>
+																		{slot.required ? (
+																			<span className="ml-1 text-orange">
+																				*
+																			</span>
+																		) : (
+																			<span className="ml-1 font-mono text-[10px] text-ink-soft/70">
+																				optional
+																			</span>
+																		)}
 																	</p>
 																	<p className="mt-0.5 text-[11px] leading-5 text-ink-soft">
 																		{slot.detail}
@@ -986,7 +1245,9 @@ export default function RegisterPage() {
 																	</div>
 																	<button
 																		type="button"
-																		onClick={() => pickDocument(slot.key, null)}
+																		onClick={() =>
+																			pickDocument(slot.key, null)
+																		}
 																		aria-label={`Remove ${slot.label}`}
 																		className="grid size-7 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
 																	>
@@ -1000,13 +1261,17 @@ export default function RegisterPage() {
 																		Choose file
 																	</span>
 																	<span className="font-mono text-[10px] text-ink-soft">
-																		PDF, JPG, PNG · max 5MB
+																		{slot.accept.includes("pdf") &&
+																		!slot.accept.includes("image")
+																			? "PDF · max 5MB"
+																			: "PDF, JPG, PNG · max 5MB"}
 																	</span>
 																	<input
 																		type="file"
 																		accept={slot.accept}
 																		onChange={(e) => {
-																			const picked = e.target.files?.[0] ?? null;
+																			const picked =
+																				e.target.files?.[0] ?? null;
 																			e.target.value = "";
 																			pickDocument(slot.key, picked);
 																		}}
@@ -1029,7 +1294,9 @@ export default function RegisterPage() {
 															<p className="text-sm font-semibold text-ink">
 																Operational licences
 																{accountType === "agent" && (
-																	<span className="ml-1 text-orange">*</span>
+																	<span className="ml-1 text-orange">
+																		*
+																	</span>
 																)}
 															</p>
 															<p className="mt-0.5 text-[11px] leading-5 text-ink-soft">
@@ -1086,12 +1353,15 @@ export default function RegisterPage() {
 																		value={licence.type}
 																		onChange={(e) =>
 																			updateLicence(licence.id, {
-																				type: e.target.value as LicenceType,
+																				type: e.target
+																					.value as LicenceType,
 																			})
 																		}
 																		className="mt-2 h-11 w-full rounded-md border border-line bg-sand px-3 text-sm text-ink"
 																	>
-																		<option value="">Select a licence type…</option>
+																		<option value="">
+																			Select a licence type…
+																		</option>
 																		{licenceTypes.map((t) => (
 																			<option key={t.key} value={t.key}>
 																				{t.label}
@@ -1125,12 +1395,17 @@ export default function RegisterPage() {
 																			{licence.file.name}
 																		</span>
 																		<span className="shrink-0 font-mono text-[10px] text-ink-soft">
-																			{(licence.file.size / 1024).toFixed(0)} KB
+																			{(
+																				licence.file.size / 1024
+																			).toFixed(0)}{" "}
+																			KB
 																		</span>
 																	</div>
 																	<button
 																		type="button"
-																		onClick={() => pickLicenceFile(licence.id, null)}
+																		onClick={() =>
+																			pickLicenceFile(licence.id, null)
+																		}
 																		aria-label="Remove licence file"
 																		className="grid size-7 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
 																	>
@@ -1150,9 +1425,13 @@ export default function RegisterPage() {
 																		type="file"
 																		accept="application/pdf,image/*"
 																		onChange={(e) => {
-																			const picked = e.target.files?.[0] ?? null;
+																			const picked =
+																				e.target.files?.[0] ?? null;
 																			e.target.value = "";
-																			pickLicenceFile(licence.id, picked);
+																			pickLicenceFile(
+																				licence.id,
+																				picked
+																			);
 																		}}
 																		className="hidden"
 																	/>
@@ -1174,12 +1453,16 @@ export default function RegisterPage() {
 													</li>
 													<li className="flex items-start gap-2">
 														<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
+														Directors and shareholders list must be a PDF.
+													</li>
+													<li className="flex items-start gap-2">
+														<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
 														Documents must be current and legible.
 													</li>
 													<li className="flex items-start gap-2">
 														<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
-														Additional licences can be added during onboarding if not
-														available now.
+														Additional licences can be added during onboarding
+														if not available now.
 													</li>
 												</ul>
 											</div>
@@ -1292,30 +1575,43 @@ export default function RegisterPage() {
 														disabled={emailOtpVerifying || !emailOtp.trim()}
 														className="h-12 bg-orange text-white hover:bg-orange-deep"
 													>
-														{emailOtpVerifying ? "Verifying…" : "Verify email"}
+														{emailOtpVerifying
+															? "Verifying…"
+															: "Verify email"}
 													</Button>
 												</div>
 											</div>
 										)}
 									</div>
 
-									{/* PHONE VERIFICATION */}
+									{/* PHONE VERIFICATION — locked until email is verified */}
 									<div
 										className={
 											"mt-4 rounded-xl p-4 ring-1 transition-colors " +
 											(phoneVerified
 												? "bg-orange/5 ring-orange/25"
-												: "bg-sand ring-line")
+												: emailVerified
+												? "bg-sand ring-line"
+												: "bg-sand-2 ring-line opacity-70")
 										}
+										aria-disabled={!emailVerified}
 									>
 										<div className="flex items-start gap-3">
 											<div
 												className={
 													"grid size-9 shrink-0 place-items-center rounded-md text-white " +
-													(phoneVerified ? "bg-orange" : "bg-ink")
+													(phoneVerified
+														? "bg-orange"
+														: emailVerified
+														? "bg-ink"
+														: "bg-ink/40")
 												}
 											>
-												<MessageSquare className="size-4" />
+												{emailVerified ? (
+													<MessageSquare className="size-4" />
+												) : (
+													<Lock className="size-4" />
+												)}
 											</div>
 											<div className="min-w-0 flex-1">
 												<div className="flex flex-wrap items-center gap-2">
@@ -1328,14 +1624,26 @@ export default function RegisterPage() {
 															Verified
 														</span>
 													)}
+													{!emailVerified && !phoneVerified && (
+														<span className="inline-flex items-center gap-1.5 rounded-full bg-sand px-2 py-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft ring-1 ring-line">
+															<Lock className="size-3" />
+															Locked
+														</span>
+													)}
 												</div>
 												<p className="mt-0.5 truncate font-mono text-[11px] text-ink-soft">
 													{phone || "your phone"}
 												</p>
+												{!emailVerified && (
+													<p className="mt-1 text-[11px] leading-5 text-ink-soft">
+														Verify your email first. This step unlocks
+														automatically once your email is confirmed.
+													</p>
+												)}
 											</div>
 										</div>
 
-										{!phoneVerified && (
+										{!phoneVerified && emailVerified && (
 											<div className="mt-4 space-y-3">
 												<Button
 													type="button"
@@ -1372,18 +1680,37 @@ export default function RegisterPage() {
 														disabled={phoneOtpVerifying || !phoneOtp.trim()}
 														className="h-12 bg-orange text-white hover:bg-orange-deep"
 													>
-														{phoneOtpVerifying ? "Verifying…" : "Verify phone"}
+														{phoneOtpVerifying
+															? "Verifying…"
+															: "Verify phone"}
 													</Button>
 												</div>
+											</div>
+										)}
+
+										{!phoneVerified && !emailVerified && (
+											<div className="mt-4 grid gap-2 sm:grid-cols-[1fr_auto]">
+												<Input
+													disabled
+													placeholder="••••••"
+													className="h-12 cursor-not-allowed border-line bg-paper text-center font-mono text-lg tracking-[0.4em] text-ink-soft opacity-60"
+												/>
+												<Button
+													type="button"
+													disabled
+													className="h-12 cursor-not-allowed bg-orange text-white opacity-40"
+												>
+													Locked
+												</Button>
 											</div>
 										)}
 									</div>
 
 									<div className="mt-5 rounded-xl bg-sand p-4 ring-1 ring-line">
 										<p className="text-[12px] leading-5 text-ink-soft">
-											Both email and phone must be verified before registration can
-											be completed. Didn't receive a code? Check the details above
-											and use the resend buttons.
+											Verify your email first. Phone verification unlocks
+											automatically once your email is confirmed. Both must be
+											verified before registration can be completed.
 										</p>
 									</div>
 
