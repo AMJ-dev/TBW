@@ -1,4 +1,12 @@
-import { useState, useEffect, type FormEvent } from "react";
+import {
+	useState,
+	useEffect,
+	useRef,
+	type FormEvent,
+	type ChangeEvent,
+	type KeyboardEvent,
+	type ClipboardEvent,
+} from "react";
 import { Link } from "@/components/router-link";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
@@ -9,13 +17,11 @@ import {
 	Copy,
 	Download,
 	Lock,
-	ShieldCheck,
 	Smartphone,
 } from "lucide-react";
 import { http, type Resp } from "@/lib/httpClient";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 type Step = "loading" | "scan" | "verify" | "recovery" | "error";
@@ -29,6 +35,8 @@ export default function MfaSetup() {
 	const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
 	const [submitting, setSubmitting] = useState(false);
 	const [loadError, setLoadError] = useState("");
+
+	const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
 	const digits = code.replace(/\D/g, "").slice(0, 6);
 	const complete = digits.length === 6;
@@ -61,6 +69,83 @@ export default function MfaSetup() {
 		};
 	}, []);
 
+	useEffect(() => {
+		if (step !== "verify") return;
+		const t = setTimeout(() => inputsRef.current[0]?.focus(), 50);
+		return () => clearTimeout(t);
+	}, [step]);
+
+	const handleChange = (index: number, e: ChangeEvent<HTMLInputElement>) => {
+		const raw = e.target.value.replace(/\D/g, "");
+		if (!raw) return;
+
+		const next = digits.split("");
+		if (raw.length > 1) {
+			const spread = raw.slice(0, 6 - index).split("");
+			spread.forEach((d, i) => {
+				if (index + i < 6) next[index + i] = d;
+			});
+			const joined = next.join("").slice(0, 6);
+			setCode(joined);
+			const focusIdx = Math.min(index + spread.length, 5);
+			inputsRef.current[focusIdx]?.focus();
+			return;
+		}
+
+		const first = raw.charAt(0);
+		if (first) next[index] = first;
+		const joined = next.join("").slice(0, 6);
+		setCode(joined);
+		if (index < 5) inputsRef.current[index + 1]?.focus();
+	};
+
+	const handleKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
+		if (e.key === "Backspace") {
+			e.preventDefault();
+			const next = digits.split("");
+			if (next[index]) {
+				next[index] = "";
+				setCode(next.join(""));
+			} else if (index > 0) {
+				next[index - 1] = "";
+				setCode(next.join(""));
+				inputsRef.current[index - 1]?.focus();
+			}
+			return;
+		}
+		if (e.key === "ArrowLeft" && index > 0) {
+			e.preventDefault();
+			inputsRef.current[index - 1]?.focus();
+		}
+		if (e.key === "ArrowRight" && index < 5) {
+			e.preventDefault();
+			inputsRef.current[index + 1]?.focus();
+		}
+		if (e.key === "Delete") {
+			e.preventDefault();
+			const next = digits.split("");
+			next[index] = "";
+			setCode(next.join(""));
+		}
+	};
+
+	const handlePaste = (index: number, e: ClipboardEvent<HTMLInputElement>) => {
+		e.preventDefault();
+		const pasted = e.clipboardData
+			.getData("text")
+			.replace(/\D/g, "")
+			.slice(0, 6);
+		if (!pasted) return;
+		const next = digits.split("");
+		pasted.split("").forEach((d, i) => {
+			if (index + i < 6) next[index + i] = d;
+		});
+		const joined = next.join("").slice(0, 6);
+		setCode(joined);
+		const focusIdx = Math.min(index + pasted.length, 5);
+		inputsRef.current[focusIdx]?.focus();
+	};
+
 	const handleVerify = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		if (!complete || submitting) return;
@@ -71,6 +156,7 @@ export default function MfaSetup() {
 			if (resp.error) {
 				toast.error(resp.data || "That code didn't match. Try again.");
 				setCode("");
+				inputsRef.current[0]?.focus();
 				return;
 			}
 			setRecoveryCodes(resp.code.recovery_codes);
@@ -81,6 +167,7 @@ export default function MfaSetup() {
 				error?.response?.data?.message || "Could not verify the code. Try again."
 			);
 			setCode("");
+			inputsRef.current[0]?.focus();
 		} finally {
 			setSubmitting(false);
 		}
@@ -283,21 +370,44 @@ export default function MfaSetup() {
 							Enter the six-digit code from your authenticator app to confirm setup.
 						</p>
 
-						<label className="mt-5 block">
+						<div className="mt-5 block">
 							<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 								Verification code
 							</span>
-							<Input
-								autoFocus
-								inputMode="numeric"
-								maxLength={6}
-								autoComplete="one-time-code"
-								placeholder="000000"
-								value={digits}
-								onChange={(e) => setCode(e.target.value)}
-								className="mt-2 h-12 border-line bg-sand text-center font-mono text-lg tracking-[0.4em] text-ink"
-							/>
-						</label>
+
+							<div className="mt-3 grid grid-cols-6 gap-2">
+								{Array.from({ length: 6 }).map((_, i) => (
+									<input
+										key={i}
+										ref={(el) => {
+											inputsRef.current[i] = el;
+										}}
+										type="text"
+										inputMode="numeric"
+										autoComplete={i === 0 ? "one-time-code" : "off"}
+										pattern="[0-9]*"
+										maxLength={1}
+										value={digits[i] ?? ""}
+										onChange={(e) => handleChange(i, e)}
+										onKeyDown={(e) => handleKeyDown(i, e)}
+										onPaste={(e) => handlePaste(i, e)}
+										onFocus={(e) => e.target.select()}
+										aria-label={`Digit ${i + 1}`}
+										className={cn(
+											"h-12 w-full rounded-md border border-line bg-sand text-center font-mono text-lg font-semibold text-ink outline-none transition-colors",
+											"focus:border-orange focus:bg-paper focus:ring-2 focus:ring-orange/25",
+											digits[i] &&
+												"border-orange/50 bg-orange/10 text-orange"
+										)}
+									/>
+								))}
+							</div>
+
+							<p className="mt-3 text-[11px] leading-5 text-ink-soft">
+								Codes refresh every 30 seconds. If the code is rejected, wait for the
+								next cycle and try again.
+							</p>
+						</div>
 
 						<div className="mt-6 flex items-center justify-between gap-3 border-t border-line pt-5">
 							<Button

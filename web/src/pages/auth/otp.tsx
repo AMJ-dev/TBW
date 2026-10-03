@@ -64,7 +64,6 @@ export default function OtpPage() {
 		} else if (countdown === 0 && !canResend) setCanResend(true);
 	}, [countdown, canResend, mounted]);
 
-	// Auto-focus the first box on mount.
 	useEffect(() => {
 		if (!mounted) return;
 		const t = setTimeout(() => inputsRef.current[0]?.focus(), 50);
@@ -110,11 +109,10 @@ export default function OtpPage() {
 		if (!raw) return;
 
 		const next = digits.split("");
-		// If user pastes multiple digits into one box, spread them.
 		if (raw.length > 1) {
 			const spread = raw.slice(0, 6 - index).split("");
 			spread.forEach((d, i) => {
-				next[index + i] = d;
+				if (index + i < 6) next[index + i] = d;
 			});
 			const joined = next.join("").slice(0, 6);
 			setCode(joined);
@@ -123,7 +121,8 @@ export default function OtpPage() {
 			return;
 		}
 
-		next[index] = raw[0];
+		const first = raw.charAt(0);
+		if (first) next[index] = first;
 		const joined = next.join("").slice(0, 6);
 		setCode(joined);
 		if (index < 5) inputsRef.current[index + 1]?.focus();
@@ -134,11 +133,9 @@ export default function OtpPage() {
 			e.preventDefault();
 			const next = digits.split("");
 			if (next[index]) {
-				// Clear current box
 				next[index] = "";
 				setCode(next.join(""));
 			} else if (index > 0) {
-				// Move back and clear previous
 				next[index - 1] = "";
 				setCode(next.join(""));
 				inputsRef.current[index - 1]?.focus();
@@ -161,10 +158,7 @@ export default function OtpPage() {
 		}
 	};
 
-	const handlePaste = (
-		index: number,
-		e: ClipboardEvent<HTMLInputElement>
-	) => {
+	const handlePaste = (index: number, e: ClipboardEvent<HTMLInputElement>) => {
 		e.preventDefault();
 		const pasted = e.clipboardData
 			.getData("text")
@@ -295,8 +289,7 @@ export default function OtpPage() {
 									className={cn(
 										"h-12 w-full rounded-md border border-line bg-sand text-center font-mono text-lg font-semibold text-ink outline-none transition-colors",
 										"focus:border-orange focus:bg-paper focus:ring-2 focus:ring-orange/25",
-										digits[i] &&
-											"border-orange/50 bg-orange/10 text-orange"
+										digits[i] && "border-orange/50 bg-orange/10 text-orange"
 									)}
 								/>
 							))}
