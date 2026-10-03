@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, startTransition, type FormEvent } from "react";
+import { useState, useEffect, useContext, useRef, startTransition, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
 import { useNavigate } from "react-router-dom";
 import {
@@ -7,7 +7,6 @@ import {
 	KeyRound,
 	LifeBuoy,
 	Loader2,
-	Smartphone,
 } from "lucide-react";
 import { http, type Resp } from "@/lib/httpClient";
 import userContext from "@/lib/userContext";
@@ -34,6 +33,8 @@ export default function MfaChallenge() {
 	const [trustDevice, setTrustDevice] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 	const [mounted, setMounted] = useState(false);
+
+	const codeInputRef = useRef<HTMLInputElement | null>(null);
 
 	const digits =
 		mode === "verify"
@@ -67,6 +68,12 @@ export default function MfaChallenge() {
 		return () => clearTimeout(t);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [complete, mode, mounted]);
+
+	useEffect(() => {
+		if (mode !== "verify") return;
+		const t = setTimeout(() => codeInputRef.current?.focus(), 0);
+		return () => clearTimeout(t);
+	}, [mode]);
 
 	const formatDeviceInfo = () =>
 		`${deviceInfo.browser} on ${deviceInfo.os} (${deviceInfo.deviceType})`;
@@ -105,6 +112,7 @@ export default function MfaChallenge() {
 			if (resp.error) {
 				toast.error(resp.data || "Invalid code. Try again.");
 				setCode("");
+				codeInputRef.current?.focus();
 				return;
 			}
 
@@ -134,6 +142,7 @@ export default function MfaChallenge() {
 		} catch (error: any) {
 			toast.error(error?.response?.data?.message || "Verification failed. Try again.");
 			setCode("");
+			codeInputRef.current?.focus();
 		} finally {
 			setSubmitting(false);
 		}
@@ -174,11 +183,16 @@ export default function MfaChallenge() {
 
 				<form onSubmit={handleSubmit} className="p-6 sm:p-7">
 					{mode === "verify" ? (
-						<label className="block">
+						<div className="block">
 							<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 								One-time code
 							</span>
-							<div className="mt-3 grid grid-cols-6 gap-2">
+							<button
+								type="button"
+								onClick={() => codeInputRef.current?.focus()}
+								className="mt-3 grid w-full grid-cols-6 gap-2 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-orange/40"
+								aria-label="Enter the six-digit code"
+							>
 								{Array.from({ length: 6 }).map((_, i) => (
 									<div
 										key={i}
@@ -190,22 +204,23 @@ export default function MfaChallenge() {
 										{digits[i] ?? ""}
 									</div>
 								))}
-							</div>
-							<Input
+							</button>
+							<input
+								ref={codeInputRef}
 								autoFocus
 								inputMode="numeric"
 								autoComplete="one-time-code"
+								pattern="[0-9]*"
 								maxLength={6}
 								value={digits}
 								onChange={(e) => setCode(e.target.value)}
-								placeholder=""
 								aria-label="One-time code"
 								className="sr-only"
 							/>
 							<p className="mt-3 text-[11px] leading-5 text-ink-soft">
 								The code refreshes every 30 seconds. If it expires, wait for the next one.
 							</p>
-						</label>
+						</div>
 					) : (
 						<label className="block">
 							<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">

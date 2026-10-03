@@ -219,6 +219,8 @@ export default function Routers() {
 						<Route path="/reports/compliance" element={<ReportsCompliancePage />} />
 						
 						<Route path="/organisation-resubmit" element={<OrganisationResubmitPage />} />
+						<Route path="/organisation/review" element={<OrganisationResubmitPage />} />
+						
 					</Route>
 
 					<Route path="/401" element={<Unauthorized />} />

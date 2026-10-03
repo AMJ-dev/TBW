@@ -220,6 +220,17 @@
             $user = $get_user->fetch(PDO::FETCH_OBJ);
             if(!isset($user->middle_name) || empty($user->middle_name)) $user->middle_name="";
             unset($user->passord);
+            $get_org = $conn->prepare("SELECT * FROM organisations WHERE id=:organisation_id");
+            $get_org->execute([":organisation_id"=>$user->organisation_id]);
+            if($get_org->rowCount()>0) {
+                $organisation->organisation = $get_org->fetch(PDO::FETCH_OBJ);
+                unset($organisation->verified_by);
+                unset($organisation->verified_at);
+                unset($organisation->rejection_reason);
+                unset($organisation->created_at);
+                unset($organisation->updated_at);
+                $user->organisation = $organisation;
+            }
         }
         return $user;
     }

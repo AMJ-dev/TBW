@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
 import { useNavigate } from "react-router-dom";
 import { QRCodeSVG } from "qrcode.react";
@@ -15,7 +15,6 @@ import {
 import { http, type Resp } from "@/lib/httpClient";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 type Step = "loading" | "scan" | "verify" | "recovery" | "error";
@@ -29,6 +28,7 @@ export default function MfaSetup() {
 	const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
 	const [submitting, setSubmitting] = useState(false);
 	const [loadError, setLoadError] = useState("");
+	const codeInputRef = useRef<HTMLInputElement | null>(null);
 
 	const digits = code.replace(/\D/g, "").slice(0, 6);
 	const complete = digits.length === 6;
@@ -61,6 +61,13 @@ export default function MfaSetup() {
 		};
 	}, []);
 
+	useEffect(() => {
+		if (step === "verify") {
+			const t = setTimeout(() => codeInputRef.current?.focus(), 0);
+			return () => clearTimeout(t);
+		}
+	}, [step]);
+
 	const handleVerify = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
 		if (!complete || submitting) return;
@@ -71,6 +78,7 @@ export default function MfaSetup() {
 			if (resp.error) {
 				toast.error(resp.data || "That code didn't match. Try again.");
 				setCode("");
+				codeInputRef.current?.focus();
 				return;
 			}
 			setRecoveryCodes(resp.code.recovery_codes);
@@ -81,6 +89,7 @@ export default function MfaSetup() {
 				error?.response?.data?.message || "Could not verify the code. Try again."
 			);
 			setCode("");
+			codeInputRef.current?.focus();
 		} finally {
 			setSubmitting(false);
 		}
@@ -283,21 +292,50 @@ export default function MfaSetup() {
 							Enter the six-digit code from your authenticator app to confirm setup.
 						</p>
 
-						<label className="mt-5 block">
+						<div className="mt-5 block">
 							<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 								Verification code
 							</span>
-							<Input
+
+							<button
+								type="button"
+								onClick={() => codeInputRef.current?.focus()}
+								className="mt-3 grid w-full grid-cols-6 gap-2 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-orange/40"
+								aria-label="Enter the six-digit code"
+							>
+								{Array.from({ length: 6 }).map((_, i) => (
+									<div
+										key={i}
+										className={cn(
+											"grid h-12 place-items-center rounded-md border border-line bg-sand font-mono text-lg font-semibold text-ink transition-colors",
+											digits[i]
+												? "border-orange/50 bg-orange/10 text-orange"
+												: ""
+										)}
+									>
+										{digits[i] ?? ""}
+									</div>
+								))}
+							</button>
+
+							<input
+								ref={codeInputRef}
 								autoFocus
 								inputMode="numeric"
-								maxLength={6}
 								autoComplete="one-time-code"
-								placeholder="000000"
+								pattern="[0-9]*"
+								maxLength={6}
 								value={digits}
 								onChange={(e) => setCode(e.target.value)}
-								className="mt-2 h-12 border-line bg-sand text-center font-mono text-lg tracking-[0.4em] text-ink"
+								aria-label="Verification code"
+								className="sr-only"
 							/>
-						</label>
+
+							<p className="mt-3 text-[11px] leading-5 text-ink-soft">
+								Codes refresh every 30 seconds. If the code is rejected, wait for the
+								next cycle and try again.
+							</p>
+						</div>
 
 						<div className="mt-6 flex items-center justify-between gap-3 border-t border-line pt-5">
 							<Button

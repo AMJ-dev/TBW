@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, startTransition, type FormEvent } from "react";
+import { useState, useEffect, useContext, useRef, startTransition, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
 import { useNavigate } from "react-router-dom";
 import {
@@ -31,6 +31,7 @@ export default function OtpPage() {
 	const [countdown, setCountdown] = useState<number>(120)
 	const [canResend, setCanResend] = useState<boolean>(false)
 	const [sending, setSending] = useState<boolean>(false)
+	const codeInputRef = useRef<HTMLInputElement | null>(null);
 	const digits = code.replace(/\D/g, "").slice(0, 6);
 	const complete = digits.length === 6;
 
@@ -153,13 +154,20 @@ export default function OtpPage() {
 						<span className="font-mono text-ink">{email}</span>
 					</p>
 				</div>
-				
+
 				<form onSubmit={handleSubmit} className="p-6 sm:p-7">
-					<label className="block">
+					<div className="block">
 						<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 							One-time code
 						</span>
-						<div className="mt-3 grid grid-cols-6 gap-2">
+
+						{/* Clickable six-box grid that focuses the hidden input */}
+						<button
+							type="button"
+							onClick={() => codeInputRef.current?.focus()}
+							className="mt-3 grid w-full grid-cols-6 gap-2 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-orange/40"
+							aria-label="Enter the six-digit code"
+						>
 							{Array.from({ length: 6 }).map((_, i) => (
 								<div
 									key={i}
@@ -171,19 +179,22 @@ export default function OtpPage() {
 									{digits[i] ?? ""}
 								</div>
 							))}
-						</div>
-						<Input
+						</button>
+
+						{/* Hidden but real input for paste, autofill, and mobile keyboards */}
+						<input
+							ref={codeInputRef}
 							autoFocus
 							inputMode="numeric"
 							autoComplete="one-time-code"
+							pattern="[0-9]*"
 							maxLength={6}
 							value={digits}
 							onChange={(e) => setCode(e.target.value)}
-							placeholder=""
 							aria-label="One-time code"
 							className="sr-only"
 						/>
-					</label>
+					</div>
 
 					<label className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl bg-sand p-4 ring-1 ring-line">
 						<input

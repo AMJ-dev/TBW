@@ -1,7 +1,6 @@
 <?php
 
     use Firebase\JWT\JWT;
-
     require_once dirname(__DIR__, 2) . "/include/set-header.php";
 
     $email = strtolower(trim($_POST["email"] ?? ""));
@@ -18,7 +17,6 @@
             "data" => "Email and verification code are required.",
             "code" => []
         ]);
-
         exit;
     }
 
@@ -28,7 +26,6 @@
             "data" => "Invalid email address.",
             "code" => []
         ]);
-
         exit;
     }
 
@@ -38,11 +35,11 @@
             "data" => "Enter a valid 6-digit verification code.",
             "code" => []
         ]);
-
         exit;
     }
 
     try {
+
         $conn->beginTransaction();
 
         $stmt = $conn->prepare("
@@ -76,21 +73,80 @@
                 "data" => "Invalid verification request.",
                 "code" => []
             ]);
-
             exit;
         }
 
         $user_id = $user["id"];
 
-        if (!in_array($user["account_status"], ["active", "rejected"], true)) {
+        $organisation = null;
+
+        if (
+            $user["account_type"] === "organisation" &&
+            !empty($user["organisation_id"])
+        ) {
+            $stmt = $conn->prepare("
+                SELECT
+                    id,
+                    organisation_name,
+                    organisation_type,
+                    verification_status,
+                    rejection_reason,
+                    verified_by,
+                    verified_at
+                FROM organisations
+                WHERE id = :id
+                LIMIT 1
+            ");
+
+            $stmt->execute([
+                ":id" => $user["organisation_id"]
+            ]);
+
+            $organisation = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$organisation) {
+                $conn->rollBack();
+
+                echo json_encode([
+                    "error" => true,
+                    "data" => "Organisation associated with this account was not found.",
+                    "code" => []
+                ]);
+                exit;
+            }
+        }
+
+        $can_login = false;
+
+        if (
+            $user["account_status"] === "active" &&
+            $organisation &&
+            $organisation["verification_status"] === "verified"
+        ) {
+            $can_login = true;
+        }
+
+        if (
+            $user["account_type"] === "organisation" &&
+            $user["account_status"] === "pending_approval" &&
+            $organisation &&
+            $organisation["verification_status"] === "rejected"
+        ) {
+            $can_login = true;
+        }
+
+        if (!$can_login) {
             $conn->rollBack();
 
             echo json_encode([
                 "error" => true,
-                "data" => "Your account is not currently active.",
-                "code" => []
+                "data" => "Your account is not currently eligible to sign in.",
+                "code" => [
+                    "status" => $user["account_status"],
+                    "organisation_status" => $organisation["verification_status"] ?? null,
+                    "organisation_rejection_reason" => $organisation["rejection_reason"] ?? null
+                ]
             ]);
-
             exit;
         }
 
@@ -102,7 +158,6 @@
                 "data" => "Your email address has not been verified.",
                 "code" => []
             ]);
-
             exit;
         }
 
@@ -138,11 +193,11 @@
                 "data" => "Verification code not found. Please request a new code.",
                 "code" => []
             ]);
-
             exit;
         }
 
         if (strtotime($otp_record["expires_at"]) <= time()) {
+
             $stmt = $conn->prepare("
                 UPDATE otp_codes
                 SET revoked_at = NOW()
@@ -160,11 +215,11 @@
                 "data" => "This verification code has expired. Please request a new code.",
                 "code" => []
             ]);
-
             exit;
         }
 
         if ((int)$otp_record["attempts"] >= (int)$otp_record["max_attempts"]) {
+
             $stmt = $conn->prepare("
                 UPDATE otp_codes
                 SET revoked_at = NOW()
@@ -182,14 +237,15 @@
                 "data" => "Too many verification attempts. Please request a new code.",
                 "code" => []
             ]);
-
             exit;
         }
 
         if (!password_verify($otp, $otp_record["otp_hash"])) {
+
             $attempts = (int)$otp_record["attempts"] + 1;
 
             if ($attempts >= (int)$otp_record["max_attempts"]) {
+
                 $stmt = $conn->prepare("
                     UPDATE otp_codes
                     SET
@@ -202,7 +258,9 @@
                     ":attempts" => $attempts,
                     ":id" => $otp_record["id"]
                 ]);
+
             } else {
+
                 $stmt = $conn->prepare("
                     UPDATE otp_codes
                     SET attempts = :attempts
@@ -274,45 +332,6 @@
         $stmt->execute([
             ":id" => $otp_record["id"]
         ]);
-
-        $organisation = null;
-
-        if (
-            $user["account_type"] === "organisation" &&
-            !empty($user["organisation_id"])
-        ) {
-            $stmt = $conn->prepare("
-                SELECT
-                    id,
-                    organisation_name,
-                    organisation_type,
-                    verification_status,
-                    rejection_reason,
-                    verified_by,
-                    verified_at
-                FROM organisations
-                WHERE id = :id
-                LIMIT 1
-            ");
-
-            $stmt->execute([
-                ":id" => $user["organisation_id"]
-            ]);
-
-            $organisation = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$organisation) {
-                $conn->rollBack();
-
-                echo json_encode([
-                    "error" => true,
-                    "data" => "Organisation associated with this account was not found.",
-                    "code" => []
-                ]);
-
-                exit;
-            }
-        }
 
         $session_id = generateId();
 
@@ -415,6 +434,7 @@
         $role = null;
 
         if ($user["account_type"] === "system") {
+
             if (empty($user["system_role_id"])) {
                 $conn->rollBack();
 
@@ -423,7 +443,6 @@
                     "data" => "Your system account does not have an assigned role.",
                     "code" => []
                 ]);
-
                 exit;
             }
 
@@ -447,6 +466,7 @@
             $role = $stmt->fetch(PDO::FETCH_ASSOC);
 
         } else {
+
             $stmt = $conn->prepare("
                 SELECT
                     r.id,
@@ -477,7 +497,9 @@
                 LIMIT 1
             ");
 
-            $stmt->execute([":user_id" => $user_id]);
+            $stmt->execute([
+                ":user_id" => $user_id
+            ]);
 
             $role = $stmt->fetch(PDO::FETCH_ASSOC);
         }
@@ -490,7 +512,6 @@
                 "data" => "Your account does not have an active role.",
                 "code" => []
             ]);
-
             exit;
         }
 
@@ -521,6 +542,7 @@
         $privileges = [];
 
         foreach ($permission_rows as $permission) {
+
             $permissions[] = $permission["permission_key"];
 
             if (!in_array($permission["module"], $privileges, true)) {
@@ -533,7 +555,7 @@
             $organisation &&
             $organisation["verification_status"] === "rejected"
         ) {
-            $route = "/organisation/review";
+            $route = "/organisation-resubmit";
         } else {
             $route = $route_map[$role_key] ?? "/portal";
         }
@@ -602,7 +624,7 @@
         echo json_encode([
             "error" => true,
             "data" => "An error occurred while verifying your code.",
-            "code" => []
+            "code" => $e->getMessage()
         ]);
 
         exit;
