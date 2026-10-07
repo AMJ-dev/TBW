@@ -9,7 +9,7 @@
                 "error" => true,
                 "data" => "Your system account does not have an assigned role.",
                 "code" => []
-            ]);
+            ]); 
             exit;
         }
 

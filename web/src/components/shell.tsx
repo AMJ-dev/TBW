@@ -496,7 +496,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 									</div>
 								)
 							))
-						) : my_details?.account_status === "rejected" ? (
+						) : my_details?.account_type === "organisation" && my_details?.organisation_status === "rejected" ? (
 							<RejectedPanel />
 						) : (
 							<PendingPanel />

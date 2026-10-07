@@ -80,47 +80,41 @@
 
         $organisation = null;
 
-        if (
-            $user["account_type"] === "organisation" &&
-            !empty($user["organisation_id"])
-        ) {
-            $stmt = $conn->prepare("
-                SELECT
-                    id,
-                    organisation_name,
-                    organisation_type,
-                    verification_status,
-                    rejection_reason,
-                    verified_by,
-                    verified_at
-                FROM organisations
-                WHERE id = :id
-                LIMIT 1
-            ");
+        $stmt = $conn->prepare("
+            SELECT
+                id,
+                organisation_name,
+                organisation_type,
+                verification_status,
+                rejection_reason,
+                verified_by,
+                verified_at
+            FROM organisations
+            WHERE id = :id
+            LIMIT 1
+        ");
 
-            $stmt->execute([
-                ":id" => $user["organisation_id"]
+        $stmt->execute([
+            ":id" => $user["organisation_id"]
+        ]);
+
+        $organisation = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$organisation) {
+            $conn->rollBack();
+
+            echo json_encode([
+                "error" => true,
+                "data" => "Organisation associated with this account was not found.",
+                "code" => []
             ]);
-
-            $organisation = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$organisation) {
-                $conn->rollBack();
-
-                echo json_encode([
-                    "error" => true,
-                    "data" => "Organisation associated with this account was not found.",
-                    "code" => []
-                ]);
-                exit;
-            }
+            exit;
         }
 
         $can_login = false;
 
         if (
             $user["account_status"] === "active" &&
-            $organisation &&
             $organisation["verification_status"] === "verified"
         ) {
             $can_login = true;
@@ -129,7 +123,6 @@
         if (
             $user["account_type"] === "organisation" &&
             $user["account_status"] === "pending_approval" &&
-            $organisation &&
             $organisation["verification_status"] === "rejected"
         ) {
             $can_login = true;

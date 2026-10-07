@@ -23,6 +23,13 @@
     $sender_email = "sender@evcarsng.com";
     $info_email = "info@evcarsng.com";
     
+    $email_host="smtp.resend.com";
+    $email_port=465; 
+    $email_user="resend";
+    $email_password="re_15ygCfu5_GyRnref9Gw6WaGAY5WwfbPBx";
+    $sender_email = "info@lovebite.online";
+    $info_email = "sender@lovebite.online";
+    
     $admin_email = "admin@trinubondedwarehouse.com";
 
     $mfa_key = "8227adcc2200e3bb07c8eb44db8eaf3de06bf261662c889a3a0f2a01963a681b";

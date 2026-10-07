@@ -462,22 +462,6 @@ try {
         ":organisation_id" => $organisation_id
     ]);
 
-    $updateRegistrationRequest = $conn->prepare("
-        UPDATE registration_requests
-        SET
-            organisation_name = :organisation_name,
-            rc_number = :rc_number,
-            tin = :tin
-        WHERE id = :registration_request_id
-    ");
-
-    $updateRegistrationRequest->execute([
-        ":organisation_name" => $name,
-        ":rc_number" => $rc_number,
-        ":tin" => $tin,
-        ":registration_request_id" => $registrationRequest["id"]
-    ]);
-
     $uploadedDocuments = [];
 
     foreach ($uploadedDocumentIds as $documentId) {
@@ -648,7 +632,7 @@ try {
     echo json_encode([
         "error" => true,
         "data" => "Unable to submit registration.",
-        "code" => null
+        "code" => $e->getMessage()
     ]);
 
 } catch (Throwable $e) {
@@ -668,6 +652,6 @@ try {
     echo json_encode([
         "error" => true,
         "data" => "Unable to submit registration.",
-        "code" => null
+        "code" => $e->getMessage()
     ]);
 }

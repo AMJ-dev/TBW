@@ -60,7 +60,8 @@ export default function UserProvider({ children }: PropsWithChildren) {
             phone: data.user.phone,
             full_name: data.user.full_name,
             account_type: data.user.account_type,
-            account_status: data.user.account_status
+            account_status: data.user.account_status,
+            organisation_status: data.organisation?.verification_status
         };
 
         const userRole: UserRole = {
@@ -218,7 +219,6 @@ export default function UserProvider({ children }: PropsWithChildren) {
         setPrivileges(data.privileges || []);
         setPermissions(data.permissions || []);
         setAuth(true);
-
         await fetchUser();
     }, [fetchUser]);
 

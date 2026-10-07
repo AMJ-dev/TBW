@@ -14,7 +14,8 @@ export interface User {
     phone?: string;
     pics?: string;
     account_type?: "system" | "organisation";
-    account_status?: "active" | "rejected";
+    account_status?: "active" | "rejected" | "pending_approval";
+    organisation_status?: string
 }
 
 export interface LoginData {

@@ -14,7 +14,15 @@
         $my_details = get_user($decoded->id); 
         if(empty($my_details) || $my_details==false) invalid_token();
         if($my_details->account_status=="suspended") account_suspended();
-        if(!in_array($my_details->account_status, ['active', 'rejected'])) invalid_token();
+        if(!in_array($my_details->account_status, ['active', 'pending_approval'])) {
+            if(
+                $my_details->account_status == 'pending_approval' && 
+                $my_details->account_type == 'organisation' && 
+                $my_details->organisation->verification_status != 'rejected'
+            ) {
+                invalid_token();
+            }
+        }
 
         $chk_session =$conn->prepare("SELECT expires_at FROM `sessions` WHERE user_id = :user_id AND id = :session_id");
         $chk_session->execute([":user_id" => $decoded->id, ":session_id" => $decoded->session_id]);
