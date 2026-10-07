@@ -63,6 +63,7 @@
             WHERE id = :id
             LIMIT 1
         ");
+
         $stmt->execute([
             ":id" => $roleId
         ]);
@@ -115,6 +116,7 @@
                 WHERE id = :id
                 LIMIT 1
             ");
+
             $stmt->execute([
                 ":id" => $organisationId
             ]);
@@ -137,18 +139,43 @@
         $stmt = $conn->prepare("
             SELECT
                 id,
+                email,
+                phone,
                 account_status,
                 account_type,
                 organisation_id
             FROM users
             WHERE email = :email
-            LIMIT 1
+               OR phone = :phone
+            LIMIT 2
         ");
+
         $stmt->execute([
-            ":email" => $email
+            ":email" => $email,
+            ":phone" => $phone
         ]);
 
-        $existingUser = $stmt->fetch(PDO::FETCH_ASSOC);
+        $existingUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $existingUser = null;
+
+        foreach ($existingUsers as $user) {
+            if (strcasecmp(trim($user["email"]), $email) === 0) {
+                $existingUser = $user;
+            }
+
+            if (
+                trim((string)$user["phone"]) === $phone &&
+                (!$existingUser || (string)$existingUser["id"] !== (string)$user["id"])
+            ) {
+                $conn->rollBack();
+                echo json_encode([
+                    "error" => true,
+                    "data" => "A user with this phone number already exists",
+                    "code" => null
+                ]);
+                exit;
+            }
+        }
 
         if ($existingUser) {
             if ($existingUser["account_status"] === "pending_approval") {
@@ -162,14 +189,13 @@
                     ORDER BY created_at DESC
                     LIMIT 1
                 ");
+
                 $stmt->execute([
                     ":user_id" => $existingUser["id"]
                 ]);
 
                 if ($stmt->fetch(PDO::FETCH_ASSOC)) {
                     $conn->rollBack();
-
-                    http_response_code(409);
                     echo json_encode([
                         "error" => true,
                         "data" => "An active invitation already exists for this email address",
@@ -179,8 +205,6 @@
                 }
             } else {
                 $conn->rollBack();
-
-                http_response_code(409);
                 echo json_encode([
                     "error" => true,
                     "data" => "A user with this email address already exists",
@@ -260,6 +284,7 @@
                 AND user_id = :user_id
                 LIMIT 1
             ");
+
             $stmt->execute([
                 ":organisation_id" => $organisationId,
                 ":user_id" => $userId
@@ -366,38 +391,17 @@
         $message = "
             <div style='font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;color:#333;'>
                 <h2 style='color:#2258BF;'>TRINŪ</h2>
-
                 <p>Hello " . htmlspecialchars($fullName, ENT_QUOTES, "UTF-8") . ",</p>
-
-                <p>
-                    You have been invited to join the TRINŪ Bonded Terminal Digital Platform.
-                </p>
-
-                <p>
-                    Your account has been prepared with the role
-                    <strong>" . htmlspecialchars($role["role_name"], ENT_QUOTES, "UTF-8") . "</strong>.
-                </p>
-
+                <p>You have been invited to join the TRINŪ Bonded Terminal Digital Platform.</p>
+                <p>Your account has been prepared with the role <strong>" . htmlspecialchars($role["role_name"], ENT_QUOTES, "UTF-8") . "</strong>.</p>
                 <div style='text-align:center;margin:30px 0;'>
-                    <a
-                        href='" . htmlspecialchars($invitationURL, ENT_QUOTES, "UTF-8") . "'
-                        style='display:inline-block;background:#2258BF;color:#fff;text-decoration:none;padding:14px 24px;border-radius:7px;'
-                    >
+                    <a href='" . htmlspecialchars($invitationURL, ENT_QUOTES, "UTF-8") . "' style='display:inline-block;background:#2258BF;color:#fff;text-decoration:none;padding:14px 24px;border-radius:7px;'>
                         Accept Invitation
                     </a>
                 </div>
-
-                <p>
-                    This invitation expires in 72 hours.
-                </p>
-
-                <p>
-                    If you were not expecting this invitation, you can safely ignore this email.
-                </p>
-
-                <p style='color:#777;font-size:12px;'>
-                    TRINŪ Bonded Terminal Digital Platform
-                </p>
+                <p>This invitation expires in 72 hours.</p>
+                <p>If you were not expecting this invitation, you can safely ignore this email.</p>
+                <p style='color:#777;font-size:12px;'>TRINŪ Bonded Terminal Digital Platform</p>
             </div>
         ";
 
@@ -410,8 +414,6 @@
 
         if (!$sent) {
             $conn->rollBack();
-
-            http_response_code(500);
             echo json_encode([
                 "error" => true,
                 "data" => "Unable to send invitation email. Please try again.",
@@ -438,11 +440,10 @@
             $conn->rollBack();
         }
 
-        http_response_code(500);
-
         echo json_encode([
             "error" => true,
             "data" => $e->getMessage(),
             "code" => null
         ]);
     }
+?>
