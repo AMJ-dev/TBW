@@ -198,7 +198,7 @@
         $sent = send_sms(
             $invite["phone"],
             "Your TRÏNŪ verification code is {$otp}. It expires in 10 minutes."
-        );
+        ); 
 
         if ($sent === false) {
             $conn->rollBack();

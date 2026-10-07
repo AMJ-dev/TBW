@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
 	AlertTriangle,
 	ArrowRight,
@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
+import { client_url } from "@/lib/constants";
 
 interface InviteContext {
 	email: string;
@@ -56,10 +57,8 @@ const formatDate = (input?: string) => {
 };
 
 export default function AcceptInvitePage() {
-	const [params] = useSearchParams();
+	const {token} = useParams();
 	const navigate = useNavigate();
-
-	const token = params.get("token") ?? "";
 
 	const [step, setStep] = useState<Step>("loading");
 	const [ctx, setCtx] = useState<InviteContext | null>(null);
@@ -404,7 +403,7 @@ export default function AcceptInvitePage() {
 						to="/"
 						className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft hover:text-orange"
 					>
-						← Back to trinu.ng
+						← Back to {client_url}
 					</Link>
 
 					<p className="mt-6 font-mono text-[10px] uppercase tracking-[0.2em] text-orange-deep">

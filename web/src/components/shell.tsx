@@ -43,6 +43,7 @@ import { cn } from "@/lib/utils";
 import UserContext from "@/lib/userContext";
 import { cargoRecords, notifications } from "@/data/mock";
 import { resolveSrc } from "@/lib/functions";
+import { client_url } from "@/lib/constants";
 
 export function TrinuMark({ compact = false }: { compact?: boolean }) {
 	return (
@@ -319,7 +320,7 @@ function RejectedPanel() {
 				</p>
 			</div>
 			<a
-				href="mailto:operations@trinu.ng"
+				href={`mailto:operations@${client_url}`}
 				className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-orange-deep hover:underline"
 			>
 				Contact operations <ArrowRight className="size-3.5" />
@@ -352,7 +353,7 @@ function PendingPanel() {
 				</p>
 			</div>
 			<a
-				href="mailto:operations@trinu.ng"
+				href={`mailto:operations@${client_url}`}
 				className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-orange-deep hover:underline"
 			>
 				Contact operations <ArrowRight className="size-3.5" />

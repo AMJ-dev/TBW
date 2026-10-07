@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PublicFrame, PublicKicker, PublicStatus } from "@/components/public/public-shell";
+import { client_url } from "@/lib/constants";
 
 type VerifiedDocument = {
 	type: string;
@@ -389,10 +390,10 @@ export default function VerifyPage() {
 											Need to report an unverified or disputed document? Contact
 											our terminal legal and compliance desk at{" "}
 											<a
-												href="mailto:compliance@trinu.ng"
+												href={`mailto:compliance@${client_url}`}
 												className="font-semibold text-orange hover:text-orange-deep"
 											>
-												compliance@trinu.ng
+												compliance@{client_url}
 											</a>
 											.
 										</p>

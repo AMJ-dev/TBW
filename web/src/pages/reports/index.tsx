@@ -25,6 +25,7 @@ import { Link } from "@/components/router-link";
 import { AppShell, StatusBadge, statusTone, Metric } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { client_url } from "@/lib/constants";
 
 interface ScheduledReport {
 	id: string;
@@ -44,7 +45,7 @@ const initialScheduledReports: ScheduledReport[] = [
 		category: "Operations",
 		frequency: "Daily (06:00 WAT)",
 		format: "CSV / Excel",
-		recipients: "ops-management@trinu.ng",
+		recipients: `ops-management@${client_url}`,
 		lastGenerated: "Today 06:00",
 		status: "Active",
 	},
@@ -54,7 +55,7 @@ const initialScheduledReports: ScheduledReport[] = [
 		category: "Compliance",
 		frequency: "Weekly (Monday)",
 		format: "PDF Dossier",
-		recipients: "compliance-liaison@trinu.ng",
+		recipients: `ops-management@${client_url}`,
 		lastGenerated: "22 Sep 2026",
 		status: "Active",
 	},
@@ -64,7 +65,7 @@ const initialScheduledReports: ScheduledReport[] = [
 		category: "Finance",
 		frequency: "Daily (06:00 WAT)",
 		format: "CSV / Excel",
-		recipients: "treasury@trinu.ng",
+		recipients: `treasury@${client_url}`,
 		lastGenerated: "Today 06:00",
 		status: "Active",
 	},
@@ -74,7 +75,7 @@ const initialScheduledReports: ScheduledReport[] = [
 		category: "Operations",
 		frequency: "Daily (06:00 WAT)",
 		format: "CSV / Excel",
-		recipients: "gate-ops@trinu.ng",
+		recipients: `gate-ops@${client_url}`,
 		lastGenerated: "Today 06:00",
 		status: "Active",
 	},
@@ -84,7 +85,7 @@ const initialScheduledReports: ScheduledReport[] = [
 		category: "Finance",
 		frequency: "Monthly (1st of Month)",
 		format: "PDF Dossier",
-		recipients: "cfo@trinu.ng, audit@trinu.ng",
+		recipients: `cfo@${client_url}, audit@${client_url}`,
 		lastGenerated: "01 Sep 2026",
 		status: "Active",
 	},
@@ -94,7 +95,7 @@ const initialScheduledReports: ScheduledReport[] = [
 		category: "Audit",
 		frequency: "Weekly (Monday)",
 		format: "CSV / Excel",
-		recipients: "compliance@trinu.ng",
+		recipients: `compliance@${client_url}`,
 		lastGenerated: "22 Sep 2026",
 		status: "Paused",
 	},
@@ -473,7 +474,7 @@ export default function ReportsIndexRoute() {
 								<label className="font-semibold text-ink-soft">Recipient Email Addresses</label>
 								<Input
 									required
-									placeholder="e.g. ops@trinu.ng, treasury@trinu.ng"
+									placeholder={`e.g. ops@${client_url}, treasury@${client_url}`}
 									value={formRecipients}
 									onChange={(e) => setFormRecipients(e.target.value)}
 									className="mt-1 border-line bg-sand font-mono text-xs text-ink"
