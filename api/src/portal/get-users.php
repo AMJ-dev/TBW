@@ -18,27 +18,34 @@
             SELECT
                 u.id,
                 om.id AS membership_id,
+                u.organisation_id,
+                u.account_type,
                 u.full_name,
                 u.email,
                 u.phone,
-                u.account_status,
-                u.last_login_at,
-                u.mfa_enabled,
-                u.two_factor_enabled,
                 u.pics,
+                u.email_verified_at,
+                u.phone_verified_at,
+                u.mfa_enabled,
+                u.last_login_at,
+                u.account_status,
                 u.created_at,
                 u.updated_at,
+                om.role_id,
+                om.job_title,
                 om.membership_status,
-                om.created_at AS membership_created_at,
+                om.invited_by,
                 om.joined_at,
-                r.id AS role_id,
+                om.created_at AS membership_created_at,
                 r.role_key,
                 r.role_name,
-                r.name AS role,
+                r.scope,
                 r.description AS role_description
             FROM organisation_members om
-            INNER JOIN users u ON u.id = om.user_id
-            LEFT JOIN roles r ON r.id = om.role_id
+            INNER JOIN users u
+                ON u.id = om.user_id
+            INNER JOIN roles r
+                ON r.id = om.role_id
             WHERE om.organisation_id = :organisation_id
             ORDER BY om.created_at DESC
         ");
@@ -54,32 +61,24 @@
         $mfaEnabled = 0;
 
         foreach ($users as &$user) {
-            if (($user["membership_status"] ?? "") === "removed") {
-                $user["account_status"] = "removed";
-            }
-
-            if (($user["account_status"] ?? "") === "active" && ($user["membership_status"] ?? "") !== "removed") {
+            if ($user["membership_status"] === "active") {
                 $active++;
             }
 
-            if (
-                in_array(
-                    strtolower((string)($user["account_status"] ?? "")),
-                    ["pending", "pending_approval", "invited"]
-                ) &&
-                ($user["membership_status"] ?? "") !== "removed"
-            ) {
+            if ($user["membership_status"] === "pending") {
                 $invited++;
             }
 
             if (
-                !empty($user["mfa_enabled"]) ||
-                !empty($user["two_factor_enabled"])
+                (int)$user["mfa_enabled"] === 1 &&
+                $user["membership_status"] === "active"
             ) {
-                if (($user["account_status"] ?? "") === "active" && ($user["membership_status"] ?? "") !== "removed") {
-                    $mfaEnabled++;
-                }
+                $mfaEnabled++;
             }
+
+            $user["role"] = $user["role_name"];
+            $user["role_in_org"] = $user["role_name"];
+            $user["two_factor_enabled"] = (bool)$user["mfa_enabled"];
         }
 
         unset($user);
@@ -89,6 +88,7 @@
             "data" => "Users loaded successfully",
             "code" => [
                 "results" => $users,
+                "users" => $users,
                 "metrics" => [
                     "total" => count($users),
                     "active" => $active,

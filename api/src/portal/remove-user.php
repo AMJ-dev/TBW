@@ -4,9 +4,10 @@
     $userId = trim($_POST["user_id"] ?? "");
     $membershipId = trim($_POST["membership_id"] ?? "");
     $organisationId = trim((string)($my_details->organisation_id ?? ""));
+    $currentUserId = trim((string)($my_details->id ?? ""));
 
     if ($userId === "" || $membershipId === "") {
-        http_response_code(422);
+        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "User ID and membership ID are required",
@@ -15,26 +16,39 @@
         exit;
     }
 
-    if ($organisationId === "") {
+    if ($organisationId === "" || $currentUserId === "") {
         http_response_code(403);
         echo json_encode([
             "error" => true,
-            "data" => "Organisation not found",
+            "data" => "Organisation information is not available",
+            "code" => null
+        ]);
+        exit;
+    }
+
+    if ($userId === $currentUserId) {
+        http_response_code(400);
+        echo json_encode([
+            "error" => true,
+            "data" => "You cannot remove yourself",
             "code" => null
         ]);
         exit;
     }
 
     try {
+        $conn->beginTransaction();
+
         $stmt = $conn->prepare("
             SELECT
                 om.id,
                 om.user_id,
-                om.role_id,
                 om.membership_status,
-                r.role_key
+                u.full_name,
+                u.email
             FROM organisation_members om
-            LEFT JOIN roles r ON r.id = om.role_id
+            INNER JOIN users u
+                ON u.id = om.user_id
             WHERE om.id = :membership_id
             AND om.user_id = :user_id
             AND om.organisation_id = :organisation_id
@@ -47,9 +61,11 @@
             ":organisation_id" => $organisationId
         ]);
 
-        $membership = $stmt->fetch(PDO::FETCH_ASSOC);
+        $member = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$membership) {
+        if (!$member) {
+            $conn->rollBack();
+
             http_response_code(404);
             echo json_encode([
                 "error" => true,
@@ -59,32 +75,23 @@
             exit;
         }
 
-        if ($membership["role_key"] === "organisation_owner") {
-            http_response_code(403);
+        if ($member["membership_status"] === "revoked") {
+            $conn->rollBack();
+
+            http_response_code(400);
             echo json_encode([
                 "error" => true,
-                "data" => "The organisation owner cannot be removed",
+                "data" => "This user has already been removed",
                 "code" => null
             ]);
             exit;
         }
-
-        if ($membership["membership_status"] === "removed") {
-            echo json_encode([
-                "error" => false,
-                "data" => "User has already been removed",
-                "code" => null
-            ]);
-            exit;
-        }
-
-        $conn->beginTransaction();
 
         $stmt = $conn->prepare("
             UPDATE organisation_members
             SET
-                membership_status = 'removed',
-                updated_at = NOW()
+                membership_status = 'revoked',
+                joined_at = NULL
             WHERE id = :membership_id
             AND user_id = :user_id
             AND organisation_id = :organisation_id
@@ -100,14 +107,12 @@
             UPDATE user_invitations
             SET revoked_at = NOW()
             WHERE user_id = :user_id
-            AND membership_id = :membership_id
             AND accepted_at IS NULL
             AND revoked_at IS NULL
         ");
 
         $stmt->execute([
-            ":user_id" => $userId,
-            ":membership_id" => $membershipId
+            ":user_id" => $userId
         ]);
 
         $conn->commit();

@@ -1,58 +1,39 @@
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
-
+    
     $fullName = trim($_POST["full_name"] ?? "");
     $email = strtolower(trim($_POST["email"] ?? ""));
     $phone = trim($_POST["phone"] ?? "");
     $roleId = trim($_POST["role_id"] ?? "");
+
+    if ($fullName === "" || $email === "" || $phone === "" || $roleId === "") {
+        http_response_code(400);
+        echo json_encode([
+            "error" => true,
+            "data" => "Full name, email, phone and role are required",
+            "code" => null
+        ]);
+        exit;
+    }
+
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        http_response_code(400);
+        echo json_encode([
+            "error" => true,
+            "data" => "Invalid email address",
+            "code" => null
+        ]);
+        exit;
+    }
+
     $organisationId = trim((string)($my_details->organisation_id ?? ""));
     $invitedBy = trim((string)($my_details->id ?? ""));
 
-    if ($fullName === "") {
-        http_response_code(422);
-        echo json_encode([
-            "error" => true,
-            "data" => "Full name is required",
-            "code" => null
-        ]);
-        exit;
-    }
-
-    if ($email === "" || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        http_response_code(422);
-        echo json_encode([
-            "error" => true,
-            "data" => "A valid email address is required",
-            "code" => null
-        ]);
-        exit;
-    }
-
-    if ($phone === "") {
-        http_response_code(422);
-        echo json_encode([
-            "error" => true,
-            "data" => "Phone number is required",
-            "code" => null
-        ]);
-        exit;
-    }
-
-    if ($roleId === "") {
-        http_response_code(422);
-        echo json_encode([
-            "error" => true,
-            "data" => "Role is required",
-            "code" => null
-        ]);
-        exit;
-    }
-
-    if ($organisationId === "") {
+    if ($organisationId === "" || $invitedBy === "") {
         http_response_code(403);
         echo json_encode([
             "error" => true,
-            "data" => "Organisation not found",
+            "data" => "Organisation information is not available",
             "code" => null
         ]);
         exit;
@@ -91,31 +72,13 @@
             exit;
         }
 
-        if ($role["scope"] !== "organisation") {
+        if ((int)$role["is_active"] !== 1 || $role["scope"] !== "organisation") {
             $conn->rollBack();
 
-            http_response_code(422);
+            http_response_code(400);
             echo json_encode([
                 "error" => true,
-                "data" => "Invalid organisation role",
-                "code" => null
-            ]);
-            exit;
-        }
-
-        if (
-            !(
-                $role["is_active"] == 1 ||
-                $role["is_active"] === "1" ||
-                $role["is_active"] === "active"
-            )
-        ) {
-            $conn->rollBack();
-
-            http_response_code(422);
-            echo json_encode([
-                "error" => true,
-                "data" => "This role is not active",
+                "data" => "Selected role is not available",
                 "code" => null
             ]);
             exit;
@@ -124,15 +87,16 @@
         $stmt = $conn->prepare("
             SELECT
                 id,
+                organisation_id,
+                account_type,
+                full_name,
                 email,
                 phone,
-                account_status,
-                account_type,
-                organisation_id
+                account_status
             FROM users
-            WHERE LOWER(email) = :email
+            WHERE email = :email
             OR phone = :phone
-            LIMIT 2
+            LIMIT 1
         ");
 
         $stmt->execute([
@@ -140,45 +104,72 @@
             ":phone" => $phone
         ]);
 
-        $existingUsers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        $existingUser = null;
+        $existingUser = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        foreach ($existingUsers as $user) {
-            if (
-                isset($user["email"]) &&
-                strcasecmp(trim((string)$user["email"]), $email) === 0
-            ) {
-                $existingUser = $user;
+        if ($existingUser) {
+            if (strcasecmp($existingUser["email"], $email) === 0) {
+                $matchedBy = "email";
+            } else {
+                $matchedBy = "phone";
             }
 
-            if (
-                trim((string)($user["phone"] ?? "")) === $phone &&
-                (
-                    !$existingUser ||
-                    (string)$existingUser["id"] !== (string)$user["id"]
-                )
-            ) {
+            if ($existingUser["organisation_id"] !== $organisationId) {
                 $conn->rollBack();
 
                 http_response_code(409);
                 echo json_encode([
                     "error" => true,
-                    "data" => "A user with this phone number already exists",
+                    "data" => "A user with this " . $matchedBy . " already exists",
                     "code" => null
                 ]);
                 exit;
             }
-        }
 
-        if ($existingUser) {
-            $existingUserId = $existingUser["id"];
+            if ($existingUser["id"] === $invitedBy) {
+                $conn->rollBack();
+
+                http_response_code(409);
+                echo json_encode([
+                    "error" => true,
+                    "data" => "You cannot invite yourself",
+                    "code" => null
+                ]);
+                exit;
+            }
+
+            $userId = $existingUser["id"];
 
             $stmt = $conn->prepare("
                 SELECT
                     id,
-                    expires_at,
-                    accepted_at,
-                    revoked_at
+                    membership_status
+                FROM organisation_members
+                WHERE organisation_id = :organisation_id
+                AND user_id = :user_id
+                LIMIT 1
+            ");
+
+            $stmt->execute([
+                ":organisation_id" => $organisationId,
+                ":user_id" => $userId
+            ]);
+
+            $member = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($member && $member["membership_status"] === "active") {
+                $conn->rollBack();
+
+                http_response_code(409);
+                echo json_encode([
+                    "error" => true,
+                    "data" => "This user is already an active member of your organisation",
+                    "code" => null
+                ]);
+                exit;
+            }
+
+            $stmt = $conn->prepare("
+                SELECT id
                 FROM user_invitations
                 WHERE user_id = :user_id
                 AND accepted_at IS NULL
@@ -189,57 +180,36 @@
             ");
 
             $stmt->execute([
-                ":user_id" => $existingUserId
+                ":user_id" => $userId
             ]);
 
-            $activeInvitation = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($activeInvitation) {
+            if ($stmt->fetch(PDO::FETCH_ASSOC)) {
                 $conn->rollBack();
 
                 http_response_code(409);
                 echo json_encode([
                     "error" => true,
-                    "data" => "An active invitation already exists for this email address",
+                    "data" => "An active invitation already exists for this user",
                     "code" => null
                 ]);
                 exit;
             }
-
-            $existingStatus = strtolower(trim((string)$existingUser["account_status"]));
-
-            if (
-                $existingStatus !== "pending" &&
-                $existingStatus !== "pending_approval" &&
-                $existingStatus !== "invited"
-            ) {
-                $conn->rollBack();
-
-                http_response_code(409);
-                echo json_encode([
-                    "error" => true,
-                    "data" => "A user with this email address already exists",
-                    "code" => null
-                ]);
-                exit;
-            }
-
-            $userId = $existingUserId;
 
             $stmt = $conn->prepare("
                 UPDATE users
                 SET
                     full_name = :full_name,
+                    email = :email,
                     phone = :phone,
-                    account_status = 'pending_approval',
                     account_type = 'organisation',
                     organisation_id = :organisation_id,
-                    updated_at = NOW()
+                    account_status = 'pending_approval'
                 WHERE id = :id
             ");
 
             $stmt->execute([
                 ":full_name" => $fullName,
+                ":email" => $email,
                 ":phone" => $phone,
                 ":organisation_id" => $organisationId,
                 ":id" => $userId
@@ -250,89 +220,54 @@
             $stmt = $conn->prepare("
                 INSERT INTO users (
                     id,
+                    organisation_id,
+                    account_type,
                     full_name,
                     email,
                     phone,
                     password_hash,
-                    account_status,
-                    account_type,
-                    organisation_id,
-                    created_at,
-                    updated_at
+                    account_status
                 ) VALUES (
                     :id,
+                    :organisation_id,
+                    'organisation',
                     :full_name,
                     :email,
                     :phone,
                     :password_hash,
-                    'pending_approval',
-                    'organisation',
-                    :organisation_id,
-                    NOW(),
-                    NOW()
+                    'pending_approval'
                 )
             ");
 
             $stmt->execute([
                 ":id" => $userId,
+                ":organisation_id" => $organisationId,
                 ":full_name" => $fullName,
                 ":email" => $email,
                 ":phone" => $phone,
-                ":password_hash" => "",
-                ":organisation_id" => $organisationId
+                ":password_hash" => password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT)
             ]);
+
+            $member = null;
         }
 
-        $stmt = $conn->prepare("
-            SELECT
-                id,
-                membership_status
-            FROM organisation_members
-            WHERE organisation_id = :organisation_id
-            AND user_id = :user_id
-            LIMIT 1
-        ");
-
-        $stmt->execute([
-            ":organisation_id" => $organisationId,
-            ":user_id" => $userId
-        ]);
-
-        $membership = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($membership) {
-            if ($membership["membership_status"] === "active") {
-                $conn->rollBack();
-
-                http_response_code(409);
-                echo json_encode([
-                    "error" => true,
-                    "data" => "This user is already a member of your organisation",
-                    "code" => null
-                ]);
-                exit;
-            }
-
+        if ($member) {
             $stmt = $conn->prepare("
                 UPDATE organisation_members
                 SET
                     role_id = :role_id,
                     membership_status = 'pending',
                     invited_by = :invited_by,
-                    updated_at = NOW()
+                    joined_at = NULL
                 WHERE id = :id
             ");
 
             $stmt->execute([
                 ":role_id" => $roleId,
                 ":invited_by" => $invitedBy,
-                ":id" => $membership["id"]
+                ":id" => $member["id"]
             ]);
-
-            $membershipId = $membership["id"];
         } else {
-            $membershipId = generateId();
-
             $stmt = $conn->prepare("
                 INSERT INTO organisation_members (
                     id,
@@ -340,23 +275,19 @@
                     user_id,
                     role_id,
                     membership_status,
-                    invited_by,
-                    created_at,
-                    updated_at
+                    invited_by
                 ) VALUES (
                     :id,
                     :organisation_id,
                     :user_id,
                     :role_id,
                     'pending',
-                    :invited_by,
-                    NOW(),
-                    NOW()
+                    :invited_by
                 )
             ");
 
             $stmt->execute([
-                ":id" => $membershipId,
+                ":id" => generateId(),
                 ":organisation_id" => $organisationId,
                 ":user_id" => $userId,
                 ":role_id" => $roleId,
@@ -376,83 +307,70 @@
             ":user_id" => $userId
         ]);
 
-        $token = rtrim(
-            strtr(
-                base64_encode(random_bytes(48)),
-                '+/',
-                '-_'
-            ),
-            '='
-        );
-
+        $token = rtrim(strtr(base64_encode(random_bytes(48)), "+/", "-_"), "=");
         $tokenHash = hash("sha256", $token);
         $invitationId = generateId();
-        $expiresAt = date("Y-m-d H:i:s", time() + (72 * 60 * 60));
+        $expiresAt = date("Y-m-d H:i:s", time() + 72 * 60 * 60);
 
         $stmt = $conn->prepare("
             INSERT INTO user_invitations (
                 id,
                 user_id,
-                membership_id,
                 token_hash,
                 expires_at,
-                invited_by,
-                created_at
+                invited_by
             ) VALUES (
                 :id,
                 :user_id,
-                :membership_id,
                 :token_hash,
                 :expires_at,
-                :invited_by,
-                NOW()
+                :invited_by
             )
         ");
 
         $stmt->execute([
             ":id" => $invitationId,
             ":user_id" => $userId,
-            ":membership_id" => $membershipId,
             ":token_hash" => $tokenHash,
             ":expires_at" => $expiresAt,
             ":invited_by" => $invitedBy
         ]);
 
-        $baseURL = rtrim($baseURL ?? "", "/") . "/";
-        $invitationURL = $baseURL . "invitation/" . $token;
+        $invitationURL = rtrim($baseURL, "/") . "/invitation/" . $token;
 
-        $subject = "You're invited to join your organisation account";
+        $subject = "You have been invited to TRINŪ";
 
         $message = "
-            <div style=\"font-family:Arial,sans-serif;line-height:1.6;color:#222\">
-                <h2>You have been invited</h2>
-                <p>Hello " . htmlspecialchars($fullName) . ",</p>
-                <p>You have been invited to join your organisation account.</p>
-                <p>Your assigned role is <strong>" . htmlspecialchars($role["role_name"]) . "</strong>.</p>
-                <p>
-                    <a href=\"" . htmlspecialchars($invitationURL) . "\"
-                    style=\"display:inline-block;padding:12px 20px;background:#f97316;color:#fff;text-decoration:none;border-radius:6px\">
-                        Accept invitation
+            <div style='font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;color:#333;'>
+                <h2 style='color:#2258BF;'>TRINŪ</h2>
+                <p>Hello " . htmlspecialchars($fullName, ENT_QUOTES, "UTF-8") . ",</p>
+                <p>You have been invited to join the TRINŪ Bonded Terminal Digital Platform.</p>
+                <p>Your account has been prepared with the role <strong>" . htmlspecialchars($role["role_name"], ENT_QUOTES, "UTF-8") . "</strong>.</p>
+                <div style='text-align:center;margin:30px 0;'>
+                    <a href='" . htmlspecialchars($invitationURL, ENT_QUOTES, "UTF-8") . "' style='display:inline-block;background:#2258BF;color:#fff;text-decoration:none;padding:14px 24px;border-radius:7px;'>
+                        Accept Invitation
                     </a>
-                </p>
+                </div>
                 <p>This invitation expires in 72 hours.</p>
+                <p>If you were not expecting this invitation, you can safely ignore this email.</p>
+                <p style='color:#777;font-size:12px;'>TRINŪ Bonded Terminal Digital Platform</p>
             </div>
         ";
 
-        $emailSent = send_email(
+        $sent = send_email(
             $email,
             $fullName,
             $subject,
             $message
         );
 
-        if (!$emailSent) {
+        if (!$sent) {
             $conn->rollBack();
 
             http_response_code(500);
             echo json_encode([
                 "error" => true,
-                "data" => "Invitation could not be sent",
+                "data" => "Unable to send invitation email. Please try again.",
                 "code" => null
             ]);
             exit;
@@ -465,7 +383,6 @@
             "data" => "Invitation sent successfully",
             "code" => [
                 "id" => $userId,
-                "membership_id" => $membershipId,
                 "email" => $email,
                 "expires_at" => $expiresAt,
                 "invitation_url" => $invitationURL
@@ -474,6 +391,16 @@
     } catch (Throwable $e) {
         if ($conn->inTransaction()) {
             $conn->rollBack();
+        }
+
+        if ((int)$e->getCode() === 23000) {
+            http_response_code(409);
+            echo json_encode([
+                "error" => true,
+                "data" => "Email or phone number already exists",
+                "code" => null
+            ]);
+            exit;
         }
 
         http_response_code(500);

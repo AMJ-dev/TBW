@@ -1,5 +1,5 @@
 <?php
-    require_once dirname(__DIR__, 4) . "/include/verify-user.php";
+    require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
     $userId = trim($_POST["user_id"] ?? "");
     $membershipId = trim($_POST["membership_id"] ?? "");
@@ -7,7 +7,7 @@
     $invitedBy = trim((string)($my_details->id ?? ""));
 
     if ($userId === "" || $membershipId === "") {
-        http_response_code(422);
+        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "User ID and membership ID are required",
@@ -16,32 +16,32 @@
         exit;
     }
 
-    if ($organisationId === "") {
+    if ($organisationId === "" || $invitedBy === "") {
         http_response_code(403);
         echo json_encode([
             "error" => true,
-            "data" => "Organisation not found",
+            "data" => "Organisation information is not available",
             "code" => null
         ]);
         exit;
     }
 
     try {
+        $conn->beginTransaction();
+
         $stmt = $conn->prepare("
             SELECT
+                om.id AS membership_id,
+                om.membership_status,
                 u.id,
                 u.full_name,
                 u.email,
-                u.phone,
-                u.account_status,
-                om.id AS membership_id,
-                om.membership_status,
-                r.id AS role_id,
-                r.role_key,
                 r.role_name
             FROM organisation_members om
-            INNER JOIN users u ON u.id = om.user_id
-            LEFT JOIN roles r ON r.id = om.role_id
+            INNER JOIN users u
+                ON u.id = om.user_id
+            INNER JOIN roles r
+                ON r.id = om.role_id
             WHERE om.id = :membership_id
             AND om.user_id = :user_id
             AND om.organisation_id = :organisation_id
@@ -54,44 +54,24 @@
             ":organisation_id" => $organisationId
         ]);
 
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        $member = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$user) {
+        if (!$member) {
+            $conn->rollBack();
+
             http_response_code(404);
             echo json_encode([
                 "error" => true,
-                "data" => "User membership not found",
+                "data" => "Organisation membership not found",
                 "code" => null
             ]);
             exit;
         }
 
-        if ($user["membership_status"] === "removed") {
-            http_response_code(409);
-            echo json_encode([
-                "error" => true,
-                "data" => "This user has been removed from the organisation",
-                "code" => null
-            ]);
-            exit;
-        }
+        if ($member["membership_status"] !== "pending") {
+            $conn->rollBack();
 
-        if (empty($user["email"])) {
-            http_response_code(422);
-            echo json_encode([
-                "error" => true,
-                "data" => "This user does not have an email address",
-                "code" => null
-            ]);
-            exit;
-        }
-
-        if (
-            strtolower((string)$user["account_status"]) !== "pending" &&
-            strtolower((string)$user["account_status"]) !== "pending_approval" &&
-            strtolower((string)$user["account_status"]) !== "invited"
-        ) {
-            http_response_code(409);
+            http_response_code(400);
             echo json_encode([
                 "error" => true,
                 "data" => "This user does not have a pending invitation",
@@ -100,99 +80,109 @@
             exit;
         }
 
-        $conn->beginTransaction();
+        $stmt = $conn->prepare("
+            SELECT id
+            FROM user_invitations
+            WHERE user_id = :user_id
+            AND accepted_at IS NULL
+            AND revoked_at IS NULL
+            AND expires_at > NOW()
+            ORDER BY created_at DESC
+            LIMIT 1
+        ");
+
+        $stmt->execute([
+            ":user_id" => $userId
+        ]);
+
+        if ($stmt->fetch(PDO::FETCH_ASSOC)) {
+            $conn->rollBack();
+
+            http_response_code(409);
+            echo json_encode([
+                "error" => true,
+                "data" => "The current invitation has not expired yet",
+                "code" => null
+            ]);
+            exit;
+        }
 
         $stmt = $conn->prepare("
             UPDATE user_invitations
             SET revoked_at = NOW()
             WHERE user_id = :user_id
-            AND membership_id = :membership_id
             AND accepted_at IS NULL
             AND revoked_at IS NULL
         ");
 
         $stmt->execute([
-            ":user_id" => $userId,
-            ":membership_id" => $membershipId
+            ":user_id" => $userId
         ]);
 
-        $token = rtrim(
-            strtr(
-                base64_encode(random_bytes(48)),
-                '+/',
-                '-_'
-            ),
-            '='
-        );
-
+        $token = rtrim(strtr(base64_encode(random_bytes(48)), "+/", "-_"), "=");
         $tokenHash = hash("sha256", $token);
         $invitationId = generateId();
-        $expiresAt = date("Y-m-d H:i:s", time() + (72 * 60 * 60));
+        $expiresAt = date("Y-m-d H:i:s", time() + 72 * 60 * 60);
 
         $stmt = $conn->prepare("
             INSERT INTO user_invitations (
                 id,
                 user_id,
-                membership_id,
                 token_hash,
                 expires_at,
-                invited_by,
-                created_at
+                invited_by
             ) VALUES (
                 :id,
                 :user_id,
-                :membership_id,
                 :token_hash,
                 :expires_at,
-                :invited_by,
-                NOW()
+                :invited_by
             )
         ");
 
         $stmt->execute([
             ":id" => $invitationId,
             ":user_id" => $userId,
-            ":membership_id" => $membershipId,
             ":token_hash" => $tokenHash,
             ":expires_at" => $expiresAt,
             ":invited_by" => $invitedBy
         ]);
 
-        $baseURL = rtrim($baseURL ?? "", "/") . "/";
-        $invitationURL = $baseURL . "invitation/" . $token;
+        $invitationURL = rtrim($baseURL, "/") . "/invitation/" . $token;
 
-        $subject = "Your organisation invitation has been re-sent";
+        $subject = "Your TRINŪ invitation has been re-sent";
 
         $message = "
-            <div style=\"font-family:Arial,sans-serif;line-height:1.6;color:#222\">
-                <h2>Your invitation is ready</h2>
-                <p>Hello " . htmlspecialchars($user["full_name"]) . ",</p>
-                <p>Your invitation to join your organisation account has been re-sent.</p>
-                <p>Your assigned role is <strong>" . htmlspecialchars($user["role_name"] ?? "User") . "</strong>.</p>
-                <p>
-                    <a href=\"" . htmlspecialchars($invitationURL) . "\"
-                    style=\"display:inline-block;padding:12px 20px;background:#f97316;color:#fff;text-decoration:none;border-radius:6px\">
-                        Accept invitation
+            <div style='font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;color:#333;'>
+                <h2 style='color:#2258BF;'>TRINŪ</h2>
+                <p>Hello " . htmlspecialchars($member["full_name"], ENT_QUOTES, "UTF-8") . ",</p>
+                <p>Your invitation to join the TRINŪ Bonded Terminal Digital Platform has been re-sent.</p>
+                <p>Your role is <strong>" . htmlspecialchars($member["role_name"], ENT_QUOTES, "UTF-8") . "</strong>.</p>
+                <div style='text-align:center;margin:30px 0;'>
+                    <a href='" . htmlspecialchars($invitationURL, ENT_QUOTES, "UTF-8") . "' style='display:inline-block;background:#2258BF;color:#fff;text-decoration:none;padding:14px 24px;border-radius:7px;'>
+                        Accept Invitation
                     </a>
-                </p>
+                </div>
                 <p>This invitation expires in 72 hours.</p>
+                <p>If you were not expecting this invitation, you can safely ignore this email.</p>
+                <p style='color:#777;font-size:12px;'>TRINŪ Bonded Terminal Digital Platform</p>
             </div>
         ";
 
-        $emailSent = send_email(
-            $user["email"],
-            $user["full_name"],
+        $sent = send_email(
+            $member["email"],
+            $member["full_name"],
             $subject,
             $message
         );
 
-        if (!$emailSent) {
+        if (!$sent) {
             $conn->rollBack();
 
             http_response_code(500);
             echo json_encode([
                 "error" => true,
-                "data" => "Invitation could not be sent",
+                "data" => "Unable to send invitation email. Please try again.",
                 "code" => null
             ]);
             exit;
@@ -204,10 +194,11 @@
             "error" => false,
             "data" => "Invitation re-sent successfully",
             "code" => [
-                "id" => $userId,
+                "user_id" => $userId,
                 "membership_id" => $membershipId,
-                "email" => $user["email"],
-                "expires_at" => $expiresAt
+                "email" => $member["email"],
+                "expires_at" => $expiresAt,
+                "invitation_url" => $invitationURL
             ]
         ]);
     } catch (Throwable $e) {

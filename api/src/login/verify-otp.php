@@ -535,23 +535,13 @@
         $privileges = [];
 
         foreach ($permission_rows as $permission) {
-
             $permissions[] = $permission["permission_key"];
-
-            if (!in_array($permission["module"], $privileges, true)) {
-                $privileges[] = $permission["module"];
-            }
+            if (!in_array($permission["module"], $privileges, true)) $privileges[] = $permission["module"];
         }
 
-        if (
-            $user["account_type"] === "organisation" &&
-            $organisation &&
-            $organisation["verification_status"] === "rejected"
-        ) {
-            $route = "/organisation-resubmit";
-        } else {
-            $route = $route_map[$role_key] ?? "/portal";
-        }
+        if ($user["account_type"] === "organisation" && $organisation && $organisation["verification_status"] === "rejected") $route = "/organisation/review";
+        else if($user["account_type"] === "system") $route = "/admin";
+        else $route = "/portal";
 
         $conn->commit();
 

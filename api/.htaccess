@@ -52,7 +52,7 @@ RewriteRule ^admin/users/invite/$ src/users/invite.php [NC]
 RewriteRule ^auth/invite/complete/$ src/invite/complete.php [NC]
 RewriteRule ^auth/invite/resend-phone/$ src/invite/resend-phone.php [NC]
 RewriteRule ^auth/invite/verify-phone/$ src/invite/verify-phone.php [NC]
-RewriteRule ^auth/invite/([0-9a-zA-Z-]+)/$ src/invite/get.php?token=$1 [NC]
+RewriteRule ^auth/invite/([0-9a-zA-Z-_]+)/$ src/invite/get.php?token=$1 [NC]
 
 RewriteRule ^admin/users/$ src/users/all.php [NC]
 # RewriteRule ^admin/users/([0-9a-zA-Z-]+)/$ src/users/single.php?id=$1 [NC]
@@ -63,10 +63,5 @@ RewriteRule ^admin/users/reset-mfa/([0-9a-zA-Z-]+)/$ src/users/reset-mfa.php?id=
 RewriteRule ^portal/users/$ src/portal/get-users.php [NC]
 RewriteRule ^portal/roles/$ src/portal/get-roles.php [NC]
 RewriteRule ^portal/user/invite/$ src/portal/invite.php [NC]
-RewriteRule ^portal/users/remove/$ src/portal/remove-users.php [NC]
-RewriteRule ^portal/users/invite/resend/$ src/portal/resend-invite.php [NC]
-
-# /portal/invite
-# portal/user/invite
-# portal/user/remove/
-# portal/user/invite/resend/
+RewriteRule ^portal/user/remove/$ src/portal/remove-user.php [NC]
+RewriteRule ^portal/user/invite/resend/$ src/portal/resend-invite.php [NC]

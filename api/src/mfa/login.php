@@ -775,8 +775,6 @@
         }
 
 
-        $route = $route_map[$role_key] ?? "/portal";
-
         $conn->commit();
 
         $token= ["id"=>$user_id, "session_id"=>$session_id];
@@ -814,7 +812,7 @@
                     "name" => $role_name,
                     "scope" => $role_scope
                 ],
-                "route" => $route,
+                "route" => $user["account_type"] === "system"?"/admin":"/portal",
                 "privileges" => $privileges,
                 "permissions" => $permissions
             ]

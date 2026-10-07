@@ -140,20 +140,12 @@
     foreach ($permission_rows as $permission) {
         $permissions[] = $permission["permission_key"];
 
-        if (!in_array($permission["module"], $privileges, true)) {
-            $privileges[] = $permission["module"];
-        }
+        if (!in_array($permission["module"], $privileges, true)) $privileges[] = $permission["module"];
     }
 
-    if (
-        $my_details->account_type === "organisation" &&
-        $organisation &&
-        $organisation["verification_status"] === "rejected"
-    ) {
-        $route = "/organisation/review";
-    } else {
-        $route = $route_map[$role_key] ?? "/portal";
-    }
+    if ($my_details->account_type === "organisation" && $organisation && $organisation["verification_status"] === "rejected") $route = "/organisation/review";
+    else if($my_details->account_type === "system") $route = "/admin";
+    else $route = "/portal";
 
     echo json_encode([
         "error" => false,
