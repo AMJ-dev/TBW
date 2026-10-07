@@ -194,7 +194,7 @@ const sections = [
 			{ label: "Configuration", to: "/admin/configuration", icon: Settings, permission: "administration.configuration" },
 			{ label: "Audit Log", to: "/admin/audit", icon: Activity, permission: "administration.audit" },
 		],
-		permission_key: ["system_admin"],
+		permission_key: ["system"],
 	},
 	{
 		title: "Operations",
@@ -212,7 +212,7 @@ const sections = [
 			{ label: "Value-added services", to: "/operations/value-added", icon: Settings, permission: "operations.manage" },
 			{ label: "Overrides", to: "/operations/overrides", icon: ShieldCheck, permission: "operations.manage" },
 		],
-		permission_key: ["system_admin", "terminal_operations"],
+		permission_key: ["system"],
 	},
 	{
 		title: "Gate",
@@ -224,7 +224,7 @@ const sections = [
 			{ label: "Gate-out console", to: "/gate/out", icon: Truck, permission: "gate.gate_out" },
 			{ label: "Vehicle registry", to: "/gate/vehicles", icon: UsersRound, permission: "gate.bookings" },
 		],
-		permission_key: ["system_admin", "gate_officer"],
+		permission_key: ["system"],
 	},
 	{
 		title: "Stakeholder portal",
@@ -241,11 +241,7 @@ const sections = [
 			{ label: "Portal users", to: "/portal/users", icon: UsersRound, permission: "administration.users" },
 			{ label: "Session management", to: "/session-management", icon: ShieldCheck, permission: "portal.view" },
 		],
-		permission_key: [
-			"organisation_owner", "management", "finance", "terminal_operations",
-			"gate_officer", "warehouse_yard_officer", "documentation_officer",
-			"customer_service_sales", "compliance_customs_liaison", "regulator_auditor", "portal_user",
-		],
+		permission_key: ["organisation"],
 	},
 	{
 		title: "Finance",
@@ -262,7 +258,7 @@ const sections = [
 			{ label: "Tax rules", to: "/finance/tax", icon: FileSpreadsheet, permission: "finance.view" },
 			{ label: "Reconciliation", to: "/finance/reconciliation", icon: ClipboardCheck, permission: "finance.reconciliation" },
 		],
-		permission_key: ["organisation_owner"],
+		permission_key: ["organisation"],
 	},
 	{
 		title: "Reports",
@@ -272,11 +268,7 @@ const sections = [
 			{ label: "Financial report", to: "/reports/financial", icon: FileSpreadsheet, permission: "reports.view" },
 			{ label: "Compliance report", to: "/reports/compliance", icon: ShieldCheck, permission: "reports.view" },
 		],
-		permission_key: [
-			"organisation_owner", "management", "finance", "terminal_operations",
-			"gate_officer", "warehouse_yard_officer", "documentation_officer",
-			"customer_service_sales", "compliance_customs_liaison", "regulator_auditor",
-		],
+		permission_key: ["organisation"],
 	},
 	{
 		title: "Cargo",
@@ -288,11 +280,7 @@ const sections = [
 			{ label: "Tracking", to: "/tracking", icon: Search, permission: "portal.cargo" },
 			{ label: "Holds & Exceptions", to: "/operations/holds", icon: AlertTriangle, permission: "operations.holds" },
 		],
-		permission_key: [
-			"organisation_owner", "management", "terminal_operations", "gate_officer",
-			"warehouse_yard_officer", "documentation_officer", "customer_service_sales",
-			"compliance_customs_liaison", "regulator_auditor",
-		],
+		permission_key: ["organisation"],
 	},
 ];
 
@@ -462,7 +450,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 					<nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
 						{my_details?.account_status === "active" ? (
 							sections.map((section) => (
-								role && section.permission_key.includes(role.key) && (
+								my_details?.account_type && section.permission_key.includes(my_details?.account_type) && (
 									<div key={section.title}>
 										<p
 											className={cn(
