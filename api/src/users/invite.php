@@ -105,7 +105,11 @@
             ]);
             exit;
         }
-
+        if ($accountType === "system") {
+            $get_org = $conn->prepare("SELECT id FROM organisations WHERE organisation_type = :organisation_type");
+            $get_org->execute([":organisation_type" => 'terminal']);
+            $organisationId = $get_org->fetch(PDO::FETCH_ASSOC)['id'];
+        }
         if ($accountType === "organisation") {
             $stmt = $conn->prepare("
                 SELECT
@@ -231,7 +235,7 @@
                 ":full_name" => $fullName,
                 ":phone" => $phone,
                 ":account_type" => $accountType,
-                ":organisation_id" => $accountType === "organisation" ? $organisationId : null,
+                ":organisation_id" => $organisationId,
                 ":id" => $userId
             ]);
         } else {
@@ -267,7 +271,7 @@
 
             $stmt->execute([
                 ":id" => $userId,
-                ":organisation_id" => $accountType === "organisation" ? $organisationId : null,
+                ":organisation_id" => $organisationId,
                 ":account_type" => $accountType,
                 ":system_role_id" => $accountType === "system" ? $roleId : null,
                 ":full_name" => $fullName,

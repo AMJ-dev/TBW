@@ -15,20 +15,13 @@
 
     $baseURL = "http://localhost:8080/";
     $apiURL = "https://api.trinubondedwarehouse.com/";
-
-    $email_host="mail.evcarsng.com";
-    $email_port=465; 
-    $email_user="info@evcarsng.com";
-    $email_password='vmh;)~#TpW0GkFiV';
-    $sender_email = "sender@evcarsng.com";
-    $info_email = "info@evcarsng.com";
     
     $email_host="smtp.resend.com";
     $email_port=465; 
     $email_user="resend";
-    $email_password="re_aU7TUdFD_Pf9144Q5tjcMm7ptVjxeJ1zv";
-    $sender_email = "info@lovebite.online";
-    $info_email = "sender@lovebite.online";
+    $email_password="********";
+    $sender_email = "info@trinubondedwarehouse.com";
+    $info_email = "sender@trinubondedwarehouse.com";
     
     $admin_email = "admin@trinubondedwarehouse.com";
 

@@ -59,3 +59,14 @@ RewriteRule ^admin/users/$ src/users/all.php [NC]
 RewriteRule ^admin/users/suspend/([0-9a-zA-Z-]+)/$ src/users/suspend.php?id=$1 [NC]
 RewriteRule ^admin/users/reactivate/([0-9a-zA-Z-]+)/$ src/users/reactivate.php?id=$1 [NC]
 RewriteRule ^admin/users/reset-mfa/([0-9a-zA-Z-]+)/$ src/users/reset-mfa.php?id=$1 [NC]
+
+RewriteRule ^portal/users/$ src/portal/get-users.php [NC]
+RewriteRule ^portal/roles/$ src/portal/get-roles.php [NC]
+RewriteRule ^portal/user/invite/$ src/portal/invite.php [NC]
+RewriteRule ^portal/users/remove/$ src/portal/remove-users.php [NC]
+RewriteRule ^portal/users/invite/resend/$ src/portal/resend-invite.php [NC]
+
+# /portal/invite
+# portal/user/invite
+# portal/user/remove/
+# portal/user/invite/resend/

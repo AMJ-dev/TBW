@@ -1,10 +1,10 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
 import {
 	AlertTriangle,
 	ArrowRight,
 	Check,
-	Plus,
+	Loader2,
 	Search,
 	ShieldCheck,
 	Trash2,
@@ -17,174 +17,303 @@ import { toast } from "sonner";
 import { AppShell, Metric, StatusBadge, statusTone } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
-
-type OrgRole =
-	| "Owner"
-	| "Admin"
-	| "Operations"
-	| "Finance"
-	| "Read-only";
+import { resolveSrc } from "@/lib/functions";
 
 type UserStatus = "Active" | "Invited" | "Suspended" | "Removed";
 
 interface OrgUser {
 	id: string;
+	membership_id?: string;
 	name: string;
 	email: string;
 	phone: string;
-	role: OrgRole;
-	status: UserStatus;
+	role: string;
+	role_key?: string;
+	status: UserStatus | string;
 	lastActive: string;
 	invitedAt: string;
 	acceptedAt?: string;
 	mfa: boolean;
+	pics?: string | null;
+	membership_status?: string;
 }
 
-const initialUsers: OrgUser[] = [
-	{
-		id: "u-1",
-		name: "Adewale Ogundipe",
-		email: "adewale@atlantictrade.ng",
-		phone: "+234 803 112 3456",
-		role: "Owner",
-		status: "Active",
-		lastActive: "Active now",
-		invitedAt: "12 Jan 2026",
-		acceptedAt: "12 Jan 2026",
-		mfa: true,
-	},
-	{
-		id: "u-2",
-		name: "Chinedu Okafor",
-		email: "chinedu@atlantictrade.ng",
-		phone: "+234 802 987 6543",
-		role: "Operations",
-		status: "Active",
-		lastActive: "2 hours ago",
-		invitedAt: "18 Jan 2026",
-		acceptedAt: "19 Jan 2026",
-		mfa: true,
-	},
-	{
-		id: "u-3",
-		name: "Halima Bello",
-		email: "halima@atlantictrade.ng",
-		phone: "+234 814 332 1199",
-		role: "Finance",
-		status: "Active",
-		lastActive: "Yesterday",
-		invitedAt: "03 Mar 2026",
-		acceptedAt: "03 Mar 2026",
-		mfa: false,
-	},
-	{
-		id: "u-4",
-		name: "Ifeoma Nwosu",
-		email: "ifeoma@atlantictrade.ng",
-		phone: "+234 805 441 2288",
-		role: "Admin",
-		status: "Active",
-		lastActive: "3 days ago",
-		invitedAt: "22 Apr 2026",
-		acceptedAt: "22 Apr 2026",
-		mfa: true,
-	},
-	{
-		id: "u-5",
-		name: "Tunde Adeyemi",
-		email: "tunde@atlantictrade.ng",
-		phone: "+234 816 778 9900",
-		role: "Read-only",
-		status: "Invited",
-		lastActive: "—",
-		invitedAt: "22 Sep 2026",
-		mfa: false,
-	},
-];
+interface OrgRole {
+	id: string;
+	role_key: string;
+	role_name: string;
+	scope: "system" | "organisation";
+	description?: string;
+	is_active?: number | boolean;
+}
 
-const roleOptions: {
-	key: OrgRole;
-	label: string;
-	detail: string;
-}[] = [
-	{
-		key: "Owner",
-		label: "Owner",
-		detail:
-			"Full access including billing, users, delegations, and account closure. At least one required.",
-	},
-	{
-		key: "Admin",
-		label: "Admin",
-		detail:
-			"Manage users, delegations, and account settings. Cannot close the account.",
-	},
-	{
-		key: "Operations",
-		label: "Operations",
-		detail:
-			"Access cargo, documents, and bookings. Cannot manage users or billing.",
-	},
-	{
-		key: "Finance",
-		label: "Finance",
-		detail:
-			"Access invoices, payments, statements, and disputes. Cannot manage users.",
-	},
-	{
-		key: "Read-only",
-		label: "Read-only",
-		detail:
-			"View everything in the account, but no actions. Useful for auditors or oversight.",
-	},
-];
+interface UsersMetrics {
+	total: number;
+	active: number;
+	invited: number;
+	mfa_enabled: number;
+}
+
+const isRoleActive = (r: OrgRole) =>
+	r.is_active === undefined ? true : Boolean(Number(r.is_active));
+
+const formatDate = (input?: string | null) => {
+	if (!input) return "—";
+	const d = new Date(input);
+	if (Number.isNaN(d.getTime())) return "—";
+	return d.toLocaleDateString("en-GB", {
+		day: "2-digit",
+		month: "short",
+		year: "numeric",
+	});
+};
+
+const formatLastActive = (input?: string | null) => {
+	if (!input) return "Never";
+	const d = new Date(input);
+	if (Number.isNaN(d.getTime())) return "—";
+	const diffMin = Math.floor((Date.now() - d.getTime()) / 60000);
+	if (diffMin < 1) return "Active now";
+	if (diffMin < 60) return `${diffMin} min${diffMin === 1 ? "" : "s"} ago`;
+	const diffHr = Math.floor(diffMin / 60);
+	if (diffHr < 24) return `${diffHr} hour${diffHr === 1 ? "" : "s"} ago`;
+	const diffDay = Math.floor(diffHr / 24);
+	if (diffDay === 1) return "Yesterday";
+	if (diffDay < 7) return `${diffDay} days ago`;
+	return formatDate(input);
+};
+
+const displayStatus = (status: string) => {
+	switch (status.toLowerCase()) {
+		case "active":
+			return "Active";
+		case "pending":
+		case "pending_approval":
+		case "invited":
+			return "Invited";
+		case "suspended":
+			return "Suspended";
+		case "removed":
+		case "revoked":
+			return "Removed";
+		default:
+			return status;
+	}
+};
 
 export default function PortalUsersRoute() {
-	const [users, setUsers] = useState<OrgUser[]>(initialUsers);
+	const [users, setUsers] = useState<OrgUser[]>([]);
+	const [roles, setRoles] = useState<OrgRole[]>([]);
+	const [metrics, setMetrics] = useState<UsersMetrics | null>(null);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState("");
+
 	const [query, setQuery] = useState("");
-	const [roleFilter, setRoleFilter] = useState<"all" | OrgRole>("all");
+	const [roleFilter, setRoleFilter] = useState<string>("all");
 	const [isInviteOpen, setIsInviteOpen] = useState(false);
 	const [removeTarget, setRemoveTarget] = useState<OrgUser | null>(null);
+	const [removing, setRemoving] = useState(false);
+
+	const fetchUsers = async () => {
+		setLoading(true);
+		setError("");
+		try {
+			const res = await http.get("portal/users/");
+			const resp: Resp = res.data;
+			if (resp.error) {
+				setError(resp.data || "Could not load users.");
+				setUsers([]);
+				setMetrics(null);
+				return;
+			}
+			const payload: any = resp.code ?? {};
+			const list: any[] = Array.isArray(payload)
+				? payload
+				: Array.isArray(payload.results)
+				? payload.results
+				: Array.isArray(payload.users)
+				? payload.users
+				: Array.isArray(payload.staff)
+				? payload.staff
+				: [];
+
+			const normalized: OrgUser[] = list.map((u) => ({
+				id: u.id,
+				membership_id: u.membership_id,
+				name:
+					u.full_name?.trim() ||
+					u.name?.trim() ||
+					u.email?.split("@")[0] ||
+					"Unknown user",
+				email: u.email ?? "",
+				phone: u.phone ?? "",
+				role: u.role_name ?? u.role ?? u.role_in_org ?? "—",
+				role_key: u.role_key ?? u.role?.role_key,
+				status: displayStatus(
+					(u.account_status ?? u.status ?? "pending").toString()
+				),
+				lastActive: formatLastActive(u.last_login_at ?? null),
+				invitedAt: formatDate(u.membership_created_at ?? u.created_at ?? null),
+				acceptedAt: u.joined_at ?? undefined,
+				mfa: Boolean(u.mfa_enabled ?? u.two_factor_enabled ?? false),
+				pics: u.pics ?? null,
+				membership_status: u.membership_status,
+			}));
+
+			setUsers(normalized);
+
+			const computedMetrics: UsersMetrics =
+				payload.metrics ?? {
+					total: normalized.length,
+					active: normalized.filter((u) => u.status === "Active").length,
+					invited: normalized.filter((u) => u.status === "Invited").length,
+					mfa_enabled: normalized.filter(
+						(u) => u.mfa && u.status === "Active"
+					).length,
+				};
+			setMetrics(computedMetrics);
+		} catch (err: any) {
+			setError(err?.response?.data?.message || "Could not load users.");
+			setUsers([]);
+			setMetrics(null);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const fetchRoles = async () => {
+		try {
+			const res = await http.get("portal/roles/");
+			const resp: Resp = res.data;
+			if (resp.error) return;
+			const payload: any = resp.code ?? {};
+			const list: any[] = Array.isArray(payload)
+				? payload
+				: Array.isArray(payload.results)
+				? payload.results
+				: Array.isArray(payload.roles)
+				? payload.roles
+				: [];
+			setRoles(
+				list
+					.map((r) => ({
+						id: r.id,
+						role_key: r.role_key ?? r.key ?? "",
+						role_name: r.role_name ?? r.name ?? "—",
+						scope: (r.scope ?? "organisation") as "system" | "organisation",
+						description: r.description,
+						is_active: r.is_active,
+					}))
+					.filter((r) => r.scope === "organisation" && isRoleActive(r))
+			);
+		} catch {
+			// Silent — roles are used for filtering and the invite modal.
+		}
+	};
+
+	useEffect(() => {
+		void fetchUsers();
+		void fetchRoles();
+	}, []);
+
+	const availableRoles = roles;
 
 	const filtered = useMemo(() => {
 		return users.filter((u) => {
+			const q = query.trim().toLowerCase();
 			const matchQuery =
-				u.name.toLowerCase().includes(query.toLowerCase()) ||
-				u.email.toLowerCase().includes(query.toLowerCase()) ||
-				u.role.toLowerCase().includes(query.toLowerCase());
+				!q ||
+				u.name.toLowerCase().includes(q) ||
+				u.email.toLowerCase().includes(q) ||
+				u.role.toLowerCase().includes(q);
 			const matchRole = roleFilter === "all" || u.role === roleFilter;
 			return matchQuery && matchRole;
 		});
 	}, [users, query, roleFilter]);
 
 	const stats = useMemo(() => {
-		const active = users.filter((u) => u.status === "Active").length;
-		const invited = users.filter((u) => u.status === "Invited").length;
-		const mfaEnabled = users.filter((u) => u.mfa && u.status === "Active").length;
-		const owners = users.filter((u) => u.role === "Owner" && u.status === "Active").length;
+		const active =
+			metrics?.active ?? users.filter((u) => u.status === "Active").length;
+		const invited =
+			metrics?.invited ?? users.filter((u) => u.status === "Invited").length;
+		const mfaEnabled =
+			metrics?.mfa_enabled ??
+			users.filter((u) => u.mfa && u.status === "Active").length;
+		const owners = users.filter(
+			(u) => u.role_key === "organisation_owner" && u.status === "Active"
+		).length;
 		return { active, invited, mfaEnabled, owners };
-	}, [users]);
+	}, [users, metrics]);
 
-	const mfaCoverage = stats.active > 0 ? Math.round((stats.mfaEnabled / stats.active) * 100) : 0;
+	const mfaCoverage =
+		stats.active > 0 ? Math.round((stats.mfaEnabled / stats.active) * 100) : 0;
 
-	const handleInvite = (next: OrgUser) => {
-		setUsers((prev) => [next, ...prev]);
-		setIsInviteOpen(false);
-		toast.success(`Invitation sent to ${next.email} (simulated).`);
+	const handleInvite = async (payload: {
+		name: string;
+		email: string;
+		phone: string;
+		role_id: string;
+	}) => {
+		const res = await http.post("portal/user/invite/", {
+			full_name: payload.name,
+			email: payload.email.trim().toLowerCase(),
+			phone: payload.phone.trim(),
+			role_id: payload.role_id,
+		});
+		const resp: Resp = res.data;
+		if (resp.error) {
+			toast.error(resp.data || "Could not send the invitation.");
+			return false;
+		}
+		toast.success(`Invitation sent to ${payload.email}.`);
+		await fetchUsers();
+		return true;
 	};
 
-	const handleRemove = () => {
-		if (!removeTarget) return;
-		setUsers((prev) =>
-			prev.map((u) => (u.id === removeTarget.id ? { ...u, status: "Removed" as UserStatus } : u))
-		);
-		toast.success(`${removeTarget.name} has been removed.`);
-		setRemoveTarget(null);
+	const handleRemove = async () => {
+		if (!removeTarget || removing) return;
+		setRemoving(true);
+		try {
+			const res = await http.post("portal/user/remove/", {
+				user_id: removeTarget.id,
+				membership_id: removeTarget.membership_id,
+			});
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Could not remove this user.");
+				return;
+			}
+			toast.success(`${removeTarget.name} has been removed.`);
+			setRemoveTarget(null);
+			await fetchUsers();
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message || "Could not remove this user."
+			);
+		} finally {
+			setRemoving(false);
+		}
 	};
 
-	const handleResend = (user: OrgUser) => {
-		toast.success(`Invitation re-sent to ${user.email} (simulated).`);
+	const handleResend = async (user: OrgUser) => {
+		try {
+			const res = await http.post("portal/user/invite/resend/", {
+				user_id: user.id,
+				membership_id: user.membership_id,
+			});
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Could not resend the invitation.");
+				return;
+			}
+			toast.success(`Invitation re-sent to ${user.email}.`);
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message || "Could not resend the invitation."
+			);
+		}
 	};
 
 	return (
@@ -211,6 +340,7 @@ export default function PortalUsersRoute() {
 					<Button
 						className="bg-orange text-white hover:bg-orange-deep"
 						onClick={() => setIsInviteOpen(true)}
+						disabled={availableRoles.length === 0}
 					>
 						<UserPlus className="mr-1.5 size-4" /> Invite user
 					</Button>
@@ -260,66 +390,113 @@ export default function PortalUsersRoute() {
 						/>
 					</div>
 					<div className="flex flex-wrap items-center gap-2">
-						{(
-							[
-								{ key: "all", label: "All" },
-								{ key: "Owner", label: "Owner" },
-								{ key: "Admin", label: "Admin" },
-								{ key: "Operations", label: "Operations" },
-								{ key: "Finance", label: "Finance" },
-								{ key: "Read-only", label: "Read-only" },
-							] as const
-						).map((r) => (
+						<button
+							type="button"
+							onClick={() => setRoleFilter("all")}
+							className={cn(
+								"rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+								roleFilter === "all"
+									? "bg-ink text-sand"
+									: "bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink"
+							)}
+						>
+							All
+						</button>
+						{availableRoles.map((r) => (
 							<button
-								key={r.key}
+								key={r.id}
 								type="button"
-								onClick={() => setRoleFilter(r.key as typeof roleFilter)}
+								onClick={() => setRoleFilter(r.role_name)}
 								className={cn(
 									"rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-									roleFilter === r.key
+									roleFilter === r.role_name
 										? "bg-ink text-sand"
 										: "bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink"
 								)}
 							>
-								{r.label}
+								{r.role_name}
 							</button>
 						))}
 					</div>
 				</div>
 
-				{filtered.length === 0 ? (
+				{loading ? (
+					<div className="flex items-center justify-center p-10">
+						<span className="size-6 animate-spin rounded-full border-2 border-orange/25 border-t-orange" />
+					</div>
+				) : error ? (
+					<div className="p-6 sm:p-8">
+						<div className="flex items-start gap-3">
+							<div className="grid size-10 shrink-0 place-items-center rounded-md bg-carmine text-white">
+								<AlertTriangle className="size-5" />
+							</div>
+							<div>
+								<p className="font-display text-base font-bold text-ink">
+									Could not load users
+								</p>
+								<p className="mt-1 text-sm leading-6 text-ink-soft">{error}</p>
+							</div>
+						</div>
+						<div className="mt-5">
+							<Button
+								onClick={() => void fetchUsers()}
+								className="bg-orange text-white hover:bg-orange-deep"
+							>
+								Try again
+							</Button>
+						</div>
+					</div>
+				) : filtered.length === 0 ? (
 					<div className="p-12 text-center">
 						<Users className="mx-auto size-7 text-ink-soft" />
-						<p className="mt-3 font-medium text-ink">No users match your filters.</p>
+						<p className="mt-3 font-medium text-ink">
+							{users.length === 0
+								? "No users on this account yet."
+								: "No users match your filters."}
+						</p>
 						<p className="mt-1 text-[12px] text-ink-soft">
-							Try a different name, email, or role.
+							{users.length === 0
+								? "Invite a colleague to get started."
+								: "Try a different name, email, or role."}
 						</p>
 					</div>
 				) : (
 					<ul className="divide-y divide-line">
 						{filtered.map((u) => {
 							const isRemoved = u.status === "Removed";
-							const isOwner = u.role === "Owner";
+							const isOwner = u.role_key === "organisation_owner";
 							return (
 								<li
-									key={u.id}
+									key={u.membership_id ?? u.id}
 									className={cn(
 										"flex flex-wrap items-center gap-4 px-5 py-4",
 										isRemoved && "opacity-60"
 									)}
 								>
-									<div className="grid size-11 shrink-0 place-items-center rounded-full bg-ink font-display text-[13px] font-semibold text-sand">
-										{u.name
-											.split(" ")
-											.map((p) => p[0] ?? "")
-											.join("")
-											.slice(0, 2)}
+									<div className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-full bg-ink font-display text-[13px] font-semibold text-sand">
+										{u.pics && u.pics !== "avatar.png" ? (
+											<img
+												src={resolveSrc(u.pics)}
+												alt={u.name}
+												className="size-full object-cover"
+											/>
+										) : (
+											u.name
+												.split(" ")
+												.map((p) => p.charAt(0))
+												.join("")
+												.slice(0, 2)
+												.toUpperCase()
+										)}
 									</div>
 
 									<div className="min-w-[220px] flex-1">
 										<div className="flex flex-wrap items-center gap-2">
 											<p className="text-sm font-semibold text-ink">{u.name}</p>
-											<StatusBadge label={u.status} tone={statusTone(u.status)} />
+											<StatusBadge
+												label={u.status}
+												tone={statusTone(u.status)}
+											/>
 											{isOwner && (
 												<span className="rounded bg-orange/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-orange-deep">
 													Owner
@@ -441,14 +618,22 @@ export default function PortalUsersRoute() {
 					</div>
 
 					<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
-						<ul className="space-y-3 text-[12px] leading-5">
-							{roleOptions.map((r) => (
-								<li key={r.key}>
-									<p className="font-semibold text-ink">{r.label}</p>
-									<p className="mt-0.5 text-ink-soft">{r.detail}</p>
-								</li>
-							))}
-						</ul>
+						{availableRoles.length === 0 ? (
+							<p className="text-[12px] text-ink-soft">
+								Roles are loading or unavailable.
+							</p>
+						) : (
+							<ul className="space-y-3 text-[12px] leading-5">
+								{availableRoles.map((r) => (
+									<li key={r.id}>
+										<p className="font-semibold text-ink">{r.role_name}</p>
+										<p className="mt-0.5 text-ink-soft">
+											{r.description ?? "—"}
+										</p>
+									</li>
+								))}
+							</ul>
+						)}
 					</div>
 				</div>
 			</div>
@@ -458,6 +643,7 @@ export default function PortalUsersRoute() {
 					onClose={() => setIsInviteOpen(false)}
 					onSubmit={handleInvite}
 					existingUsers={users}
+					roles={availableRoles}
 				/>
 			)}
 
@@ -466,6 +652,7 @@ export default function PortalUsersRoute() {
 					user={removeTarget}
 					onClose={() => setRemoveTarget(null)}
 					onConfirm={handleRemove}
+					removing={removing}
 				/>
 			)}
 		</AppShell>
@@ -476,41 +663,62 @@ function InviteUserModal({
 	onClose,
 	onSubmit,
 	existingUsers,
+	roles,
 }: {
 	onClose: () => void;
-	onSubmit: (u: OrgUser) => void;
+	onSubmit: (payload: {
+		name: string;
+		email: string;
+		phone: string;
+		role_id: string;
+	}) => Promise<boolean>;
 	existingUsers: OrgUser[];
+	roles: OrgRole[];
 }) {
 	const [name, setName] = useState("");
 	const [email, setEmail] = useState("");
 	const [phone, setPhone] = useState("");
-	const [role, setRole] = useState<OrgRole>("Operations");
+	const [roleId, setRoleId] = useState<string>("");
+	const [submitting, setSubmitting] = useState(false);
 
-	const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+	useEffect(() => {
+		if (!roleId && roles.length > 0) {
+			const defaultRole =
+				roles.find((r) => r.role_key === "portal_user") ?? roles[0];
+			if (defaultRole) setRoleId(defaultRole.id);
+		}
+	}, [roles, roleId]);
+
+	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
-		if (!name.trim() || !email.trim()) {
-			toast.error("Name and email are required.");
+		if (!name.trim() || !email.trim() || !phone.trim() || !roleId) {
+			toast.error("Name, email, phone, and role are required.");
 			return;
 		}
-		if (existingUsers.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
+		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+			toast.error("Enter a valid email address.");
+			return;
+		}
+		if (
+			existingUsers.some(
+				(u) => u.email.toLowerCase() === email.trim().toLowerCase()
+			)
+		) {
 			toast.error("A user with that email already exists on this account.");
 			return;
 		}
-		onSubmit({
-			id: `u-${Date.now()}`,
-			name,
-			email,
-			phone,
-			role,
-			status: "Invited",
-			lastActive: "—",
-			invitedAt: new Date().toLocaleDateString("en-GB", {
-				day: "2-digit",
-				month: "short",
-				year: "numeric",
-			}),
-			mfa: false,
-		});
+		setSubmitting(true);
+		try {
+			const ok = await onSubmit({
+				name: name.trim(),
+				email: email.trim(),
+				phone: phone.trim(),
+				role_id: roleId,
+			});
+			if (ok) onClose();
+		} finally {
+			setSubmitting(false);
+		}
 	};
 
 	return (
@@ -529,8 +737,8 @@ function InviteUserModal({
 								Invite a colleague to your account
 							</h3>
 							<p className="mt-1 text-[12px] text-ink-soft">
-								They receive an email invitation. Access begins once they accept and set
-								up two-factor authentication.
+								They receive an email invitation. Access begins once they accept and
+								set up two-factor authentication.
 							</p>
 						</div>
 						<Button
@@ -564,10 +772,11 @@ function InviteUserModal({
 						</div>
 
 						<Field
-							label="Phone (optional)"
+							label="Phone"
 							placeholder="+234 ..."
 							value={phone}
 							onChange={setPhone}
+							required
 						/>
 
 						<div>
@@ -575,13 +784,13 @@ function InviteUserModal({
 								Role
 							</p>
 							<div className="mt-3 grid gap-2">
-								{roleOptions.map((r) => {
-									const active = role === r.key;
+								{roles.map((r) => {
+									const active = roleId === r.id;
 									return (
 										<button
-											key={r.key}
+											key={r.id}
 											type="button"
-											onClick={() => setRole(r.key)}
+											onClick={() => setRoleId(r.id)}
 											className={cn(
 												"flex items-start gap-3 rounded-xl border p-3 text-left transition-colors",
 												active
@@ -600,9 +809,11 @@ function InviteUserModal({
 												{active && <Check className="size-3" />}
 											</span>
 											<span className="min-w-0">
-												<span className="text-sm font-semibold text-ink">{r.label}</span>
+												<span className="text-sm font-semibold text-ink">
+													{r.role_name}
+												</span>
 												<span className="mt-0.5 block text-[11px] leading-5 text-ink-soft">
-													{r.detail}
+													{r.description ?? "—"}
 												</span>
 											</span>
 										</button>
@@ -619,8 +830,9 @@ function InviteUserModal({
 										Two-factor authentication
 									</p>
 									<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-										The user will be asked to set up two-factor authentication when they
-										accept the invitation. This is required for all account users.
+										The user will be asked to set up two-factor authentication when
+										they accept the invitation. This is required for all account
+										users.
 									</p>
 								</div>
 							</div>
@@ -628,11 +840,30 @@ function InviteUserModal({
 					</div>
 
 					<div className="flex items-center justify-between gap-3 border-t border-line p-5 sm:p-6">
-						<Button type="button" variant="ghost" onClick={onClose} className="text-ink-soft">
+						<Button
+							type="button"
+							variant="ghost"
+							onClick={onClose}
+							className="text-ink-soft"
+							disabled={submitting}
+						>
 							Cancel
 						</Button>
-						<Button type="submit" className="bg-orange text-white hover:bg-orange-deep">
-							Send invitation <ArrowRight />
+						<Button
+							type="submit"
+							disabled={submitting || roles.length === 0}
+							className="bg-orange text-white hover:bg-orange-deep disabled:opacity-60"
+						>
+							{submitting ? (
+								<>
+									<Loader2 className="size-4 animate-spin" />
+									Sending…
+								</>
+							) : (
+								<>
+									Send invitation <ArrowRight />
+								</>
+							)}
 						</Button>
 					</div>
 				</form>
@@ -645,10 +876,12 @@ function RemoveUserDialog({
 	user,
 	onClose,
 	onConfirm,
+	removing,
 }: {
 	user: OrgUser;
 	onClose: () => void;
 	onConfirm: () => void;
+	removing: boolean;
 }) {
 	return (
 		<div
@@ -693,11 +926,20 @@ function RemoveUserDialog({
 				</div>
 
 				<div className="mt-6 flex justify-end gap-2">
-					<Button variant="outline" onClick={onClose} className="border-line bg-paper text-ink">
+					<Button
+						variant="outline"
+						onClick={onClose}
+						className="border-line bg-paper text-ink"
+						disabled={removing}
+					>
 						Keep user
 					</Button>
-					<Button onClick={onConfirm} className="bg-coral text-white hover:bg-coral/90">
-						Remove user
+					<Button
+						onClick={onConfirm}
+						disabled={removing}
+						className="bg-coral text-white hover:bg-coral/90 disabled:opacity-60"
+					>
+						{removing ? "Removing…" : "Remove user"}
 					</Button>
 				</div>
 			</div>

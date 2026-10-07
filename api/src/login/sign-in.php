@@ -256,20 +256,13 @@ try {
 
     $can_login = false;
 
-    if (
-        $user["account_status"] === "active" &&
-        $user["organisation_status"] === "verified"
-    ) {
-        $can_login = true;
-    }
+    if ($user["account_status"] === "active" && $user["organisation_status"] === "verified") $can_login = true;
 
     if (
         $user["account_type"] === "organisation" &&
         $user["account_status"] === "pending_approval" &&
         $user["organisation_status"] === "rejected"
-    ) {
-        $can_login = true;
-    }
+    ) $can_login = true;
 
     if (!$can_login) {
 
