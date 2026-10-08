@@ -5,6 +5,8 @@ import {
 	ArrowLeft,
 	CircleDollarSign,
 	Container,
+	Eye,
+	EyeOff,
 	FileSpreadsheet,
 	Landmark,
 	MessageSquare,
@@ -25,6 +27,14 @@ import { cn } from "@/lib/utils";
 
 type IntegrationTone = "success" | "warning" | "info" | "critical";
 
+interface IntegrationField {
+	key: string;
+	label: string;
+	placeholder: string;
+	kind: "text" | "number" | "password" | "email" | "url";
+	required: boolean;
+}
+
 interface Integration {
 	id: string;
 	name: string;
@@ -35,6 +45,7 @@ interface Integration {
 	enabled: boolean;
 	retryCount: number;
 	healthLabel: string;
+	fields: IntegrationField[];
 }
 
 interface IntegrationsConfig {
@@ -65,6 +76,29 @@ const initialConfig: IntegrationsConfig = {
 			enabled: true,
 			retryCount: 3,
 			healthLabel: "Officer-keyed reference capture active",
+			fields: [
+				{
+					key: "api_base_url",
+					label: "API base URL",
+					placeholder: "Provided by NCS once approved",
+					kind: "url",
+					required: false,
+				},
+				{
+					key: "api_key",
+					label: "API key",
+					placeholder: "Issued by NCS",
+					kind: "password",
+					required: false,
+				},
+				{
+					key: "officer_reference_prefix",
+					label: "Officer reference prefix",
+					placeholder: "e.g. NCS/ABJ",
+					kind: "text",
+					required: false,
+				},
+			],
 		},
 		{
 			id: "i-2",
@@ -76,10 +110,33 @@ const initialConfig: IntegrationsConfig = {
 			enabled: true,
 			retryCount: 3,
 			healthLabel: "EDI + CSV fallback",
+			fields: [
+				{
+					key: "edi_endpoint",
+					label: "EDI endpoint",
+					placeholder: "sftp://lines.example.com/inbound",
+					kind: "url",
+					required: false,
+				},
+				{
+					key: "edi_username",
+					label: "EDI username",
+					placeholder: "trinu-edi",
+					kind: "text",
+					required: false,
+				},
+				{
+					key: "edi_password",
+					label: "EDI password",
+					placeholder: "••••••••",
+					kind: "password",
+					required: false,
+				},
+			],
 		},
 		{
 			id: "i-3",
-			name: "Payment gateway",
+			name: "Payment gateway (Flutterwave)",
 			desc: "Gateway-hosted payment flow with signed webhooks and idempotency. No cardholder data on platform-controlled systems.",
 			icon: CircleDollarSign,
 			status: "Active",
@@ -87,6 +144,36 @@ const initialConfig: IntegrationsConfig = {
 			enabled: true,
 			retryCount: 3,
 			healthLabel: "Webhook signature verified",
+			fields: [
+				{
+					key: "public_key",
+					label: "Public key",
+					placeholder: "FLWPUBK-xxxxxxxxxxxxxxxxxxxxx-X",
+					kind: "text",
+					required: true,
+				},
+				{
+					key: "private_key",
+					label: "Private key",
+					placeholder: "FLWSECK-xxxxxxxxxxxxxxxxxxxxx-X",
+					kind: "password",
+					required: true,
+				},
+				{
+					key: "webhook_secret",
+					label: "Webhook secret hash",
+					placeholder: "Used to verify signed webhooks",
+					kind: "password",
+					required: true,
+				},
+				{
+					key: "merchant_reference_prefix",
+					label: "Merchant reference prefix",
+					placeholder: "e.g. TRINU",
+					kind: "text",
+					required: false,
+				},
+			],
 		},
 		{
 			id: "i-4",
@@ -98,10 +185,26 @@ const initialConfig: IntegrationsConfig = {
 			enabled: true,
 			retryCount: 3,
 			healthLabel: "Statement import running",
+			fields: [
+				{
+					key: "account_number",
+					label: "Account number",
+					placeholder: "0123456789",
+					kind: "text",
+					required: true,
+				},
+				{
+					key: "bank_name",
+					label: "Bank name",
+					placeholder: "e.g. Providus Bank",
+					kind: "text",
+					required: true,
+				},
+			],
 		},
 		{
 			id: "i-5",
-			name: "Email",
+			name: "Email (SMTP)",
 			desc: "SPF, DKIM, and DMARC configured on the Client domain. Delivery status tracked per recipient.",
 			icon: MessageSquare,
 			status: "Active",
@@ -109,10 +212,47 @@ const initialConfig: IntegrationsConfig = {
 			enabled: true,
 			retryCount: 3,
 			healthLabel: "Domain authenticated",
+			fields: [
+				{
+					key: "email_host",
+					label: "Email host",
+					placeholder: "smtp.example.com",
+					kind: "text",
+					required: true,
+				},
+				{
+					key: "email_port",
+					label: "Email port",
+					placeholder: "587",
+					kind: "number",
+					required: true,
+				},
+				{
+					key: "email_user",
+					label: "Email user",
+					placeholder: "notifications@trinu.ng",
+					kind: "text",
+					required: true,
+				},
+				{
+					key: "email_password",
+					label: "Email password",
+					placeholder: "••••••••",
+					kind: "password",
+					required: true,
+				},
+				{
+					key: "sender_email",
+					label: "Sender email",
+					placeholder: "no-reply@trinu.ng",
+					kind: "email",
+					required: true,
+				},
+			],
 		},
 		{
 			id: "i-6",
-			name: "SMS aggregator",
+			name: "SMS (BulkSMSNigeria)",
 			desc: "Nigerian aggregator with delivery receipts and registered sender ID.",
 			icon: Smartphone,
 			status: "Active",
@@ -120,6 +260,22 @@ const initialConfig: IntegrationsConfig = {
 			enabled: true,
 			retryCount: 3,
 			healthLabel: "Sender ID registered",
+			fields: [
+				{
+					key: "sms_api_token",
+					label: "SMS API token",
+					placeholder: "BulkSMSNigeria API token",
+					kind: "password",
+					required: true,
+				},
+				{
+					key: "sms_sender_id",
+					label: "Sender ID",
+					placeholder: "e.g. TRINU",
+					kind: "text",
+					required: true,
+				},
+			],
 		},
 		{
 			id: "i-7",
@@ -131,6 +287,22 @@ const initialConfig: IntegrationsConfig = {
 			enabled: true,
 			retryCount: 3,
 			healthLabel: "Templates approved",
+			fields: [
+				{
+					key: "wa_phone_id",
+					label: "Phone number ID",
+					placeholder: "Meta Business phone number ID",
+					kind: "text",
+					required: true,
+				},
+				{
+					key: "wa_access_token",
+					label: "Access token",
+					placeholder: "••••••••",
+					kind: "password",
+					required: true,
+				},
+			],
 		},
 		{
 			id: "i-8",
@@ -142,6 +314,22 @@ const initialConfig: IntegrationsConfig = {
 			enabled: true,
 			retryCount: 3,
 			healthLabel: "Daily export scheduled",
+			fields: [
+				{
+					key: "erp_endpoint",
+					label: "ERP endpoint",
+					placeholder: "https://erp.example.com/api",
+					kind: "url",
+					required: false,
+				},
+				{
+					key: "erp_api_key",
+					label: "ERP API key",
+					placeholder: "••••••••",
+					kind: "password",
+					required: false,
+				},
+			],
 		},
 		{
 			id: "i-9",
@@ -153,6 +341,22 @@ const initialConfig: IntegrationsConfig = {
 			enabled: true,
 			retryCount: 3,
 			healthLabel: "Ticket capture healthy",
+			fields: [
+				{
+					key: "bridge_host",
+					label: "Host / IP",
+					placeholder: "192.168.1.50",
+					kind: "text",
+					required: true,
+				},
+				{
+					key: "bridge_port",
+					label: "Port",
+					placeholder: "4001",
+					kind: "number",
+					required: true,
+				},
+			],
 		},
 		{
 			id: "i-10",
@@ -164,6 +368,22 @@ const initialConfig: IntegrationsConfig = {
 			enabled: false,
 			retryCount: 3,
 			healthLabel: "Disabled — manual gate flow active",
+			fields: [
+				{
+					key: "controller_url",
+					label: "Controller URL",
+					placeholder: "https://gate-controller.local",
+					kind: "url",
+					required: false,
+				},
+				{
+					key: "controller_api_key",
+					label: "Controller API key",
+					placeholder: "••••••••",
+					kind: "password",
+					required: false,
+				},
+			],
 		},
 	],
 };
@@ -171,6 +391,7 @@ const initialConfig: IntegrationsConfig = {
 export default function AdminIntegrationsConfigurationPage() {
 	const [config, setConfig] = useState<IntegrationsConfig>(initialConfig);
 	const [dirty, setDirty] = useState(false);
+	const [revealed, setRevealed] = useState<Set<string>>(new Set());
 
 	const markDirty = () => setDirty(true);
 
@@ -200,6 +421,15 @@ export default function AdminIntegrationsConfigurationPage() {
 			),
 		}));
 		markDirty();
+	};
+
+	const toggleReveal = (fieldId: string) => {
+		setRevealed((prev) => {
+			const next = new Set(prev);
+			if (next.has(fieldId)) next.delete(fieldId);
+			else next.add(fieldId);
+			return next;
+		});
 	};
 
 	const handleSave = () => {
@@ -235,9 +465,9 @@ export default function AdminIntegrationsConfigurationPage() {
 						Integrations
 					</h2>
 					<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-						Manage integration adapters, enable or disable them independently,
-						and configure retry behaviour. Every adapter has a manual fallback;
-						no integration failure blocks operations.
+						Manage integration adapters, credentials, enable/disable state, and
+						retry behaviour. Every adapter has a manual fallback; no integration
+						failure blocks operations.
 					</p>
 				</div>
 
@@ -274,10 +504,10 @@ export default function AdminIntegrationsConfigurationPage() {
 							Manual fallback for every integration
 						</p>
 						<p className="mt-1 text-xs leading-5 text-ink-soft">
-							Each adapter has a documented manual path. Invalid inbound
-							payloads are quarantined; failed outbound messages route to the
-							dead-letter queue for administrator replay. All exchanges are
-							correlated and logged end-to-end.
+							Credentials are encrypted at rest and never logged. Invalid
+							inbound payloads are quarantined; failed outbound messages route
+							to the dead-letter queue for administrator replay. All exchanges
+							are correlated and logged end-to-end.
 						</p>
 					</div>
 				</div>
@@ -386,8 +616,9 @@ export default function AdminIntegrationsConfigurationPage() {
 						Adapters
 					</h3>
 					<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-						Each adapter can be enabled or disabled independently. Disabling an
-						adapter falls back to the manual path.
+						Each adapter can be enabled or disabled independently. Credentials
+						are stored encrypted; disabling an adapter falls back to the manual
+						path.
 					</p>
 				</div>
 				<ul className="divide-y divide-line">
@@ -455,6 +686,79 @@ export default function AdminIntegrationsConfigurationPage() {
 										</div>
 									</div>
 								</div>
+
+								{i.fields.length > 0 && (
+									<div className="mt-5 rounded-xl bg-sand/50 p-4 ring-1 ring-line">
+										<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+											Credentials &amp; settings
+										</p>
+										<div className="mt-3 grid gap-3 sm:grid-cols-2">
+											{i.fields.map((f) => {
+												const fieldId = `${i.id}.${f.key}`;
+												const isRevealed = revealed.has(fieldId);
+												const isSecret = f.kind === "password";
+												return (
+													<label
+														key={f.key}
+														className="block"
+													>
+														<span className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+															{f.label}
+															{f.required && (
+																<span className="text-coral">
+																	*
+																</span>
+															)}
+														</span>
+														<div className="mt-1.5 flex items-center gap-2">
+															<Input
+																type={
+																	isSecret && !isRevealed
+																		? "password"
+																		: "text"
+																}
+																inputMode={
+																	f.kind === "number"
+																		? "numeric"
+																		: undefined
+																}
+																placeholder={f.placeholder}
+																defaultValue=""
+																className={cn(
+																	"h-10 flex-1 border-line bg-paper text-[13px] text-ink",
+																	(f.kind === "number" ||
+																		f.kind === "password" ||
+																		f.kind === "url") &&
+																		"font-mono"
+																)}
+															/>
+															{isSecret && (
+																<button
+																	type="button"
+																	onClick={() =>
+																		toggleReveal(fieldId)
+																	}
+																	aria-label={
+																		isRevealed
+																			? "Hide value"
+																			: "Show value"
+																	}
+																	className="grid size-10 shrink-0 place-items-center rounded-md border border-line bg-paper text-ink-soft transition-colors hover:bg-sand hover:text-ink"
+																>
+																	{isRevealed ? (
+																		<EyeOff className="size-4" />
+																	) : (
+																		<Eye className="size-4" />
+																	)}
+																</button>
+															)}
+														</div>
+													</label>
+												);
+											})}
+										</div>
+									</div>
+								)}
 							</li>
 						);
 					})}
@@ -472,8 +776,9 @@ export default function AdminIntegrationsConfigurationPage() {
 							The platform degrades, it does not stop. Customs decisions are
 							never made by an integration — the platform records what the
 							competent authority has provided, whether by API or by an officer
-							entering a reference. Integration changes are logged with actor,
-							prior value, and reason.
+							entering a reference. Credentials are encrypted at rest and never
+							written to logs. Integration changes are logged with actor, prior
+							value, and reason.
 						</p>
 					</div>
 				</div>

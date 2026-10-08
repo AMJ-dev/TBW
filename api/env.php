@@ -16,6 +16,8 @@
     $baseURL = "http://localhost:8080/";
     $apiURL = "https://api.trinubondedwarehouse.com/";
 
+    $redis_ip = "192.168.205.67";
+
     $email_host="mail.evcarsng.com";
     $email_port=465; 
     $email_user="info@evcarsng.com";
@@ -36,5 +38,3 @@
 
     $sms_sender = "TRINU";
     $sms_api_token = "u6MNFnajPKvyVj7bW0av21j5D3YuVNcUNEehecKfrRdLWdw71NKnw9Yv5zDD";
-
-    // CODE, VERIFICATION, OTP, TOKEN, MINUTES, PASSWORD, PIN etc
