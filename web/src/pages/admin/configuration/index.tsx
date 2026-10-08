@@ -269,67 +269,6 @@ export default function ConfigurationRoute() {
 						})}
 					</div>
 
-					{featured.length > 0 && (
-						<section className="rounded-2xl bg-slate p-5 text-sand ring-1 ring-slate">
-							<div className="flex flex-wrap items-center justify-between gap-4">
-								<div className="flex min-w-0 items-start gap-3">
-									<div className="grid size-10 shrink-0 place-items-center rounded-lg bg-orange/15 text-orange">
-										<Settings2 className="size-5" />
-									</div>
-									<div className="min-w-0">
-										<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
-											Quick access
-										</p>
-										<p className="mt-1 font-display text-base font-bold text-sand">
-											Most-visited configuration areas
-										</p>
-										<p className="mt-0.5 text-[12px] leading-5 text-sand/75">
-											Direct links for day-to-day operations.
-										</p>
-									</div>
-								</div>
-								<Link to="/admin/audit">
-									<Button
-										variant="outline"
-										size="sm"
-										className="border-sand/25 bg-transparent text-sand hover:bg-sand/10"
-									>
-										View audit log
-										<ArrowRight className="ml-1 size-3.5" />
-									</Button>
-								</Link>
-							</div>
-
-							<div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-								{featured.map((s) => {
-									const Icon = iconRegistry[s.icon] ?? Settings2;
-									return (
-										<Link
-											key={s.key}
-											to={s.href}
-											className="group flex items-center justify-between gap-3 rounded-xl bg-sand/5 px-4 py-3 ring-1 ring-sand/15 transition-colors hover:bg-sand/10"
-										>
-											<div className="flex min-w-0 items-center gap-3">
-												<div className="grid size-8 shrink-0 place-items-center rounded-md bg-orange/15 text-orange">
-													<Icon className="size-4" />
-												</div>
-												<div className="min-w-0">
-													<p className="truncate text-[13px] font-semibold text-sand">
-														{s.title}
-													</p>
-													<p className="truncate font-mono text-[10px] text-sand/70">
-														{s.state}
-													</p>
-												</div>
-											</div>
-											<ArrowRight className="size-4 shrink-0 text-sand/50 transition-transform group-hover:translate-x-0.5 group-hover:text-orange" />
-										</Link>
-									);
-								})}
-							</div>
-						</section>
-					)}
-
 					{grouped.map((g) => (
 						<section key={g.key} className="space-y-3">
 							<div className="flex flex-wrap items-end justify-between gap-2">

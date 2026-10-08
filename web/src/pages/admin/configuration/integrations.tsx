@@ -305,33 +305,6 @@ const initialConfig: IntegrationsConfig = {
 			],
 		},
 		{
-			id: "i-8",
-			name: "Accounting / ERP",
-			desc: "API adapter or scheduled export to the accounting system. Customer master source-of-truth agreed during Discovery.",
-			icon: FileSpreadsheet,
-			status: "Scheduled export",
-			tone: "info",
-			enabled: true,
-			retryCount: 3,
-			healthLabel: "Daily export scheduled",
-			fields: [
-				{
-					key: "erp_endpoint",
-					label: "ERP endpoint",
-					placeholder: "https://erp.example.com/api",
-					kind: "url",
-					required: false,
-				},
-				{
-					key: "erp_api_key",
-					label: "ERP API key",
-					placeholder: "••••••••",
-					kind: "password",
-					required: false,
-				},
-			],
-		},
-		{
 			id: "i-9",
 			name: "Weighbridge",
 			desc: "Serial/TCP weight ticket capture with operator attribution.",
@@ -512,103 +485,6 @@ export default function AdminIntegrationsConfigurationPage() {
 					</div>
 				</div>
 			</div>
-
-			<section className="rounded-2xl bg-paper ring-1 ring-line">
-				<div className="border-b border-line p-5">
-					<h3 className="font-display text-sm font-bold text-ink">
-						Integration Controls
-					</h3>
-					<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-						Cross-cutting behaviour applied to every adapter.
-					</p>
-				</div>
-				<ul className="divide-y divide-line">
-					<RuleRow
-						icon={Network}
-						label="Correlation ID logging"
-						desc="Attach a correlation ID to every request and response across adapters."
-						on={config.correlationIdLogging}
-						onToggle={() =>
-							update("correlationIdLogging", !config.correlationIdLogging)
-						}
-					/>
-					<RuleRow
-						icon={RefreshCcw}
-						label="Dead-letter queue with admin replay"
-						desc="Failed messages retained and replayable by an administrator."
-						on={config.deadLetterQueueEnabled}
-						onToggle={() =>
-							update(
-								"deadLetterQueueEnabled",
-								!config.deadLetterQueueEnabled
-							)
-						}
-					/>
-					<RuleRow
-						icon={ShieldCheck}
-						label="Circuit breaker"
-						desc="Pause dispatch to an adapter after repeated failures and reopen automatically."
-						on={config.circuitBreakerEnabled}
-						onToggle={() =>
-							update("circuitBreakerEnabled", !config.circuitBreakerEnabled)
-						}
-					/>
-					<RuleRow
-						icon={ShieldCheck}
-						label="Schema validation and quarantine"
-						desc="Reject and quarantine inbound payloads that fail schema validation."
-						on={config.schemaValidationRequired}
-						onToggle={() =>
-							update(
-								"schemaValidationRequired",
-								!config.schemaValidationRequired
-							)
-						}
-					/>
-					<RuleRow
-						icon={ShieldCheck}
-						label="Enforce manual fallback"
-						desc="Require a documented manual path for every enabled adapter."
-						on={config.manualFallbackRequired}
-						onToggle={() =>
-							update(
-								"manualFallbackRequired",
-								!config.manualFallbackRequired
-							)
-						}
-					/>
-					<div className="flex flex-wrap items-start justify-between gap-4 p-5">
-						<div className="flex min-w-[240px] flex-1 items-start gap-3">
-							<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-								<RefreshCcw className="size-4" />
-							</div>
-							<div className="min-w-0">
-								<p className="text-[13px] font-semibold text-ink">
-									Retry backoff base
-								</p>
-								<p className="mt-0.5 text-[11px] leading-5 text-ink-soft">
-									Base interval for exponential retry/backoff across adapters.
-								</p>
-							</div>
-						</div>
-						<div className="flex items-center gap-2">
-							<Input
-								value={String(config.retryBackoffSeconds)}
-								onChange={(e) =>
-									update(
-										"retryBackoffSeconds",
-										Number(e.target.value) || 0
-									)
-								}
-								className="h-9 w-24 border-line bg-sand font-mono text-sm text-ink"
-							/>
-							<span className="font-mono text-[11px] text-ink-soft">
-								seconds
-							</span>
-						</div>
-					</div>
-				</ul>
-			</section>
 
 			<section className="rounded-2xl bg-paper ring-1 ring-line">
 				<div className="border-b border-line p-5">
