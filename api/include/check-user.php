@@ -50,9 +50,7 @@
         $my_details->session_id = $decoded->session_id;
 
         unset($my_details->password);
-
         require_once __DIR__ . '/set-cookie.php';
-
     } catch (Exception $e) {
         invalid_token();
     }
