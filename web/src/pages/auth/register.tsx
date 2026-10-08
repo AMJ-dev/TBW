@@ -430,7 +430,6 @@ export default function RegisterPage() {
 				form.append(`licence_id_${index}`, l.id);
 			}
 		});
-
 		return form;
 	};
 

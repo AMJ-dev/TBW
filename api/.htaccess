@@ -39,12 +39,12 @@ RewriteRule ^my-sessions/$ src/sessions/get.php [NC]
 RewriteRule ^my-sessions/revoke-others/$ src/sessions/revoke-others.php [NC]
 RewriteRule ^my-sessions/revoke/([0-9a-zA-Z-]+)/$ src/sessions/revoke.php?id=$1 [NC]
 
-RewriteRule ^admin/organizations/$ src/organizations/get.php [NC]
-RewriteRule ^organisation/my-registration/$ src/organizations/non-details.php [NC]
-RewriteRule ^organisation/submit-registration/$ src/organizations/replace.php [NC]
-RewriteRule ^admin/organizations/([0-9a-zA-Z-]+)/$ src/organizations/details.php?id=$1 [NC]
-RewriteRule ^admin/organizations/reject/([0-9a-zA-Z-]+)/$ src/organizations/reject.php?id=$1 [NC]
-RewriteRule ^admin/organizations/approve/([0-9a-zA-Z-]+)/$ src/organizations/approve.php?id=$1 [NC]
+RewriteRule ^admin/organisations/$ src/organisations/get.php [NC]
+RewriteRule ^organisation/my-registration/$ src/organisations/non-details.php [NC]
+RewriteRule ^organisation/submit-registration/$ src/organisations/replace.php [NC]
+RewriteRule ^admin/organisations/([0-9a-zA-Z-]+)/$ src/organisations/details.php?id=$1 [NC]
+RewriteRule ^admin/organisations/reject/([0-9a-zA-Z-]+)/$ src/organisations/reject.php?id=$1 [NC]
+RewriteRule ^admin/organisations/approve/([0-9a-zA-Z-]+)/$ src/organisations/approve.php?id=$1 [NC]
 
 RewriteRule ^admin/roles/$ src/roles/get.php [NC]
 

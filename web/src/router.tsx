@@ -39,8 +39,8 @@ const EditProfilePage = lazy(() => import("@/pages/profile/edit"));
 const AdminPage = lazy(() => import("@/pages/admin"));
 const AdminAuditPage = lazy(() => import("@/pages/admin/audit"));
 const AdminConfigurationPage = lazy(() => import("@/pages/admin/configuration"));
-const AdminOrganizationsPage = lazy(() => import("@/pages/admin/organizations"));
-const AdminOrganizationDetailsPage = lazy(() => import("@/pages/admin/organization-details"));
+const AdminOrganisationsPage = lazy(() => import("@/pages/admin/organisations"));
+const AdminOrganisationDetailsPage = lazy(() => import("@/pages/admin/organisation-details"));
 const AdminRolesPage = lazy(() => import("@/pages/admin/roles"));
 const AdminUsersPage = lazy(() => import("@/pages/admin/users"));
 const AdminAddUsersPage = lazy(() => import("@/pages/admin/add-user"));
@@ -152,8 +152,8 @@ export default function Routers() {
 						<Route path="/admin" element={<AdminPage />} />
 						<Route path="/admin/audit" element={<AdminAuditPage />} />
 						<Route path="/admin/configuration" element={<AdminConfigurationPage />} />
-						<Route path="/admin/organizations" element={<AdminOrganizationsPage />} />
-						<Route path="/admin/organizations/:id" element={<AdminOrganizationDetailsPage />} />
+						<Route path="/admin/organisations" element={<AdminOrganisationsPage />} />
+						<Route path="/admin/organisations/:id" element={<AdminOrganisationDetailsPage />} />
 						<Route path="/admin/roles" element={<AdminRolesPage />} />
 						<Route path="/admin/users" element={<AdminUsersPage />} />
 						<Route path="/admin/user/add" element={<AdminAddUsersPage />} />
