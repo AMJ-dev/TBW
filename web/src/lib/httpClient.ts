@@ -82,14 +82,14 @@ http.interceptors.response.use(
         if (err.response) {
             const status = err.response.status
             const responseData = err.response.data
-
+            console.log({status})
             if (status === 401 || status === 403 || status === 405) {
                 if (status === 403 && responseData?.code === 'ACCOUNT_SUSPENDED') {
                     console.log('Account is suspended:', responseData.data)
                     window.location.href = '/account-suspended'
                 } else if (status === 405) {
                     console.log('Invalid token / Method Not Allowed:', responseData?.data)
-                    // window.location.href = '/unauthorized'
+                    window.location.href = '/unauthorized'
                 }
             }
         }

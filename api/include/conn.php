@@ -6,18 +6,9 @@
 
     require_once __DIR__."/constants.php";    
     require_once __DIR__."/connections/redis.php";
-
     require_once __DIR__."/connections/db.php";
 
-    require_once __DIR__.'/php-jwt/BeforeValidException.php';
-    require_once __DIR__.'/php-jwt/ExpiredException.php';
-    require_once __DIR__.'/php-jwt/SignatureInvalidException.php';
-    require_once __DIR__.'/php-jwt/JWT.php';
-
-    require __DIR__."/PHPMailer/Exception.php";
-    require __DIR__."/PHPMailer/PHPMailer.php";
-    require __DIR__."/PHPMailer/SMTP.php";
-
-    require __DIR__.'/set-header.php';
-    
-    require __DIR__.'/functions.php';
+    require_once __DIR__.'/php-jwt/index.php';
+    require_once __DIR__."/PHPMailer/index.php";
+    require_once __DIR__.'/set-header.php';
+    require_once __DIR__.'/functions.php';

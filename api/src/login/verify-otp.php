@@ -92,9 +92,7 @@
             LIMIT 1
         ");
 
-        $stmt->execute([
-            ":id" => $user["organisation_id"]
-        ]);
+        $stmt->execute([":id" => $user["organisation_id"]]);
 
         $organisation = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -170,9 +168,7 @@
             FOR UPDATE
         ");
 
-        $stmt->execute([
-            ":user_id" => $user_id
-        ]);
+        $stmt->execute([":user_id" => $user_id]);
 
         $otp_record = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -189,15 +185,8 @@
 
         if (strtotime($otp_record["expires_at"]) <= time()) {
 
-            $stmt = $conn->prepare("
-                UPDATE otp_codes
-                SET revoked_at = NOW()
-                WHERE id = :id
-            ");
-
-            $stmt->execute([
-                ":id" => $otp_record["id"]
-            ]);
+            $stmt = $conn->prepare("UPDATE otp_codes SET revoked_at = NOW() WHERE id = :id");
+            $stmt->execute([":id" => $otp_record["id"]]);
 
             $conn->commit();
 
@@ -211,15 +200,8 @@
 
         if ((int)$otp_record["attempts"] >= (int)$otp_record["max_attempts"]) {
 
-            $stmt = $conn->prepare("
-                UPDATE otp_codes
-                SET revoked_at = NOW()
-                WHERE id = :id
-            ");
-
-            $stmt->execute([
-                ":id" => $otp_record["id"]
-            ]);
+            $stmt = $conn->prepare("UPDATE otp_codes SET revoked_at = NOW() WHERE id = :id");
+            $stmt->execute([":id" => $otp_record["id"]]);
 
             $conn->commit();
 
@@ -232,36 +214,13 @@
         }
 
         if (!password_verify($otp, $otp_record["otp_hash"])) {
-
             $attempts = (int)$otp_record["attempts"] + 1;
-
             if ($attempts >= (int)$otp_record["max_attempts"]) {
-
-                $stmt = $conn->prepare("
-                    UPDATE otp_codes
-                    SET
-                        attempts = :attempts,
-                        revoked_at = NOW()
-                    WHERE id = :id
-                ");
-
-                $stmt->execute([
-                    ":attempts" => $attempts,
-                    ":id" => $otp_record["id"]
-                ]);
-
+                $stmt = $conn->prepare("UPDATE otp_codes SET attempts = :attempts, revoked_at = NOW() WHERE id = :id");
+                $stmt->execute([":attempts" => $attempts, ":id" => $otp_record["id"]]);
             } else {
-
-                $stmt = $conn->prepare("
-                    UPDATE otp_codes
-                    SET attempts = :attempts
-                    WHERE id = :id
-                ");
-
-                $stmt->execute([
-                    ":attempts" => $attempts,
-                    ":id" => $otp_record["id"]
-                ]);
+                $stmt = $conn->prepare("UPDATE otp_codes SET attempts = :attempts WHERE id = :id");
+                $stmt->execute([":attempts" => $attempts, ":id" => $otp_record["id"]]);
             }
 
             $attempt_id = generateId();
@@ -320,19 +279,14 @@
             WHERE id = :id
         ");
 
-        $stmt->execute([
-            ":id" => $otp_record["id"]
-        ]);
+        $stmt->execute([":id" => $otp_record["id"]]);
 
         $session_id = generateId();
 
         $session_token = bin2hex(random_bytes(32));
         $session_token_hash = hash("sha256", $session_token);
 
-        $session_expires_at = date(
-            "Y-m-d H:i:s",
-            time() + (30 * 24 * 60 * 60)
-        );
+        $session_expires_at = date("Y-m-d H:i:s", time() + (30 * 24 * 60 * 60));
 
         $stmt = $conn->prepare("
             INSERT INTO sessions (
@@ -386,9 +340,7 @@
             WHERE id = :user_id
         ");
 
-        $stmt->execute([
-            ":user_id" => $user_id
-        ]);
+        $stmt->execute([":user_id" => $user_id]);
 
         $attempt_id = generateId();
 
@@ -450,14 +402,9 @@
                 LIMIT 1
             ");
 
-            $stmt->execute([
-                ":role_id" => $user["system_role_id"]
-            ]);
-
+            $stmt->execute([":role_id" => $user["system_role_id"]]);
             $role = $stmt->fetch(PDO::FETCH_ASSOC);
-
         } else {
-
             $stmt = $conn->prepare("
                 SELECT
                     r.id,
@@ -488,9 +435,7 @@
                 LIMIT 1
             ");
 
-            $stmt->execute([
-                ":user_id" => $user_id
-            ]);
+            $stmt->execute([":user_id" => $user_id]);
 
             $role = $stmt->fetch(PDO::FETCH_ASSOC);
         }
@@ -523,9 +468,7 @@
             ORDER BY p.module, p.action
         ");
 
-        $stmt->execute([
-            ":role_id" => $role_id
-        ]);
+        $stmt->execute([":role_id" => $role_id]);
 
         $permission_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -544,13 +487,8 @@
         else $route = "/portal";
 
         require_once dirname(__DIR__, 2) . "/include/set-token.php";
-
     } catch (Throwable $e) {
-
-        if ($conn->inTransaction()) {
-            $conn->rollBack();
-        }
-
+        if ($conn->inTransaction()) $conn->rollBack();
         error_log("Login verify OTP error: " . $e->getMessage());
 
         http_response_code(500);

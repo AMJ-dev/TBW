@@ -13,6 +13,10 @@
     $db_user = "cyberpros";
     $db_pass = "Group2022@";
 
+    $redis_ip = "192.168.205.67";
+    $redis_port = 6379;
+    $redis_password="Group2020@";
+
     $baseURL = "http://localhost:8080/";
     $apiURL = "https://api.trinubondedwarehouse.com/";
     

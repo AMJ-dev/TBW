@@ -1,14 +1,13 @@
 <?php
-
     require_once __DIR__ . '/set-header.php';
 
     use Firebase\JWT\JWT;
     use Firebase\JWT\Key;
-
+    
     $token = $_COOKIE['token'] ?? null;
 
     if (!$token) invalid_token();
-
+    
     try {
         $decoded = JWT::decode($token, new Key($publicKey, 'RS256'));
 

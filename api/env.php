@@ -17,6 +17,8 @@
     $apiURL = "https://api.trinubondedwarehouse.com/";
 
     $redis_ip = "192.168.205.67";
+    $redis_port = 6379;
+    $redis_password="Group2020@";
 
     $email_host="mail.evcarsng.com";
     $email_port=465; 
@@ -28,7 +30,7 @@
     $email_host="smtp.resend.com";
     $email_port=465; 
     $email_user="resend";
-    $email_password="re_aU7TUdFD_Pf9144Q5tjcMm7ptVjxeJ1zv";
+    $email_password="re_LkgVH9pr_EddXQL8XwfSWEEuLoorfiG9E";
     $sender_email = "info@lovebite.online";
     $info_email = "sender@lovebite.online";
     

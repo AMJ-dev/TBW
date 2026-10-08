@@ -113,14 +113,17 @@ export default function UserProvider({ children }: PropsWithChildren) {
             const res = await http.get("get-profile/");
             const resp: Resp = res.data;
 
-            if (resp.error === false && resp.data) updateProfile(resp.data);
+            if (resp.error === false && resp.data) {
+                updateProfile(resp.data);
+            }
+            else console.log("error")
         } catch (error: any) {
             const status =
                 error?.status ||
                 error?.response?.status ||
                 error?.response?.data?.status;
-
-            if (status === 401) logout();
+            console.log({status})
+            if (status === 401 || status === 403 || status === 405) logout();
         } finally {
             fetchingProfile.current = false;
             setDetailsReady(true);
