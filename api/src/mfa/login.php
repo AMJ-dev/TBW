@@ -540,10 +540,7 @@
             random_bytes(32)
         );
 
-        $session_token_hash = hash(
-            "sha256",
-            $session_token
-        );
+        $session_token_hash = hash("sha256", $session_token);
 
         $session_expires_at = date(
             "Y-m-d H:i:s",
@@ -751,8 +748,7 @@
             ":role_id" => $role_id
         ]);
 
-        $permission_rows =
-            $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $permission_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $permissions = [];
         $privileges = [];
@@ -774,51 +770,10 @@
             }
         }
 
-
         $conn->commit();
+        $route = $user["account_type"] === "system"?"/admin":"/portal";
 
-        $token= ["id"=>$user_id, "session_id"=>$session_id];
-        $jwt = JWT::encode($token, $privateKey, 'RS256');
-
-        setcookie(
-            'token',                   
-            $jwt,                       
-            [
-                'expires'  => time() + 86400,
-                'path'     => '/',
-                'domain'   => '',         
-                'secure'   => str_starts_with(strtolower($baseURL), 'https://'),       
-                'httponly' => true,       
-                'samesite' => 'Lax'        
-            ]
-        ); 
-        echo json_encode([
-            "error" => false,
-            "data" => "Login successful.",
-            "code" => [
-                "token" => $session_token,
-                "email" => $user["email"],
-                "expires_in" => 2592000,
-                "user" => [
-                    "id" => $user["id"],
-                    "email" => $user["email"],
-                    "full_name" => $user["full_name"],
-                    "phone" => $user["phone"],
-                    "account_type" => $user["account_type"]
-                ],
-                "role" => [
-                    "id" => $role_id,
-                    "key" => $role_key,
-                    "name" => $role_name,
-                    "scope" => $role_scope
-                ],
-                "route" => $user["account_type"] === "system"?"/admin":"/portal",
-                "privileges" => $privileges,
-                "permissions" => $permissions
-            ]
-        ]);
-
-        exit;
+        require_once dirname(__DIR__, 2) . "/include/set-token.php";
 
     } catch (Throwable $e) {
 

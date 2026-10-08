@@ -1,6 +1,4 @@
 <?php
-
-    use Firebase\JWT\JWT;
     require_once dirname(__DIR__, 2) . "/include/set-header.php";
 
     $email = strtolower(trim($_POST["email"] ?? ""));
@@ -539,60 +537,13 @@
             if (!in_array($permission["module"], $privileges, true)) $privileges[] = $permission["module"];
         }
 
+        $conn->commit();
+
         if ($user["account_type"] === "organisation" && $organisation && $organisation["verification_status"] === "rejected") $route = "/organisation/review";
         else if($user["account_type"] === "system") $route = "/admin";
         else $route = "/portal";
 
-        $conn->commit();
-
-        $token = [
-            "id" => $user_id,
-            "session_id" => $session_id
-        ];
-
-        $jwt = JWT::encode($token, $privateKey, "RS256");
-
-        setcookie(
-            "token",
-            $jwt,
-            [
-                "expires" => time() + 86400,
-                "path" => "/",
-                "domain" => "",
-                "secure" => str_starts_with(strtolower($baseURL), "https://"),
-                "httponly" => true,
-                "samesite" => "Lax"
-            ]
-        );
-
-        echo json_encode([
-            "error" => false,
-            "data" => "Login successful.",
-            "code" => [
-                "email" => $user["email"],
-                "expires_in" => 2592000,
-                "user" => [
-                    "id" => $user["id"],
-                    "email" => $user["email"],
-                    "full_name" => $user["full_name"],
-                    "phone" => $user["phone"],
-                    "account_type" => $user["account_type"],
-                    "account_status" => $user["account_status"],
-                ],
-                "organisation" => $organisation,
-                "role" => [
-                    "id" => $role_id,
-                    "key" => $role_key,
-                    "name" => $role_name,
-                    "scope" => $role_scope
-                ],
-                "route" => $route,
-                "privileges" => $privileges,
-                "permissions" => $permissions
-            ]
-        ]);
-
-        exit;
+        require_once dirname(__DIR__, 2) . "/include/set-token.php";
 
     } catch (Throwable $e) {
 

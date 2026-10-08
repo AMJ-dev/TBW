@@ -38,13 +38,28 @@ const EditProfilePage = lazy(() => import("@/pages/profile/edit"));
 
 const AdminPage = lazy(() => import("@/pages/admin"));
 const AdminAuditPage = lazy(() => import("@/pages/admin/audit"));
-const AdminConfigurationPage = lazy(() => import("@/pages/admin/configuration"));
+const AdminConfigurationPage = lazy(() => import("@/pages/admin/configuration/index"));
 const AdminOrganisationsPage = lazy(() => import("@/pages/admin/organisations"));
 const AdminOrganisationDetailsPage = lazy(() => import("@/pages/admin/organisation-details"));
 const AdminRolesPage = lazy(() => import("@/pages/admin/roles"));
 const AdminUsersPage = lazy(() => import("@/pages/admin/users"));
 const AdminAddUsersPage = lazy(() => import("@/pages/admin/add-user"));
 const AdminUserDetailsPage = lazy(() => import("@/pages/admin/user-details"));
+
+const AdminCargoConfigurationPage = lazy(() => import("@/pages/admin/configuration/cargo"));
+const AdminDocumentsConfigurationPage = lazy(() => import("@/pages/admin/configuration/documents"));
+const AdminFeatureFlagsConfigurationPage = lazy(() => import("@/pages/admin/configuration/feature-flags"));
+const AdminFinancialConfigurationPage = lazy(() => import("@/pages/admin/configuration/financial"));
+const AdminGateConfigurationPage = lazy(() => import("@/pages/admin/configuration/gate"));
+const AdminIntegrationsConfigurationPage = lazy(() => import("@/pages/admin/configuration/integrations"));
+const AdminMaintenanceConfigurationPage = lazy(() => import("@/pages/admin/configuration/maintenance"));
+const AdminNotificationsConfigurationPage = lazy(() => import("@/pages/admin/configuration/notifications"));
+const AdminOrganisationConfigurationPage = lazy(() => import("@/pages/admin/configuration/organisation"));
+const AdminSecurityConfigurationPage = lazy(() => import("@/pages/admin/configuration/security"));
+const AdminStorageConfigurationPage = lazy(() => import("@/pages/admin/configuration/storage"));
+const AdminTerminalConfigurationPage = lazy(() => import("@/pages/admin/configuration/terminal"));
+const AdminRetentionConfigurationPage = lazy(() => import("@/pages/admin/configuration/retention"));
+
 
 const FinancePage = lazy(() => import("@/pages/finance"));
 const FinanceDashboardPage = lazy(() => import("@/pages/finance/dashboard"));
@@ -158,7 +173,23 @@ export default function Routers() {
 						<Route path="/admin/users" element={<AdminUsersPage />} />
 						<Route path="/admin/user/add" element={<AdminAddUsersPage />} />
 						<Route path="/admin/users/:id" element={<AdminUserDetailsPage />} />
-
+						<Route path="/admin/configuration/organisation" element={<AdminOrganisationConfigurationPage />} />
+						<Route path="/admin/configuration/terminal" element={<AdminTerminalConfigurationPage />} />
+						<Route path="/admin/configuration/cargo" element={<AdminCargoConfigurationPage />} />
+						<Route path="/admin/configuration/documents" element={<AdminDocumentsConfigurationPage />} />
+						<Route path="/admin/configuration/feature-flags" element={<AdminFeatureFlagsConfigurationPage />} />
+						<Route path="/admin/configuration/gate" element={<AdminGateConfigurationPage />} />
+						<Route path="/admin/configuration/integrations" element={<AdminIntegrationsConfigurationPage />} />
+						<Route path="/admin/configuration/maintenance" element={<AdminMaintenanceConfigurationPage />} />
+						<Route path="/admin/configuration/notifications" element={<AdminNotificationsConfigurationPage />} />
+						<Route path="/admin/configuration/security" element={<AdminSecurityConfigurationPage />} />
+						<Route path="/admin/configuration/storage" element={<AdminStorageConfigurationPage />} />
+						<Route path="/admin/configuration/terminal" element={<AdminTerminalConfigurationPage />} />
+						<Route path="/admin/configuration/financial" element={<AdminFinancialConfigurationPage />} />
+						<Route path="/admin/configuration/financial" element={<AdminFinancialConfigurationPage />} />
+						<Route path="/admin/configuration/financial" element={<AdminFinancialConfigurationPage />} />
+						<Route path="/admin/configuration/retention" element={<AdminRetentionConfigurationPage />} />
+						
 						<Route path="/finance" element={<FinancePage />} />
 						<Route path="/finance/dashboard" element={<FinanceDashboardPage />} />
 						<Route path="/finance/invoices" element={<FinanceInvoicesPage />} />

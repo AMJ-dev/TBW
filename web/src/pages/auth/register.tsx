@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
 import { http, type Resp } from "@/lib/httpClient";
+import { sectorOptions } from "@/lib/constants";
 
 type AccountType = "importer" | "agent";
 
@@ -127,43 +128,6 @@ type LicenceEntry = {
 	reference: string;
 	file: File | null;
 };
-
-const sectorOptions = [
-	"Agriculture & Agro-processing",
-	"Automotive & Spare Parts",
-	"Aviation & Aerospace",
-	"Chemicals & Petrochemicals",
-	"Construction & Building Materials",
-	"Consumer Goods & FMCG",
-	"E-commerce & Digital Services",
-	"Education & Training",
-	"Electronics & Technology",
-	"Energy, Power & Utilities",
-	"Engineering & Technical Services",
-	"Environment, Waste Management & Recycling",
-	"Fashion, Textiles & Apparel",
-	"Financial Services, Banking & Fintech",
-	"Food & Beverage",
-	"Healthcare & Pharmaceuticals",
-	"Hospitality, Tourism & Entertainment",
-	"Industrial & Manufacturing",
-	"Infrastructure & Real Estate",
-	"Insurance & Risk Management",
-	"Legal, Consulting & Professional Services",
-	"Logistics, Freight Forwarding & Supply Chain",
-	"Machinery & Heavy Equipment",
-	"Maritime, Shipping & Port Operations",
-	"Mining, Minerals & Metals",
-	"Oil & Gas (Upstream, Midstream & Downstream)",
-	"Packaging, Printing & Publishing",
-	"Professional, Scientific & Technical Services",
-	"Public Sector, Government & NGOs",
-	"Retail & Wholesale Distribution",
-	"Telecommunications & Media",
-	"Transportation & Fleet Management",
-	"Water Resources & Sanitation",
-	"Other",
-] as const;
 
 type Sector = (typeof sectorOptions)[number];
 

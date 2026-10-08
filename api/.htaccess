@@ -60,6 +60,9 @@ RewriteRule ^admin/users/suspend/([0-9a-zA-Z-]+)/$ src/users/suspend.php?id=$1 [
 RewriteRule ^admin/users/reactivate/([0-9a-zA-Z-]+)/$ src/users/reactivate.php?id=$1 [NC]
 RewriteRule ^admin/users/reset-mfa/([0-9a-zA-Z-]+)/$ src/users/reset-mfa.php?id=$1 [NC]
 
+RewriteRule ^admin/config/hub/$ src/admin-config/hub.php [NC]
+
+
 RewriteRule ^portal/users/$ src/portal/get-users.php [NC]
 RewriteRule ^portal/roles/$ src/portal/get-roles.php [NC]
 RewriteRule ^portal/user/invite/$ src/portal/invite.php [NC]
