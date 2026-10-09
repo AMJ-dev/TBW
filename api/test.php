@@ -4,70 +4,62 @@ require_once __DIR__ . '/include/conn.php';
 try {
     $conn->beginTransaction();
 
-    $q = $conn->prepare("INSERT INTO gate_configuration (id, config_key, slot_duration, concurrent_slots, advance_booking_window_days, amendment_cutoff_hours) VALUES (:id, :config_key, :slot_duration, :concurrent_slots, :advance_booking_window_days, :amendment_cutoff_hours) ON DUPLICATE KEY UPDATE slot_duration = VALUES(slot_duration), concurrent_slots = VALUES(concurrent_slots), advance_booking_window_days = VALUES(advance_booking_window_days), amendment_cutoff_hours = VALUES(amendment_cutoff_hours)");
+    $q = $conn->prepare("INSERT INTO financial_configuration (id, config_key, base_currency, fx_enabled, fx_currency, fx_source, fx_rate, fx_effective_at, vat_rate, discount_threshold, waiver_threshold, credit_note_threshold, dual_approval_required, clearance_gate_enforced, allow_approved_credit, allow_waiver, auto_block_on_exposure, default_credit_terms_days, dunning_interval_days) VALUES (:id, :config_key, :base_currency, :fx_enabled, :fx_currency, :fx_source, :fx_rate, :fx_effective_at, :vat_rate, :discount_threshold, :waiver_threshold, :credit_note_threshold, :dual_approval_required, :clearance_gate_enforced, :allow_approved_credit, :allow_waiver, :auto_block_on_exposure, :default_credit_terms_days, :dunning_interval_days) ON DUPLICATE KEY UPDATE base_currency = VALUES(base_currency), fx_enabled = VALUES(fx_enabled), fx_currency = VALUES(fx_currency), fx_source = VALUES(fx_source), fx_rate = VALUES(fx_rate), fx_effective_at = VALUES(fx_effective_at), vat_rate = VALUES(vat_rate), discount_threshold = VALUES(discount_threshold), waiver_threshold = VALUES(waiver_threshold), credit_note_threshold = VALUES(credit_note_threshold), dual_approval_required = VALUES(dual_approval_required), clearance_gate_enforced = VALUES(clearance_gate_enforced), allow_approved_credit = VALUES(allow_approved_credit), allow_waiver = VALUES(allow_waiver), auto_block_on_exposure = VALUES(auto_block_on_exposure), default_credit_terms_days = VALUES(default_credit_terms_days), dunning_interval_days = VALUES(dunning_interval_days)");
+
     $q->bindValue(":id", generateId(), PDO::PARAM_STR);
     $q->bindValue(":config_key", "default", PDO::PARAM_STR);
-    $q->bindValue(":slot_duration", 60, PDO::PARAM_INT);
-    $q->bindValue(":concurrent_slots", 3, PDO::PARAM_INT);
-    $q->bindValue(":advance_booking_window_days", 7, PDO::PARAM_INT);
-    $q->bindValue(":amendment_cutoff_hours", 4, PDO::PARAM_INT);
+    $q->bindValue(":base_currency", "NGN", PDO::PARAM_STR);
+    $q->bindValue(":fx_enabled", 0, PDO::PARAM_INT);
+    $q->bindValue(":fx_currency", "USD", PDO::PARAM_STR);
+    $q->bindValue(":fx_source", "", PDO::PARAM_STR);
+    $q->bindValue(":fx_rate", 0, PDO::PARAM_STR);
+    $q->bindValue(":fx_effective_at", null, PDO::PARAM_NULL);
+    $q->bindValue(":vat_rate", 7.5, PDO::PARAM_STR);
+    $q->bindValue(":discount_threshold", 500000, PDO::PARAM_STR);
+    $q->bindValue(":waiver_threshold", 250000, PDO::PARAM_STR);
+    $q->bindValue(":credit_note_threshold", 100000, PDO::PARAM_STR);
+    $q->bindValue(":dual_approval_required", 1, PDO::PARAM_INT);
+    $q->bindValue(":clearance_gate_enforced", 1, PDO::PARAM_INT);
+    $q->bindValue(":allow_approved_credit", 1, PDO::PARAM_INT);
+    $q->bindValue(":allow_waiver", 0, PDO::PARAM_INT);
+    $q->bindValue(":auto_block_on_exposure", 1, PDO::PARAM_INT);
+    $q->bindValue(":default_credit_terms_days", 30, PDO::PARAM_INT);
+    $q->bindValue(":dunning_interval_days", 7, PDO::PARAM_INT);
     $q->execute();
 
-    $q = $conn->prepare("SELECT id FROM gate_configuration WHERE config_key = :config_key LIMIT 1");
+    $q = $conn->prepare("SELECT id FROM financial_configuration WHERE config_key = :config_key LIMIT 1");
     $q->bindValue(":config_key", "default", PDO::PARAM_STR);
     $q->execute();
     $configurationId = $q->fetchColumn();
 
-    $blackouts = [
-        [
-            "date" => date("Y") . "-12-25",
-            "reason" => "Christmas Day"
-        ],
-        [
-            "date" => date("Y") . "-01-01",
-            "reason" => "New Year's Day"
-        ]
-    ];
-
-    foreach ($blackouts as $item) {
-        $q = $conn->prepare("INSERT INTO gate_blackout_periods (id, gate_configuration_id, blackout_date, reason) VALUES (:id, :configuration_id, :blackout_date, :reason) ON DUPLICATE KEY UPDATE reason = VALUES(reason)");
-        $q->bindValue(":id", generateId(), PDO::PARAM_STR);
-        $q->bindValue(":configuration_id", $configurationId, PDO::PARAM_STR);
-        $q->bindValue(":blackout_date", $item["date"], PDO::PARAM_STR);
-        $q->bindValue(":reason", $item["reason"], PDO::PARAM_STR);
-        $q->execute();
-    }
-
-    $requirements = [
-        "Valid vehicle registration",
-        "Valid vehicle insurance certificate",
-        "Valid roadworthiness certificate",
-        "Valid driver's licence",
-        "Approved cargo documentation",
-        "Valid terminal booking confirmation"
-    ];
-
-    foreach ($requirements as $label) {
-        $q = $conn->prepare("INSERT INTO gate_vehicle_requirements (id, gate_configuration_id, label) VALUES (:id, :configuration_id, :label) ON DUPLICATE KEY UPDATE label = VALUES(label)");
-        $q->bindValue(":id", generateId(), PDO::PARAM_STR);
-        $q->bindValue(":configuration_id", $configurationId, PDO::PARAM_STR);
-        $q->bindValue(":label", $label, PDO::PARAM_STR);
-        $q->execute();
+    if (!$configurationId) {
+        throw new RuntimeException("Unable to retrieve the financial configuration ID.");
     }
 
     $conn->commit();
 
     echo json_encode([
         "error" => false,
-        "data" => "Gate and booking configuration saved successfully",
+        "data" => "Financial configuration saved successfully",
         "code" => [
             "configuration_id" => $configurationId,
-            "slot_duration" => 60,
-            "concurrent_slots" => 3,
-            "advance_booking_window_days" => 7,
-            "amendment_cutoff_hours" => 4,
-            "blackout_periods_saved" => count($blackouts),
-            "vehicle_requirements_saved" => count($requirements)
+            "base_currency" => "NGN",
+            "fx_enabled" => false,
+            "fx_currency" => "USD",
+            "fx_source" => "",
+            "fx_rate" => 0,
+            "fx_effective_at" => null,
+            "vat_rate" => 7.5,
+            "discount_threshold" => 500000,
+            "waiver_threshold" => 250000,
+            "credit_note_threshold" => 100000,
+            "dual_approval_required" => true,
+            "clearance_gate_enforced" => true,
+            "allow_approved_credit" => true,
+            "allow_waiver" => false,
+            "auto_block_on_exposure" => true,
+            "default_credit_terms_days" => 30,
+            "dunning_interval_days" => 7
         ]
     ]);
 } catch (Throwable $e) {
@@ -79,7 +71,7 @@ try {
 
     echo json_encode([
         "error" => true,
-        "data" => "Unable to save gate and booking configuration",
+        "data" => "Unable to save financial configuration",
         "code" => null
     ]);
 }

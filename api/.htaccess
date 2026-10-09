@@ -68,6 +68,8 @@ RewriteRule ^admin/config/terminal/$ src/admin-config/terminal.php [NC]
 RewriteRule ^admin/config/terminal/update/$ src/admin-config/update-terminal.php [NC]
 RewriteRule ^admin/config/gate/$ src/admin-config/gate.php [NC]
 RewriteRule ^admin/config/gate/update/$ src/admin-config/update-gate.php [NC]
+RewriteRule ^admin/config/financial/$ src/admin-config/financial.php [NC]
+RewriteRule ^admin/config/financial/update/$ src/admin-config/update-financial.php [NC]
 
 # 
 
