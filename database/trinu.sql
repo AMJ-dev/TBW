@@ -83,6 +83,127 @@ LOCK TABLES `admin_config_section_visits` WRITE;
 UNLOCK TABLES;
 
 --
+-- Table structure for table `gate_blackout_periods`
+--
+
+DROP TABLE IF EXISTS `gate_blackout_periods`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `gate_blackout_periods` (
+  `id` char(36) NOT NULL,
+  `gate_configuration_id` char(36) NOT NULL,
+  `blackout_date` date NOT NULL,
+  `reason` varchar(255) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_gate_blackout_date` (`gate_configuration_id`,`blackout_date`),
+  KEY `idx_gate_blackout_date` (`blackout_date`),
+  CONSTRAINT `fk_gate_blackout_configuration` FOREIGN KEY (`gate_configuration_id`) REFERENCES `gate_configuration` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `gate_blackout_periods`
+--
+
+LOCK TABLES `gate_blackout_periods` WRITE;
+/*!40000 ALTER TABLE `gate_blackout_periods` DISABLE KEYS */;
+INSERT INTO `gate_blackout_periods` VALUES ('7df6e6d7-a517-4d08-b2fa-6a1dda9f89db','ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','2026-12-25','Christmas Day','2026-10-09 16:55:08'),('bf794163-003d-41ee-8be6-9551410ca253','ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','2026-01-01','New Year\'s Day','2026-10-09 16:55:08');
+/*!40000 ALTER TABLE `gate_blackout_periods` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `gate_configuration`
+--
+
+DROP TABLE IF EXISTS `gate_configuration`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `gate_configuration` (
+  `id` char(36) NOT NULL,
+  `config_key` varchar(40) NOT NULL DEFAULT 'default',
+  `slot_duration` int(11) NOT NULL DEFAULT 60,
+  `concurrent_slots` int(11) NOT NULL DEFAULT 3,
+  `advance_booking_window_days` int(11) NOT NULL DEFAULT 7,
+  `amendment_cutoff_hours` int(11) NOT NULL DEFAULT 4,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_gate_configuration_key` (`config_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `gate_configuration`
+--
+
+LOCK TABLES `gate_configuration` WRITE;
+/*!40000 ALTER TABLE `gate_configuration` DISABLE KEYS */;
+INSERT INTO `gate_configuration` VALUES ('ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','default',60,3,7,4,'2026-10-09 16:41:07','2026-10-09 16:41:07');
+/*!40000 ALTER TABLE `gate_configuration` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `gate_configuration_audit`
+--
+
+DROP TABLE IF EXISTS `gate_configuration_audit`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `gate_configuration_audit` (
+  `id` char(36) NOT NULL,
+  `configuration_id` char(36) NOT NULL,
+  `actor_id` varchar(128) NOT NULL,
+  `action` varchar(40) NOT NULL,
+  `old_values` longtext DEFAULT NULL,
+  `new_values` longtext NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_gate_config_audit_configuration` (`configuration_id`),
+  KEY `idx_gate_config_audit_actor` (`actor_id`),
+  KEY `idx_gate_config_audit_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `gate_configuration_audit`
+--
+
+LOCK TABLES `gate_configuration_audit` WRITE;
+/*!40000 ALTER TABLE `gate_configuration_audit` DISABLE KEYS */;
+INSERT INTO `gate_configuration_audit` VALUES ('aa0cfb98-b521-476a-bb66-770309a41397','ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','c0654f0b-8452-4a03-a43d-0d0cda17da1b','UPDATE','{\"id\":\"ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4\",\"slot_duration\":60,\"concurrent_slots\":3,\"advance_booking_window_days\":7,\"amendment_cutoff_hours\":4}','{\"slot_duration\":60,\"concurrent_slots\":3,\"advance_booking_window_days\":7,\"amendment_cutoff_hours\":4,\"blackout_periods\":[{\"id\":\"bf794163-003d-41ee-8be6-9551410ca253\",\"date\":\"2026-01-01\",\"reason\":\"New Year\'s Day\"},{\"id\":\"7df6e6d7-a517-4d08-b2fa-6a1dda9f89db\",\"date\":\"2026-12-25\",\"reason\":\"Christmas Day\"}],\"vehicle_requirements\":[{\"id\":\"e536d3b7-f18c-48ee-9ff3-dd44d05e1e0d\",\"label\":\"Valid terminal booking confirmation\"},{\"id\":\"dec8ad52-0694-4ed9-aa06-03e454097eca\",\"label\":\"Valid vehicle registration\"},{\"id\":\"3ab4970f-937e-485c-aa01-a106164c8720\",\"label\":\"Valid driver\'s licence\"},{\"id\":\"63cb0c23-e853-4a44-bf70-ec66ce5b3c19\",\"label\":\"Approved cargo documentation\"},{\"id\":\"b9ef4b23-bf59-4b29-9d06-0f677234dbc7\",\"label\":\"Valid vehicle insurance certificate\"}]}','2026-10-09 16:55:08');
+/*!40000 ALTER TABLE `gate_configuration_audit` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `gate_vehicle_requirements`
+--
+
+DROP TABLE IF EXISTS `gate_vehicle_requirements`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `gate_vehicle_requirements` (
+  `id` char(36) NOT NULL,
+  `gate_configuration_id` char(36) NOT NULL,
+  `label` varchar(255) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_gate_vehicle_requirements_configuration` (`gate_configuration_id`),
+  CONSTRAINT `fk_gate_vehicle_requirements_configuration` FOREIGN KEY (`gate_configuration_id`) REFERENCES `gate_configuration` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `gate_vehicle_requirements`
+--
+
+LOCK TABLES `gate_vehicle_requirements` WRITE;
+/*!40000 ALTER TABLE `gate_vehicle_requirements` DISABLE KEYS */;
+INSERT INTO `gate_vehicle_requirements` VALUES ('3ab4970f-937e-485c-aa01-a106164c8720','ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','Valid driver\'s licence','2026-10-09 16:55:08'),('63cb0c23-e853-4a44-bf70-ec66ce5b3c19','ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','Approved cargo documentation','2026-10-09 16:55:08'),('b9ef4b23-bf59-4b29-9d06-0f677234dbc7','ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','Valid vehicle insurance certificate','2026-10-09 16:55:08'),('dec8ad52-0694-4ed9-aa06-03e454097eca','ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','Valid vehicle registration','2026-10-09 16:55:08'),('e536d3b7-f18c-48ee-9ff3-dd44d05e1e0d','ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','Valid terminal booking confirmation','2026-10-09 16:55:08');
+/*!40000 ALTER TABLE `gate_vehicle_requirements` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `login_attempts`
 --
 
@@ -630,7 +751,7 @@ CREATE TABLE `sessions` (
 
 LOCK TABLES `sessions` WRITE;
 /*!40000 ALTER TABLE `sessions` DISABLE KEYS */;
-INSERT INTO `sessions` VALUES ('0997562a-0144-448b-a90d-063ffddd8167','ff20dfcf-f843-4cd3-a263-412210683de9','33b8ceaf16748dafd377c91d39e5e15c266ebbe4a0eae2619e2380d490b6fd46',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:00:50','2026-10-31 18:00:50',NULL,NULL,'2026-10-01 16:00:50'),('1198246b-102c-4adf-85b6-a0460cf9b95a','4a9ba8d5-93b6-4b65-af96-934920afcd18','397fb86b977b57e309ee610d0c7967197d58a6b4f8e994cb56be5d01666af187',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:30:23','2026-11-02 15:30:23',NULL,NULL,'2026-10-03 14:30:23'),('2632d7e9-af51-46e5-9b6f-dd62e125af17','4a9ba8d5-93b6-4b65-af96-934920afcd18','a196a7f8508b401cac5197ca1458e65bad8d19eeb0d0af1de05cd57d11e618dc',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 14:46:01','2026-11-02 14:46:01',NULL,NULL,'2026-10-03 13:46:01'),('3881279e-11ea-4f3c-9d76-11927c1c28ac','ff20dfcf-f843-4cd3-a263-412210683de9','24218105a69709b7eab7a7efdfa80417e9ab77cbf3344d0195c182a3eaa784c3',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-02 12:53:24','2026-11-01 12:53:24',NULL,NULL,'2026-10-02 10:53:24'),('3f779800-112f-4a40-b843-f8f03022325d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','62f098acd16856c52d6fbb85725b83492b446893667f97a1f860302b74410753',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 12:36:27','2026-11-02 12:36:27',NULL,NULL,'2026-10-03 11:36:27'),('63ffc6d7-032d-435a-bdcf-6145ecb541c2','ff20dfcf-f843-4cd3-a263-412210683de9','fd54b95fe5fb1f4222c5491124179f80f3389ee8a6d955368df682690f48f1b4',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:20:13','2026-10-31 18:20:13',NULL,NULL,'2026-10-01 16:20:13'),('67e4f923-400e-4655-a67a-7e1bb74bcb24','ff20dfcf-f843-4cd3-a263-412210683de9','04fdd5b13e825690fa60d0de193c51a9d6f6b13e8c9235df9a412cdefc2c2c62',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:17:51','2026-10-31 18:17:51',NULL,NULL,'2026-10-01 16:17:51'),('68ef296d-8fc6-4a5f-856d-e983d5357d7e','4a9ba8d5-93b6-4b65-af96-934920afcd18','96ef396045b76fe8c218e4d3d0fdcddba9b997d9f87884a8b0d311c9f746ba32',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:01:42','2026-11-02 15:01:42',NULL,NULL,'2026-10-03 14:01:42'),('9b4fc236-f24e-4127-8259-d7816eeea03f','c0654f0b-8452-4a03-a43d-0d0cda17da1b','11a7d220a8950dc7dcaaf347897b5adc221d8d7ae134d0a27e971e0e67ea7cac',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-08 19:18:35','2026-10-10 17:20:19',NULL,NULL,'2026-10-08 18:18:35'),('b804baca-dfa2-4a05-8511-e10dcba17e0b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','de7bb0dd59388fe82003ba00911fdfbeef18f2cdb8d7d6fbc67f8e402f455cbf',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 14:30:28','2026-11-06 14:30:28',NULL,NULL,'2026-10-07 13:30:28'),('d375207c-6fe5-4be1-a753-2fb2117b2663','4a9ba8d5-93b6-4b65-af96-934920afcd18','ad2d2dcc6eec3d2bb76177f7532a22bc0107420d4d1616146a48eccb494fc19f',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:32:30','2026-11-02 15:32:30',NULL,NULL,'2026-10-03 14:32:30'),('e13d005b-11b9-4521-ad27-95cc3a2b1e7d','4a9ba8d5-93b6-4b65-af96-934920afcd18','204e4cedeb31c34b6d4f828d89fc5892aad44955df0cbda4d144d081c407ee30',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 15:17:14','2026-11-06 15:17:14',NULL,NULL,'2026-10-07 14:17:14');
+INSERT INTO `sessions` VALUES ('0997562a-0144-448b-a90d-063ffddd8167','ff20dfcf-f843-4cd3-a263-412210683de9','33b8ceaf16748dafd377c91d39e5e15c266ebbe4a0eae2619e2380d490b6fd46',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:00:50','2026-10-31 18:00:50',NULL,NULL,'2026-10-01 16:00:50'),('1198246b-102c-4adf-85b6-a0460cf9b95a','4a9ba8d5-93b6-4b65-af96-934920afcd18','397fb86b977b57e309ee610d0c7967197d58a6b4f8e994cb56be5d01666af187',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:30:23','2026-11-02 15:30:23',NULL,NULL,'2026-10-03 14:30:23'),('2632d7e9-af51-46e5-9b6f-dd62e125af17','4a9ba8d5-93b6-4b65-af96-934920afcd18','a196a7f8508b401cac5197ca1458e65bad8d19eeb0d0af1de05cd57d11e618dc',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 14:46:01','2026-11-02 14:46:01',NULL,NULL,'2026-10-03 13:46:01'),('3881279e-11ea-4f3c-9d76-11927c1c28ac','ff20dfcf-f843-4cd3-a263-412210683de9','24218105a69709b7eab7a7efdfa80417e9ab77cbf3344d0195c182a3eaa784c3',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-02 12:53:24','2026-11-01 12:53:24',NULL,NULL,'2026-10-02 10:53:24'),('3f779800-112f-4a40-b843-f8f03022325d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','62f098acd16856c52d6fbb85725b83492b446893667f97a1f860302b74410753',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 12:36:27','2026-11-02 12:36:27',NULL,NULL,'2026-10-03 11:36:27'),('63ffc6d7-032d-435a-bdcf-6145ecb541c2','ff20dfcf-f843-4cd3-a263-412210683de9','fd54b95fe5fb1f4222c5491124179f80f3389ee8a6d955368df682690f48f1b4',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:20:13','2026-10-31 18:20:13',NULL,NULL,'2026-10-01 16:20:13'),('67e4f923-400e-4655-a67a-7e1bb74bcb24','ff20dfcf-f843-4cd3-a263-412210683de9','04fdd5b13e825690fa60d0de193c51a9d6f6b13e8c9235df9a412cdefc2c2c62',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:17:51','2026-10-31 18:17:51',NULL,NULL,'2026-10-01 16:17:51'),('68ef296d-8fc6-4a5f-856d-e983d5357d7e','4a9ba8d5-93b6-4b65-af96-934920afcd18','96ef396045b76fe8c218e4d3d0fdcddba9b997d9f87884a8b0d311c9f746ba32',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:01:42','2026-11-02 15:01:42',NULL,NULL,'2026-10-03 14:01:42'),('9b4fc236-f24e-4127-8259-d7816eeea03f','c0654f0b-8452-4a03-a43d-0d0cda17da1b','11a7d220a8950dc7dcaaf347897b5adc221d8d7ae134d0a27e971e0e67ea7cac',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-08 19:18:35','2026-10-10 17:55:21',NULL,NULL,'2026-10-08 18:18:35'),('b804baca-dfa2-4a05-8511-e10dcba17e0b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','de7bb0dd59388fe82003ba00911fdfbeef18f2cdb8d7d6fbc67f8e402f455cbf',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 14:30:28','2026-11-06 14:30:28',NULL,NULL,'2026-10-07 13:30:28'),('d375207c-6fe5-4be1-a753-2fb2117b2663','4a9ba8d5-93b6-4b65-af96-934920afcd18','ad2d2dcc6eec3d2bb76177f7532a22bc0107420d4d1616146a48eccb494fc19f',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:32:30','2026-11-02 15:32:30',NULL,NULL,'2026-10-03 14:32:30'),('e13d005b-11b9-4521-ad27-95cc3a2b1e7d','4a9ba8d5-93b6-4b65-af96-934920afcd18','204e4cedeb31c34b6d4f828d89fc5892aad44955df0cbda4d144d081c407ee30',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 15:17:14','2026-11-06 15:17:14',NULL,NULL,'2026-10-07 14:17:14');
 /*!40000 ALTER TABLE `sessions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -926,4 +1047,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-09 17:20:48
+-- Dump completed on 2026-10-09 17:55:29

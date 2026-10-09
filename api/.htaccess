@@ -66,8 +66,10 @@ RewriteRule ^admin/config/organisation/update/$ src/admin-config/update-org.php 
 RewriteRule ^admin/config/organisation/remove/$ src/admin-config/remove-docs.php [NC]
 RewriteRule ^admin/config/terminal/$ src/admin-config/terminal.php [NC]
 RewriteRule ^admin/config/terminal/update/$ src/admin-config/update-terminal.php [NC]
+RewriteRule ^admin/config/gate/$ src/admin-config/gate.php [NC]
+RewriteRule ^admin/config/gate/update/$ src/admin-config/update-gate.php [NC]
 
-
+# 
 
 RewriteRule ^portal/users/$ src/portal/get-users.php [NC]
 RewriteRule ^portal/roles/$ src/portal/get-roles.php [NC]
