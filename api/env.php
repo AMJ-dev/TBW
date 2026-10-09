@@ -10,8 +10,8 @@
     
     $db_host = "localhost";
     $db_name = "trinu";
-    $db_user = "cyberpros";
-    $db_pass = "Group2022@";
+    $db_user = "root";
+    $db_pass = "";
 
     $baseURL = "http://localhost:8080/";
     $apiURL = "https://api.trinubondedwarehouse.com/";

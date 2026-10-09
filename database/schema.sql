@@ -2331,3 +2331,11 @@ ALTER TABLE registration_requests
     DROP COLUMN privacy_version,
     DROP COLUMN ip_address,
     DROP COLUMN user_agent;
+
+  ALTER TABLE organisations
+    ADD COLUMN trading_name varchar(255) DEFAULT NULL,
+    ADD COLUMN operating_address text DEFAULT NULL,
+    ADD COLUMN contact_email varchar(254) DEFAULT NULL,
+    ADD COLUMN contact_phone varchar(25) DEFAULT NULL,
+    ADD COLUMN contact_person varchar(150) DEFAULT NULL,
+    ADD COLUMN contact_person_title varchar(150) DEFAULT NULL;

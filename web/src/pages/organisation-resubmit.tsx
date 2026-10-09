@@ -94,9 +94,7 @@ export default function OrganisationResubmitPage() {
 	const [rcNumber, setRcNumber] = useState("");
 	const [tin, setTin] = useState("");
 
-	const [replacements, setReplacements] = useState<Record<string, File | null>>(
-		{}
-	);
+	const [replacements, setReplacements] = useState<Record<string, File | null>>({});
 	const [saving, setSaving] = useState(false);
 
 	const fetchAll = async () => {
