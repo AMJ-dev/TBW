@@ -124,6 +124,7 @@ const ForbiddenPage = lazy(() => import("@/pages/errors/403"));
 const RateLimitedPage = lazy(() => import("@/pages/errors/429"));
 const ServerErrorPage = lazy(() => import("@/pages/errors/500"));
 const AccountSuspended = lazy(() => import("@/pages/errors/suspended"));
+const MaintenancePage = lazy(() => import("@/pages/errors/maintenance"));
 
 export default function Routers() {
 	return (
@@ -261,6 +262,7 @@ export default function Routers() {
 					<Route path="/429" element={<RateLimitedPage />} />
 					<Route path="/500" element={<ServerErrorPage />} />
 					<Route path="/unauthorized" element={<Unauthorized />} />
+					<Route path="/maintenance" element={<MaintenancePage />} />
 					<Route path="/account-suspended" element={<AccountSuspended />} />
 					<Route path="*" element={<NotFoundPage />} />
 				</Route>
