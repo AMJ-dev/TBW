@@ -74,6 +74,8 @@ RewriteRule ^admin/config/storage/$ src/admin-config/storage.php [NC]
 RewriteRule ^admin/config/storage/update/$ src/admin-config/update-storage.php [NC]
 RewriteRule ^admin/config/cargo/$ src/admin-config/cargo.php [NC]
 RewriteRule ^admin/config/cargo/update/$ src/admin-config/update-cargo.php [NC]
+RewriteRule ^admin/config/documents/$ src/admin-config/documents.php [NC]
+RewriteRule ^admin/config/documents/update/$ src/admin-config/update-documents.php [NC]
 
 # 
 

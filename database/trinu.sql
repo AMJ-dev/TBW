@@ -291,6 +291,113 @@ INSERT INTO `cargo_transitions` VALUES ('02d0af4e-925e-46b4-8221-3c4341249578','
 UNLOCK TABLES;
 
 --
+-- Table structure for table `document_config_audit`
+--
+
+DROP TABLE IF EXISTS `document_config_audit`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `document_config_audit` (
+  `id` char(36) NOT NULL,
+  `config_version_id` char(36) NOT NULL,
+  `actor_id` char(36) NOT NULL,
+  `action` varchar(80) NOT NULL,
+  `change_reason` varchar(500) NOT NULL,
+  `before_json` longtext DEFAULT NULL,
+  `after_json` longtext NOT NULL,
+  `request_id` char(36) NOT NULL,
+  `ip_address` varchar(45) NOT NULL DEFAULT '',
+  `user_agent` varchar(500) NOT NULL DEFAULT '',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `details` longtext DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_document_config_audit_request` (`request_id`),
+  KEY `idx_document_config_audit_version` (`config_version_id`),
+  KEY `idx_document_config_audit_actor` (`actor_id`),
+  KEY `idx_document_config_audit_created` (`created_at`),
+  CONSTRAINT `fk_document_config_audit_version` FOREIGN KEY (`config_version_id`) REFERENCES `document_config_versions` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `document_config_audit`
+--
+
+LOCK TABLES `document_config_audit` WRITE;
+/*!40000 ALTER TABLE `document_config_audit` DISABLE KEYS */;
+INSERT INTO `document_config_audit` VALUES ('02e94b56-7c3e-4c61-9239-f6ba85519eec','26c22d35-73b4-4696-a76b-d40a8525250d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','DOCUMENT_CONFIGURATION_UPDATED','Document configuration updated','{\"numbering_prefix\":\"TRN\",\"numbering_format\":\"TRN-{TYPE}-{YYYY}-{SEQ:6}\",\"retention_months\":84,\"document_types\":[{\"key\":\"receipt_note\",\"label\":\"Receipt Note\",\"required\":1,\"has_expiry\":0,\"verification_required\":1},{\"key\":\"release_authorisation\",\"label\":\"Release Authorisation\",\"required\":1,\"has_expiry\":0,\"verification_required\":1},{\"key\":\"gate_pass\",\"label\":\"Gate Pass\",\"required\":1,\"has_expiry\":1,\"verification_required\":1},{\"key\":\"storage_statement\",\"label\":\"Storage Statement\",\"required\":0,\"has_expiry\":0,\"verification_required\":1},{\"key\":\"examination_report\",\"label\":\"Examination Attendance Report\",\"required\":0,\"has_expiry\":0,\"verification_required\":1},{\"key\":\"delivery_order\",\"label\":\"Delivery Order\",\"required\":1,\"has_expiry\":1,\"verification_required\":1}],\"templates\":[]}','{\"numbering_prefix\":\"TRN\",\"numbering_format\":\"TRN-{TYPE}-{YYYY}-{SEQ:6}\",\"retention_months\":84,\"document_types\":[{\"id\":\"efed375a-f850-4312-800b-14a60c7918f1\",\"key\":\"receipt_note\",\"label\":\"Receipt Note\",\"required\":true,\"has_expiry\":true,\"verification_required\":true,\"sort_order\":0},{\"id\":\"d384b999-ed83-4266-bf24-7fdeab4096ba\",\"key\":\"release_authorisation\",\"label\":\"Release Authorisation\",\"required\":true,\"has_expiry\":true,\"verification_required\":true,\"sort_order\":1},{\"id\":\"a33ffb0d-2322-461c-9a4d-e73b0eaa0b62\",\"key\":\"gate_pass\",\"label\":\"Gate Pass\",\"required\":true,\"has_expiry\":true,\"verification_required\":true,\"sort_order\":2},{\"id\":\"a204778c-6807-424d-9747-6ef4a456ccca\",\"key\":\"storage_statement\",\"label\":\"Storage Statement\",\"required\":true,\"has_expiry\":true,\"verification_required\":true,\"sort_order\":3},{\"id\":\"d8fad965-3ae3-4041-9009-7108f19c450f\",\"key\":\"examination_report\",\"label\":\"Examination Attendance Report\",\"required\":true,\"has_expiry\":true,\"verification_required\":true,\"sort_order\":4},{\"id\":\"b3b36d8f-df25-4c51-bf2c-662ef8c8d996\",\"key\":\"delivery_order\",\"label\":\"Delivery Order\",\"required\":true,\"has_expiry\":true,\"verification_required\":true,\"sort_order\":5}],\"templates\":[{\"id\":\"bb222777-f7a0-4c5e-a0fc-7c149e31b852\",\"key\":\"gate_pass\",\"label\":\"Gate Pass\",\"version\":1,\"active\":true,\"sort_order\":0}]}','d68d9b26-256a-4eae-8b29-ad97e6e848ca','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','2026-10-09 19:19:23',NULL),('2ee03de9-ec5f-4ed4-88f8-a34c10078e42','91e733b8-de81-431b-a803-509e2dba2dcf','c0654f0b-8452-4a03-a43d-0d0cda17da1b','DOCUMENT_CONFIGURATION_UPDATED','Document configuration updated','{\"numbering_prefix\":\"TRN\",\"numbering_format\":\"TRN-{TYPE}-{YYYY}-{SEQ:6}\",\"retention_months\":84,\"document_types\":[{\"key\":\"receipt_note\",\"label\":\"Receipt Note\",\"required\":1,\"has_expiry\":1,\"verification_required\":1},{\"key\":\"release_authorisation\",\"label\":\"Release Authorisation\",\"required\":1,\"has_expiry\":1,\"verification_required\":1},{\"key\":\"gate_pass\",\"label\":\"Gate Pass\",\"required\":1,\"has_expiry\":1,\"verification_required\":1},{\"key\":\"storage_statement\",\"label\":\"Storage Statement\",\"required\":1,\"has_expiry\":1,\"verification_required\":1},{\"key\":\"examination_report\",\"label\":\"Examination Attendance Report\",\"required\":1,\"has_expiry\":1,\"verification_required\":1},{\"key\":\"delivery_order\",\"label\":\"Delivery Order\",\"required\":1,\"has_expiry\":1,\"verification_required\":1}],\"templates\":[{\"key\":\"receipt_note\",\"label\":\"Gate Pass\",\"version\":2,\"active\":1}]}','{\"numbering_prefix\":\"TRN\",\"numbering_format\":\"TRN-{TYPE}-{YYYY}-{SEQ:6}\",\"retention_months\":84,\"document_types\":[{\"id\":\"0fa1f5dc-7a85-46c9-a16d-8e4f96df48cc\",\"key\":\"receipt_note\",\"label\":\"Receipt Note\",\"required\":true,\"has_expiry\":true,\"verification_required\":true,\"sort_order\":0},{\"id\":\"8547fed4-2988-4f61-beb3-ab9b31fd27b6\",\"key\":\"release_authorisation\",\"label\":\"Release Authorisation\",\"required\":true,\"has_expiry\":true,\"verification_required\":true,\"sort_order\":1},{\"id\":\"1ce77f2f-9f3a-4ca0-9294-d82090c03332\",\"key\":\"gate_pass\",\"label\":\"Gate Pass\",\"required\":true,\"has_expiry\":true,\"verification_required\":true,\"sort_order\":2},{\"id\":\"794f28b5-4aab-4c5d-9654-4ef58613d09a\",\"key\":\"storage_statement\",\"label\":\"Storage Statement\",\"required\":true,\"has_expiry\":true,\"verification_required\":true,\"sort_order\":3},{\"id\":\"ca6131ad-4782-4ced-a3de-2249753a5617\",\"key\":\"examination_report\",\"label\":\"Examination Attendance Report\",\"required\":true,\"has_expiry\":true,\"verification_required\":true,\"sort_order\":4},{\"id\":\"d8e4a229-d77f-4a34-9446-80b1a130f1e6\",\"key\":\"delivery_order\",\"label\":\"Delivery Order\",\"required\":true,\"has_expiry\":true,\"verification_required\":true,\"sort_order\":5}],\"templates\":[{\"id\":\"4cfaefc9-317b-44da-baa7-93ee5f357d3f\",\"key\":\"gate_pass\",\"label\":\"Gate Pass\",\"version\":2,\"active\":true,\"sort_order\":0},{\"id\":\"fcd78393-4b8c-4e41-8812-7f0ef9fe7546\",\"key\":\"receipt_note\",\"label\":\"Set fd\",\"version\":1,\"active\":true,\"sort_order\":1}]}','daec0091-0394-446b-b778-80793d798c85','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','2026-10-09 19:32:24',NULL),('5110506a-b99d-44c0-a7a8-03cf1b28135c','2d0cdcf8-4d78-4a6a-89c9-b49d6f517bb4','c0654f0b-8452-4a03-a43d-0d0cda17da1b','documents_configuration_updated','',NULL,'','','','','2026-10-09 19:41:33','{\"numbering_prefix\":\"TRN\",\"numbering_format\":\"TRN-{TYPE}-{YYYY}-{SEQ:6}\",\"retention_months\":84,\"document_type_count\":6}'),('b2275a9c-6d14-4268-93f4-c0d101a7077d','2d0cdcf8-4d78-4a6a-89c9-b49d6f517bb4','c0654f0b-8452-4a03-a43d-0d0cda17da1b','updated','',NULL,'','0b3185be-0b8c-4410-934e-00a791b2a512','','','2026-10-09 19:54:27','{\"numbering_prefix\":\"TRN\",\"numbering_format\":\"TRN-{TYPE}-{YYYY}-{SEQ:6}\",\"retention_months\":84,\"document_type_count\":6}'),('c8eeade3-37f6-4094-86f5-07df7101dd27','2d0cdcf8-4d78-4a6a-89c9-b49d6f517bb4','c0654f0b-8452-4a03-a43d-0d0cda17da1b','updated','',NULL,'','83532dca-c119-4ac8-8762-b7680b77a3c1','','','2026-10-09 19:55:05','{\"numbering_prefix\":\"TRN\",\"numbering_format\":\"TRN-{TYPE}-{YYYY}-{SEQ:6}\",\"retention_months\":84,\"document_type_count\":6}'),('cf2a7b8d-23b8-4090-bd12-e27ee445cff6','2d0cdcf8-4d78-4a6a-89c9-b49d6f517bb4','c0654f0b-8452-4a03-a43d-0d0cda17da1b','updated','',NULL,'','2d742ae1-175d-44d1-8da0-802b6c8e4f6a','','','2026-10-09 19:54:57','{\"numbering_prefix\":\"TRN\",\"numbering_format\":\"TRN-{TYPE}-{YYYY}-{SEQ:6}\",\"retention_months\":84,\"document_type_count\":7}');
+/*!40000 ALTER TABLE `document_config_audit` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `document_config_versions`
+--
+
+DROP TABLE IF EXISTS `document_config_versions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `document_config_versions` (
+  `id` char(36) NOT NULL,
+  `version_no` int(10) unsigned NOT NULL,
+  `is_current` tinyint(1) NOT NULL DEFAULT 0,
+  `numbering_prefix` varchar(20) NOT NULL,
+  `numbering_format` varchar(150) NOT NULL,
+  `retention_months` smallint(5) unsigned NOT NULL,
+  `change_reason` varchar(500) NOT NULL,
+  `created_by` char(36) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_document_config_version_no` (`version_no`),
+  KEY `idx_document_config_current` (`is_current`),
+  CONSTRAINT `chk_document_retention_months` CHECK (`retention_months` between 1 and 1200)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `document_config_versions`
+--
+
+LOCK TABLES `document_config_versions` WRITE;
+/*!40000 ALTER TABLE `document_config_versions` DISABLE KEYS */;
+INSERT INTO `document_config_versions` VALUES ('26c22d35-73b4-4696-a76b-d40a8525250d',2,0,'TRN','TRN-{TYPE}-{YYYY}-{SEQ:6}',84,'Document configuration updated','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 19:19:23'),('2d0cdcf8-4d78-4a6a-89c9-b49d6f517bb4',4,1,'TRN','TRN-{TYPE}-{YYYY}-{SEQ:6}',84,'Documents configuration updated','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 19:41:33'),('91e733b8-de81-431b-a803-509e2dba2dcf',3,0,'TRN','TRN-{TYPE}-{YYYY}-{SEQ:6}',84,'Document configuration updated','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 19:32:24'),('e227fbb6-1af1-443b-a823-97b7e324f218',1,0,'TRN','TRN-{TYPE}-{YYYY}-{SEQ:6}',84,'Initial document configuration','00000000-0000-4000-8000-000000000000','2026-10-09 19:16:32');
+/*!40000 ALTER TABLE `document_config_versions` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `document_types`
+--
+
+DROP TABLE IF EXISTS `document_types`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `document_types` (
+  `id` char(36) NOT NULL,
+  `config_version_id` char(36) NOT NULL,
+  `document_key` varchar(80) NOT NULL,
+  `label` varchar(150) NOT NULL,
+  `required` tinyint(1) NOT NULL DEFAULT 0,
+  `has_expiry` tinyint(1) NOT NULL DEFAULT 0,
+  `verification_required` tinyint(1) NOT NULL DEFAULT 1,
+  `sort_order` int(11) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_document_type_version_key` (`config_version_id`,`document_key`),
+  KEY `idx_document_types_version_order` (`config_version_id`,`sort_order`),
+  CONSTRAINT `fk_document_types_config_version` FOREIGN KEY (`config_version_id`) REFERENCES `document_config_versions` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `document_types`
+--
+
+LOCK TABLES `document_types` WRITE;
+/*!40000 ALTER TABLE `document_types` DISABLE KEYS */;
+INSERT INTO `document_types` VALUES ('0fa1f5dc-7a85-46c9-a16d-8e4f96df48cc','26c22d35-73b4-4696-a76b-d40a8525250d','receipt_note','Receipt Note',1,1,1,0,'2026-10-09 19:19:23'),('1b6b9cff-d28f-42d3-8442-3970056d5dfc','91e733b8-de81-431b-a803-509e2dba2dcf','storage_statement','Storage Statement',1,1,1,3,'2026-10-09 19:32:24'),('1ce77f2f-9f3a-4ca0-9294-d82090c03332','26c22d35-73b4-4696-a76b-d40a8525250d','gate_pass','Gate Pass',1,1,1,2,'2026-10-09 19:19:23'),('3593b0fc-d7a0-4d4f-b255-404e662e534a','91e733b8-de81-431b-a803-509e2dba2dcf','receipt_note','Receipt Note',1,1,1,0,'2026-10-09 19:32:24'),('3b0bedc7-1d79-4059-ac78-0b3019d3107d','2d0cdcf8-4d78-4a6a-89c9-b49d6f517bb4','receipt_note','Receipt Note',1,1,0,0,'2026-10-09 19:55:05'),('47852828-75f6-4631-99b6-a0237777075e','2d0cdcf8-4d78-4a6a-89c9-b49d6f517bb4','release_authorisation','Release Authorisation',1,1,1,1,'2026-10-09 19:55:05'),('6b1e4441-a4b3-436f-93b3-d2c6aabc7b9a','91e733b8-de81-431b-a803-509e2dba2dcf','gate_pass','Gate Pass',1,1,1,2,'2026-10-09 19:32:24'),('794f28b5-4aab-4c5d-9654-4ef58613d09a','26c22d35-73b4-4696-a76b-d40a8525250d','storage_statement','Storage Statement',1,1,1,3,'2026-10-09 19:19:23'),('7956ed40-e233-4475-adfa-eeb4b33adf4a','2d0cdcf8-4d78-4a6a-89c9-b49d6f517bb4','delivery_order','Delivery Order',1,1,1,5,'2026-10-09 19:55:05'),('8547fed4-2988-4f61-beb3-ab9b31fd27b6','26c22d35-73b4-4696-a76b-d40a8525250d','release_authorisation','Release Authorisation',1,1,1,1,'2026-10-09 19:19:23'),('a204778c-6807-424d-9747-6ef4a456ccca','e227fbb6-1af1-443b-a823-97b7e324f218','storage_statement','Storage Statement',0,0,1,4,'2026-10-09 19:16:32'),('a33ffb0d-2322-461c-9a4d-e73b0eaa0b62','e227fbb6-1af1-443b-a823-97b7e324f218','gate_pass','Gate Pass',1,1,1,3,'2026-10-09 19:16:32'),('b1cb5ba0-0748-48da-a282-51305ad5d1ab','2d0cdcf8-4d78-4a6a-89c9-b49d6f517bb4','examination_report','Examination Attendance Report',1,1,1,4,'2026-10-09 19:55:05'),('b3b36d8f-df25-4c51-bf2c-662ef8c8d996','e227fbb6-1af1-443b-a823-97b7e324f218','delivery_order','Delivery Order',1,1,1,6,'2026-10-09 19:16:32'),('c357f93f-c130-4552-a149-e512ec6f90d1','91e733b8-de81-431b-a803-509e2dba2dcf','release_authorisation','Release Authorisation',1,1,1,1,'2026-10-09 19:32:24'),('ca6131ad-4782-4ced-a3de-2249753a5617','26c22d35-73b4-4696-a76b-d40a8525250d','examination_report','Examination Attendance Report',1,1,1,4,'2026-10-09 19:19:23'),('d384b999-ed83-4266-bf24-7fdeab4096ba','e227fbb6-1af1-443b-a823-97b7e324f218','release_authorisation','Release Authorisation',1,0,1,2,'2026-10-09 19:16:32'),('d75507f9-a1e1-4cdf-823f-7237de0f6448','2d0cdcf8-4d78-4a6a-89c9-b49d6f517bb4','gate_pass','Gate Pass',1,1,1,2,'2026-10-09 19:55:05'),('d8e4a229-d77f-4a34-9446-80b1a130f1e6','26c22d35-73b4-4696-a76b-d40a8525250d','delivery_order','Delivery Order',1,1,1,5,'2026-10-09 19:19:23'),('d8fad965-3ae3-4041-9009-7108f19c450f','e227fbb6-1af1-443b-a823-97b7e324f218','examination_report','Examination Attendance Report',0,0,1,5,'2026-10-09 19:16:32'),('efed375a-f850-4312-800b-14a60c7918f1','e227fbb6-1af1-443b-a823-97b7e324f218','receipt_note','Receipt Note',1,0,1,1,'2026-10-09 19:16:32'),('f116c41d-67e7-4dc5-add7-4d93f348f8df','2d0cdcf8-4d78-4a6a-89c9-b49d6f517bb4','storage_statement','Storage Statement',1,0,1,3,'2026-10-09 19:55:05'),('fe4d332b-3f77-438d-8fdf-fcd0c6d25264','91e733b8-de81-431b-a803-509e2dba2dcf','examination_report','Examination Attendance Report',1,1,1,4,'2026-10-09 19:32:24'),('fff19339-7276-4522-a27c-7a23a7d8c470','91e733b8-de81-431b-a803-509e2dba2dcf','delivery_order','Delivery Order',1,1,1,5,'2026-10-09 19:32:24');
+/*!40000 ALTER TABLE `document_types` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `financial_configuration`
 --
 
@@ -1031,7 +1138,7 @@ CREATE TABLE `sessions` (
 
 LOCK TABLES `sessions` WRITE;
 /*!40000 ALTER TABLE `sessions` DISABLE KEYS */;
-INSERT INTO `sessions` VALUES ('0997562a-0144-448b-a90d-063ffddd8167','ff20dfcf-f843-4cd3-a263-412210683de9','33b8ceaf16748dafd377c91d39e5e15c266ebbe4a0eae2619e2380d490b6fd46',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:00:50','2026-10-31 18:00:50',NULL,NULL,'2026-10-01 16:00:50'),('1198246b-102c-4adf-85b6-a0460cf9b95a','4a9ba8d5-93b6-4b65-af96-934920afcd18','397fb86b977b57e309ee610d0c7967197d58a6b4f8e994cb56be5d01666af187',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:30:23','2026-11-02 15:30:23',NULL,NULL,'2026-10-03 14:30:23'),('2632d7e9-af51-46e5-9b6f-dd62e125af17','4a9ba8d5-93b6-4b65-af96-934920afcd18','a196a7f8508b401cac5197ca1458e65bad8d19eeb0d0af1de05cd57d11e618dc',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 14:46:01','2026-11-02 14:46:01',NULL,NULL,'2026-10-03 13:46:01'),('3881279e-11ea-4f3c-9d76-11927c1c28ac','ff20dfcf-f843-4cd3-a263-412210683de9','24218105a69709b7eab7a7efdfa80417e9ab77cbf3344d0195c182a3eaa784c3',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-02 12:53:24','2026-11-01 12:53:24',NULL,NULL,'2026-10-02 10:53:24'),('3f779800-112f-4a40-b843-f8f03022325d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','62f098acd16856c52d6fbb85725b83492b446893667f97a1f860302b74410753',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 12:36:27','2026-11-02 12:36:27',NULL,NULL,'2026-10-03 11:36:27'),('63ffc6d7-032d-435a-bdcf-6145ecb541c2','ff20dfcf-f843-4cd3-a263-412210683de9','fd54b95fe5fb1f4222c5491124179f80f3389ee8a6d955368df682690f48f1b4',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:20:13','2026-10-31 18:20:13',NULL,NULL,'2026-10-01 16:20:13'),('67e4f923-400e-4655-a67a-7e1bb74bcb24','ff20dfcf-f843-4cd3-a263-412210683de9','04fdd5b13e825690fa60d0de193c51a9d6f6b13e8c9235df9a412cdefc2c2c62',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:17:51','2026-10-31 18:17:51',NULL,NULL,'2026-10-01 16:17:51'),('68ef296d-8fc6-4a5f-856d-e983d5357d7e','4a9ba8d5-93b6-4b65-af96-934920afcd18','96ef396045b76fe8c218e4d3d0fdcddba9b997d9f87884a8b0d311c9f746ba32',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:01:42','2026-11-02 15:01:42',NULL,NULL,'2026-10-03 14:01:42'),('9b4fc236-f24e-4127-8259-d7816eeea03f','c0654f0b-8452-4a03-a43d-0d0cda17da1b','11a7d220a8950dc7dcaaf347897b5adc221d8d7ae134d0a27e971e0e67ea7cac',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-08 19:18:35','2026-10-10 19:59:53',NULL,NULL,'2026-10-08 18:18:35'),('b804baca-dfa2-4a05-8511-e10dcba17e0b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','de7bb0dd59388fe82003ba00911fdfbeef18f2cdb8d7d6fbc67f8e402f455cbf',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 14:30:28','2026-11-06 14:30:28',NULL,NULL,'2026-10-07 13:30:28'),('d375207c-6fe5-4be1-a753-2fb2117b2663','4a9ba8d5-93b6-4b65-af96-934920afcd18','ad2d2dcc6eec3d2bb76177f7532a22bc0107420d4d1616146a48eccb494fc19f',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:32:30','2026-11-02 15:32:30',NULL,NULL,'2026-10-03 14:32:30'),('e13d005b-11b9-4521-ad27-95cc3a2b1e7d','4a9ba8d5-93b6-4b65-af96-934920afcd18','204e4cedeb31c34b6d4f828d89fc5892aad44955df0cbda4d144d081c407ee30',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 15:17:14','2026-11-06 15:17:14',NULL,NULL,'2026-10-07 14:17:14');
+INSERT INTO `sessions` VALUES ('0997562a-0144-448b-a90d-063ffddd8167','ff20dfcf-f843-4cd3-a263-412210683de9','33b8ceaf16748dafd377c91d39e5e15c266ebbe4a0eae2619e2380d490b6fd46',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:00:50','2026-10-31 18:00:50',NULL,NULL,'2026-10-01 16:00:50'),('1198246b-102c-4adf-85b6-a0460cf9b95a','4a9ba8d5-93b6-4b65-af96-934920afcd18','397fb86b977b57e309ee610d0c7967197d58a6b4f8e994cb56be5d01666af187',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:30:23','2026-11-02 15:30:23',NULL,NULL,'2026-10-03 14:30:23'),('2632d7e9-af51-46e5-9b6f-dd62e125af17','4a9ba8d5-93b6-4b65-af96-934920afcd18','a196a7f8508b401cac5197ca1458e65bad8d19eeb0d0af1de05cd57d11e618dc',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 14:46:01','2026-11-02 14:46:01',NULL,NULL,'2026-10-03 13:46:01'),('3881279e-11ea-4f3c-9d76-11927c1c28ac','ff20dfcf-f843-4cd3-a263-412210683de9','24218105a69709b7eab7a7efdfa80417e9ab77cbf3344d0195c182a3eaa784c3',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-02 12:53:24','2026-11-01 12:53:24',NULL,NULL,'2026-10-02 10:53:24'),('3f779800-112f-4a40-b843-f8f03022325d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','62f098acd16856c52d6fbb85725b83492b446893667f97a1f860302b74410753',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 12:36:27','2026-11-02 12:36:27',NULL,NULL,'2026-10-03 11:36:27'),('63ffc6d7-032d-435a-bdcf-6145ecb541c2','ff20dfcf-f843-4cd3-a263-412210683de9','fd54b95fe5fb1f4222c5491124179f80f3389ee8a6d955368df682690f48f1b4',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:20:13','2026-10-31 18:20:13',NULL,NULL,'2026-10-01 16:20:13'),('67e4f923-400e-4655-a67a-7e1bb74bcb24','ff20dfcf-f843-4cd3-a263-412210683de9','04fdd5b13e825690fa60d0de193c51a9d6f6b13e8c9235df9a412cdefc2c2c62',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:17:51','2026-10-31 18:17:51',NULL,NULL,'2026-10-01 16:17:51'),('68ef296d-8fc6-4a5f-856d-e983d5357d7e','4a9ba8d5-93b6-4b65-af96-934920afcd18','96ef396045b76fe8c218e4d3d0fdcddba9b997d9f87884a8b0d311c9f746ba32',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:01:42','2026-11-02 15:01:42',NULL,NULL,'2026-10-03 14:01:42'),('9b4fc236-f24e-4127-8259-d7816eeea03f','c0654f0b-8452-4a03-a43d-0d0cda17da1b','11a7d220a8950dc7dcaaf347897b5adc221d8d7ae134d0a27e971e0e67ea7cac',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-08 19:18:35','2026-10-10 20:55:10',NULL,NULL,'2026-10-08 18:18:35'),('b804baca-dfa2-4a05-8511-e10dcba17e0b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','de7bb0dd59388fe82003ba00911fdfbeef18f2cdb8d7d6fbc67f8e402f455cbf',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 14:30:28','2026-11-06 14:30:28',NULL,NULL,'2026-10-07 13:30:28'),('d375207c-6fe5-4be1-a753-2fb2117b2663','4a9ba8d5-93b6-4b65-af96-934920afcd18','ad2d2dcc6eec3d2bb76177f7532a22bc0107420d4d1616146a48eccb494fc19f',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:32:30','2026-11-02 15:32:30',NULL,NULL,'2026-10-03 14:32:30'),('e13d005b-11b9-4521-ad27-95cc3a2b1e7d','4a9ba8d5-93b6-4b65-af96-934920afcd18','204e4cedeb31c34b6d4f828d89fc5892aad44955df0cbda4d144d081c407ee30',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 15:17:14','2026-11-06 15:17:14',NULL,NULL,'2026-10-07 14:17:14');
 /*!40000 ALTER TABLE `sessions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1429,4 +1536,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-09 20:00:07
+-- Dump completed on 2026-10-09 20:55:26
