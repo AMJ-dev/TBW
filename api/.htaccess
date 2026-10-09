@@ -70,6 +70,10 @@ RewriteRule ^admin/config/gate/$ src/admin-config/gate.php [NC]
 RewriteRule ^admin/config/gate/update/$ src/admin-config/update-gate.php [NC]
 RewriteRule ^admin/config/financial/$ src/admin-config/financial.php [NC]
 RewriteRule ^admin/config/financial/update/$ src/admin-config/update-financial.php [NC]
+RewriteRule ^admin/config/storage/$ src/admin-config/storage.php [NC]
+RewriteRule ^admin/config/storage/update/$ src/admin-config/update-storage.php [NC]
+RewriteRule ^admin/config/cargo/$ src/admin-config/cargo.php [NC]
+RewriteRule ^admin/config/cargo/update/$ src/admin-config/update-cargo.php [NC]
 
 # 
 
