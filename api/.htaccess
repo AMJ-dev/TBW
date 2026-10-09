@@ -76,6 +76,8 @@ RewriteRule ^admin/config/cargo/$ src/admin-config/cargo.php [NC]
 RewriteRule ^admin/config/cargo/update/$ src/admin-config/update-cargo.php [NC]
 RewriteRule ^admin/config/documents/$ src/admin-config/documents.php [NC]
 RewriteRule ^admin/config/documents/update/$ src/admin-config/update-documents.php [NC]
+RewriteRule ^admin/config/notifications/$ src/admin-config/notifications.php [NC]
+RewriteRule ^admin/config/notifications/update/$ src/admin-config/update-notifications.php [NC]
 
 # 
 

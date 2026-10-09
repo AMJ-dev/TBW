@@ -4,7 +4,7 @@ require_once __DIR__ . '/include/conn.php';
 try {
     $conn->beginTransaction();
 
-    $q = $conn->prepare("SELECT id FROM document_config_versions WHERE version_no = :version_no LIMIT 1");
+    $q = $conn->prepare("SELECT id FROM notification_config_versions WHERE version_no = :version_no LIMIT 1");
     $q->bindValue(":version_no", 1, PDO::PARAM_INT);
     $q->execute();
     $configurationId = $q->fetchColumn();
@@ -12,70 +12,77 @@ try {
     if (!$configurationId) {
         $configurationId = generateId();
 
-        $q = $conn->prepare("INSERT INTO document_config_versions (id, version_no, is_current, numbering_prefix, numbering_format, retention_months, change_reason, created_by) VALUES (:id, :version_no, :is_current, :numbering_prefix, :numbering_format, :retention_months, :change_reason, :created_by)");
+        $config = [
+            "channels_enabled" => [
+                "email" => true,
+                "sms" => true
+            ],
+            "quiet_hours_enabled" => false,
+            "quiet_hours_start" => "22:00",
+            "quiet_hours_end" => "07:00",
+            "rate_limit_per_hour" => 10,
+            "digest_frequency" => "immediate",
+            "fallback_channel_enabled" => true,
+            "retry_count" => 3,
+            "track_delivery_status" => true,
+            "transactional_marketing_split" => true,
+            "internal_alerts" => [
+                "sla" => true,
+                "exceptions" => true,
+                "integrations" => true,
+                "security" => true
+            ],
+            "events" => [
+                ["id" => generateId(), "key" => "cargo_received", "label" => "Cargo Received", "channels" => ["email", "sms"], "template" => "cargo_received", "mandatory" => false],
+                ["id" => generateId(), "key" => "cargo_positioned", "label" => "Cargo Positioned", "channels" => ["email", "sms"], "template" => "cargo_positioned", "mandatory" => false],
+                ["id" => generateId(), "key" => "document_issued", "label" => "Document Issued", "channels" => ["email", "sms"], "template" => "document_issued", "mandatory" => false],
+                ["id" => generateId(), "key" => "examination_scheduled", "label" => "Examination Scheduled", "channels" => ["email", "sms"], "template" => "examination_scheduled", "mandatory" => false],
+                ["id" => generateId(), "key" => "hold_placed", "label" => "Hold Placed", "channels" => ["email", "sms"], "template" => "hold_placed", "mandatory" => true],
+                ["id" => generateId(), "key" => "invoice_issued", "label" => "Invoice Issued", "channels" => ["email", "sms"], "template" => "invoice_issued", "mandatory" => false],
+                ["id" => generateId(), "key" => "payment_received", "label" => "Payment Received", "channels" => ["email", "sms"], "template" => "payment_received", "mandatory" => false],
+                ["id" => generateId(), "key" => "release_authorised", "label" => "Release Authorised", "channels" => ["email", "sms"], "template" => "release_authorised", "mandatory" => true],
+                ["id" => generateId(), "key" => "slot_confirmed", "label" => "Slot Confirmed", "channels" => ["email", "sms"], "template" => "slot_confirmed", "mandatory" => false],
+                ["id" => generateId(), "key" => "storage_deadline", "label" => "Storage Deadline", "channels" => ["email", "sms"], "template" => "storage_deadline", "mandatory" => false],
+                ["id" => generateId(), "key" => "overstay_escalation", "label" => "Overstay Escalation", "channels" => ["email", "sms"], "template" => "overstay_escalation", "mandatory" => false],
+                ["id" => generateId(), "key" => "collection_ready", "label" => "Collection Ready", "channels" => ["email", "sms"], "template" => "collection_ready", "mandatory" => false]
+            ]
+        ];
+
+        $q = $conn->prepare("INSERT INTO notification_config_versions (id, version_no, is_current, config_json, change_reason, created_by) VALUES (:id, :version_no, :is_current, :config_json, :change_reason, :created_by)");
         $q->bindValue(":id", $configurationId, PDO::PARAM_STR);
         $q->bindValue(":version_no", 1, PDO::PARAM_INT);
         $q->bindValue(":is_current", 1, PDO::PARAM_INT);
-        $q->bindValue(":numbering_prefix", "TRN", PDO::PARAM_STR);
-        $q->bindValue(":numbering_format", "TRN-{TYPE}-{YYYY}-{SEQ:6}", PDO::PARAM_STR);
-        $q->bindValue(":retention_months", 84, PDO::PARAM_INT);
-        $q->bindValue(":change_reason", "Initial document configuration", PDO::PARAM_STR);
+        $q->bindValue(":config_json", json_encode($config, JSON_THROW_ON_ERROR), PDO::PARAM_STR);
+        $q->bindValue(":change_reason", "Initial notification configuration", PDO::PARAM_STR);
         $q->bindValue(":created_by", "00000000-0000-4000-8000-000000000000", PDO::PARAM_STR);
         $q->execute();
-    }
-
-    $documentTypes = [
-        ["receipt_note", "Receipt Note", 1, 0, 1],
-        ["release_authorisation", "Release Authorisation", 1, 0, 2],
-        ["gate_pass", "Gate Pass", 1, 1, 3],
-        ["storage_statement", "Storage Statement", 0, 0, 4],
-        ["examination_report", "Examination Attendance Report", 0, 0, 5],
-        ["delivery_order", "Delivery Order", 1, 1, 6]
-    ];
-
-    $q = $conn->prepare("SELECT id FROM document_types WHERE config_version_id = :config_version_id AND document_key = :document_key LIMIT 1");
-
-    $insert = $conn->prepare("INSERT INTO document_types (id, config_version_id, document_key, label, required, has_expiry, verification_required, sort_order) VALUES (:id, :config_version_id, :document_key, :label, :required, :has_expiry, :verification_required, :sort_order)");
-
-    foreach ($documentTypes as $type) {
-        $q->bindValue(":config_version_id", $configurationId, PDO::PARAM_STR);
-        $q->bindValue(":document_key", $type[0], PDO::PARAM_STR);
+    } else {
+        $q = $conn->prepare("SELECT config_json FROM notification_config_versions WHERE id = :id LIMIT 1");
+        $q->bindValue(":id", $configurationId, PDO::PARAM_STR);
         $q->execute();
-
-        if (!$q->fetchColumn()) {
-            $insert->bindValue(":id", generateId(), PDO::PARAM_STR);
-            $insert->bindValue(":config_version_id", $configurationId, PDO::PARAM_STR);
-            $insert->bindValue(":document_key", $type[0], PDO::PARAM_STR);
-            $insert->bindValue(":label", $type[1], PDO::PARAM_STR);
-            $insert->bindValue(":required", $type[2], PDO::PARAM_INT);
-            $insert->bindValue(":has_expiry", $type[3], PDO::PARAM_INT);
-            $insert->bindValue(":verification_required", 1, PDO::PARAM_INT);
-            $insert->bindValue(":sort_order", $type[4], PDO::PARAM_INT);
-            $insert->execute();
-        }
+        $config = json_decode($q->fetchColumn(), true, 512, JSON_THROW_ON_ERROR);
     }
 
     $conn->commit();
 
     echo json_encode([
         "error" => false,
-        "data" => "Document configuration initialized successfully",
+        "data" => "Notification configuration initialized successfully",
         "code" => [
             "configuration_id" => $configurationId,
             "version" => 1,
-            "numbering_prefix" => "TRN",
-            "numbering_format" => "TRN-{TYPE}-{YYYY}-{SEQ:6}",
-            "retention_months" => 84,
-            "document_types" => array_map(function ($type) {
-                return [
-                    "key" => $type[0],
-                    "label" => $type[1],
-                    "required" => (bool)$type[2],
-                    "has_expiry" => (bool)$type[3],
-                    "verification_required" => true,
-                    "sort_order" => $type[4]
-                ];
-            }, $documentTypes)
+            "channels_enabled" => $config["channels_enabled"],
+            "quiet_hours_enabled" => $config["quiet_hours_enabled"],
+            "quiet_hours_start" => $config["quiet_hours_start"],
+            "quiet_hours_end" => $config["quiet_hours_end"],
+            "rate_limit_per_hour" => $config["rate_limit_per_hour"],
+            "digest_frequency" => $config["digest_frequency"],
+            "fallback_channel_enabled" => $config["fallback_channel_enabled"],
+            "retry_count" => $config["retry_count"],
+            "track_delivery_status" => $config["track_delivery_status"],
+            "transactional_marketing_split" => $config["transactional_marketing_split"],
+            "internal_alerts" => $config["internal_alerts"],
+            "events" => $config["events"]
         ]
     ]);
 } catch (Throwable $e) {
@@ -83,13 +90,13 @@ try {
         $conn->rollBack();
     }
 
-    error_log("Document configuration initialization error: " . $e->getMessage());
+    error_log("Notification configuration initialization error: " . $e->getMessage());
 
     http_response_code(500);
 
     echo json_encode([
         "error" => true,
-        "data" => "Unable to initialize document configuration",
+        "data" => "Unable to initialize notification configuration",
         "code" => null
     ]);
 }
