@@ -147,6 +147,40 @@ LOCK TABLES `mfa_recovery_codes` WRITE;
 UNLOCK TABLES;
 
 --
+-- Table structure for table `organisation_audit_logs`
+--
+
+DROP TABLE IF EXISTS `organisation_audit_logs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `organisation_audit_logs` (
+  `id` char(36) NOT NULL,
+  `organisation_id` char(36) NOT NULL,
+  `user_id` char(36) NOT NULL,
+  `action` varchar(100) NOT NULL,
+  `details` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` varchar(500) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_org_audit_org_time` (`organisation_id`,`created_at`),
+  KEY `idx_org_audit_user` (`user_id`),
+  CONSTRAINT `fk_org_audit_org` FOREIGN KEY (`organisation_id`) REFERENCES `organisations` (`id`),
+  CONSTRAINT `fk_org_audit_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `organisation_audit_logs`
+--
+
+LOCK TABLES `organisation_audit_logs` WRITE;
+/*!40000 ALTER TABLE `organisation_audit_logs` DISABLE KEYS */;
+INSERT INTO `organisation_audit_logs` VALUES ('0877be2b-e437-f815-ba24-2b1e408a0817','d2beefba-e4bc-4d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','organisation.configuration_updated','{\"legal_name\":\"TRINU BONDED WAREHOUSE\",\"uploaded_files\":2}','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','2026-10-09 15:26:23'),('4a2c69c4-becb-418b-9bbb-9c4f2554f15e','d2beefba-e4bc-4d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','organisation.document_uploaded','{\"document_id\":\"bbd99577-a3f4-4687-b40d-845c2de71144\",\"kind\":\"utility_bill\",\"file_name\":\"istockphoto-1289461335-612x612.jpg\"}','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','2026-10-09 14:39:19'),('53cbc286-a4e0-4534-907a-491b9c6002fd','d2beefba-e4bc-4d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','organisation.document_uploaded','{\"document_id\":\"7954b1db-f871-48c7-82a1-96d47ce05c4b\",\"kind\":\"tin\",\"file_name\":\"CAC.jpg\"}','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','2026-10-09 14:24:56'),('e985d0e4-d47e-9159-41c9-3d741c5e60b9','d2beefba-e4bc-4d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','organisation.configuration_updated','{\"legal_name\":\"TRINU BONDED WAREHOUSE\",\"uploaded_files\":0}','::1','Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Safari/537.36','2026-10-09 15:25:55');
+/*!40000 ALTER TABLE `organisation_audit_logs` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `organisation_document_reviews`
 --
 
@@ -180,7 +214,7 @@ CREATE TABLE `organisation_document_reviews` (
 
 LOCK TABLES `organisation_document_reviews` WRITE;
 /*!40000 ALTER TABLE `organisation_document_reviews` DISABLE KEYS */;
-INSERT INTO `organisation_document_reviews` VALUES ('15a3e168-c25c-11f1-b11f-5081407ad051','476b6bbb-932c-43b4-9846-d9bf057b9a77','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-07 14:33:38','2026-10-07 14:33:38'),('15a3ea5f-c25c-11f1-b11f-5081407ad051','59b0835d-ee9f-43c1-8cf3-00a67dd9eb5e','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-07 14:33:38','2026-10-07 14:33:38'),('15a3f0ea-c25c-11f1-b11f-5081407ad051','8492c69c-431c-411f-b90a-ad2c9e10da0b','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-07 14:33:38','2026-10-07 14:33:38'),('15a3f73c-c25c-11f1-b11f-5081407ad051','d5399b12-4eb2-4d16-9b20-24e59817f784','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-07 14:33:38','2026-10-07 14:33:38'),('15a3fc8f-c25c-11f1-b11f-5081407ad051','f540a7ce-914a-4d1e-853d-634861c5de67','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-07 14:33:38','2026-10-07 14:33:38'),('1d287255-c25c-11f1-b11f-5081407ad051','54501249-897a-4d21-a315-647e9687510e','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('1d287aa1-c25c-11f1-b11f-5081407ad051','739a8695-8948-4064-b9d4-ad16c439576d','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('1d288263-c25c-11f1-b11f-5081407ad051','7ae81cb1-5590-4693-b1ce-982cfddef2c4','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('1d28ffa0-c25c-11f1-b11f-5081407ad051','ae93afa7-f5e1-4aa7-a4c7-915e91a49576','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('1d2908cf-c25c-11f1-b11f-5081407ad051','be191640-1517-43e8-b72c-29ac830c9206','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('1d2911ba-c25c-11f1-b11f-5081407ad051','c49d989c-ea00-4446-8584-18b3e876c078','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('1d291c52-c25c-11f1-b11f-5081407ad051','d639d935-b164-4e13-8eaa-dc507429ebe6','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('65ed4777-f0e7-451d-afd7-5d9c9b6fb60c','fedfbab6-7cdd-4e1d-831c-4671ce979d14','0a91a3fc-c629-45a7-a246-70bde778408d','approved',NULL,NULL,'2026-10-02 12:55:38','2026-10-01 16:55:26','2026-10-02 10:55:38'),('90cd4f78-bdc2-11f1-a42e-5081407ad051','291577ed-5a9b-4013-8a2c-3f5b0fc180d7','0a91a3fc-c629-45a7-a246-70bde778408d','approved',NULL,NULL,'2026-10-02 12:55:38','2026-10-01 17:04:37','2026-10-02 10:55:38'),('90cdafe4-bdc2-11f1-a42e-5081407ad051','93f51ad8-2c1d-4054-80df-8d5f77d8f93f','0a91a3fc-c629-45a7-a246-70bde778408d','approved',NULL,NULL,'2026-10-02 12:55:38','2026-10-01 17:04:37','2026-10-02 10:55:38'),('90cdb7bd-bdc2-11f1-a42e-5081407ad051','d7c15eb3-63c1-4f4c-86ca-a51e2ad7ac3f','0a91a3fc-c629-45a7-a246-70bde778408d','approved',NULL,NULL,'2026-10-02 12:55:38','2026-10-01 17:04:37','2026-10-02 10:55:38'),('90cdbea1-bdc2-11f1-a42e-5081407ad051','f9a88e37-a6e0-4a9a-baf5-63029389d1eb','0a91a3fc-c629-45a7-a246-70bde778408d','approved',NULL,NULL,'2026-10-02 12:55:38','2026-10-01 17:04:37','2026-10-02 10:55:38'),('b49e70ad-bdb4-11f1-a42e-5081407ad051','389843a6-bcdc-4ae1-83b4-4f7ec11f54b2','0a91a3fc-c629-45a7-a246-70bde778408d','approved',NULL,NULL,'2026-10-02 12:55:38','2026-10-01 15:25:24','2026-10-02 10:55:38'),('b589dbc9-bf2f-11f1-9ab1-5081407ad051','445936fe-92c2-45d5-8f12-c44d54a5c3c4','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-03 13:38:25','2026-10-07 14:33:38'),('e46cb78e-155e-4ebe-ba96-495490c1b784','397d1077-fce9-4b33-8cb0-c96e11d3ace9','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-07 14:33:18','2026-10-07 14:33:38');
+INSERT INTO `organisation_document_reviews` VALUES ('15a3e168-c25c-11f1-b11f-5081407ad051','476b6bbb-932c-43b4-9846-d9bf057b9a77','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-07 14:33:38','2026-10-07 14:33:38'),('15a3ea5f-c25c-11f1-b11f-5081407ad051','59b0835d-ee9f-43c1-8cf3-00a67dd9eb5e','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-07 14:33:38','2026-10-07 14:33:38'),('15a3f0ea-c25c-11f1-b11f-5081407ad051','8492c69c-431c-411f-b90a-ad2c9e10da0b','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-07 14:33:38','2026-10-07 14:33:38'),('15a3f73c-c25c-11f1-b11f-5081407ad051','d5399b12-4eb2-4d16-9b20-24e59817f784','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-07 14:33:38','2026-10-07 14:33:38'),('15a3fc8f-c25c-11f1-b11f-5081407ad051','f540a7ce-914a-4d1e-853d-634861c5de67','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-07 14:33:38','2026-10-07 14:33:38'),('1d287255-c25c-11f1-b11f-5081407ad051','54501249-897a-4d21-a315-647e9687510e','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('1d287aa1-c25c-11f1-b11f-5081407ad051','739a8695-8948-4064-b9d4-ad16c439576d','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('1d288263-c25c-11f1-b11f-5081407ad051','7ae81cb1-5590-4693-b1ce-982cfddef2c4','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('1d28ffa0-c25c-11f1-b11f-5081407ad051','ae93afa7-f5e1-4aa7-a4c7-915e91a49576','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('1d2908cf-c25c-11f1-b11f-5081407ad051','be191640-1517-43e8-b72c-29ac830c9206','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('1d2911ba-c25c-11f1-b11f-5081407ad051','c49d989c-ea00-4446-8584-18b3e876c078','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('1d291c52-c25c-11f1-b11f-5081407ad051','d639d935-b164-4e13-8eaa-dc507429ebe6','eee3288a-4560-46e2-a957-31db1b0d8c73','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50','2026-10-07 14:33:50','2026-10-07 14:33:50'),('4f1c1b20-6ff6-f096-bb49-909ce4204c2a','088c76ac-32e6-f93c-b2f2-fd86ceab7b5b','d2beefba-e4bc-4d','pending',NULL,NULL,NULL,'2026-10-09 15:26:23','2026-10-09 15:26:23'),('65ed4777-f0e7-451d-afd7-5d9c9b6fb60c','fedfbab6-7cdd-4e1d-831c-4671ce979d14','0a91a3fc-c629-45a7-a246-70bde778408d','approved',NULL,NULL,'2026-10-02 12:55:38','2026-10-01 16:55:26','2026-10-02 10:55:38'),('90cd4f78-bdc2-11f1-a42e-5081407ad051','291577ed-5a9b-4013-8a2c-3f5b0fc180d7','0a91a3fc-c629-45a7-a246-70bde778408d','approved',NULL,NULL,'2026-10-02 12:55:38','2026-10-01 17:04:37','2026-10-02 10:55:38'),('90cdafe4-bdc2-11f1-a42e-5081407ad051','93f51ad8-2c1d-4054-80df-8d5f77d8f93f','0a91a3fc-c629-45a7-a246-70bde778408d','approved',NULL,NULL,'2026-10-02 12:55:38','2026-10-01 17:04:37','2026-10-02 10:55:38'),('90cdb7bd-bdc2-11f1-a42e-5081407ad051','d7c15eb3-63c1-4f4c-86ca-a51e2ad7ac3f','0a91a3fc-c629-45a7-a246-70bde778408d','approved',NULL,NULL,'2026-10-02 12:55:38','2026-10-01 17:04:37','2026-10-02 10:55:38'),('90cdbea1-bdc2-11f1-a42e-5081407ad051','f9a88e37-a6e0-4a9a-baf5-63029389d1eb','0a91a3fc-c629-45a7-a246-70bde778408d','approved',NULL,NULL,'2026-10-02 12:55:38','2026-10-01 17:04:37','2026-10-02 10:55:38'),('b49e70ad-bdb4-11f1-a42e-5081407ad051','389843a6-bcdc-4ae1-83b4-4f7ec11f54b2','0a91a3fc-c629-45a7-a246-70bde778408d','approved',NULL,NULL,'2026-10-02 12:55:38','2026-10-01 15:25:24','2026-10-02 10:55:38'),('b589dbc9-bf2f-11f1-9ab1-5081407ad051','445936fe-92c2-45d5-8f12-c44d54a5c3c4','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-03 13:38:25','2026-10-07 14:33:38'),('d85134f7-093b-4ac6-a5ef-f2eaa1f80edc','bbd99577-a3f4-4687-b40d-845c2de71144','d2beefba-e4bc-4d','pending',NULL,NULL,NULL,'2026-10-09 14:39:19','2026-10-09 14:39:19'),('e32b83ac-2f68-8bcf-7e1f-3836a859d086','84d9a23a-a33f-3b74-79da-5aa04faa7703','d2beefba-e4bc-4d','pending',NULL,NULL,NULL,'2026-10-09 15:26:23','2026-10-09 15:26:23'),('e46cb78e-155e-4ebe-ba96-495490c1b784','397d1077-fce9-4b33-8cb0-c96e11d3ace9','6540d4e1-2545-48e7-8671-02a7eba57610','approved',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38','2026-10-07 14:33:18','2026-10-07 14:33:38'),('f14d2ad1-8c34-4f31-bb2c-a5ff250e305c','7954b1db-f871-48c7-82a1-96d47ce05c4b','d2beefba-e4bc-4d','pending',NULL,NULL,NULL,'2026-10-09 14:24:56','2026-10-09 14:24:56');
 /*!40000 ALTER TABLE `organisation_document_reviews` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -267,7 +301,7 @@ CREATE TABLE `organisations` (
 
 LOCK TABLES `organisations` WRITE;
 /*!40000 ALTER TABLE `organisations` DISABLE KEYS */;
-INSERT INTO `organisations` VALUES ('0a91a3fc-c629-45a7-a246-70bde778408d','Atlantic Trade PLC','RC-93749834','343434343',NULL,NULL,NULL,NULL,'importer','verified','682f7cf2-b05f-4c','2026-10-02 12:55:38',NULL,'2026-10-01 13:33:18','2026-10-02 10:55:38',NULL,NULL,NULL,NULL,NULL,NULL),('6540d4e1-2545-48e7-8671-02a7eba57610','Trade Plc','RC-3782367','93923792','1888-02-12','Food & Beverage','sdsdsd sdsd',NULL,'importer','verified','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38',NULL,'2026-10-03 13:22:00','2026-10-07 14:33:38',NULL,NULL,NULL,NULL,NULL,NULL),('d2beefba-e4bc-4d','TRINU BONDED WAREHOUSE','RC-2555656565','61561651615',NULL,NULL,NULL,NULL,'terminal','verified',NULL,NULL,NULL,'2026-09-29 11:56:20','2026-09-29 17:00:42',NULL,NULL,NULL,NULL,NULL,NULL),('eee3288a-4560-46e2-a957-31db1b0d8c73','JeoDan Trading Corporations','RC-1428932','2243243423',NULL,NULL,NULL,NULL,'importer','verified','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50',NULL,'2026-10-03 11:20:51','2026-10-07 14:33:50',NULL,NULL,NULL,NULL,NULL,NULL);
+INSERT INTO `organisations` VALUES ('0a91a3fc-c629-45a7-a246-70bde778408d','Atlantic Trade PLC','RC-93749834','343434343',NULL,NULL,NULL,NULL,'importer','verified','682f7cf2-b05f-4c','2026-10-02 12:55:38',NULL,'2026-10-01 13:33:18','2026-10-02 10:55:38',NULL,NULL,NULL,NULL,NULL,NULL),('6540d4e1-2545-48e7-8671-02a7eba57610','Trade Plc','RC-3782367','93923792','1888-02-12','Food & Beverage','sdsdsd sdsd',NULL,'importer','verified','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:38',NULL,'2026-10-03 13:22:00','2026-10-07 14:33:38',NULL,NULL,NULL,NULL,NULL,NULL),('d2beefba-e4bc-4d','TRINU BONDED WAREHOUSE','RC-2555656565','61561651615',NULL,'Healthcare & Pharmaceuticals','','','terminal','verified',NULL,NULL,NULL,'2026-09-29 11:56:20','2026-10-09 15:26:23','','','','','',''),('eee3288a-4560-46e2-a957-31db1b0d8c73','JeoDan Trading Corporations','RC-1428932','2243243423',NULL,NULL,NULL,NULL,'importer','verified','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-07 15:33:50',NULL,'2026-10-03 11:20:51','2026-10-07 14:33:50',NULL,NULL,NULL,NULL,NULL,NULL);
 /*!40000 ALTER TABLE `organisations` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -389,8 +423,8 @@ DROP TABLE IF EXISTS `registration_documents`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `registration_documents` (
   `id` char(36) NOT NULL,
-  `registration_request_id` char(36) NOT NULL,
-  `document_type` enum('cac','tin','signatory_id','licence','directors_list') NOT NULL,
+  `registration_request_id` char(36) DEFAULT NULL,
+  `document_type` enum('cac','tin','signatory_id','licence','directors_list','utility_bill','other') NOT NULL,
   `licence_type` varchar(80) DEFAULT NULL,
   `licence_reference` varchar(150) DEFAULT NULL,
   `file_path` varchar(255) NOT NULL,
@@ -412,7 +446,7 @@ CREATE TABLE `registration_documents` (
 
 LOCK TABLES `registration_documents` WRITE;
 /*!40000 ALTER TABLE `registration_documents` DISABLE KEYS */;
-INSERT INTO `registration_documents` VALUES ('291577ed-5a9b-4013-8a2c-3f5b0fc180d7','a6567683-4fd3-4513-9205-d464aeec0b2f','licence','nafdac','32323','uploads/4c24ac1faf2026_10_01_03_33_18ages.jpg','images.jpg','image/jpeg',30816,'2026-10-01 13:33:18'),('389843a6-bcdc-4ae1-83b4-4f7ec11f54b2','a6567683-4fd3-4513-9205-d464aeec0b2f','licence','son','23232','uploads/a3e3f455e82026_10_01_03_33_18NCAP.png','SONCAP.png','image/png',65868,'2026-10-01 13:33:18'),('397d1077-fce9-4b33-8cb0-c96e11d3ace9','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','directors_list',NULL,NULL,'uploads/045ecd1268c1b4533c8268428e7ce8f4_2026_10_07_15_33_18.pdf','JeoDan_Trading_Corporations_Directors_Shareholders.pdf','application/pdf',3813,'2026-10-07 14:33:18'),('445936fe-92c2-45d5-8f12-c44d54a5c3c4','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','directors_list',NULL,NULL,'uploads/85c5a5205d2026_10_03_02_22_00ders.pdf','JeoDan_Trading_Corporations_Directors_Shareholders.pdf','application/pdf',3813,'2026-10-03 13:22:00'),('476b6bbb-932c-43b4-9846-d9bf057b9a77','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','signatory_id',NULL,NULL,'uploads/a36a15701c2026_10_03_02_22_00ence.jpg','drivers-licence.jpg','image/jpeg',83149,'2026-10-03 13:22:00'),('54501249-897a-4d21-a315-647e9687510e','f8b9170a-fdb3-4369-9fcd-643925f19a7d','licence','soncap','3434','uploads/8604165b7c2026_10_03_12_20_51NCAP.png','SONCAP.png','image/png',65868,'2026-10-03 11:20:51'),('59b0835d-ee9f-43c1-8cf3-00a67dd9eb5e','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','licence','ncs_customs_agent','sdsd','uploads/e3d26feec72026_10_03_02_22_00ity.webp','utility.webp','image/webp',34942,'2026-10-03 13:22:00'),('739a8695-8948-4064-b9d4-ad16c439576d','f8b9170a-fdb3-4369-9fcd-643925f19a7d','signatory_id',NULL,NULL,'uploads/0cc28b44172026_10_03_12_20_51ence.jpg','drivers-licence.jpg','image/jpeg',83149,'2026-10-03 11:20:51'),('7ae81cb1-5590-4693-b1ce-982cfddef2c4','f8b9170a-fdb3-4369-9fcd-643925f19a7d','',NULL,NULL,'uploads/20a2850f122026_10_03_12_20_51ity.webp','utility.webp','image/webp',34942,'2026-10-03 11:20:51'),('8492c69c-431c-411f-b90a-ad2c9e10da0b','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','',NULL,NULL,'uploads/2f0066af792026_10_03_02_22_00ity.webp','utility.webp','image/webp',34942,'2026-10-03 13:22:00'),('93f51ad8-2c1d-4054-80df-8d5f77d8f93f','a6567683-4fd3-4513-9205-d464aeec0b2f','tin',NULL,NULL,'uploads/c994eddf212026_10_01_03_33_18ance.jpg','Tax-clearance.jpg','image/jpeg',56688,'2026-10-01 13:33:18'),('ae93afa7-f5e1-4aa7-a4c7-915e91a49576','f8b9170a-fdb3-4369-9fcd-643925f19a7d','licence','nafdac','3443','uploads/8dc6e882e42026_10_03_12_20_51fdac.jpg','nafdac.jpg','image/jpeg',30816,'2026-10-03 11:20:51'),('be191640-1517-43e8-b72c-29ac830c9206','f8b9170a-fdb3-4369-9fcd-643925f19a7d','cac',NULL,NULL,'uploads/5e2bec5e432026_10_03_12_20_51CAC.jpg','CAC.jpg','image/jpeg',213489,'2026-10-03 11:20:51'),('c49d989c-ea00-4446-8584-18b3e876c078','f8b9170a-fdb3-4369-9fcd-643925f19a7d','',NULL,NULL,'uploads/0474094ef42026_10_03_12_20_51ders.pdf','JeoDan_Trading_Corporations_Directors_Shareholders.pdf','application/pdf',3813,'2026-10-03 11:20:51'),('d5399b12-4eb2-4d16-9b20-24e59817f784','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','cac',NULL,NULL,'uploads/b3ed4e42bc2026_10_03_02_22_00CAC.jpg','CAC.jpg','image/jpeg',213489,'2026-10-03 13:22:00'),('d639d935-b164-4e13-8eaa-dc507429ebe6','f8b9170a-fdb3-4369-9fcd-643925f19a7d','tin',NULL,NULL,'uploads/feeaaa1aab2026_10_03_12_20_51ance.jpg','Tax-clearance.jpg','image/jpeg',56688,'2026-10-03 11:20:51'),('d7c15eb3-63c1-4f4c-86ca-a51e2ad7ac3f','a6567683-4fd3-4513-9205-d464aeec0b2f','signatory_id',NULL,NULL,'uploads/8c7e3ac2ba2026_10_01_03_33_18ence.jpg','drivers-licence.jpg','image/jpeg',83149,'2026-10-01 13:33:18'),('f540a7ce-914a-4d1e-853d-634861c5de67','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','tin',NULL,NULL,'uploads/eb1e86245d2026_10_03_02_22_00ance.jpg','Tax-clearance.jpg','image/jpeg',56688,'2026-10-03 13:22:00'),('f9a88e37-a6e0-4a9a-baf5-63029389d1eb','a6567683-4fd3-4513-9205-d464aeec0b2f','cac',NULL,NULL,'uploads/568e0915192026_10_01_03_33_18CAC.jpg','CAC.jpg','image/jpeg',213489,'2026-10-01 13:33:18'),('fedfbab6-7cdd-4e1d-831c-4671ce979d14','a6567683-4fd3-4513-9205-d464aeec0b2f','licence','son','23232','uploads/658d9901b683976269a580cd86254659_2026_10_01_18_55_26.png','SONCAP.png','image/png',65868,'2026-10-01 16:55:26');
+INSERT INTO `registration_documents` VALUES ('088c76ac-32e6-f93c-b2f2-fd86ceab7b5b',NULL,'licence','ncs_customs_agent','sdsd','uploads/87a6d8cbd3b9ae3cff09e9b657725233f247faf12bd8bdc9.pdf','JeoDan_Trading_Corporations_Directors_Shareholders.pdf','application/pdf',3813,'2026-10-09 15:26:23'),('291577ed-5a9b-4013-8a2c-3f5b0fc180d7','a6567683-4fd3-4513-9205-d464aeec0b2f','licence','nafdac','32323','uploads/4c24ac1faf2026_10_01_03_33_18ages.jpg','images.jpg','image/jpeg',30816,'2026-10-01 13:33:18'),('389843a6-bcdc-4ae1-83b4-4f7ec11f54b2','a6567683-4fd3-4513-9205-d464aeec0b2f','licence','son','23232','uploads/a3e3f455e82026_10_01_03_33_18NCAP.png','SONCAP.png','image/png',65868,'2026-10-01 13:33:18'),('397d1077-fce9-4b33-8cb0-c96e11d3ace9','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','directors_list',NULL,NULL,'uploads/045ecd1268c1b4533c8268428e7ce8f4_2026_10_07_15_33_18.pdf','JeoDan_Trading_Corporations_Directors_Shareholders.pdf','application/pdf',3813,'2026-10-07 14:33:18'),('445936fe-92c2-45d5-8f12-c44d54a5c3c4','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','directors_list',NULL,NULL,'uploads/85c5a5205d2026_10_03_02_22_00ders.pdf','JeoDan_Trading_Corporations_Directors_Shareholders.pdf','application/pdf',3813,'2026-10-03 13:22:00'),('476b6bbb-932c-43b4-9846-d9bf057b9a77','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','signatory_id',NULL,NULL,'uploads/a36a15701c2026_10_03_02_22_00ence.jpg','drivers-licence.jpg','image/jpeg',83149,'2026-10-03 13:22:00'),('54501249-897a-4d21-a315-647e9687510e','f8b9170a-fdb3-4369-9fcd-643925f19a7d','licence','soncap','3434','uploads/8604165b7c2026_10_03_12_20_51NCAP.png','SONCAP.png','image/png',65868,'2026-10-03 11:20:51'),('59b0835d-ee9f-43c1-8cf3-00a67dd9eb5e','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','licence','ncs_customs_agent','sdsd','uploads/e3d26feec72026_10_03_02_22_00ity.webp','utility.webp','image/webp',34942,'2026-10-03 13:22:00'),('739a8695-8948-4064-b9d4-ad16c439576d','f8b9170a-fdb3-4369-9fcd-643925f19a7d','signatory_id',NULL,NULL,'uploads/0cc28b44172026_10_03_12_20_51ence.jpg','drivers-licence.jpg','image/jpeg',83149,'2026-10-03 11:20:51'),('7954b1db-f871-48c7-82a1-96d47ce05c4b',NULL,'tin',NULL,NULL,'uploads/organisation-documents/8c73b3a8970a71426536c076edc3c1189c73851643bd4ed7.jpg','CAC.jpg','image/jpeg',213489,'2026-10-09 14:24:56'),('7ae81cb1-5590-4693-b1ce-982cfddef2c4','f8b9170a-fdb3-4369-9fcd-643925f19a7d','',NULL,NULL,'uploads/20a2850f122026_10_03_12_20_51ity.webp','utility.webp','image/webp',34942,'2026-10-03 11:20:51'),('8492c69c-431c-411f-b90a-ad2c9e10da0b','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','',NULL,NULL,'uploads/2f0066af792026_10_03_02_22_00ity.webp','utility.webp','image/webp',34942,'2026-10-03 13:22:00'),('84d9a23a-a33f-3b74-79da-5aa04faa7703',NULL,'signatory_id',NULL,NULL,'uploads/5b9c0ced06f623e9014988f1e25228ceaa038eb4cf23f743.jpg','drivers-licence.jpg','image/jpeg',83149,'2026-10-09 15:26:23'),('93f51ad8-2c1d-4054-80df-8d5f77d8f93f','a6567683-4fd3-4513-9205-d464aeec0b2f','tin',NULL,NULL,'uploads/c994eddf212026_10_01_03_33_18ance.jpg','Tax-clearance.jpg','image/jpeg',56688,'2026-10-01 13:33:18'),('ae93afa7-f5e1-4aa7-a4c7-915e91a49576','f8b9170a-fdb3-4369-9fcd-643925f19a7d','licence','nafdac','3443','uploads/8dc6e882e42026_10_03_12_20_51fdac.jpg','nafdac.jpg','image/jpeg',30816,'2026-10-03 11:20:51'),('bbd99577-a3f4-4687-b40d-845c2de71144',NULL,'utility_bill',NULL,NULL,'uploads/organisation-documents/962b428a5f077a33c1e0ba241e5f96db23296ed559d406e4.jpg','istockphoto-1289461335-612x612.jpg','image/jpeg',23983,'2026-10-09 14:39:19'),('be191640-1517-43e8-b72c-29ac830c9206','f8b9170a-fdb3-4369-9fcd-643925f19a7d','cac',NULL,NULL,'uploads/5e2bec5e432026_10_03_12_20_51CAC.jpg','CAC.jpg','image/jpeg',213489,'2026-10-03 11:20:51'),('c49d989c-ea00-4446-8584-18b3e876c078','f8b9170a-fdb3-4369-9fcd-643925f19a7d','',NULL,NULL,'uploads/0474094ef42026_10_03_12_20_51ders.pdf','JeoDan_Trading_Corporations_Directors_Shareholders.pdf','application/pdf',3813,'2026-10-03 11:20:51'),('d5399b12-4eb2-4d16-9b20-24e59817f784','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','cac',NULL,NULL,'uploads/b3ed4e42bc2026_10_03_02_22_00CAC.jpg','CAC.jpg','image/jpeg',213489,'2026-10-03 13:22:00'),('d639d935-b164-4e13-8eaa-dc507429ebe6','f8b9170a-fdb3-4369-9fcd-643925f19a7d','tin',NULL,NULL,'uploads/feeaaa1aab2026_10_03_12_20_51ance.jpg','Tax-clearance.jpg','image/jpeg',56688,'2026-10-03 11:20:51'),('d7c15eb3-63c1-4f4c-86ca-a51e2ad7ac3f','a6567683-4fd3-4513-9205-d464aeec0b2f','signatory_id',NULL,NULL,'uploads/8c7e3ac2ba2026_10_01_03_33_18ence.jpg','drivers-licence.jpg','image/jpeg',83149,'2026-10-01 13:33:18'),('f540a7ce-914a-4d1e-853d-634861c5de67','3de67ef0-f8fb-4f11-bf1e-9e43108f6c6e','tin',NULL,NULL,'uploads/eb1e86245d2026_10_03_02_22_00ance.jpg','Tax-clearance.jpg','image/jpeg',56688,'2026-10-03 13:22:00'),('f9a88e37-a6e0-4a9a-baf5-63029389d1eb','a6567683-4fd3-4513-9205-d464aeec0b2f','cac',NULL,NULL,'uploads/568e0915192026_10_01_03_33_18CAC.jpg','CAC.jpg','image/jpeg',213489,'2026-10-01 13:33:18'),('fedfbab6-7cdd-4e1d-831c-4671ce979d14','a6567683-4fd3-4513-9205-d464aeec0b2f','licence','son','23232','uploads/658d9901b683976269a580cd86254659_2026_10_01_18_55_26.png','SONCAP.png','image/png',65868,'2026-10-01 16:55:26');
 /*!40000 ALTER TABLE `registration_documents` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -596,8 +630,172 @@ CREATE TABLE `sessions` (
 
 LOCK TABLES `sessions` WRITE;
 /*!40000 ALTER TABLE `sessions` DISABLE KEYS */;
-INSERT INTO `sessions` VALUES ('0997562a-0144-448b-a90d-063ffddd8167','ff20dfcf-f843-4cd3-a263-412210683de9','33b8ceaf16748dafd377c91d39e5e15c266ebbe4a0eae2619e2380d490b6fd46',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:00:50','2026-10-31 18:00:50',NULL,NULL,'2026-10-01 16:00:50'),('1198246b-102c-4adf-85b6-a0460cf9b95a','4a9ba8d5-93b6-4b65-af96-934920afcd18','397fb86b977b57e309ee610d0c7967197d58a6b4f8e994cb56be5d01666af187',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:30:23','2026-11-02 15:30:23',NULL,NULL,'2026-10-03 14:30:23'),('2632d7e9-af51-46e5-9b6f-dd62e125af17','4a9ba8d5-93b6-4b65-af96-934920afcd18','a196a7f8508b401cac5197ca1458e65bad8d19eeb0d0af1de05cd57d11e618dc',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 14:46:01','2026-11-02 14:46:01',NULL,NULL,'2026-10-03 13:46:01'),('3881279e-11ea-4f3c-9d76-11927c1c28ac','ff20dfcf-f843-4cd3-a263-412210683de9','24218105a69709b7eab7a7efdfa80417e9ab77cbf3344d0195c182a3eaa784c3',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-02 12:53:24','2026-11-01 12:53:24',NULL,NULL,'2026-10-02 10:53:24'),('3f779800-112f-4a40-b843-f8f03022325d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','62f098acd16856c52d6fbb85725b83492b446893667f97a1f860302b74410753',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 12:36:27','2026-11-02 12:36:27',NULL,NULL,'2026-10-03 11:36:27'),('63ffc6d7-032d-435a-bdcf-6145ecb541c2','ff20dfcf-f843-4cd3-a263-412210683de9','fd54b95fe5fb1f4222c5491124179f80f3389ee8a6d955368df682690f48f1b4',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:20:13','2026-10-31 18:20:13',NULL,NULL,'2026-10-01 16:20:13'),('67e4f923-400e-4655-a67a-7e1bb74bcb24','ff20dfcf-f843-4cd3-a263-412210683de9','04fdd5b13e825690fa60d0de193c51a9d6f6b13e8c9235df9a412cdefc2c2c62',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:17:51','2026-10-31 18:17:51',NULL,NULL,'2026-10-01 16:17:51'),('68ef296d-8fc6-4a5f-856d-e983d5357d7e','4a9ba8d5-93b6-4b65-af96-934920afcd18','96ef396045b76fe8c218e4d3d0fdcddba9b997d9f87884a8b0d311c9f746ba32',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:01:42','2026-11-02 15:01:42',NULL,NULL,'2026-10-03 14:01:42'),('9b4fc236-f24e-4127-8259-d7816eeea03f','c0654f0b-8452-4a03-a43d-0d0cda17da1b','11a7d220a8950dc7dcaaf347897b5adc221d8d7ae134d0a27e971e0e67ea7cac',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-08 19:18:35','2026-10-10 14:57:37',NULL,NULL,'2026-10-08 18:18:35'),('b804baca-dfa2-4a05-8511-e10dcba17e0b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','de7bb0dd59388fe82003ba00911fdfbeef18f2cdb8d7d6fbc67f8e402f455cbf',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 14:30:28','2026-11-06 14:30:28',NULL,NULL,'2026-10-07 13:30:28'),('d375207c-6fe5-4be1-a753-2fb2117b2663','4a9ba8d5-93b6-4b65-af96-934920afcd18','ad2d2dcc6eec3d2bb76177f7532a22bc0107420d4d1616146a48eccb494fc19f',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:32:30','2026-11-02 15:32:30',NULL,NULL,'2026-10-03 14:32:30'),('e13d005b-11b9-4521-ad27-95cc3a2b1e7d','4a9ba8d5-93b6-4b65-af96-934920afcd18','204e4cedeb31c34b6d4f828d89fc5892aad44955df0cbda4d144d081c407ee30',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 15:17:14','2026-11-06 15:17:14',NULL,NULL,'2026-10-07 14:17:14');
+INSERT INTO `sessions` VALUES ('0997562a-0144-448b-a90d-063ffddd8167','ff20dfcf-f843-4cd3-a263-412210683de9','33b8ceaf16748dafd377c91d39e5e15c266ebbe4a0eae2619e2380d490b6fd46',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:00:50','2026-10-31 18:00:50',NULL,NULL,'2026-10-01 16:00:50'),('1198246b-102c-4adf-85b6-a0460cf9b95a','4a9ba8d5-93b6-4b65-af96-934920afcd18','397fb86b977b57e309ee610d0c7967197d58a6b4f8e994cb56be5d01666af187',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:30:23','2026-11-02 15:30:23',NULL,NULL,'2026-10-03 14:30:23'),('2632d7e9-af51-46e5-9b6f-dd62e125af17','4a9ba8d5-93b6-4b65-af96-934920afcd18','a196a7f8508b401cac5197ca1458e65bad8d19eeb0d0af1de05cd57d11e618dc',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 14:46:01','2026-11-02 14:46:01',NULL,NULL,'2026-10-03 13:46:01'),('3881279e-11ea-4f3c-9d76-11927c1c28ac','ff20dfcf-f843-4cd3-a263-412210683de9','24218105a69709b7eab7a7efdfa80417e9ab77cbf3344d0195c182a3eaa784c3',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-02 12:53:24','2026-11-01 12:53:24',NULL,NULL,'2026-10-02 10:53:24'),('3f779800-112f-4a40-b843-f8f03022325d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','62f098acd16856c52d6fbb85725b83492b446893667f97a1f860302b74410753',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 12:36:27','2026-11-02 12:36:27',NULL,NULL,'2026-10-03 11:36:27'),('63ffc6d7-032d-435a-bdcf-6145ecb541c2','ff20dfcf-f843-4cd3-a263-412210683de9','fd54b95fe5fb1f4222c5491124179f80f3389ee8a6d955368df682690f48f1b4',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:20:13','2026-10-31 18:20:13',NULL,NULL,'2026-10-01 16:20:13'),('67e4f923-400e-4655-a67a-7e1bb74bcb24','ff20dfcf-f843-4cd3-a263-412210683de9','04fdd5b13e825690fa60d0de193c51a9d6f6b13e8c9235df9a412cdefc2c2c62',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:17:51','2026-10-31 18:17:51',NULL,NULL,'2026-10-01 16:17:51'),('68ef296d-8fc6-4a5f-856d-e983d5357d7e','4a9ba8d5-93b6-4b65-af96-934920afcd18','96ef396045b76fe8c218e4d3d0fdcddba9b997d9f87884a8b0d311c9f746ba32',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:01:42','2026-11-02 15:01:42',NULL,NULL,'2026-10-03 14:01:42'),('9b4fc236-f24e-4127-8259-d7816eeea03f','c0654f0b-8452-4a03-a43d-0d0cda17da1b','11a7d220a8950dc7dcaaf347897b5adc221d8d7ae134d0a27e971e0e67ea7cac',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-08 19:18:35','2026-10-10 17:20:19',NULL,NULL,'2026-10-08 18:18:35'),('b804baca-dfa2-4a05-8511-e10dcba17e0b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','de7bb0dd59388fe82003ba00911fdfbeef18f2cdb8d7d6fbc67f8e402f455cbf',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 14:30:28','2026-11-06 14:30:28',NULL,NULL,'2026-10-07 13:30:28'),('d375207c-6fe5-4be1-a753-2fb2117b2663','4a9ba8d5-93b6-4b65-af96-934920afcd18','ad2d2dcc6eec3d2bb76177f7532a22bc0107420d4d1616146a48eccb494fc19f',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:32:30','2026-11-02 15:32:30',NULL,NULL,'2026-10-03 14:32:30'),('e13d005b-11b9-4521-ad27-95cc3a2b1e7d','4a9ba8d5-93b6-4b65-af96-934920afcd18','204e4cedeb31c34b6d4f828d89fc5892aad44955df0cbda4d144d081c407ee30',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 15:17:14','2026-11-06 15:17:14',NULL,NULL,'2026-10-07 14:17:14');
 /*!40000 ALTER TABLE `sessions` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `terminal_cargo_services`
+--
+
+DROP TABLE IF EXISTS `terminal_cargo_services`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `terminal_cargo_services` (
+  `id` char(36) NOT NULL,
+  `label` varchar(255) NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_terminal_cargo_service_label` (`label`),
+  KEY `idx_terminal_cargo_service_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `terminal_cargo_services`
+--
+
+LOCK TABLES `terminal_cargo_services` WRITE;
+/*!40000 ALTER TABLE `terminal_cargo_services` DISABLE KEYS */;
+INSERT INTO `terminal_cargo_services` VALUES ('2a1fd3d6-d6bb-4f5c-84f3-cf8f700e0f25','Industrial cargo',1,'2026-10-09 16:20:01','2026-10-09 16:20:01'),('363026a1-9d5e-4617-9515-3c89384deab7','General cargo',1,'2026-10-09 16:20:01','2026-10-09 16:20:01'),('47227fe9-8403-4585-945f-94b6e693af46','Project cargo',1,'2026-10-09 16:20:01','2026-10-09 16:20:01'),('9cef3829-3f2f-44f2-ad2c-5f66f91b96bc','Containerised cargo',1,'2026-10-09 16:20:01','2026-10-09 16:20:01'),('b2fac354-7c60-4df0-8c2e-9e9d02ab4cfc','Automotive cargo',1,'2026-10-09 16:20:01','2026-10-09 16:20:01'),('dde09f2b-a1f3-4cd0-80fc-cd7bd12533d6','Agricultural cargo',1,'2026-10-09 16:20:01','2026-10-09 16:20:01'),('e12972fd-3a19-4607-b366-ce4f551b0d64','Special cargo',1,'2026-10-09 16:20:01','2026-10-09 16:20:01');
+/*!40000 ALTER TABLE `terminal_cargo_services` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `terminal_configuration`
+--
+
+DROP TABLE IF EXISTS `terminal_configuration`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `terminal_configuration` (
+  `id` tinyint(3) unsigned NOT NULL,
+  `terminal_name` varchar(255) NOT NULL DEFAULT '',
+  `terminal_code` varchar(80) NOT NULL DEFAULT '',
+  `operating_hours` varchar(100) NOT NULL DEFAULT '',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_terminal_configuration_code` (`terminal_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `terminal_configuration`
+--
+
+LOCK TABLES `terminal_configuration` WRITE;
+/*!40000 ALTER TABLE `terminal_configuration` DISABLE KEYS */;
+INSERT INTO `terminal_configuration` VALUES (1,'Abuja Flagship Facility','TRN-ABJ-01','08:00–18:00','2026-10-09 16:20:01','2026-10-09 16:20:01');
+/*!40000 ALTER TABLE `terminal_configuration` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `terminal_configuration_audit`
+--
+
+DROP TABLE IF EXISTS `terminal_configuration_audit`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `terminal_configuration_audit` (
+  `id` char(36) NOT NULL,
+  `actor_id` varchar(64) DEFAULT NULL,
+  `action` varchar(100) NOT NULL,
+  `before_data` longtext DEFAULT NULL,
+  `after_data` longtext NOT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `user_agent` varchar(500) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_terminal_config_audit_actor` (`actor_id`),
+  KEY `idx_terminal_config_audit_created` (`created_at`),
+  KEY `idx_terminal_config_audit_action` (`action`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `terminal_configuration_audit`
+--
+
+LOCK TABLES `terminal_configuration_audit` WRITE;
+/*!40000 ALTER TABLE `terminal_configuration_audit` DISABLE KEYS */;
+/*!40000 ALTER TABLE `terminal_configuration_audit` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `terminal_hold_reasons`
+--
+
+DROP TABLE IF EXISTS `terminal_hold_reasons`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `terminal_hold_reasons` (
+  `id` char(36) NOT NULL,
+  `label` varchar(255) NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_terminal_hold_reason_label` (`label`),
+  KEY `idx_terminal_hold_reason_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `terminal_hold_reasons`
+--
+
+LOCK TABLES `terminal_hold_reasons` WRITE;
+/*!40000 ALTER TABLE `terminal_hold_reasons` DISABLE KEYS */;
+INSERT INTO `terminal_hold_reasons` VALUES ('326ddd96-a1d5-4a77-a585-16710d216b31','Regulatory agency hold',1,'2026-10-09 16:20:01','2026-10-09 16:20:01'),('447237a8-9608-46bc-b423-9ad42941464d','Outstanding charges',1,'2026-10-09 16:20:01','2026-10-09 16:20:01'),('533dbf30-0370-4d5c-816b-d8bf978eafec','Customs inspection hold',1,'2026-10-09 16:20:01','2026-10-09 16:20:01'),('6def5104-a534-4cc1-a85a-4f687520a618','Missing documentation',1,'2026-10-09 16:20:01','2026-10-09 16:20:01'),('8089b7e5-c00a-4ca8-b323-7ec919f8d7ec','Seal mismatch',1,'2026-10-09 16:20:01','2026-10-09 16:20:01'),('af7af8db-2b78-4d37-bcb6-ffa5b9968580','Cargo damage',1,'2026-10-09 16:20:01','2026-10-09 16:20:01');
+/*!40000 ALTER TABLE `terminal_hold_reasons` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `terminal_locations`
+--
+
+DROP TABLE IF EXISTS `terminal_locations`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `terminal_locations` (
+  `id` char(36) NOT NULL,
+  `code` varchar(80) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `kind` enum('yard','warehouse') NOT NULL DEFAULT 'yard',
+  `bonded` tinyint(1) NOT NULL DEFAULT 1,
+  `status` enum('active','inactive','maintenance') NOT NULL DEFAULT 'active',
+  `capacity` decimal(14,3) DEFAULT NULL,
+  `capacity_unit` enum('TEU','sqm','pallets','positions','tonnes') NOT NULL DEFAULT 'TEU',
+  `cargo_types` varchar(1000) NOT NULL DEFAULT '',
+  `security` varchar(1000) NOT NULL DEFAULT '',
+  `equipment` varchar(1000) NOT NULL DEFAULT '',
+  `block_code` varchar(80) NOT NULL DEFAULT '',
+  `row_code` varchar(80) NOT NULL DEFAULT '',
+  `slot_code` varchar(80) NOT NULL DEFAULT '',
+  `tier_code` varchar(80) NOT NULL DEFAULT '',
+  `aisle_code` varchar(80) NOT NULL DEFAULT '',
+  `rack_code` varchar(80) NOT NULL DEFAULT '',
+  `bin_code` varchar(80) NOT NULL DEFAULT '',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_terminal_location_code` (`code`),
+  KEY `idx_terminal_location_status` (`status`),
+  KEY `idx_terminal_location_kind` (`kind`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `terminal_locations`
+--
+
+LOCK TABLES `terminal_locations` WRITE;
+/*!40000 ALTER TABLE `terminal_locations` DISABLE KEYS */;
+INSERT INTO `terminal_locations` VALUES ('a50a1e50-c119-49d3-83ec-db7e4132b4d3','CY-A','Container Yard A','yard',1,'active',120.000,'TEU','Import containers, export containers, transit cargo, refrigerated containers','24-hour CCTV surveillance, controlled entry gate, perimeter fencing, security patrols','Reach stacker, terminal tractor, container handler, forklift','A','01','01','Ground','CY-A-ACCESS','STACK-A01','POSITION-A-01','2026-10-09 16:20:01','2026-10-09 16:20:01'),('e1bf6d26-3b03-46f3-9983-5079f4566048','BW-1','Bonded Warehouse 1','warehouse',1,'active',2400.000,'sqm','General cargo, palletised goods, agricultural products, industrial goods','CCTV surveillance, controlled access, fire detection system, intruder alarm','Forklift, electric pallet truck, platform weighing scale, loading dock equipment','WH-B','01','01','Ground','A','R01','B01','2026-10-09 16:20:01','2026-10-09 16:20:01');
+/*!40000 ALTER TABLE `terminal_locations` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -728,4 +926,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-09 15:00:36
+-- Dump completed on 2026-10-09 17:20:48

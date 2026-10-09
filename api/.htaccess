@@ -63,8 +63,9 @@ RewriteRule ^admin/users/reset-mfa/([0-9a-zA-Z-]+)/$ src/users/reset-mfa.php?id=
 RewriteRule ^admin/config/hub/$ src/admin-config/hub.php [NC]
 RewriteRule ^admin/config/organisation/$ src/admin-config/organisation.php [NC]
 RewriteRule ^admin/config/organisation/update/$ src/admin-config/update-org.php [NC]
-RewriteRule ^admin/config/organisation/documents/add/$ src/admin-config/add-docs.php [NC]
 RewriteRule ^admin/config/organisation/remove/$ src/admin-config/remove-docs.php [NC]
+RewriteRule ^admin/config/terminal/$ src/admin-config/terminal.php [NC]
+RewriteRule ^admin/config/terminal/update/$ src/admin-config/update-terminal.php [NC]
 
 
 

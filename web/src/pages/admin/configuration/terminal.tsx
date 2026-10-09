@@ -1,13 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "@/components/router-link";
 import {
 	AlertTriangle,
 	ArrowLeft,
 	Boxes,
 	Building2,
-	Container,
-	Grid3x3,
 	Layers,
+	MapPin,
 	Package,
 	Plus,
 	Save,
@@ -20,142 +19,249 @@ import { AppShell, StatusBadge } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { http, type Resp } from "@/lib/httpClient";
 
-interface ZoneRow {
+type LocationKind = "yard" | "warehouse";
+type LocationStatus = "active" | "inactive" | "maintenance";
+type CapacityUnit = "TEU" | "sqm" | "pallets" | "positions" | "tonnes";
+
+interface LocationRow {
 	id: string;
 	code: string;
 	name: string;
-	kind: "yard" | "warehouse";
+	kind: LocationKind;
 	bonded: boolean;
+	status: LocationStatus;
 	capacity: string;
+	capacityUnit: CapacityUnit;
+	cargoTypes: string;
+	security: string;
+	equipment: string;
+	block: string;
+	row: string;
+	slot: string;
+	tier: string;
+	aisle: string;
+	rack: string;
+	bin: string;
 }
 
 interface CargoService {
 	id: string;
 	label: string;
-	enabled: boolean;
 }
 
 interface HoldReason {
 	id: string;
 	label: string;
-	category: "customs" | "agency" | "terminal" | "financial" | "damage" | "documentation";
-}
-
-interface OperationalArea {
-	id: string;
-	label: string;
-	enabled: boolean;
 }
 
 interface TerminalConfig {
 	terminalName: string;
 	terminalCode: string;
-	terminalType: string;
 	operatingHours: string;
-	weeklyClosure: string;
-	zones: ZoneRow[];
+	locations: LocationRow[];
 	cargoServices: CargoService[];
 	holdReasons: HoldReason[];
-	operationalAreas: OperationalArea[];
 }
 
-const initialConfig: TerminalConfig = {
-	terminalName: "Abuja Flagship Facility",
+const emptyConfig: TerminalConfig = {
+	terminalName: "",
 	terminalCode: "",
-	terminalType: "Inland Bonded Terminal",
-	operatingHours: "08:00 – 18:00",
-	weeklyClosure: "Sunday",
-	zones: [
-		{
-			id: "z-1",
-			code: "CY-A",
-			name: "Container Yard A",
-			kind: "yard",
-			bonded: true,
-			capacity: "120 TEU",
-		},
-		{
-			id: "z-2",
-			code: "BW-1",
-			name: "Bonded Warehouse 1",
-			kind: "warehouse",
-			bonded: true,
-			capacity: "2,400 sqm",
-		},
-	],
-	cargoServices: [
-		{ id: "cs-1", label: "General cargo", enabled: true },
-		{ id: "cs-2", label: "Containerised cargo", enabled: true },
-		{ id: "cs-3", label: "Agricultural cargo", enabled: true },
-		{ id: "cs-4", label: "Industrial cargo", enabled: true },
-		{ id: "cs-5", label: "Automotive cargo", enabled: true },
-		{ id: "cs-6", label: "Project cargo", enabled: false },
-		{ id: "cs-7", label: "Special cargo", enabled: false },
-	],
-	holdReasons: [
-		{ id: "hr-1", label: "Customs inspection hold", category: "customs" },
-		{ id: "hr-2", label: "Regulatory agency hold", category: "agency" },
-		{ id: "hr-3", label: "Seal mismatch", category: "terminal" },
-		{ id: "hr-4", label: "Outstanding charges", category: "financial" },
-		{ id: "hr-5", label: "Cargo damage", category: "damage" },
-		{ id: "hr-6", label: "Missing documentation", category: "documentation" },
-	],
-	operationalAreas: [
-		{ id: "oa-1", label: "Gate", enabled: true },
-		{ id: "oa-2", label: "Receiving & tally", enabled: true },
-		{ id: "oa-3", label: "Examination bay", enabled: true },
-		{ id: "oa-4", label: "Loading & discharge", enabled: true },
-		{ id: "oa-5", label: "Reefer points", enabled: false },
-	],
+	operatingHours: "",
+	locations: [],
+	cargoServices: [],
+	holdReasons: [],
 };
 
+const capacityUnits: { value: CapacityUnit; label: string }[] = [
+	{ value: "TEU", label: "TEU" },
+	{ value: "sqm", label: "Square metres" },
+	{ value: "pallets", label: "Pallets" },
+	{ value: "positions", label: "Positions" },
+	{ value: "tonnes", label: "Tonnes" },
+];
+
+const normaliseLocation = (raw: any): LocationRow => ({
+	id: String(raw?.id ?? crypto.randomUUID()),
+	code: raw?.code ?? "",
+	name: raw?.name ?? "",
+	kind: (raw?.kind ?? "yard") as LocationKind,
+	bonded: Boolean(raw?.bonded ?? true),
+	status: (raw?.status ?? "active") as LocationStatus,
+	capacity:
+		raw?.capacity === null || raw?.capacity === undefined
+			? ""
+			: String(raw.capacity),
+	capacityUnit: (raw?.capacity_unit ?? raw?.capacityUnit ?? "TEU") as CapacityUnit,
+	cargoTypes: raw?.cargo_types ?? raw?.cargoTypes ?? "",
+	security: raw?.security ?? "",
+	equipment: raw?.equipment ?? "",
+	block: raw?.block ?? "",
+	row: raw?.row ?? "",
+	slot: raw?.slot ?? "",
+	tier: raw?.tier ?? "",
+	aisle: raw?.aisle ?? "",
+	rack: raw?.rack ?? "",
+	bin: raw?.bin ?? "",
+});
+
+const normaliseCargoService = (raw: any): CargoService => ({
+	id: String(raw?.id ?? crypto.randomUUID()),
+	label: raw?.label ?? raw?.name ?? "",
+});
+
+const normaliseHoldReason = (raw: any): HoldReason => ({
+	id: String(raw?.id ?? crypto.randomUUID()),
+	label: raw?.label ?? raw?.name ?? "",
+});
+
 export default function AdminTerminalConfigurationPage() {
-	const [config, setConfig] = useState<TerminalConfig>(initialConfig);
+	const [config, setConfig] = useState<TerminalConfig>(emptyConfig);
+	const [loading, setLoading] = useState(true);
+	const [saving, setSaving] = useState(false);
+	const [error, setError] = useState("");
 	const [dirty, setDirty] = useState(false);
 
-	const markDirty = () => setDirty(true);
+	const fetchAll = async () => {
+		setLoading(true);
+		setError("");
+		try {
+			const res = await http.get("/admin/config/terminal/");
+			const resp: Resp = res.data;
+			if (resp.error) {
+				setError(resp.data || "Could not load terminal configuration.");
+				return;
+			}
+			const payload: any = resp.code ?? {};
+
+			const rawLocations: any[] = Array.isArray(payload.locations)
+				? payload.locations
+				: [];
+			const rawServices: any[] = Array.isArray(payload.cargo_services)
+				? payload.cargo_services
+				: Array.isArray(payload.cargoServices)
+					? payload.cargoServices
+					: [];
+			const rawHolds: any[] = Array.isArray(payload.hold_reasons)
+				? payload.hold_reasons
+				: Array.isArray(payload.holdReasons)
+					? payload.holdReasons
+					: [];
+
+			setConfig({
+				terminalName:
+					payload.terminal_name ?? payload.terminalName ?? "",
+				terminalCode:
+					payload.terminal_code ?? payload.terminalCode ?? "",
+				operatingHours:
+					payload.operating_hours ?? payload.operatingHours ?? "",
+				locations: rawLocations.map(normaliseLocation),
+				cargoServices: rawServices.map(normaliseCargoService),
+				holdReasons: rawHolds.map(normaliseHoldReason),
+			});
+			setDirty(false);
+		} catch (err: any) {
+			setError(
+				err?.response?.data?.message ||
+					"Could not load terminal configuration."
+			);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		void fetchAll();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const update = <K extends keyof TerminalConfig>(
 		key: K,
 		value: TerminalConfig[K]
 	) => {
 		setConfig((prev) => ({ ...prev, [key]: value }));
-		markDirty();
+		setDirty(true);
 	};
 
-	const addZone = () => {
+	const addLocation = () => {
 		setConfig((prev) => ({
 			...prev,
-			zones: [
-				...prev.zones,
+			locations: [
+				...prev.locations,
 				{
-					id: `z-${Date.now()}`,
+					id: `loc-${Date.now()}`,
 					code: "",
 					name: "",
 					kind: "yard",
 					bonded: true,
+					status: "active",
 					capacity: "",
+					capacityUnit: "TEU",
+					cargoTypes: "",
+					security: "",
+					equipment: "",
+					block: "",
+					row: "",
+					slot: "",
+					tier: "",
+					aisle: "",
+					rack: "",
+					bin: "",
 				},
 			],
 		}));
-		markDirty();
+		setDirty(true);
 	};
 
-	const updateZone = (id: string, patch: Partial<ZoneRow>) => {
+	const updateLocation = (id: string, patch: Partial<LocationRow>) => {
 		setConfig((prev) => ({
 			...prev,
-			zones: prev.zones.map((z) => (z.id === id ? { ...z, ...patch } : z)),
+			locations: prev.locations.map((location) =>
+				location.id === id ? { ...location, ...patch } : location
+			),
 		}));
-		markDirty();
+		setDirty(true);
 	};
 
-	const removeZone = (id: string) => {
+	const removeLocation = (id: string) => {
 		setConfig((prev) => ({
 			...prev,
-			zones: prev.zones.filter((z) => z.id !== id),
+			locations: prev.locations.filter((location) => location.id !== id),
 		}));
-		markDirty();
+		setDirty(true);
+	};
+
+	const addCargoService = () => {
+		setConfig((prev) => ({
+			...prev,
+			cargoServices: [
+				...prev.cargoServices,
+				{
+					id: `service-${Date.now()}`,
+					label: "",
+				},
+			],
+		}));
+		setDirty(true);
+	};
+
+	const updateCargoService = (id: string, label: string) => {
+		setConfig((prev) => ({
+			...prev,
+			cargoServices: prev.cargoServices.map((service) =>
+				service.id === id ? { ...service, label } : service
+			),
+		}));
+		setDirty(true);
+	};
+
+	const removeCargoService = (id: string) => {
+		setConfig((prev) => ({
+			...prev,
+			cargoServices: prev.cargoServices.filter((service) => service.id !== id),
+		}));
+		setDirty(true);
 	};
 
 	const addHoldReason = () => {
@@ -164,67 +270,203 @@ export default function AdminTerminalConfigurationPage() {
 			holdReasons: [
 				...prev.holdReasons,
 				{
-					id: `hr-${Date.now()}`,
+					id: `hold-${Date.now()}`,
 					label: "",
-					category: "terminal",
 				},
 			],
 		}));
-		markDirty();
+		setDirty(true);
 	};
 
-	const updateHoldReason = (id: string, patch: Partial<HoldReason>) => {
+	const updateHoldReason = (id: string, label: string) => {
 		setConfig((prev) => ({
 			...prev,
-			holdReasons: prev.holdReasons.map((h) =>
-				h.id === id ? { ...h, ...patch } : h
+			holdReasons: prev.holdReasons.map((reason) =>
+				reason.id === id ? { ...reason, label } : reason
 			),
 		}));
-		markDirty();
+		setDirty(true);
 	};
 
 	const removeHoldReason = (id: string) => {
 		setConfig((prev) => ({
 			...prev,
-			holdReasons: prev.holdReasons.filter((h) => h.id !== id),
+			holdReasons: prev.holdReasons.filter((reason) => reason.id !== id),
 		}));
-		markDirty();
+		setDirty(true);
 	};
 
-	const toggleService = (id: string) => {
-		setConfig((prev) => ({
-			...prev,
-			cargoServices: prev.cargoServices.map((s) =>
-				s.id === id ? { ...s, enabled: !s.enabled } : s
-			),
-		}));
-		markDirty();
-	};
+	const handleSave = async () => {
+		if (saving) return;
 
-	const toggleArea = (id: string) => {
-		setConfig((prev) => ({
-			...prev,
-			operationalAreas: prev.operationalAreas.map((a) =>
-				a.id === id ? { ...a, enabled: !a.enabled } : a
-			),
-		}));
-		markDirty();
-	};
-
-	const handleSave = () => {
 		if (!config.terminalName.trim()) {
 			toast.error("Terminal name is required.");
 			return;
 		}
-		toast.success("Terminal configuration saved. Change logged.");
-		setDirty(false);
+		if (!config.terminalCode.trim()) {
+			toast.error("Terminal code is required.");
+			return;
+		}
+
+		const invalidLocation = config.locations.some(
+			(location) =>
+				!location.code.trim() ||
+				!location.name.trim() ||
+				(location.capacity !== "" &&
+					(!Number.isFinite(Number(location.capacity)) ||
+						Number(location.capacity) < 0))
+		);
+		if (invalidLocation) {
+			toast.error(
+				"Complete each location's code and name, and enter a valid capacity."
+			);
+			return;
+		}
+
+		const emptyService = config.cargoServices.find(
+			(service) => !service.label.trim()
+		);
+		if (emptyService) {
+			toast.error("Every cargo service needs a label, or remove the empty row.");
+			return;
+		}
+
+		const serviceLabels = config.cargoServices.map((s) =>
+			s.label.trim().toLowerCase()
+		);
+		const duplicateService = serviceLabels.find(
+			(label, index) => serviceLabels.indexOf(label) !== index
+		);
+		if (duplicateService) {
+			toast.error(`Duplicate cargo service: "${duplicateService}".`);
+			return;
+		}
+
+		const emptyHold = config.holdReasons.find(
+			(reason) => !reason.label.trim()
+		);
+		if (emptyHold) {
+			toast.error("Every hold reason needs a label, or remove the empty row.");
+			return;
+		}
+
+		const holdLabels = config.holdReasons.map((r) =>
+			r.label.trim().toLowerCase()
+		);
+		const duplicateHold = holdLabels.find(
+			(label, index) => holdLabels.indexOf(label) !== index
+		);
+		if (duplicateHold) {
+			toast.error(`Duplicate hold reason: "${duplicateHold}".`);
+			return;
+		}
+
+		setSaving(true);
+		try {
+			const payload = {
+				terminal_name: config.terminalName.trim(),
+				terminal_code: config.terminalCode.trim(),
+				operating_hours: config.operatingHours.trim(),
+				locations: config.locations.map((location) => ({
+					id: location.id,
+					code: location.code.trim(),
+					name: location.name.trim(),
+					kind: location.kind,
+					bonded: location.bonded,
+					status: location.status,
+					capacity:
+						location.capacity === "" ? null : Number(location.capacity),
+					capacity_unit: location.capacityUnit,
+					cargo_types: location.cargoTypes.trim(),
+					security: location.security.trim(),
+					equipment: location.equipment.trim(),
+					block: location.block.trim(),
+					row: location.row.trim(),
+					slot: location.slot.trim(),
+					tier: location.tier.trim(),
+					aisle: location.aisle.trim(),
+					rack: location.rack.trim(),
+					bin: location.bin.trim(),
+				})),
+				cargo_services: config.cargoServices.map((service) => ({
+					id: service.id,
+					label: service.label.trim(),
+				})),
+				hold_reasons: config.holdReasons.map((reason) => ({
+					id: reason.id,
+					label: reason.label.trim(),
+				})),
+			};
+
+			const res = await http.post(
+				"/admin/config/terminal/update/",
+				payload
+			);
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Could not save the terminal configuration.");
+				return;
+			}
+			toast.success("Terminal configuration saved. Change logged.");
+			await fetchAll();
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message ||
+					"Could not save the terminal configuration."
+			);
+		} finally {
+			setSaving(false);
+		}
 	};
 
-	const handleDiscard = () => {
-		setConfig(initialConfig);
-		setDirty(false);
+	const handleDiscard = async () => {
+		await fetchAll();
 		toast.message("Changes discarded.");
 	};
+
+	if (loading) {
+		return (
+			<AppShell
+				title="Terminal Operations"
+				eyebrow="Administration · Configuration"
+			>
+				<div className="flex items-center justify-center rounded-2xl bg-paper p-10 ring-1 ring-line">
+					<span className="size-6 animate-spin rounded-full border-2 border-orange/25 border-t-orange" />
+				</div>
+			</AppShell>
+		);
+	}
+
+	if (error) {
+		return (
+			<AppShell
+				title="Terminal Operations"
+				eyebrow="Administration · Configuration"
+			>
+				<div className="rounded-2xl bg-paper p-6 ring-1 ring-line sm:p-8">
+					<div className="flex items-start gap-3">
+						<div className="grid size-10 shrink-0 place-items-center rounded-md bg-carmine text-white">
+							<AlertTriangle className="size-5" />
+						</div>
+						<div>
+							<p className="font-display text-base font-bold text-ink">
+								Could not load terminal configuration
+							</p>
+							<p className="mt-1 text-sm leading-6 text-ink-soft">{error}</p>
+						</div>
+					</div>
+					<div className="mt-5">
+						<Button
+							onClick={() => void fetchAll()}
+							className="bg-orange text-white hover:bg-orange-deep"
+						>
+							Try again
+						</Button>
+					</div>
+				</div>
+			</AppShell>
+		);
+	}
 
 	return (
 		<AppShell
@@ -244,33 +486,14 @@ export default function AdminTerminalConfigurationPage() {
 						Terminal Operations
 					</h2>
 					<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-						Configure terminal identity, zones, cargo services, operational areas,
-						hold reasons, and operational hours. Changes affect new events only;
-						historical records retain their original configuration.
+						Configure terminal identity, operating hours, cargo services,
+						storage locations, and hold reasons. Changes apply to new
+						operational events; historical records retain their original
+						configuration.
 					</p>
 				</div>
 
-				<div className="flex flex-wrap items-center gap-2">
-					{dirty && <StatusBadge label="Unsaved changes" tone="warning" />}
-					<Button
-						type="button"
-						variant="outline"
-						onClick={handleDiscard}
-						disabled={!dirty}
-						className="border-line bg-paper text-ink hover:bg-sand disabled:opacity-60"
-					>
-						Discard
-					</Button>
-					<Button
-						type="button"
-						onClick={handleSave}
-						disabled={!dirty}
-						className="bg-orange text-white hover:bg-orange-deep disabled:opacity-60"
-					>
-						<Save className="size-4" />
-						Save changes
-					</Button>
-				</div>
+				{dirty && <StatusBadge label="Unsaved changes" tone="warning" />}
 			</div>
 
 			<div className="rounded-xl bg-paper p-5 ring-1 ring-line">
@@ -283,9 +506,9 @@ export default function AdminTerminalConfigurationPage() {
 							Operational Rules
 						</p>
 						<p className="mt-1 text-xs leading-5 text-ink-soft">
-							Zone, service, and hold definitions are configuration, not
-							hard-coded behaviour. Every movement, hold, and service event
-							references this configuration and remains immutable on the record.
+							Location hierarchy, bonded segregation, cargo services, and hold
+							reasons are configurable. Operational movements and holds should
+							retain their own event history and audit trail.
 						</p>
 					</div>
 				</div>
@@ -297,7 +520,7 @@ export default function AdminTerminalConfigurationPage() {
 						Terminal Identity
 					</h3>
 					<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-						Facility label, code, type, and operating hours for this terminal.
+						The facility name, unique terminal code, and normal operating hours.
 					</p>
 				</div>
 				<div className="grid gap-4 p-5 sm:grid-cols-2">
@@ -306,38 +529,25 @@ export default function AdminTerminalConfigurationPage() {
 						required
 						icon={Building2}
 						value={config.terminalName}
-						onChange={(v) => update("terminalName", v)}
+						onChange={(value) => update("terminalName", value)}
 						placeholder="e.g. Abuja Flagship Facility"
 					/>
 					<Field
 						label="Terminal code"
+						required
 						icon={Building2}
 						value={config.terminalCode}
-						onChange={(v) => update("terminalCode", v)}
+						onChange={(value) => update("terminalCode", value)}
 						placeholder="e.g. TRN-ABJ-01"
 						mono
-					/>
-					<Field
-						label="Terminal type"
-						icon={Building2}
-						value={config.terminalType}
-						onChange={(v) => update("terminalType", v)}
-						placeholder="e.g. Inland Bonded Terminal"
 					/>
 					<Field
 						label="Operating hours"
 						icon={Building2}
 						value={config.operatingHours}
-						onChange={(v) => update("operatingHours", v)}
-						placeholder="e.g. 08:00 – 18:00"
+						onChange={(value) => update("operatingHours", value)}
+						placeholder="e.g. 08:00–18:00"
 						mono
-					/>
-					<Field
-						label="Weekly closure"
-						icon={Building2}
-						value={config.weeklyClosure}
-						onChange={(v) => update("weeklyClosure", v)}
-						placeholder="e.g. Sunday"
 					/>
 				</div>
 			</section>
@@ -349,101 +559,259 @@ export default function AdminTerminalConfigurationPage() {
 							Zones &amp; Locations
 						</h3>
 						<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-							Yard and warehouse zones. Bonded flag controls segregation on the
-							floor.
+							Configure yard blocks, rows, slots and tiers, or warehouse
+							aisles, racks and bins.
 						</p>
 					</div>
 					<Button
 						type="button"
 						variant="outline"
 						size="sm"
-						onClick={addZone}
+						onClick={addLocation}
 						className="border-line bg-paper text-ink hover:bg-sand"
 					>
 						<Plus className="size-3.5" />
-						Add zone
+						Add location
 					</Button>
 				</div>
 
-				{config.zones.length === 0 ? (
+				{config.locations.length === 0 ? (
 					<div className="p-6 text-center text-sm text-ink-soft">
-						No zones configured.
+						No locations configured.
 					</div>
 				) : (
 					<ul className="divide-y divide-line">
-						{config.zones.map((z) => (
-							<li key={z.id} className="p-5">
+						{config.locations.map((location) => (
+							<li key={location.id} className="p-5">
 								<div className="flex flex-wrap items-start gap-4">
 									<div
 										className={cn(
 											"grid size-10 shrink-0 place-items-center rounded-lg text-white",
-											z.kind === "warehouse" ? "bg-orange" : "bg-slate"
+											location.kind === "warehouse" ? "bg-orange" : "bg-slate"
 										)}
 									>
-										{z.kind === "warehouse" ? (
+										{location.kind === "warehouse" ? (
 											<Warehouse className="size-5" />
 										) : (
 											<Boxes className="size-5" />
 										)}
 									</div>
 
-									<div className="min-w-[220px] flex-1 space-y-3">
-										<div className="grid gap-3 sm:grid-cols-3">
+									<div className="min-w-[220px] flex-1 space-y-4">
+										<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
 											<SmallField
-												label="Code"
-												value={z.code}
-												onChange={(v) => updateZone(z.id, { code: v })}
+												label="Location code"
+												value={location.code}
+												onChange={(value) =>
+													updateLocation(location.id, { code: value })
+												}
 												placeholder="CY-A"
 												mono
 											/>
 											<SmallField
-												label="Name"
-												value={z.name}
-												onChange={(v) => updateZone(z.id, { name: v })}
-												placeholder="Container Yard A"
-												full
-											/>
-											<SmallField
-												label="Capacity"
-												value={z.capacity}
-												onChange={(v) => updateZone(z.id, { capacity: v })}
-												placeholder="120 TEU"
-											/>
-										</div>
-
-										<div className="flex flex-wrap items-center gap-3">
-											<select
-												value={z.kind}
-												onChange={(e) =>
-													updateZone(z.id, {
-														kind: e.target.value as ZoneRow["kind"],
-													})
+												label="Location name"
+												value={location.name}
+												onChange={(value) =>
+													updateLocation(location.id, { name: value })
 												}
-												className="h-9 rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25"
-											>
-												<option value="yard">Yard</option>
-												<option value="warehouse">Warehouse</option>
-											</select>
-
-											<label className="inline-flex items-center gap-2 text-[12px] text-ink">
-												<input
-													type="checkbox"
-													checked={z.bonded}
-													onChange={(e) =>
-														updateZone(z.id, { bonded: e.target.checked })
+												placeholder="Container Yard A"
+											/>
+											<label className="block">
+												<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+													Location type
+												</span>
+												<select
+													value={location.kind}
+													onChange={(event) => {
+														const kind = event.target.value as LocationKind;
+														updateLocation(location.id, {
+															kind,
+															capacityUnit: kind === "yard" ? "TEU" : "sqm",
+														});
+													}}
+													className="mt-1 h-9 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25"
+												>
+													<option value="yard">Yard</option>
+													<option value="warehouse">Warehouse</option>
+												</select>
+											</label>
+											<label className="block">
+												<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+													Status
+												</span>
+												<select
+													value={location.status}
+													onChange={(event) =>
+														updateLocation(location.id, {
+															status: event.target.value as LocationStatus,
+														})
 													}
-													className="size-4 accent-orange"
-												/>
-												Bonded
+													className="mt-1 h-9 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25"
+												>
+													<option value="active">Active</option>
+													<option value="inactive">Inactive</option>
+													<option value="maintenance">Maintenance</option>
+												</select>
 											</label>
 										</div>
+
+										<div className="grid gap-3 sm:grid-cols-[1fr_1fr_1.5fr]">
+											<SmallField
+												label="Capacity"
+												value={location.capacity}
+												onChange={(value) =>
+													updateLocation(location.id, { capacity: value })
+												}
+												placeholder="120"
+											/>
+											<label className="block">
+												<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+													Capacity unit
+												</span>
+												<select
+													value={location.capacityUnit}
+													onChange={(event) =>
+														updateLocation(location.id, {
+															capacityUnit:
+																event.target.value as CapacityUnit,
+														})
+													}
+													className="mt-1 h-9 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25"
+												>
+													{capacityUnits.map((unit) => (
+														<option key={unit.value} value={unit.value}>
+															{unit.label}
+														</option>
+													))}
+												</select>
+											</label>
+											<SmallField
+												label="Cargo types supported"
+												value={location.cargoTypes}
+												onChange={(value) =>
+													updateLocation(location.id, {
+														cargoTypes: value,
+													})
+												}
+												placeholder="Containerised cargo, general cargo"
+											/>
+										</div>
+
+										{location.kind === "yard" ? (
+											<div className="rounded-lg border border-line p-3">
+												<p className="mb-3 flex items-center gap-2 text-xs font-semibold text-ink">
+													<MapPin className="size-3.5 text-orange" />
+													Yard hierarchy
+												</p>
+												<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+													<SmallField
+														label="Block"
+														value={location.block}
+														onChange={(value) =>
+															updateLocation(location.id, { block: value })
+														}
+														placeholder="A"
+													/>
+													<SmallField
+														label="Row"
+														value={location.row}
+														onChange={(value) =>
+															updateLocation(location.id, { row: value })
+														}
+														placeholder="01"
+													/>
+													<SmallField
+														label="Slot"
+														value={location.slot}
+														onChange={(value) =>
+															updateLocation(location.id, { slot: value })
+														}
+														placeholder="01"
+													/>
+													<SmallField
+														label="Tier"
+														value={location.tier}
+														onChange={(value) =>
+															updateLocation(location.id, { tier: value })
+														}
+														placeholder="Ground or 1"
+													/>
+												</div>
+											</div>
+										) : (
+											<div className="rounded-lg border border-line p-3">
+												<p className="mb-3 flex items-center gap-2 text-xs font-semibold text-ink">
+													<Warehouse className="size-3.5 text-orange" />
+													Warehouse hierarchy
+												</p>
+												<div className="grid gap-3 sm:grid-cols-3">
+													<SmallField
+														label="Aisle"
+														value={location.aisle}
+														onChange={(value) =>
+															updateLocation(location.id, { aisle: value })
+														}
+														placeholder="A"
+													/>
+													<SmallField
+														label="Rack"
+														value={location.rack}
+														onChange={(value) =>
+															updateLocation(location.id, { rack: value })
+														}
+														placeholder="R01"
+													/>
+													<SmallField
+														label="Bin"
+														value={location.bin}
+														onChange={(value) =>
+															updateLocation(location.id, { bin: value })
+														}
+														placeholder="B01"
+													/>
+												</div>
+											</div>
+										)}
+
+										<div className="grid gap-3 sm:grid-cols-2">
+											<SmallField
+												label="Security provisions"
+												value={location.security}
+												onChange={(value) =>
+													updateLocation(location.id, { security: value })
+												}
+												placeholder="e.g. Controlled access"
+											/>
+											<SmallField
+												label="Equipment"
+												value={location.equipment}
+												onChange={(value) =>
+													updateLocation(location.id, { equipment: value })
+												}
+												placeholder="e.g. Forklift, reach stacker"
+											/>
+										</div>
+
+										<label className="inline-flex items-center gap-2 text-[12px] text-ink">
+											<input
+												type="checkbox"
+												checked={location.bonded}
+												onChange={(event) =>
+													updateLocation(location.id, {
+														bonded: event.target.checked,
+													})
+												}
+												className="size-4 accent-orange"
+											/>
+											Bonded location
+										</label>
 									</div>
 
 									<Button
 										type="button"
 										variant="ghost"
 										size="sm"
-										onClick={() => removeZone(z.id)}
+										onClick={() => removeLocation(location.id)}
 										className="text-carmine hover:bg-carmine/10"
 									>
 										<Trash2 className="size-3.5" />
@@ -457,80 +825,67 @@ export default function AdminTerminalConfigurationPage() {
 			</section>
 
 			<section className="rounded-2xl bg-paper ring-1 ring-line">
-				<div className="border-b border-line p-5">
-					<h3 className="font-display text-sm font-bold text-ink">
-						Cargo Services
-					</h3>
-					<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-						Cargo categories the terminal is licensed and equipped to handle.
-						Disabling a service removes it from intake forms and public pages.
-					</p>
-				</div>
-				<ul className="divide-y divide-line">
-					{config.cargoServices.map((s) => (
-						<li
-							key={s.id}
-							className="flex flex-wrap items-center justify-between gap-3 p-5"
-						>
-							<div className="flex items-center gap-3">
-								<div className="grid size-9 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-									<Package className="size-4" />
-								</div>
-								<p className="text-[13px] font-semibold text-ink">
-									{s.label}
-								</p>
-							</div>
-							<div className="flex items-center gap-3">
-								<StatusBadge
-									label={s.enabled ? "Enabled" : "Disabled"}
-									tone={s.enabled ? "success" : "neutral"}
-								/>
-								<Toggle
-									on={s.enabled}
-									onToggle={() => toggleService(s.id)}
-								/>
-							</div>
-						</li>
-					))}
-				</ul>
-			</section>
-
-			<section className="rounded-2xl bg-paper ring-1 ring-line">
 				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-5">
 					<div>
 						<h3 className="font-display text-sm font-bold text-ink">
-							Operational Areas
+							Cargo Services
 						</h3>
 						<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-							Areas of the terminal that appear in operational workflows and
-							service requests.
+							Cargo categories the terminal is licensed and equipped to handle.
+							These appear in intake forms and public service listings.
 						</p>
 					</div>
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						onClick={addCargoService}
+						className="border-line bg-paper text-ink hover:bg-sand"
+					>
+						<Plus className="size-3.5" />
+						Add service
+					</Button>
 				</div>
-				<ul className="divide-y divide-line">
-					{config.operationalAreas.map((a) => (
-						<li
-							key={a.id}
-							className="flex flex-wrap items-center justify-between gap-3 p-5"
-						>
-							<div className="flex items-center gap-3">
-								<div className="grid size-9 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-									<Grid3x3 className="size-4" />
+
+				{config.cargoServices.length === 0 ? (
+					<div className="p-6 text-center text-sm text-ink-soft">
+						No cargo services configured.
+					</div>
+				) : (
+					<ul className="divide-y divide-line">
+						{config.cargoServices.map((service) => (
+							<li
+								key={service.id}
+								className="flex flex-wrap items-center gap-3 p-5"
+							>
+								<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
+									<Package className="size-4" />
 								</div>
-								<p className="text-[13px] font-semibold text-ink">
-									{a.label}
-								</p>
-							</div>
-							<div className="flex items-center gap-3">
-								<StatusBadge
-									label={a.enabled ? "Enabled" : "Disabled"}
-									tone={a.enabled ? "success" : "neutral"}
+
+								<Input
+									value={service.label}
+									onChange={(event) =>
+										updateCargoService(service.id, event.target.value)
+									}
+									placeholder="e.g. Containerised cargo"
+									className="h-11 min-w-[220px] flex-1 border-line bg-sand text-ink"
 								/>
-								<Toggle on={a.enabled} onToggle={() => toggleArea(a.id)} />
-							</div>
-						</li>
-					))}
-				</ul>
+
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									onClick={() => removeCargoService(service.id)}
+									aria-label={`Remove ${service.label || "service"}`}
+									className="text-carmine hover:bg-carmine/10"
+								>
+									<Trash2 className="size-3.5" />
+									Remove
+								</Button>
+							</li>
+						))}
+					</ul>
+				)}
 			</section>
 
 			<section className="rounded-2xl bg-paper ring-1 ring-line">
@@ -540,9 +895,9 @@ export default function AdminTerminalConfigurationPage() {
 							Hold Reasons
 						</h3>
 						<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-							Categories and reasons available when placing a hold on a
-							consignment. Every hold requires authority, reference, actor, and
-							reason.
+							Reasons available to authorised staff when placing a hold. The
+							actual hold workflow separately captures authority, reference,
+							actor, timestamp, and lift details.
 						</p>
 					</div>
 					<Button
@@ -563,50 +918,35 @@ export default function AdminTerminalConfigurationPage() {
 					</div>
 				) : (
 					<ul className="divide-y divide-line">
-						{config.holdReasons.map((h) => (
-							<li key={h.id} className="p-5">
-								<div className="flex flex-wrap items-center gap-4">
-									<div className="grid size-10 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-										<Layers className="size-5" />
-									</div>
-
-									<div className="min-w-[220px] flex-1">
-										<SmallField
-											label="Reason"
-											value={h.label}
-											onChange={(v) => updateHoldReason(h.id, { label: v })}
-											placeholder="e.g. Seal mismatch"
-											full
-										/>
-									</div>
-
-									<select
-										value={h.category}
-										onChange={(e) =>
-											updateHoldReason(h.id, {
-												category: e.target.value as HoldReason["category"],
-											})
-										}
-										className="h-9 rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25"
-									>
-										<option value="customs">Customs</option>
-										<option value="agency">Agency</option>
-										<option value="terminal">Terminal</option>
-										<option value="financial">Financial</option>
-										<option value="damage">Damage</option>
-										<option value="documentation">Documentation</option>
-									</select>
-
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										onClick={() => removeHoldReason(h.id)}
-										className="text-carmine hover:bg-carmine/10"
-									>
-										<Trash2 className="size-3.5" />
-									</Button>
+						{config.holdReasons.map((reason) => (
+							<li
+								key={reason.id}
+								className="flex flex-wrap items-center gap-3 p-5"
+							>
+								<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
+									<Layers className="size-4" />
 								</div>
+
+								<Input
+									value={reason.label}
+									onChange={(event) =>
+										updateHoldReason(reason.id, event.target.value)
+									}
+									placeholder="e.g. Seal mismatch"
+									className="h-11 min-w-[220px] flex-1 border-line bg-sand text-ink"
+								/>
+
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									onClick={() => removeHoldReason(reason.id)}
+									aria-label={`Remove ${reason.label || "reason"}`}
+									className="text-carmine hover:bg-carmine/10"
+								>
+									<Trash2 className="size-3.5" />
+									Remove
+								</Button>
 							</li>
 						))}
 					</ul>
@@ -618,13 +958,50 @@ export default function AdminTerminalConfigurationPage() {
 					<AlertTriangle className="mt-0.5 size-4 shrink-0 text-orange-deep" />
 					<div className="min-w-0">
 						<p className="text-[13px] font-semibold text-ink">
-							Cargo type &amp; service scope
+							Location capacity and allocation
 						</p>
 						<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-							Cargo services and zones should reflect what the facility is
-							licensed and equipped for. Changes to licensed categories should
-							be confirmed against the facility licence before being enabled.
+							Capacity must be stored as a numeric value with a unit.
+							Operational allocation logic should prevent double allocation of
+							occupied positions and retain an auditable movement history.
+							Current occupancy should come from operational records, not be
+							manually entered as configuration.
 						</p>
+					</div>
+				</div>
+			</div>
+
+			<div className="sticky bottom-4 z-10 rounded-2xl bg-slate p-4 text-sand ring-1 ring-slate shadow-xl">
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<div className="min-w-0">
+						<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+							{dirty ? "Unsaved changes" : "All changes saved"}
+						</p>
+						<p className="mt-0.5 text-[12px] leading-5 text-sand/75">
+							{dirty
+								? "Save to apply terminal, location, service, and hold changes."
+								: "No pending changes."}
+						</p>
+					</div>
+					<div className="flex flex-wrap items-center gap-2">
+						<Button
+							type="button"
+							variant="outline"
+							onClick={handleDiscard}
+							disabled={!dirty || saving}
+							className="border-sand/25 bg-transparent text-sand hover:bg-sand/10 disabled:opacity-40"
+						>
+							Discard
+						</Button>
+						<Button
+							type="button"
+							onClick={handleSave}
+							disabled={!dirty || saving}
+							className="bg-orange text-white hover:bg-orange-deep disabled:opacity-60"
+						>
+							<Save className="size-4" />
+							{saving ? "Saving…" : "Save changes"}
+						</Button>
 					</div>
 				</div>
 			</div>
@@ -640,7 +1017,6 @@ function Field({
 	icon: Icon,
 	mono,
 	required,
-	full,
 }: {
 	label: string;
 	value: string;
@@ -649,10 +1025,9 @@ function Field({
 	icon: typeof Building2;
 	mono?: boolean;
 	required?: boolean;
-	full?: boolean;
 }) {
 	return (
-		<label className={cn("block", full && "sm:col-span-2")}>
+		<label className="block">
 			<span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 				<Icon className="size-3.5 text-orange" />
 				{label}
@@ -660,7 +1035,7 @@ function Field({
 			</span>
 			<Input
 				value={value}
-				onChange={(e) => onChange(e.target.value)}
+				onChange={(event) => onChange(event.target.value)}
 				placeholder={placeholder}
 				className={cn(
 					"mt-1.5 h-11 border-line bg-sand text-ink",
@@ -677,23 +1052,21 @@ function SmallField({
 	onChange,
 	placeholder,
 	mono,
-	full,
 }: {
 	label: string;
 	value: string;
 	onChange: (value: string) => void;
 	placeholder?: string;
 	mono?: boolean;
-	full?: boolean;
 }) {
 	return (
-		<label className={cn("block", full && "sm:col-span-2")}>
+		<label className="block">
 			<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 				{label}
 			</span>
 			<Input
 				value={value}
-				onChange={(e) => onChange(e.target.value)}
+				onChange={(event) => onChange(event.target.value)}
 				placeholder={placeholder}
 				className={cn(
 					"mt-1 h-9 border-line bg-paper text-[13px] text-ink",
@@ -701,32 +1074,5 @@ function SmallField({
 				)}
 			/>
 		</label>
-	);
-}
-
-function Toggle({
-	on,
-	onToggle,
-}: {
-	on: boolean;
-	onToggle: () => void;
-}) {
-	return (
-		<button
-			type="button"
-			onClick={onToggle}
-			aria-pressed={on}
-			className={cn(
-				"inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
-				on ? "bg-orange" : "bg-sand-2"
-			)}
-		>
-			<span
-				className={cn(
-					"size-5 rounded-full bg-white shadow-sm transition-transform",
-					on ? "translate-x-5" : "translate-x-0.5"
-				)}
-			/>
-		</button>
 	);
 }

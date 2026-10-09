@@ -3,18 +3,18 @@ import { Link } from "@/components/router-link";
 import {
 	AlertTriangle,
 	ArrowLeft,
+	Award,
 	Building2,
-	CheckCircle2,
 	Clock3,
 	FileText,
 	Globe,
 	Mail,
 	MapPin,
+	Paperclip,
 	Phone,
 	Plus,
 	Save,
 	ShieldCheck,
-	ShieldX,
 	Trash2,
 	Upload,
 	Users,
@@ -26,7 +26,6 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { sectorOptions } from "@/lib/constants";
 import { http, type Resp } from "@/lib/httpClient";
-import { resolveSrc } from "@/lib/functions";
 
 type OrgStatus =
 	| "pending"
@@ -37,17 +36,17 @@ type OrgStatus =
 
 type OrgType = "terminal" | "importer" | "agent";
 
+type DocKey = "cac" | "tin" | "signatory_id" | "directors_list" | "utility_bill";
+
 interface ApiDocument {
 	id: string;
 	kind: string;
 	label: string;
 	file_name: string;
 	file_url: string;
-	status: "pending" | "approved" | "rejected" | string;
-	rejection_reason: string | null;
-	reviewed_by: string | null;
-	reviewed_at: string | null;
 	uploaded_at: string;
+	licence_type?: string | null;
+	licence_reference?: string | null;
 }
 
 interface OrganisationConfig {
@@ -110,15 +109,70 @@ const statusLabel: Record<OrgStatus, string> = {
 	suspended: "Suspended",
 };
 
-const DOCUMENT_KINDS = [
-	{ value: "cac", label: "CAC Certificate" },
-	{ value: "tin", label: "Tax Identification" },
-	{ value: "signatory_id", label: "Authorised Signatory ID" },
-	{ value: "directors_list", label: "Directors & Shareholders List" },
-	{ value: "utility_bill", label: "Utility Bill (Proof of Address)" },
-	{ value: "licence", label: "Operational Licence" },
-	{ value: "other", label: "Other document" },
+interface DocumentSlot {
+	key: DocKey;
+	label: string;
+	detail: string;
+	accept: string;
+}
+
+const documentSlots: DocumentSlot[] = [
+	{
+		key: "cac",
+		label: "CAC certificate",
+		detail: "Certificate of incorporation or business name registration.",
+		accept: "application/pdf,image/*",
+	},
+	{
+		key: "tin",
+		label: "TIN certificate",
+		detail: "Tax Identification Number certificate issued by FIRS.",
+		accept: "application/pdf,image/*",
+	},
+	{
+		key: "signatory_id",
+		label: "Authorised signatory ID",
+		detail: "National ID, driver's licence, or international passport.",
+		accept: "application/pdf,image/*",
+	},
+	{
+		key: "directors_list",
+		label: "Directors and shareholders list",
+		detail: "A current list of the company's directors and shareholders.",
+		accept: "application/pdf",
+	},
+	{
+		key: "utility_bill",
+		label: "Utility bill (proof of address)",
+		detail: "A recent utility bill showing the organisation's registered address.",
+		accept: "application/pdf,image/*",
+	},
 ];
+
+type LicenceType =
+	| "ncs_customs_agent"
+	| "nafdac"
+	| "son"
+	| "naqs"
+	| "soncap"
+	| "other";
+
+const licenceTypes: { key: LicenceType; label: string }[] = [
+	{ key: "ncs_customs_agent", label: "NCS Customs Agent Licence" },
+	{ key: "nafdac", label: "NAFDAC Permit" },
+	{ key: "son", label: "SON (Standards Organisation of Nigeria)" },
+	{ key: "naqs", label: "NAQS (Quarantine Service)" },
+	{ key: "soncap", label: "SONCAP Certificate" },
+	{ key: "other", label: "Other operational licence" },
+];
+
+interface LicenceEntry {
+	id: string;
+	kind: "licence";
+	type: LicenceType | "";
+	reference: string;
+	file: File | null;
+}
 
 const MAX_DOC_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = [
@@ -127,6 +181,7 @@ const ALLOWED_MIME = [
 	"image/png",
 	"image/webp",
 ];
+const ALLOWED_PDF_ONLY = ["application/pdf"];
 
 const formatDate = (input: string | null) => {
 	if (!input) return "—";
@@ -155,33 +210,51 @@ const pickFirstArray = (payload: any): ApiDocument[] => {
 	return [];
 };
 
+const pickLicencesArray = (payload: any): ApiDocument[] => {
+	const candidates = [
+		payload?.licences,
+		payload?.licenses,
+		payload?.organisation?.licences,
+		payload?.organization?.licences,
+	];
+	for (const c of candidates) {
+		if (Array.isArray(c)) return c as ApiDocument[];
+	}
+	return [];
+};
+
 const normaliseDocument = (raw: any): ApiDocument => ({
 	id: String(raw?.id ?? raw?.document_id ?? ""),
 	kind: raw?.kind ?? raw?.document_type ?? "document",
 	label: raw?.label ?? raw?.name ?? raw?.kind ?? "Document",
 	file_name: raw?.file_name ?? raw?.filename ?? "—",
 	file_url: raw?.file_url ?? raw?.url ?? "",
-	status: raw?.status ?? "pending",
-	rejection_reason: raw?.rejection_reason ?? null,
-	reviewed_by: raw?.reviewed_by_name ?? raw?.reviewed_by ?? null,
-	reviewed_at: raw?.reviewed_at ?? null,
 	uploaded_at: raw?.uploaded_at ?? raw?.created_at ?? "",
+	licence_type: raw?.licence_type ?? null,
+	licence_reference: raw?.licence_reference ?? raw?.reference ?? null,
 });
 
 export default function AdminOrganisationConfigurationPage() {
 	const [config, setConfig] = useState<OrganisationConfig>(emptyConfig);
 	const [meta, setMeta] = useState<OrgMeta>(emptyMeta);
 	const [documents, setDocuments] = useState<ApiDocument[]>([]);
-	const [documentsKeyFound, setDocumentsKeyFound] = useState(false);
+	const [licences, setLicences] = useState<ApiDocument[]>([]);
+
+	const [slotFiles, setSlotFiles] = useState<Record<DocKey, File | null>>({
+		cac: null,
+		tin: null,
+		signatory_id: null,
+		directors_list: null,
+		utility_bill: null,
+	});
+
+	const [newLicences, setNewLicences] = useState<LicenceEntry[]>([]);
+
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
+	const [removing, setRemoving] = useState<string | null>(null);
 	const [error, setError] = useState("");
 	const [dirty, setDirty] = useState(false);
-
-	const [addOpen, setAddOpen] = useState(false);
-	const [newDocKind, setNewDocKind] = useState("cac");
-	const [newDocFile, setNewDocFile] = useState<File | null>(null);
-	const [uploading, setUploading] = useState(false);
 
 	const fetchAll = async () => {
 		setLoading(true);
@@ -221,14 +294,9 @@ export default function AdminOrganisationConfigurationPage() {
 				updatedAt: org.updated_at ?? null,
 			});
 
-			const rawDocs = pickFirstArray(payload);
-			setDocumentsKeyFound(
-				rawDocs.length > 0 ||
-					Array.isArray(payload?.documents) ||
-					Array.isArray(payload?.docs) ||
-					Array.isArray(payload?.kyc_documents)
-			);
-			setDocuments(rawDocs.map(normaliseDocument));
+			setDocuments(pickFirstArray(payload).map(normaliseDocument));
+			setLicences(pickLicencesArray(payload).map(normaliseDocument));
+			resetPendingEdits();
 		} catch (err: any) {
 			setError(
 				err?.response?.data?.message ||
@@ -237,6 +305,18 @@ export default function AdminOrganisationConfigurationPage() {
 		} finally {
 			setLoading(false);
 		}
+	};
+
+	const resetPendingEdits = () => {
+		setSlotFiles({
+			cac: null,
+			tin: null,
+			signatory_id: null,
+			directors_list: null,
+			utility_bill: null,
+		});
+		setNewLicences([]);
+		setDirty(false);
 	};
 
 	useEffect(() => {
@@ -252,6 +332,136 @@ export default function AdminOrganisationConfigurationPage() {
 		setDirty(true);
 	};
 
+	const pickSlotFile = (key: DocKey, file: File | null) => {
+		if (!file) {
+			setSlotFiles((prev) => ({ ...prev, [key]: null }));
+			return;
+		}
+		const slot = documentSlots.find((s) => s.key === key);
+		const allowed =
+			slot?.accept.includes("pdf") && !slot?.accept.includes("image")
+				? ALLOWED_PDF_ONLY
+				: ALLOWED_MIME;
+
+		if (file.size > MAX_DOC_BYTES) {
+			toast.error("Each document must be 5MB or smaller.");
+			return;
+		}
+		if (!allowed.includes(file.type)) {
+			toast.error(
+				allowed === ALLOWED_PDF_ONLY
+					? "Only PDF files are accepted for this document."
+					: "Only PDF, JPG, PNG, or WebP files are accepted."
+			);
+			return;
+		}
+		setSlotFiles((prev) => ({ ...prev, [key]: file }));
+		setDirty(true);
+	};
+
+	const addLicenceEntry = () => {
+		setNewLicences((prev) => [
+			...prev,
+			{
+				id: crypto.randomUUID(),
+				kind: "licence",
+				type: "",
+				reference: "",
+				file: null,
+			},
+		]);
+		setDirty(true);
+	};
+
+	const updateLicenceEntry = (id: string, patch: Partial<LicenceEntry>) => {
+		setNewLicences((prev) =>
+			prev.map((l) => (l.id === id ? { ...l, ...patch } : l))
+		);
+		setDirty(true);
+	};
+
+	const removeLicenceEntry = (id: string) => {
+		setNewLicences((prev) => prev.filter((l) => l.id !== id));
+		setDirty(true);
+	};
+
+	const pickLicenceFile = (id: string, file: File | null) => {
+		if (!file) {
+			updateLicenceEntry(id, { file: null });
+			return;
+		}
+		if (file.size > MAX_DOC_BYTES) {
+			toast.error("Each licence document must be 5MB or smaller.");
+			return;
+		}
+		if (!ALLOWED_MIME.includes(file.type)) {
+			toast.error("Only PDF, JPG, PNG, or WebP files are accepted.");
+			return;
+		}
+		updateLicenceEntry(id, { file });
+	};
+
+	const existingDocFor = (key: DocKey) =>
+		documents.find((d) => d.kind === key) ?? null;
+
+	const handleRemoveExistingDocument = async (doc: ApiDocument) => {
+		if (removing) return;
+		const confirmed = window.confirm(
+			`Remove ${doc.file_name}? This takes effect immediately and is logged.`
+		);
+		if (!confirmed) return;
+
+		setRemoving(doc.id);
+		try {
+			const res = await http.post(
+				`/admin/config/organisation/documents/remove/`,
+				{ document_id: doc.id }
+			);
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Could not remove the document.");
+				return;
+			}
+			toast.success("Document removed. Change logged.");
+			await fetchAll();
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message || "Could not remove the document."
+			);
+		} finally {
+			setRemoving(null);
+		}
+	};
+
+	const handleRemoveExistingLicence = async (lic: ApiDocument) => {
+		if (removing) return;
+		const confirmed = window.confirm(
+			`Remove this licence? This takes effect immediately and is logged.`
+		);
+		if (!confirmed) return;
+
+		setRemoving(lic.id);
+		try {
+			const res = await http.post(
+				`/admin/config/organisation/documents/remove/`,
+				{ document_id: lic.id }
+			);
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Could not remove the licence.");
+				return;
+			}
+			toast.success("Licence removed. Change logged.");
+			await fetchAll();
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message || "Could not remove the licence."
+			);
+		} finally {
+			setRemoving(null);
+		}
+	};
+
 	const handleSave = async () => {
 		if (saving) return;
 		if (!config.legalName.trim()) {
@@ -265,34 +475,68 @@ export default function AdminOrganisationConfigurationPage() {
 			toast.error("Contact email is not valid.");
 			return;
 		}
+		const incompleteLicence = newLicences.find(
+			(l) => !l.type || !l.reference.trim() || !l.file
+		);
+		if (incompleteLicence) {
+			toast.error(
+				"Each new licence needs a type, a reference number, and a file."
+			);
+			return;
+		}
 
 		setSaving(true);
 		try {
-			const payload = {
-				legal_name: config.legalName.trim(),
-				trading_name: config.tradingName.trim() || null,
-				org_type: config.orgType,
-				rc_number: config.rcNumber.trim() || null,
-				tin: config.tin.trim() || null,
-				date_of_incorporation: config.dateOfIncorporation.trim() || null,
-				sector: config.sector.trim() || null,
-				registered_address: config.registeredAddress.trim() || null,
-				operating_address: config.operatingAddress.trim() || null,
-				website: config.website.trim() || null,
-				contact_email: config.contactEmail.trim() || null,
-				contact_phone: config.contactPhone.trim() || null,
-				contact_person: config.contactPerson.trim() || null,
-				contact_person_title: config.contactPersonTitle.trim() || null,
-			};
+			const form = new FormData();
 
-			const res = await http.post("/admin/config/organisation/update/", payload);
+			form.append("legal_name", config.legalName.trim());
+			form.append("trading_name", config.tradingName.trim());
+			form.append("org_type", config.orgType);
+			form.append("rc_number", config.rcNumber.trim());
+			form.append("tin", config.tin.trim());
+			form.append(
+				"date_of_incorporation",
+				config.dateOfIncorporation.trim()
+			);
+			form.append("sector", config.sector.trim());
+			form.append("registered_address", config.registeredAddress.trim());
+			form.append("operating_address", config.operatingAddress.trim());
+			form.append("website", config.website.trim());
+			form.append("contact_email", config.contactEmail.trim());
+			form.append("contact_phone", config.contactPhone.trim());
+			form.append("contact_person", config.contactPerson.trim());
+			form.append("contact_person_title", config.contactPersonTitle.trim());
+
+			documentSlots.forEach((slot) => {
+				const file = slotFiles[slot.key];
+				if (file) form.append(slot.key, file);
+			});
+
+			const licenceMeta = newLicences.map((l) => ({
+				id: l.id,
+				licence_type: l.type,
+				licence_reference: l.reference.trim(),
+			}));
+			form.append("licences", JSON.stringify(licenceMeta));
+
+			newLicences.forEach((l, index) => {
+				if (l.file) {
+					form.append(`licence_file_${index}`, l.file);
+					form.append(`licence_id_${index}`, l.id);
+				}
+			});
+
+			const res = await http.post(
+				"/admin/config/organisation/update/",
+				form,
+				{ headers: { "Content-Type": "multipart/form-data" } }
+			);
 			const resp: Resp = res.data;
 			if (resp.error) {
 				toast.error(resp.data || "Could not save the configuration.");
 				return;
 			}
 			toast.success("Organisation configuration saved. Change logged.");
-			setDirty(false);
 			await fetchAll();
 		} catch (err: any) {
 			toast.error(
@@ -305,84 +549,9 @@ export default function AdminOrganisationConfigurationPage() {
 	};
 
 	const handleDiscard = async () => {
-		setDirty(false);
+		resetPendingEdits();
 		await fetchAll();
 		toast.message("Changes discarded.");
-	};
-
-	const pickNewFile = (file: File | null) => {
-		if (!file) {
-			setNewDocFile(null);
-			return;
-		}
-		if (file.size > MAX_DOC_BYTES) {
-			toast.error("Each document must be 5MB or smaller.");
-			return;
-		}
-		if (!ALLOWED_MIME.includes(file.type)) {
-			toast.error("Only PDF, JPG, PNG, or WebP files are accepted.");
-			return;
-		}
-		setNewDocFile(file);
-	};
-
-	const handleUpload = async () => {
-		if (!newDocFile) {
-			toast.error("Choose a file first.");
-			return;
-		}
-		setUploading(true);
-		try {
-			const form = new FormData();
-			form.append("kind", newDocKind);
-			form.append("file", newDocFile);
-
-			const res = await http.post(
-				"/admin/config/organisation/documents/add/",
-				form,
-				{ headers: { "Content-Type": "multipart/form-data" } }
-			);
-			const resp: Resp = res.data;
-			if (resp.error) {
-				toast.error(resp.data || "Could not upload the document.");
-				return;
-			}
-			toast.success("Document uploaded and queued for review.");
-			setNewDocFile(null);
-			setNewDocKind("cac");
-			setAddOpen(false);
-			await fetchAll();
-		} catch (err: any) {
-			toast.error(
-				err?.response?.data?.message ||
-					"Could not upload the document."
-			);
-		} finally {
-			setUploading(false);
-		}
-	};
-
-	const handleDelete = async (doc: ApiDocument) => {
-		if (doc.status !== "pending") {
-			toast.error(
-				"Only documents awaiting review can be removed. Approved and rejected documents carry a decision record."
-			);
-			return;
-		}
-		try {
-			const res = await http.post(`/admin/config/organisation/documents/remove/`, { document_id: doc.id });
-			const resp: Resp = res.data;
-			if (resp.error) {
-				toast.error(resp.data || "Could not remove the document.");
-				return;
-			}
-			toast.success("Document removed.");
-			await fetchAll();
-		} catch (err: any) {
-			toast.error(
-				err?.response?.data?.message || "Could not remove the document."
-			);
-		}
 	};
 
 	if (loading) {
@@ -430,9 +599,6 @@ export default function AdminOrganisationConfigurationPage() {
 	}
 
 	const isRejected = config.status === "rejected";
-	const rejectedDocs = documents.filter((d) => d.status === "rejected");
-	const approvedDocs = documents.filter((d) => d.status === "approved");
-	const pendingDocs = documents.filter((d) => d.status === "pending");
 
 	return (
 		<AppShell
@@ -458,27 +624,7 @@ export default function AdminOrganisationConfigurationPage() {
 					</p>
 				</div>
 
-				<div className="flex flex-wrap items-center gap-2">
-					{dirty && <StatusBadge label="Unsaved changes" tone="warning" />}
-					<Button
-						type="button"
-						variant="outline"
-						onClick={handleDiscard}
-						disabled={!dirty || saving}
-						className="border-line bg-paper text-ink hover:bg-sand disabled:opacity-60"
-					>
-						Discard
-					</Button>
-					<Button
-						type="button"
-						onClick={handleSave}
-						disabled={!dirty || saving}
-						className="bg-orange text-white hover:bg-orange-deep disabled:opacity-60"
-					>
-						<Save className="size-4" />
-						{saving ? "Saving…" : "Save changes"}
-					</Button>
-				</div>
+				{dirty && <StatusBadge label="Unsaved changes" tone="warning" />}
 			</div>
 
 			<div className="rounded-xl bg-paper p-5 ring-1 ring-line">
@@ -507,8 +653,7 @@ export default function AdminOrganisationConfigurationPage() {
 								Lifecycle
 							</h3>
 							<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-								Current status and verification record. Status is set by
-								approving or rejecting the organisation from the review flow.
+								Current status and verification record.
 							</p>
 						</div>
 						<StatusBadge
@@ -578,7 +723,7 @@ export default function AdminOrganisationConfigurationPage() {
 				{isRejected && meta.rejectionReason && (
 					<div className="mx-5 mb-5 rounded-md border-l-4 border-carmine bg-carmine/5 p-4 ring-1 ring-carmine/20">
 						<div className="flex items-start gap-3">
-							<ShieldX className="mt-0.5 size-4 shrink-0 text-carmine" />
+							<AlertTriangle className="mt-0.5 size-4 shrink-0 text-carmine" />
 							<div className="min-w-0">
 								<p className="font-mono text-[10px] uppercase tracking-[0.12em] text-carmine">
 									Rejection reason
@@ -740,269 +885,474 @@ export default function AdminOrganisationConfigurationPage() {
 
 			<section className="rounded-2xl bg-paper ring-1 ring-line">
 				<div className="border-b border-line p-5">
+					<h3 className="font-display text-sm font-bold text-ink">
+						Documents
+					</h3>
+					<p className="mt-1 text-[12px] leading-5 text-ink-soft">
+						Upload or replace the organisation's KYC documents. Each slot holds
+						one document. Removing an existing document takes effect
+						immediately.
+					</p>
+				</div>
+
+				<div className="space-y-3 p-5">
+					{documentSlots.map((slot) => {
+						const existing = existingDocFor(slot.key);
+						const picked = slotFiles[slot.key];
+						return (
+							<DocumentCard
+								key={slot.key}
+								icon={FileText}
+								label={slot.label}
+								detail={slot.detail}
+								accept={slot.accept}
+								existing={existing}
+								picked={picked}
+								removing={removing === existing?.id}
+								onPick={(f) => pickSlotFile(slot.key, f)}
+								onRemove={() =>
+									existing &&
+									handleRemoveExistingDocument(existing)
+								}
+							/>
+						);
+					})}
+				</div>
+			</section>
+
+			<section className="rounded-2xl bg-paper ring-1 ring-line">
+				<div className="border-b border-line p-5">
 					<div className="flex flex-wrap items-center justify-between gap-3">
 						<div>
 							<h3 className="font-display text-sm font-bold text-ink">
-								Documents
+								Operational licences
 							</h3>
 							<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-								Uploaded KYC documents and their review status. Admin can add
-								documents on behalf of the organisation; approve or reject from
-								the review flow.
+								The organisation can hold more than one licence. Each entry
+								needs a licence type, a reference number, and the licence
+								document. Removing an existing licence takes effect
+								immediately.
 							</p>
 						</div>
-						<div className="flex flex-wrap items-center gap-2">
-							<span className="rounded-full bg-orange/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-orange ring-1 ring-orange/25">
-								{approvedDocs.length} approved
-							</span>
-							{pendingDocs.length > 0 && (
-								<span className="rounded-full bg-sky/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-sky-deep ring-1 ring-sky/25">
-									{pendingDocs.length} pending
-								</span>
-							)}
-							{rejectedDocs.length > 0 && (
-								<span className="rounded-full bg-carmine/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] text-carmine ring-1 ring-carmine/25">
-									{rejectedDocs.length} rejected
-								</span>
-							)}
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								onClick={() => setAddOpen((v) => !v)}
-								className="border-line bg-paper text-ink hover:bg-sand"
-							>
-								<Plus className="size-3.5" />
-								{addOpen ? "Cancel" : "Add document"}
-							</Button>
-						</div>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							onClick={addLicenceEntry}
+							className="border-line bg-paper text-ink hover:bg-sand-2"
+						>
+							<Plus className="size-3.5" />
+							Add licence
+						</Button>
 					</div>
 				</div>
 
-				{addOpen && (
-					<div className="border-b border-line bg-sand/50 p-5">
-						<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-							New document
-						</p>
-						<div className="mt-3 grid gap-3 sm:grid-cols-2">
-							<label className="block">
-								<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-									Document type
+				<div className="space-y-3 p-5">
+					{licences.length > 0 && (
+						<div className="space-y-3">
+							<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+								On file
+								<span className="ml-2 text-ink-soft/70">
+									· {licences.length}{" "}
+									{licences.length === 1 ? "licence" : "licences"}
 								</span>
-								<select
-									value={newDocKind}
-									onChange={(e) => setNewDocKind(e.target.value)}
-									className="mt-1.5 h-11 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-orange/25"
-								>
-									{DOCUMENT_KINDS.map((k) => (
-										<option key={k.value} value={k.value}>
-											{k.label}
-										</option>
-									))}
-								</select>
-							</label>
-
-							<div>
-								<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-									File
-								</span>
-								<div className="mt-1.5">
-									{newDocFile ? (
-										<div className="flex items-center justify-between gap-3 rounded-md bg-paper px-3 py-2 ring-1 ring-line">
-											<div className="flex min-w-0 items-center gap-2">
-												<FileText className="size-3.5 shrink-0 text-orange" />
-												<span className="truncate font-mono text-[11px] text-ink">
-													{newDocFile.name}
-												</span>
-											</div>
-											<button
-												type="button"
-												onClick={() => setNewDocFile(null)}
-												className="grid size-7 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
-												aria-label="Remove file"
-											>
-												<Trash2 className="size-3.5" />
-											</button>
-										</div>
-									) : (
-										<label className="flex cursor-pointer items-center justify-between gap-3 rounded-md border border-dashed border-line bg-paper px-3 py-3 text-[12px] text-ink-soft transition-colors hover:border-orange/40 hover:bg-orange/5 hover:text-orange">
-											<span className="inline-flex items-center gap-2">
-												<Upload className="size-3.5" />
-												Choose file
-											</span>
-											<span className="font-mono text-[10px] text-ink-soft">
-												PDF, JPG, PNG · max 5MB
-											</span>
-											<input
-												type="file"
-												accept="application/pdf,image/*"
-												onChange={(e) => {
-													const picked =
-														e.target.files?.[0] ?? null;
-													e.target.value = "";
-													pickNewFile(picked);
-												}}
-												className="hidden"
-											/>
-										</label>
-									)}
-								</div>
-							</div>
-						</div>
-
-						<div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
-							<p className="text-[11px] text-ink-soft">
-								Uploaded documents enter the review queue and are logged with
-								the acting admin as the uploader.
 							</p>
-							<Button
-								type="button"
-								onClick={handleUpload}
-								disabled={uploading || !newDocFile}
-								className="bg-orange text-white hover:bg-orange-deep disabled:opacity-60"
-							>
-								<Upload className="size-4" />
-								{uploading ? "Uploading…" : "Upload document"}
-							</Button>
+							{licences.map((lic) => (
+								<ExistingLicenceCard
+									key={lic.id}
+									licence={lic}
+									removing={removing === lic.id}
+									onRemove={() =>
+										handleRemoveExistingLicence(lic)
+									}
+								/>
+							))}
 						</div>
-					</div>
-				)}
+					)}
 
-				{documents.length === 0 ? (
-					<div className="p-6 text-center text-sm text-ink-soft">
-						{documentsKeyFound
-							? "No documents on file for this organisation."
-							: "The response from the server did not include a documents array."}
-					</div>
-				) : (
-					<ul className="divide-y divide-line">
-						{documents.map((doc) => {
-							const isRejectedDoc = doc.status === "rejected";
-							const isApprovedDoc = doc.status === "approved";
-							const isPendingDoc = doc.status === "pending";
-							return (
-								<li key={doc.id} className="p-5">
-									<div className="flex flex-wrap items-start gap-4">
-										<div
-											className={cn(
-												"grid size-11 shrink-0 place-items-center rounded-xl text-white",
-												isRejectedDoc
-													? "bg-carmine"
-													: isApprovedDoc
-														? "bg-orange"
-														: "bg-sky"
-											)}
-										>
-											{isRejectedDoc ? (
-												<ShieldX className="size-5" />
-											) : isApprovedDoc ? (
-												<CheckCircle2 className="size-5" />
-											) : (
-												<Clock3 className="size-5" />
-											)}
-										</div>
+					{newLicences.length > 0 && (
+						<div className="space-y-3">
+							<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+								New licences to add
+							</p>
+							{newLicences.map((licence, index) => (
+								<LicenceCard
+									key={licence.id}
+									index={index}
+									licence={licence}
+									onUpdate={updateLicenceEntry}
+									onRemove={removeLicenceEntry}
+									onPickFile={pickLicenceFile}
+								/>
+							))}
+						</div>
+					)}
 
-										<div className="min-w-[200px] flex-1">
-											<div className="flex flex-wrap items-center gap-2">
-												<p className="text-sm font-semibold text-ink">
-													{doc.label}
-												</p>
-												<StatusBadge
-													label={doc.status}
-													tone={
-														isApprovedDoc
-															? "success"
-															: isRejectedDoc
-																? "critical"
-																: "warning"
-													}
-												/>
-											</div>
-											<p className="mt-1 font-mono text-[11px] text-ink-soft">
-												{doc.file_name}
-											</p>
-											{isRejectedDoc && doc.rejection_reason && (
-												<div className="mt-2 rounded-md bg-carmine/5 px-3 py-2 ring-1 ring-carmine/20">
-													<p className="font-mono text-[10px] uppercase tracking-[0.12em] text-carmine">
-														Rejection reason
-													</p>
-													<p className="mt-0.5 text-[12px] leading-5 text-ink-soft">
-														{doc.rejection_reason}
-													</p>
-												</div>
-											)}
-											{doc.reviewed_by && (
-												<p className="mt-1 text-[11px] text-ink-soft">
-													Reviewed by {doc.reviewed_by} ·{" "}
-													{formatDate(doc.reviewed_at)}
-												</p>
-											)}
-										</div>
-
-										<div className="flex min-w-[160px] flex-col items-end gap-2">
-											{doc.file_url && (
-												<a
-													href={resolveSrc(doc.file_url)}
-													target="_blank"
-													rel="noopener noreferrer"
-												>
-													<Button
-														type="button"
-														variant="outline"
-														size="sm"
-														className="border-line bg-paper text-ink hover:bg-sand"
-													>
-														<FileText className="size-3.5" />
-														View file
-													</Button>
-												</a>
-											)}
-											{isPendingDoc && (
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													onClick={() => handleDelete(doc)}
-													className="text-carmine hover:bg-carmine/10"
-												>
-													<Trash2 className="size-3.5" />
-													Remove
-												</Button>
-											)}
-											<span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-												Uploaded {formatDate(doc.uploaded_at)}
-											</span>
-										</div>
-									</div>
-								</li>
-							);
-						})}
-					</ul>
-				)}
+					{licences.length === 0 && newLicences.length === 0 && (
+						<div className="rounded-xl border border-dashed border-line bg-sand px-4 py-6 text-center text-[12px] text-ink-soft">
+							No licences on file. Click{" "}
+							<span className="font-semibold text-ink">Add licence</span> to
+							upload one.
+						</div>
+					)}
+				</div>
 			</section>
 
-			<div className="rounded-2xl bg-paper p-5 ring-1 ring-line">
-				<div className="flex flex-wrap items-start gap-3">
-					<AlertTriangle className="mt-0.5 size-4 shrink-0 text-orange-deep" />
+			<div className="sticky bottom-4 z-10 rounded-2xl bg-slate p-4 text-sand ring-1 ring-slate shadow-xl">
+				<div className="flex flex-wrap items-center justify-between gap-3">
 					<div className="min-w-0">
-						<p className="text-[13px] font-semibold text-ink">
-							Status, decisions, and audit trail
+						<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+							{dirty ? "Unsaved changes" : "All changes saved"}
 						</p>
-						<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-							Status is a decision, not a setting. Approve or reject an
-							organisation from the review flow, where the decision records
-							authority, reason, actor, and timestamp. Admin-added documents go
-							into the same review queue as member uploads and log the acting
-							admin as the uploader. Only pending documents can be removed;
-							approved and rejected documents carry a decision record and
-							cannot be deleted.
+						<p className="mt-0.5 text-[12px] leading-5 text-sand/75">
+							{dirty
+								? "Save to apply profile, document, and licence changes."
+								: "No pending changes."}
 						</p>
+					</div>
+					<div className="flex flex-wrap items-center gap-2">
+						<Button
+							type="button"
+							variant="outline"
+							onClick={handleDiscard}
+							disabled={!dirty || saving}
+							className="border-sand/25 bg-transparent text-sand hover:bg-sand/10 disabled:opacity-40"
+						>
+							Discard
+						</Button>
+						<Button
+							type="button"
+							onClick={handleSave}
+							disabled={!dirty || saving}
+							className="bg-orange text-white hover:bg-orange-deep disabled:opacity-60"
+						>
+							<Save className="size-4" />
+							{saving ? "Saving…" : "Save changes"}
+						</Button>
 					</div>
 				</div>
 			</div>
 		</AppShell>
 	);
 }
+
+function DocumentCard({
+	icon: Icon,
+	label,
+	detail,
+	accept,
+	existing,
+	picked,
+	removing,
+	onPick,
+	onRemove,
+}: {
+	icon: typeof FileText;
+	label: string;
+	detail: string;
+	accept: string;
+	existing: ApiDocument | null;
+	picked: File | null;
+	removing: boolean;
+	onPick: (f: File | null) => void;
+	onRemove: () => void;
+}) {
+	const acceptHint =
+		accept.includes("pdf") && !accept.includes("image")
+			? "PDF · max 5MB"
+			: "PDF, JPG, PNG · max 5MB";
+
+	return (
+		<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
+			<div className="flex items-start gap-3">
+				<div className="grid size-9 shrink-0 place-items-center rounded-md bg-orange text-white">
+					<Icon className="size-4" />
+				</div>
+				<div className="min-w-0 flex-1">
+					<p className="text-sm font-semibold text-ink">{label}</p>
+					<p className="mt-0.5 text-[11px] leading-5 text-ink-soft">
+						{detail}
+					</p>
+				</div>
+			</div>
+
+			{picked ? (
+				<div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-paper px-3 py-2 ring-1 ring-orange/30">
+					<div className="flex min-w-0 items-center gap-2">
+						<Paperclip className="size-3.5 shrink-0 text-orange" />
+						<span className="truncate font-mono text-[11px] text-ink">
+							{picked.name}
+						</span>
+						<span className="shrink-0 font-mono text-[10px] text-ink-soft">
+							{(picked.size / 1024).toFixed(0)} KB
+						</span>
+					</div>
+					<button
+						type="button"
+						onClick={() => onPick(null)}
+						aria-label="Remove file"
+						className="grid size-7 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
+					>
+						<Trash2 className="size-3.5" />
+					</button>
+				</div>
+			) : existing ? (
+				<div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-paper px-3 py-2 ring-1 ring-line">
+					<div className="flex min-w-0 items-center gap-2">
+						<Paperclip className="size-3.5 shrink-0 text-orange" />
+						<span className="truncate font-mono text-[11px] text-ink">
+							{existing.file_name}
+						</span>
+					</div>
+					<div className="flex items-center gap-2">
+						{existing.file_url && (
+							<a
+								href={existing.file_url}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="font-mono text-[10px] uppercase tracking-[0.12em] text-orange hover:text-orange-deep"
+							>
+								View
+							</a>
+						)}
+						<label className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft hover:text-orange">
+							Replace
+							<input
+								type="file"
+								accept={accept}
+								onChange={(e) => {
+									const f = e.target.files?.[0] ?? null;
+									e.target.value = "";
+									onPick(f);
+								}}
+								className="hidden"
+							/>
+						</label>
+						<button
+							type="button"
+							onClick={onRemove}
+							disabled={removing}
+							aria-label="Remove document"
+							className="grid size-7 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10 disabled:opacity-40"
+						>
+							{removing ? (
+								<span className="size-3.5 animate-spin rounded-full border-2 border-carmine/25 border-t-carmine" />
+							) : (
+								<Trash2 className="size-3.5" />
+							)}
+						</button>
+					</div>
+				</div>
+			) : (
+				<label className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-md border border-dashed border-line bg-paper px-3 py-3 text-[12px] text-ink-soft transition-colors hover:border-orange/40 hover:bg-orange/5 hover:text-orange">
+					<span className="inline-flex items-center gap-2">
+						<Upload className="size-3.5" />
+						Choose file
+					</span>
+					<span className="font-mono text-[10px] text-ink-soft">
+						{acceptHint}
+					</span>
+					<input
+						type="file"
+						accept={accept}
+						onChange={(e) => {
+							const f = e.target.files?.[0] ?? null;
+							e.target.value = "";
+							onPick(f);
+						}}
+						className="hidden"
+					/>
+				</label>
+			)}
+		</div>
+	);
+}
+
+function LicenceCard({
+	index,
+	licence,
+	onUpdate,
+	onRemove,
+	onPickFile,
+}: {
+	index: number;
+	licence: LicenceEntry;
+	onUpdate: (id: string, patch: Partial<LicenceEntry>) => void;
+	onRemove: (id: string) => void;
+	onPickFile: (id: string, f: File | null) => void;
+}) {
+	return (
+		<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
+			<div className="flex items-start gap-3">
+				<div className="grid size-9 shrink-0 place-items-center rounded-md bg-orange text-white">
+					<Award className="size-4" />
+				</div>
+				<div className="min-w-0 flex-1">
+					<p className="text-sm font-semibold text-ink">
+						Licence {index + 1}
+					</p>
+					<p className="mt-0.5 text-[11px] leading-5 text-ink-soft">
+						Add the licence type, reference number, and document.
+					</p>
+				</div>
+				<button
+					type="button"
+					onClick={() => onRemove(licence.id)}
+					aria-label="Remove licence"
+					className="grid size-7 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
+				>
+					<Trash2 className="size-3.5" />
+				</button>
+			</div>
+
+			<div className="mt-3 grid gap-3 sm:grid-cols-2">
+				<label className="block">
+					<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+						Licence type
+					</span>
+					<select
+						value={licence.type}
+						onChange={(e) =>
+							onUpdate(licence.id, {
+								type: e.target.value as LicenceType,
+							})
+						}
+						className="mt-1.5 h-11 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-orange/25"
+					>
+						<option value="">Select a licence type…</option>
+						{licenceTypes.map((t) => (
+							<option key={t.key} value={t.key}>
+								{t.label}
+							</option>
+						))}
+					</select>
+				</label>
+
+				<label className="block">
+					<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+						Licence reference number
+					</span>
+					<Input
+						placeholder="e.g. NCS/AG/2026/00123"
+						value={licence.reference}
+						onChange={(e) =>
+							onUpdate(licence.id, { reference: e.target.value })
+						}
+						className="mt-1.5 h-11 border-line bg-paper font-mono text-ink"
+					/>
+				</label>
+			</div>
+
+			{licence.file ? (
+				<div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-paper px-3 py-2 ring-1 ring-line">
+					<div className="flex min-w-0 items-center gap-2">
+						<Paperclip className="size-3.5 shrink-0 text-orange" />
+						<span className="truncate font-mono text-[11px] text-ink">
+							{licence.file.name}
+						</span>
+						<span className="shrink-0 font-mono text-[10px] text-ink-soft">
+							{(licence.file.size / 1024).toFixed(0)} KB
+						</span>
+					</div>
+					<button
+						type="button"
+						onClick={() => onPickFile(licence.id, null)}
+						aria-label="Remove file"
+						className="grid size-7 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
+					>
+						<Trash2 className="size-3.5" />
+					</button>
+				</div>
+			) : (
+				<label className="mt-3 flex cursor-pointer items-center justify-between gap-3 rounded-md border border-dashed border-line bg-paper px-3 py-3 text-[12px] text-ink-soft transition-colors hover:border-orange/40 hover:bg-orange/5 hover:text-orange">
+					<span className="inline-flex items-center gap-2">
+						<Upload className="size-3.5" />
+						Upload licence document
+					</span>
+					<span className="font-mono text-[10px] text-ink-soft">
+						PDF, JPG, PNG · max 5MB
+					</span>
+					<input
+						type="file"
+						accept="application/pdf,image/*"
+						onChange={(e) => {
+							const f = e.target.files?.[0] ?? null;
+							e.target.value = "";
+							onPickFile(licence.id, f);
+						}}
+						className="hidden"
+					/>
+				</label>
+			)}
+		</div>
+	);
+}
+
+function ExistingLicenceCard({
+	licence,
+	removing,
+	onRemove,
+}: {
+	licence: ApiDocument;
+	removing: boolean;
+	onRemove: () => void;
+}) {
+	const typeLabel =
+		licenceTypes.find((t) => t.key === licence.licence_type)?.label ??
+		licence.licence_type ??
+		"Operational licence";
+
+	return (
+		<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
+			<div className="flex items-start gap-3">
+				<div className="grid size-9 shrink-0 place-items-center rounded-md bg-orange text-white">
+					<Award className="size-4" />
+				</div>
+				<div className="min-w-0 flex-1">
+					<p className="text-sm font-semibold text-ink">{typeLabel}</p>
+					{licence.licence_reference && (
+						<p className="mt-0.5 font-mono text-[11px] text-ink-soft">
+							Ref · {licence.licence_reference}
+						</p>
+					)}
+				</div>
+				<button
+					type="button"
+					onClick={onRemove}
+					disabled={removing}
+					aria-label="Remove licence"
+					className="grid size-7 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10 disabled:opacity-40"
+				>
+					{removing ? (
+						<span className="size-3.5 animate-spin rounded-full border-2 border-carmine/25 border-t-carmine" />
+					) : (
+						<Trash2 className="size-3.5" />
+					)}
+				</button>
+			</div>
+
+			<div className="mt-3 flex items-center justify-between gap-3 rounded-md bg-paper px-3 py-2 ring-1 ring-line">
+				<div className="flex min-w-0 items-center gap-2">
+					<Paperclip className="size-3.5 shrink-0 text-orange" />
+					<span className="truncate font-mono text-[11px] text-ink">
+						{licence.file_name}
+					</span>
+				</div>
+				{licence.file_url && (
+					<a
+						href={licence.file_url}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="font-mono text-[10px] uppercase tracking-[0.12em] text-orange hover:text-orange-deep"
+					>
+						View
+					</a>
+				)}
+			</div>
+		</div>
+	);
+}
+
 
 function MetaField({
 	icon: Icon,
