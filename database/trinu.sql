@@ -398,6 +398,102 @@ INSERT INTO `document_types` VALUES ('0fa1f5dc-7a85-46c9-a16d-8e4f96df48cc','26c
 UNLOCK TABLES;
 
 --
+-- Table structure for table `feature_flag_audit_logs`
+--
+
+DROP TABLE IF EXISTS `feature_flag_audit_logs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `feature_flag_audit_logs` (
+  `id` char(36) NOT NULL,
+  `actor_id` char(36) NOT NULL,
+  `action` varchar(100) NOT NULL,
+  `change_reason` varchar(500) NOT NULL DEFAULT '',
+  `details` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`details`)),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_feature_flag_audit_actor` (`actor_id`),
+  KEY `idx_feature_flag_audit_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `feature_flag_audit_logs`
+--
+
+LOCK TABLES `feature_flag_audit_logs` WRITE;
+/*!40000 ALTER TABLE `feature_flag_audit_logs` DISABLE KEYS */;
+INSERT INTO `feature_flag_audit_logs` VALUES ('275d68ae-2f25-4145-a649-181a0ba8973d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','feature_flag_configuration_initialized','Initial feature flag configuration','{\"configuration_id\":\"e3a7ea2f-25a7-4de6-bdc8-04e72c07a8f3\",\"audit_all_changes\":true,\"require_reason\":true,\"flags_initialized\":0}','2026-10-09 21:33:55'),('b23e04ef-5297-4a07-889b-98a4c3d4e059','c0654f0b-8452-4a03-a43d-0d0cda17da1b','feature_flags_initialized','Initial feature flag catalogue','{\"configuration_id\":\"e3a7ea2f-25a7-4de6-bdc8-04e72c07a8f3\",\"inserted_count\":14,\"existing_count\":0,\"inserted_flags\":[\"public.cargo_tracking\",\"public.metrics_display\",\"public.terminal_map\",\"portal.self_registration\",\"portal.quote_request\",\"portal.online_payment\",\"portal.storage_accrual\",\"ops.offline_gate\",\"ops.anpr\",\"ops.handheld_scanner\",\"ops.automated_yard\",\"platform.native_mobile\",\"platform.developer_api\",\"platform.trade_finance\"]}','2026-10-09 21:38:04'),('bb5286ba-3c5f-4988-99db-07d940680cf9','c0654f0b-8452-4a03-a43d-0d0cda17da1b','feature_flags_updated','sdsdvsd','{\"config_changes\":[],\"flag_changes\":[{\"id\":\"54719215-8156-4d64-9710-da337c70379e\",\"key\":\"ops.anpr\",\"label\":\"ANPR plate recognition\",\"old_enabled\":false,\"new_enabled\":true}]}','2026-10-09 21:40:51');
+/*!40000 ALTER TABLE `feature_flag_audit_logs` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `feature_flag_config`
+--
+
+DROP TABLE IF EXISTS `feature_flag_config`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `feature_flag_config` (
+  `id` char(36) NOT NULL,
+  `audit_all_changes` tinyint(1) NOT NULL DEFAULT 1,
+  `require_reason` tinyint(1) NOT NULL DEFAULT 1,
+  `created_by` char(36) NOT NULL,
+  `updated_by` char(36) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `allow_per_org_override` tinyint(1) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `feature_flag_config`
+--
+
+LOCK TABLES `feature_flag_config` WRITE;
+/*!40000 ALTER TABLE `feature_flag_config` DISABLE KEYS */;
+INSERT INTO `feature_flag_config` VALUES ('e3a7ea2f-25a7-4de6-bdc8-04e72c07a8f3',1,1,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:33:55','2026-10-09 21:33:55',0);
+/*!40000 ALTER TABLE `feature_flag_config` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `feature_flags`
+--
+
+DROP TABLE IF EXISTS `feature_flags`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `feature_flags` (
+  `id` char(36) NOT NULL,
+  `flag_key` varchar(150) NOT NULL,
+  `label` varchar(200) NOT NULL,
+  `description` text NOT NULL,
+  `scope` enum('public','portal','operations','platform') NOT NULL DEFAULT 'platform',
+  `enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `requires_approval` tinyint(1) NOT NULL DEFAULT 0,
+  `created_by` char(36) NOT NULL,
+  `updated_by` char(36) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `flag_key` (`flag_key`),
+  KEY `idx_feature_flags_scope` (`scope`),
+  KEY `idx_feature_flags_enabled` (`enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `feature_flags`
+--
+
+LOCK TABLES `feature_flags` WRITE;
+/*!40000 ALTER TABLE `feature_flags` DISABLE KEYS */;
+INSERT INTO `feature_flags` VALUES ('15093fd3-a788-46b4-aaf2-0e3ab7085525','platform.developer_api','Developer public API','Deferred scope. Public developer programme; disabled by default.','platform',0,1,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:38:04'),('2ce122b1-0467-43c0-aee7-fce875b6df3c','portal.quote_request','Quote request submission','Allow unauth and auth users to submit quote requests.','portal',1,0,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:38:04'),('338cd542-bf12-4782-8d67-dabc5726bf1a','platform.native_mobile','Native mobile applications','Deferred scope. Reserved for Phase 3+; no effect while disabled.','platform',0,1,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:38:04'),('360a854b-ccf3-411f-a509-5b69a55833ec','public.cargo_tracking','Public cargo tracking','Allow unauthenticated tracking lookups on the public site.','public',1,0,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:38:04'),('3c258780-11bd-4a7b-99b7-5f125504c93b','ops.automated_yard','Automated yard optimisation','Deferred scope. Reserved for future phases; disabled by default.','operations',0,1,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:38:04'),('47eb8677-9c19-4843-beaa-4b9cb4c0f622','ops.offline_gate','Offline gate authorisation','Allow gate decisions from cached authorisations when upstream is unavailable.','operations',1,1,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:38:04'),('54719215-8156-4d64-9710-da337c70379e','ops.anpr','ANPR plate recognition','Enable automatic plate match to booking at gate. Manual fallback always available.','operations',1,0,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:40:51'),('5564893e-055b-462a-9cb3-df06ffae1dd6','portal.online_payment','Online payment initiation','Allow customers to initiate payment from the portal.','portal',1,1,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:38:04'),('7d3558bc-8df3-4d47-97bc-315dc36060bd','portal.storage_accrual','Live storage accrual','Show real-time storage cost accrual in the portal.','portal',1,0,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:38:04'),('7e2aea3a-fa80-444c-9768-99af7ca5a9bd','platform.trade_finance','Trade finance marketplace','Deferred scope. Reserved for future phases; disabled by default.','platform',0,1,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:38:04'),('a6c35761-ef82-4614-9816-4a1610553c1e','public.terminal_map','Interactive terminal map','Enable the public zone visualisation.','public',0,0,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:38:04'),('ca1529f6-c941-4a3c-976e-d4db780bec90','public.metrics_display','Public metrics display','Show aggregate operational metrics on the public site. Suppressible without deploy.','public',1,1,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:38:04'),('ce62e72e-2a94-4520-8425-f6677afbbb94','ops.handheld_scanner','Handheld scanning','Enable barcode/QR scanning on staff handhelds.','operations',1,0,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:38:04'),('eed191ee-7817-4710-b362-6ec710833a6d','portal.self_registration','Portal self-registration','Allow prospects to create an account pending approval.','portal',1,0,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:38:04','2026-10-09 21:38:04');
+/*!40000 ALTER TABLE `feature_flags` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `financial_configuration`
 --
 
@@ -588,6 +684,143 @@ LOCK TABLES `gate_vehicle_requirements` WRITE;
 /*!40000 ALTER TABLE `gate_vehicle_requirements` DISABLE KEYS */;
 INSERT INTO `gate_vehicle_requirements` VALUES ('3ab4970f-937e-485c-aa01-a106164c8720','ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','Valid driver\'s licence','2026-10-09 16:55:08'),('63cb0c23-e853-4a44-bf70-ec66ce5b3c19','ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','Approved cargo documentation','2026-10-09 16:55:08'),('b9ef4b23-bf59-4b29-9d06-0f677234dbc7','ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','Valid vehicle insurance certificate','2026-10-09 16:55:08'),('dec8ad52-0694-4ed9-aa06-03e454097eca','ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','Valid vehicle registration','2026-10-09 16:55:08'),('e536d3b7-f18c-48ee-9ff3-dd44d05e1e0d','ff8c4144-4ffe-49b1-9f26-dcf37ecf09c4','Valid terminal booking confirmation','2026-10-09 16:55:08');
 /*!40000 ALTER TABLE `gate_vehicle_requirements` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `integration_adapters`
+--
+
+DROP TABLE IF EXISTS `integration_adapters`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `integration_adapters` (
+  `id` char(36) NOT NULL,
+  `adapter_key` varchar(100) NOT NULL,
+  `name` varchar(150) NOT NULL,
+  `description` text NOT NULL,
+  `category` varchar(100) NOT NULL,
+  `icon` varchar(50) NOT NULL DEFAULT 'Webhook',
+  `enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `environment` enum('sandbox','production') NOT NULL DEFAULT 'sandbox',
+  `retry_count` tinyint(3) unsigned NOT NULL DEFAULT 3,
+  `timeout_seconds` smallint(5) unsigned NOT NULL DEFAULT 30,
+  `fields` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`fields`)),
+  `created_by` char(36) DEFAULT NULL,
+  `updated_by` char(36) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `adapter_key` (`adapter_key`),
+  KEY `idx_integration_adapters_category` (`category`),
+  KEY `idx_integration_adapters_enabled` (`enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `integration_adapters`
+--
+
+LOCK TABLES `integration_adapters` WRITE;
+/*!40000 ALTER TABLE `integration_adapters` DISABLE KEYS */;
+INSERT INTO `integration_adapters` VALUES ('06feff4e-88d9-48c4-adf6-7ed37c3dd26b','bank_reconciliation','Bank Reconciliation','Connect to a bank statement or reconciliation service.','Banking','Landmark',0,'sandbox',3,30,'[{\"key\":\"base_url\",\"label\":\"API base URL\",\"placeholder\":\"https:\\/\\/api.example.com\",\"kind\":\"url\",\"required\":true},{\"key\":\"client_id\",\"label\":\"Client ID\",\"placeholder\":\"Enter client ID\",\"kind\":\"text\",\"required\":true},{\"key\":\"client_secret\",\"label\":\"Client secret\",\"placeholder\":\"Enter client secret\",\"kind\":\"password\",\"required\":true,\"secret\":true}]',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:03:12','2026-10-09 21:20:38'),('45a45457-f0e1-4d95-9d89-8e5bf868078a','payment_gateway','Payment Gateway','Connect to an external payment provider.','Payments','CircleDollarSign',0,'sandbox',3,30,'[{\"key\":\"base_url\",\"label\":\"API base URL\",\"placeholder\":\"https:\\/\\/sandbox.example.com\",\"kind\":\"url\",\"required\":true},{\"key\":\"secret_key\",\"label\":\"Secret key\",\"placeholder\":\"Enter secret key\",\"kind\":\"password\",\"required\":true,\"secret\":true},{\"key\":\"webhook_secret\",\"label\":\"Webhook signing secret\",\"placeholder\":\"Enter webhook secret\",\"kind\":\"password\",\"required\":true,\"secret\":true}]',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:03:12','2026-10-09 21:20:38'),('6341215c-14c6-41ce-ab63-0e29e4942fda','webhook_service','External Webhooks','Manage outgoing webhook destinations and credentials.','Developer Tools','Webhook',0,'sandbox',3,30,'[{\"key\":\"endpoint_url\",\"label\":\"Endpoint URL\",\"placeholder\":\"https:\\/\\/your-service.example.com\\/webhook\",\"kind\":\"url\",\"required\":true},{\"key\":\"signing_secret\",\"label\":\"Signing secret\",\"placeholder\":\"Enter signing secret\",\"kind\":\"password\",\"required\":true,\"secret\":true}]',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:03:12','2026-10-09 21:20:38'),('93e61074-1d3b-499e-a1b6-2eff0eb21cd5','whatsapp_provider','WhatsApp Provider','Send approved WhatsApp notifications.','Communications','MessageSquare',0,'sandbox',3,30,'[{\"key\":\"base_url\",\"label\":\"API base URL\",\"placeholder\":\"https:\\/\\/api.example.com\",\"kind\":\"url\",\"required\":true},{\"key\":\"access_token\",\"label\":\"Access token\",\"placeholder\":\"Enter access token\",\"kind\":\"password\",\"required\":true,\"secret\":true}]',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:03:12','2026-10-09 21:20:38'),('9a2b7c27-7ff7-4c38-ad71-8b05b5e3ff7e','email_provider','Email Provider','Send platform notifications and transactional email.','Communications','Mail',0,'sandbox',3,30,'[{\"key\":\"api_key\",\"label\":\"API key\",\"placeholder\":\"Enter API key\",\"kind\":\"password\",\"required\":true,\"secret\":true},{\"key\":\"from_email\",\"label\":\"Sender email\",\"placeholder\":\"notifications@example.com\",\"kind\":\"email\",\"required\":true}]',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:03:12','2026-10-09 21:20:38'),('a4522764-c0fd-44c8-95d9-695d3429390a','customs_gateway','Customs Gateway','Connection to the customs or cargo clearance gateway.','Customs','ShieldCheck',0,'sandbox',3,30,'[{\"key\":\"base_url\",\"label\":\"API base URL\",\"placeholder\":\"https:\\/\\/sandbox.example.com\",\"kind\":\"url\",\"required\":true},{\"key\":\"api_key\",\"label\":\"API key\",\"placeholder\":\"Enter API key\",\"kind\":\"password\",\"required\":true,\"secret\":true}]',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:03:12','2026-10-09 21:20:38'),('bcd59698-0243-41aa-b105-cc499e0981d6','shipping_line','Shipping Line API','Connect to shipping line tracking and shipment services.','Shipping','Ship',0,'sandbox',3,30,'[{\"key\":\"base_url\",\"label\":\"API base URL\",\"placeholder\":\"https:\\/\\/api.example.com\",\"kind\":\"url\",\"required\":true},{\"key\":\"api_key\",\"label\":\"API key\",\"placeholder\":\"Enter API key\",\"kind\":\"password\",\"required\":true,\"secret\":true}]',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:03:12','2026-10-09 21:20:38'),('c91c23de-f379-47ce-a4f8-f7f21e7b17e8','sms_provider','SMS Provider','Send SMS alerts and verification messages.','Communications','Smartphone',0,'sandbox',3,30,'[{\"key\":\"base_url\",\"label\":\"API base URL\",\"placeholder\":\"https:\\/\\/api.example.com\",\"kind\":\"url\",\"required\":true},{\"key\":\"api_key\",\"label\":\"API key\",\"placeholder\":\"Enter API key\",\"kind\":\"password\",\"required\":true,\"secret\":true}]',NULL,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:03:12','2026-10-09 21:20:38');
+/*!40000 ALTER TABLE `integration_adapters` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `integration_audit_logs`
+--
+
+DROP TABLE IF EXISTS `integration_audit_logs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `integration_audit_logs` (
+  `id` char(36) NOT NULL,
+  `actor_id` char(36) NOT NULL,
+  `action` varchar(50) NOT NULL,
+  `integration_id` char(36) DEFAULT NULL,
+  `details` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`details`)),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `fk_integration_audit_adapter` (`integration_id`),
+  KEY `idx_integration_audit_created_at` (`created_at`),
+  KEY `idx_integration_audit_actor` (`actor_id`),
+  KEY `idx_integration_audit_action` (`action`),
+  CONSTRAINT `fk_integration_audit_adapter` FOREIGN KEY (`integration_id`) REFERENCES `integration_adapters` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `integration_audit_logs`
+--
+
+LOCK TABLES `integration_audit_logs` WRITE;
+/*!40000 ALTER TABLE `integration_audit_logs` DISABLE KEYS */;
+INSERT INTO `integration_audit_logs` VALUES ('0a085ee0-2a66-41b2-b620-31db823765ac','c0654f0b-8452-4a03-a43d-0d0cda17da1b','integration_updated','a4522764-c0fd-44c8-95d9-695d3429390a','{\"enabled\":0,\"environment\":\"sandbox\",\"retry_count\":3,\"timeout_seconds\":30}','2026-10-09 21:20:38'),('1d410d14-732e-419c-a2ad-1b06601fb57b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','integration_updated','bcd59698-0243-41aa-b105-cc499e0981d6','{\"enabled\":0,\"environment\":\"sandbox\",\"retry_count\":3,\"timeout_seconds\":30}','2026-10-09 21:20:38'),('655681ce-b730-40d7-a2a6-879acda4136d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','integration_updated','c91c23de-f379-47ce-a4f8-f7f21e7b17e8','{\"enabled\":0,\"environment\":\"sandbox\",\"retry_count\":3,\"timeout_seconds\":30}','2026-10-09 21:20:38'),('6b1edab1-ada9-4ed0-ad57-f41541cc4f8e','c0654f0b-8452-4a03-a43d-0d0cda17da1b','integration_updated','45a45457-f0e1-4d95-9d89-8e5bf868078a','{\"enabled\":0,\"environment\":\"sandbox\",\"retry_count\":3,\"timeout_seconds\":30}','2026-10-09 21:20:38'),('9490ebda-2453-4dc4-95cd-7bcfd6633879','c0654f0b-8452-4a03-a43d-0d0cda17da1b','integration_updated','9a2b7c27-7ff7-4c38-ad71-8b05b5e3ff7e','{\"enabled\":0,\"environment\":\"sandbox\",\"retry_count\":3,\"timeout_seconds\":30}','2026-10-09 21:20:38'),('97e48946-f26b-4e60-be95-52204858cc57','c0654f0b-8452-4a03-a43d-0d0cda17da1b','integration_updated','06feff4e-88d9-48c4-adf6-7ed37c3dd26b','{\"enabled\":0,\"environment\":\"sandbox\",\"retry_count\":3,\"timeout_seconds\":30}','2026-10-09 21:20:38'),('b6c1c4f1-a88d-41f2-9cbc-4b59a7217589','c0654f0b-8452-4a03-a43d-0d0cda17da1b','integration_updated','93e61074-1d3b-499e-a1b6-2eff0eb21cd5','{\"enabled\":0,\"environment\":\"sandbox\",\"retry_count\":3,\"timeout_seconds\":30}','2026-10-09 21:20:38'),('d19e9124-fe62-4c75-8626-d33543e62bd8','c0654f0b-8452-4a03-a43d-0d0cda17da1b','integration_settings_updated',NULL,'{\"correlation_id_logging\":1,\"dead_letter_queue_enabled\":1,\"circuit_breaker_enabled\":1,\"schema_validation_required\":1,\"manual_fallback_required\":0,\"retry_backoff_seconds\":30}','2026-10-09 21:20:38'),('d2707d41-ef00-4db1-9e9c-a43cec3c29fc','c0654f0b-8452-4a03-a43d-0d0cda17da1b','integration_updated','6341215c-14c6-41ce-ab63-0e29e4942fda','{\"enabled\":0,\"environment\":\"sandbox\",\"retry_count\":3,\"timeout_seconds\":30}','2026-10-09 21:20:38');
+/*!40000 ALTER TABLE `integration_audit_logs` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `integration_credentials`
+--
+
+DROP TABLE IF EXISTS `integration_credentials`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `integration_credentials` (
+  `id` char(36) NOT NULL,
+  `integration_id` char(36) NOT NULL,
+  `field_key` varchar(150) NOT NULL,
+  `encrypted_value` mediumtext NOT NULL,
+  `updated_by` char(36) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_integration_credential_field` (`integration_id`,`field_key`),
+  KEY `idx_integration_credentials_updated_by` (`updated_by`),
+  CONSTRAINT `fk_integration_credentials_adapter` FOREIGN KEY (`integration_id`) REFERENCES `integration_adapters` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `integration_credentials`
+--
+
+LOCK TABLES `integration_credentials` WRITE;
+/*!40000 ALTER TABLE `integration_credentials` DISABLE KEYS */;
+/*!40000 ALTER TABLE `integration_credentials` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `integration_settings`
+--
+
+DROP TABLE IF EXISTS `integration_settings`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `integration_settings` (
+  `id` char(36) NOT NULL,
+  `correlation_id_logging` tinyint(1) NOT NULL DEFAULT 1,
+  `dead_letter_queue_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `circuit_breaker_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `schema_validation_required` tinyint(1) NOT NULL DEFAULT 1,
+  `manual_fallback_required` tinyint(1) NOT NULL DEFAULT 1,
+  `retry_backoff_seconds` int(10) unsigned NOT NULL DEFAULT 30,
+  `updated_by` char(36) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_integration_settings_singleton` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `integration_settings`
+--
+
+LOCK TABLES `integration_settings` WRITE;
+/*!40000 ALTER TABLE `integration_settings` DISABLE KEYS */;
+INSERT INTO `integration_settings` VALUES ('e205ca01-ee99-4e83-b2c8-f343d1af760c',1,1,1,1,0,30,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:03:12','2026-10-09 21:20:38');
+/*!40000 ALTER TABLE `integration_settings` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -1204,6 +1437,82 @@ INSERT INTO `roles` VALUES ('18386d94-bc37-11f1-bb55-5081407ad051','system_admin
 UNLOCK TABLES;
 
 --
+-- Table structure for table `security_config_audit_logs`
+--
+
+DROP TABLE IF EXISTS `security_config_audit_logs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `security_config_audit_logs` (
+  `id` char(36) NOT NULL,
+  `actor_id` char(36) NOT NULL,
+  `action` varchar(100) NOT NULL,
+  `details` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`details`)),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_security_audit_actor` (`actor_id`),
+  KEY `idx_security_audit_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `security_config_audit_logs`
+--
+
+LOCK TABLES `security_config_audit_logs` WRITE;
+/*!40000 ALTER TABLE `security_config_audit_logs` DISABLE KEYS */;
+INSERT INTO `security_config_audit_logs` VALUES ('5f4eb197-336d-4201-b105-f31a9c58c76c','c0654f0b-8452-4a03-a43d-0d0cda17da1b','security_configuration_updated','{\"mfa_mandatory_for_staff\":1,\"mfa_encouraged_for_trade\":0,\"reauthentication_for_sensitive_actions\":1,\"trusted_devices_enabled\":0,\"breached_password_screening\":1,\"progressive_lockout_enabled\":1,\"break_glass_requires_dual_approval\":1,\"regulator_read_only_access\":0,\"audit_all_auth_events\":1,\"security_alerts_enabled\":1,\"alert_on_privilege_changes\":1,\"alert_on_repeated_login_failures\":1,\"device_management_enabled\":1,\"remote_sign_out_enabled\":1,\"mfa_grace_period_hours\":24,\"session_timeout_minutes\":30,\"concurrent_sessions_allowed\":3,\"minimum_password_length\":12,\"lockout_threshold\":5,\"lockout_duration_minutes\":30,\"regulator_access_duration_hours\":24}','2026-10-09 21:29:43');
+/*!40000 ALTER TABLE `security_config_audit_logs` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `security_settings`
+--
+
+DROP TABLE IF EXISTS `security_settings`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `security_settings` (
+  `id` char(36) NOT NULL,
+  `mfa_mandatory_for_staff` tinyint(1) NOT NULL DEFAULT 1,
+  `mfa_encouraged_for_trade` tinyint(1) NOT NULL DEFAULT 1,
+  `mfa_grace_period_hours` smallint(5) unsigned NOT NULL DEFAULT 24,
+  `session_timeout_minutes` smallint(5) unsigned NOT NULL DEFAULT 30,
+  `concurrent_sessions_allowed` tinyint(3) unsigned NOT NULL DEFAULT 3,
+  `reauthentication_for_sensitive_actions` tinyint(1) NOT NULL DEFAULT 1,
+  `trusted_devices_enabled` tinyint(1) NOT NULL DEFAULT 0,
+  `breached_password_screening` tinyint(1) NOT NULL DEFAULT 1,
+  `minimum_password_length` smallint(5) unsigned NOT NULL DEFAULT 12,
+  `progressive_lockout_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `lockout_threshold` tinyint(3) unsigned NOT NULL DEFAULT 5,
+  `lockout_duration_minutes` smallint(5) unsigned NOT NULL DEFAULT 30,
+  `break_glass_requires_dual_approval` tinyint(1) NOT NULL DEFAULT 1,
+  `regulator_read_only_access` tinyint(1) NOT NULL DEFAULT 0,
+  `regulator_access_duration_hours` smallint(5) unsigned NOT NULL DEFAULT 24,
+  `audit_all_auth_events` tinyint(1) NOT NULL DEFAULT 1,
+  `security_alerts_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `alert_on_privilege_changes` tinyint(1) NOT NULL DEFAULT 1,
+  `alert_on_repeated_login_failures` tinyint(1) NOT NULL DEFAULT 1,
+  `device_management_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `remote_sign_out_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `updated_by` char(36) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `security_settings`
+--
+
+LOCK TABLES `security_settings` WRITE;
+/*!40000 ALTER TABLE `security_settings` DISABLE KEYS */;
+INSERT INTO `security_settings` VALUES ('e3da774e-4c97-4fd8-a78f-9607ec1a1535',1,0,24,30,3,1,0,1,12,1,5,30,1,0,24,1,1,1,1,1,1,'c0654f0b-8452-4a03-a43d-0d0cda17da1b','2026-10-09 21:28:52','2026-10-09 21:29:43');
+/*!40000 ALTER TABLE `security_settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `sessions`
 --
 
@@ -1244,7 +1553,7 @@ CREATE TABLE `sessions` (
 
 LOCK TABLES `sessions` WRITE;
 /*!40000 ALTER TABLE `sessions` DISABLE KEYS */;
-INSERT INTO `sessions` VALUES ('0997562a-0144-448b-a90d-063ffddd8167','ff20dfcf-f843-4cd3-a263-412210683de9','33b8ceaf16748dafd377c91d39e5e15c266ebbe4a0eae2619e2380d490b6fd46',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:00:50','2026-10-31 18:00:50',NULL,NULL,'2026-10-01 16:00:50'),('1198246b-102c-4adf-85b6-a0460cf9b95a','4a9ba8d5-93b6-4b65-af96-934920afcd18','397fb86b977b57e309ee610d0c7967197d58a6b4f8e994cb56be5d01666af187',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:30:23','2026-11-02 15:30:23',NULL,NULL,'2026-10-03 14:30:23'),('2632d7e9-af51-46e5-9b6f-dd62e125af17','4a9ba8d5-93b6-4b65-af96-934920afcd18','a196a7f8508b401cac5197ca1458e65bad8d19eeb0d0af1de05cd57d11e618dc',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 14:46:01','2026-11-02 14:46:01',NULL,NULL,'2026-10-03 13:46:01'),('3881279e-11ea-4f3c-9d76-11927c1c28ac','ff20dfcf-f843-4cd3-a263-412210683de9','24218105a69709b7eab7a7efdfa80417e9ab77cbf3344d0195c182a3eaa784c3',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-02 12:53:24','2026-11-01 12:53:24',NULL,NULL,'2026-10-02 10:53:24'),('3f779800-112f-4a40-b843-f8f03022325d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','62f098acd16856c52d6fbb85725b83492b446893667f97a1f860302b74410753',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 12:36:27','2026-11-02 12:36:27',NULL,NULL,'2026-10-03 11:36:27'),('63ffc6d7-032d-435a-bdcf-6145ecb541c2','ff20dfcf-f843-4cd3-a263-412210683de9','fd54b95fe5fb1f4222c5491124179f80f3389ee8a6d955368df682690f48f1b4',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:20:13','2026-10-31 18:20:13',NULL,NULL,'2026-10-01 16:20:13'),('67e4f923-400e-4655-a67a-7e1bb74bcb24','ff20dfcf-f843-4cd3-a263-412210683de9','04fdd5b13e825690fa60d0de193c51a9d6f6b13e8c9235df9a412cdefc2c2c62',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:17:51','2026-10-31 18:17:51',NULL,NULL,'2026-10-01 16:17:51'),('68ef296d-8fc6-4a5f-856d-e983d5357d7e','4a9ba8d5-93b6-4b65-af96-934920afcd18','96ef396045b76fe8c218e4d3d0fdcddba9b997d9f87884a8b0d311c9f746ba32',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:01:42','2026-11-02 15:01:42',NULL,NULL,'2026-10-03 14:01:42'),('9b4fc236-f24e-4127-8259-d7816eeea03f','c0654f0b-8452-4a03-a43d-0d0cda17da1b','11a7d220a8950dc7dcaaf347897b5adc221d8d7ae134d0a27e971e0e67ea7cac',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-08 19:18:35','2026-10-10 21:58:32',NULL,NULL,'2026-10-08 18:18:35'),('b804baca-dfa2-4a05-8511-e10dcba17e0b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','de7bb0dd59388fe82003ba00911fdfbeef18f2cdb8d7d6fbc67f8e402f455cbf',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 14:30:28','2026-11-06 14:30:28',NULL,NULL,'2026-10-07 13:30:28'),('d375207c-6fe5-4be1-a753-2fb2117b2663','4a9ba8d5-93b6-4b65-af96-934920afcd18','ad2d2dcc6eec3d2bb76177f7532a22bc0107420d4d1616146a48eccb494fc19f',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:32:30','2026-11-02 15:32:30',NULL,NULL,'2026-10-03 14:32:30'),('e13d005b-11b9-4521-ad27-95cc3a2b1e7d','4a9ba8d5-93b6-4b65-af96-934920afcd18','204e4cedeb31c34b6d4f828d89fc5892aad44955df0cbda4d144d081c407ee30',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 15:17:14','2026-11-06 15:17:14',NULL,NULL,'2026-10-07 14:17:14');
+INSERT INTO `sessions` VALUES ('0997562a-0144-448b-a90d-063ffddd8167','ff20dfcf-f843-4cd3-a263-412210683de9','33b8ceaf16748dafd377c91d39e5e15c266ebbe4a0eae2619e2380d490b6fd46',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:00:50','2026-10-31 18:00:50',NULL,NULL,'2026-10-01 16:00:50'),('1198246b-102c-4adf-85b6-a0460cf9b95a','4a9ba8d5-93b6-4b65-af96-934920afcd18','397fb86b977b57e309ee610d0c7967197d58a6b4f8e994cb56be5d01666af187',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:30:23','2026-11-02 15:30:23',NULL,NULL,'2026-10-03 14:30:23'),('2632d7e9-af51-46e5-9b6f-dd62e125af17','4a9ba8d5-93b6-4b65-af96-934920afcd18','a196a7f8508b401cac5197ca1458e65bad8d19eeb0d0af1de05cd57d11e618dc',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 14:46:01','2026-11-02 14:46:01',NULL,NULL,'2026-10-03 13:46:01'),('3881279e-11ea-4f3c-9d76-11927c1c28ac','ff20dfcf-f843-4cd3-a263-412210683de9','24218105a69709b7eab7a7efdfa80417e9ab77cbf3344d0195c182a3eaa784c3',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-02 12:53:24','2026-11-01 12:53:24',NULL,NULL,'2026-10-02 10:53:24'),('3f779800-112f-4a40-b843-f8f03022325d','c0654f0b-8452-4a03-a43d-0d0cda17da1b','62f098acd16856c52d6fbb85725b83492b446893667f97a1f860302b74410753',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 12:36:27','2026-11-02 12:36:27',NULL,NULL,'2026-10-03 11:36:27'),('63ffc6d7-032d-435a-bdcf-6145ecb541c2','ff20dfcf-f843-4cd3-a263-412210683de9','fd54b95fe5fb1f4222c5491124179f80f3389ee8a6d955368df682690f48f1b4',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:20:13','2026-10-31 18:20:13',NULL,NULL,'2026-10-01 16:20:13'),('67e4f923-400e-4655-a67a-7e1bb74bcb24','ff20dfcf-f843-4cd3-a263-412210683de9','04fdd5b13e825690fa60d0de193c51a9d6f6b13e8c9235df9a412cdefc2c2c62',NULL,'Firefox on Windows (Desktop)','unknown',NULL,NULL,'127.0.0.1','Abuja, FCT, Nigeria',0,1,'2026-10-01 18:17:51','2026-10-31 18:17:51',NULL,NULL,'2026-10-01 16:17:51'),('68ef296d-8fc6-4a5f-856d-e983d5357d7e','4a9ba8d5-93b6-4b65-af96-934920afcd18','96ef396045b76fe8c218e4d3d0fdcddba9b997d9f87884a8b0d311c9f746ba32',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:01:42','2026-11-02 15:01:42',NULL,NULL,'2026-10-03 14:01:42'),('9b4fc236-f24e-4127-8259-d7816eeea03f','c0654f0b-8452-4a03-a43d-0d0cda17da1b','11a7d220a8950dc7dcaaf347897b5adc221d8d7ae134d0a27e971e0e67ea7cac',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-08 19:18:35','2026-10-10 22:41:02',NULL,NULL,'2026-10-08 18:18:35'),('b804baca-dfa2-4a05-8511-e10dcba17e0b','c0654f0b-8452-4a03-a43d-0d0cda17da1b','de7bb0dd59388fe82003ba00911fdfbeef18f2cdb8d7d6fbc67f8e402f455cbf',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 14:30:28','2026-11-06 14:30:28',NULL,NULL,'2026-10-07 13:30:28'),('d375207c-6fe5-4be1-a753-2fb2117b2663','4a9ba8d5-93b6-4b65-af96-934920afcd18','ad2d2dcc6eec3d2bb76177f7532a22bc0107420d4d1616146a48eccb494fc19f',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-03 15:32:30','2026-11-02 15:32:30',NULL,NULL,'2026-10-03 14:32:30'),('e13d005b-11b9-4521-ad27-95cc3a2b1e7d','4a9ba8d5-93b6-4b65-af96-934920afcd18','204e4cedeb31c34b6d4f828d89fc5892aad44955df0cbda4d144d081c407ee30',NULL,'Chrome on Windows (Desktop)','unknown',NULL,NULL,'::1','Abuja, FCT, Nigeria',0,1,'2026-10-07 15:17:14','2026-11-06 15:17:14',NULL,NULL,'2026-10-07 14:17:14');
 /*!40000 ALTER TABLE `sessions` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1642,4 +1951,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-09 21:58:43
+-- Dump completed on 2026-10-09 22:41:12

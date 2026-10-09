@@ -328,27 +328,39 @@ export default function AdminIntegrationsConfigurationPage() {
 
 		setSaving(true);
 		try {
-			const payload = {
-				correlation_id_logging: config.correlationIdLogging,
-				dead_letter_queue_enabled: config.deadLetterQueueEnabled,
-				circuit_breaker_enabled: config.circuitBreakerEnabled,
-				schema_validation_required: config.schemaValidationRequired,
-				manual_fallback_required: config.manualFallbackRequired,
-				retry_backoff_seconds: config.retryBackoffSeconds,
-				integrations: config.integrations.map((integration) => ({
+		const formData = new URLSearchParams();
+
+		formData.set("correlation_id_logging", String(config.correlationIdLogging));
+		formData.set("dead_letter_queue_enabled", String(config.deadLetterQueueEnabled));
+		formData.set("circuit_breaker_enabled", String(config.circuitBreakerEnabled));
+		formData.set("schema_validation_required", String(config.schemaValidationRequired));
+		formData.set("manual_fallback_required", String(config.manualFallbackRequired));
+		formData.set("retry_backoff_seconds", String(config.retryBackoffSeconds));
+
+		formData.set(
+			"integrations",
+			JSON.stringify(
+				config.integrations.map((integration) => ({
 					id: integration.id,
 					enabled: integration.enabled,
 					environment: integration.environment,
 					retry_count: integration.retryCount,
 					timeout_seconds: integration.timeoutSeconds,
-				})),
-				credentials: config.credentials,
-			};
+				}))
+			)
+		);
 
-			const res = await http.post(
-				"/admin/config/integrations/update/",
-				payload
-			);
+		formData.set("credentials", JSON.stringify(config.credentials));
+
+		const res = await http.post(
+			"/admin/config/integrations/update/",
+			formData,
+			{
+				headers: {
+					"Content-Type": "application/x-www-form-urlencoded",
+				},
+			}
+		);
 			const resp: Resp = res.data;
 			if (resp.error) {
 				toast.error(

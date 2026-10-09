@@ -37,6 +37,7 @@
     $admin_email = "admin@trinubondedwarehouse.com";
 
     $mfa_key = "8227adcc2200e3bb07c8eb44db8eaf3de06bf261662c889a3a0f2a01963a681b";
+    $INTEGRATION_ENCRYPTION_KEY = 'WANZ2f/letvPdFuHgKDxxfU7Z8oAG2U9UO+8567xY2E=';
 
     $sms_sender = "TRINU";
     $sms_api_token = "u6MNFnajPKvyVj7bW0av21j5D3YuVNcUNEehecKfrRdLWdw71NKnw9Yv5zDD";
