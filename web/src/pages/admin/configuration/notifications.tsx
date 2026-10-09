@@ -836,33 +836,38 @@ export default function AdminNotificationsConfigurationPage() {
           </div>
         </div>
 
-        <div className="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate p-4 text-white shadow-xl">
-          <div>
-            <p className="text-xs font-semibold">
-              {dirty ? "Unsaved changes" : "All changes saved"}
-            </p>
-            <p className="mt-1 text-xs text-white/70">
-              Save to apply your notification configuration.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              disabled={!dirty || saving}
-              onClick={() => void fetchAll()}
-              className="border-sand/25 bg-transparent text-sand hover:bg-sand/10 disabled:opacity-40"
-            >
-              Discard
-            </Button>
-            <Button
-              type="button"
-              disabled={!dirty || saving}
-              onClick={() => void handleSave()}
-              className="bg-orange text-white hover:bg-orange/90"
-            >
-              <Save className="mr-2 size-4" />
-              {saving ? "Saving..." : "Save changes"}
-            </Button>
+        <div className="sticky bottom-4 z-10 rounded-2xl bg-slate p-4 text-sand ring-1 ring-slate shadow-xl">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+                {dirty ? "Unsaved changes" : "All changes saved"}
+              </p>
+              <p className="mt-0.5 text-[12px] leading-5 text-sand/75">
+                {dirty
+                  ? "Save to apply channel, behaviour, alert, and event changes."
+                  : "No pending changes."}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!dirty || saving}
+                onClick={() => void fetchAll()}
+                className="border-sand/25 bg-transparent text-sand hover:bg-sand/10 disabled:opacity-40"
+              >
+                Discard
+              </Button>
+              <Button
+                type="button"
+                onClick={handleSave}
+                disabled={!dirty || saving}
+                className="bg-orange text-white hover:bg-orange-deep disabled:opacity-60"
+              >
+                <Save className="mr-2 size-4" />
+                {saving ? "Saving…" : "Save changes"}
+              </Button>
+            </div>
           </div>
         </div>
       </div>

@@ -1,31 +1,37 @@
-import { useState } from "react";
-import { Link } from "@/components/router-link";
+import { useEffect, useState } from "react";
 import {
 	AlertTriangle,
 	ArrowLeft,
-	Clock,
-	Eye,
+	BellRing,
 	Fingerprint,
 	KeyRound,
+	Laptop,
 	Lock,
 	LockKeyhole,
 	Save,
 	ShieldCheck,
 	UserCheck,
 	UserX,
+	type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "@/components/router-link";
 import { AppShell, StatusBadge } from "@/components/shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { http, type Resp } from "@/lib/httpClient";
 
 interface SecurityConfig {
 	mfaMandatoryForStaff: boolean;
 	mfaEncouragedForTrade: boolean;
+	mfaGracePeriodHours: number;
 	sessionTimeoutMinutes: number;
 	concurrentSessionsAllowed: number;
+	reauthenticationForSensitiveActions: boolean;
+	trustedDevicesEnabled: boolean;
 	breachedPasswordScreening: boolean;
+	minimumPasswordLength: number;
 	progressiveLockoutEnabled: boolean;
 	lockoutThreshold: number;
 	lockoutDurationMinutes: number;
@@ -33,16 +39,23 @@ interface SecurityConfig {
 	regulatorReadOnlyAccess: boolean;
 	regulatorAccessDurationHours: number;
 	auditAllAuthEvents: boolean;
-	deviceListEnabled: boolean;
+	securityAlertsEnabled: boolean;
+	alertOnPrivilegeChanges: boolean;
+	alertOnRepeatedLoginFailures: boolean;
+	deviceManagementEnabled: boolean;
 	remoteSignOutEnabled: boolean;
 }
 
-const initialConfig: SecurityConfig = {
+const emptyConfig: SecurityConfig = {
 	mfaMandatoryForStaff: true,
 	mfaEncouragedForTrade: true,
+	mfaGracePeriodHours: 24,
 	sessionTimeoutMinutes: 30,
 	concurrentSessionsAllowed: 3,
+	reauthenticationForSensitiveActions: true,
+	trustedDevicesEnabled: false,
 	breachedPasswordScreening: true,
+	minimumPasswordLength: 12,
 	progressiveLockoutEnabled: true,
 	lockoutThreshold: 5,
 	lockoutDurationMinutes: 30,
@@ -50,419 +63,814 @@ const initialConfig: SecurityConfig = {
 	regulatorReadOnlyAccess: false,
 	regulatorAccessDurationHours: 24,
 	auditAllAuthEvents: true,
-	deviceListEnabled: true,
+	securityAlertsEnabled: true,
+	alertOnPrivilegeChanges: true,
+	alertOnRepeatedLoginFailures: true,
+	deviceManagementEnabled: true,
 	remoteSignOutEnabled: true,
 };
 
-export default function AdminSecurityConfigurationPage() {
-	const [config, setConfig] = useState<SecurityConfig>(initialConfig);
-	const [dirty, setDirty] = useState(false);
+function Toggle({
+	checked,
+	onChange,
+	label,
+}: {
+	checked: boolean;
+	onChange: (checked: boolean) => void;
+	label: string;
+}) {
+	return (
+		<button
+			type="button"
+			role="switch"
+			aria-checked={checked}
+			aria-label={label}
+			onClick={() => onChange(!checked)}
+			className={cn(
+				"relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange focus-visible:ring-offset-2",
+				checked ? "bg-orange" : "bg-sand-2"
+			)}
+		>
+			<span
+				className={cn(
+					"size-5 rounded-full bg-white shadow-sm transition-transform",
+					checked ? "translate-x-5" : "translate-x-0.5"
+				)}
+			/>
+		</button>
+	);
+}
 
-	const markDirty = () => setDirty(true);
+function SettingRow({
+	icon: Icon,
+	label,
+	description,
+	checked,
+	onChange,
+}: {
+	icon: LucideIcon;
+	label: string;
+	description: string;
+	checked: boolean;
+	onChange: (checked: boolean) => void;
+}) {
+	return (
+		<div className="flex flex-wrap items-center justify-between gap-4 border-b border-line py-4 last:border-b-0">
+			<div className="flex min-w-0 flex-1 items-start gap-3">
+				<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
+					<Icon className="size-4" />
+				</div>
+				<div className="min-w-0">
+					<p className="text-sm font-semibold text-ink">{label}</p>
+					<p className="mt-1 text-xs leading-5 text-ink-soft">
+						{description}
+					</p>
+				</div>
+			</div>
+			<Toggle checked={checked} onChange={onChange} label={label} />
+		</div>
+	);
+}
+
+function NumberField({
+	label,
+	description,
+	value,
+	min,
+	max,
+	unit,
+	onChange,
+}: {
+	label: string;
+	description?: string;
+	value: number;
+	min: number;
+	max: number;
+	unit: string;
+	onChange: (value: number) => void;
+}) {
+	return (
+		<label className="block min-w-0">
+			<span className="text-sm font-medium text-ink">{label}</span>
+			{description && (
+				<span className="mt-1 block text-xs leading-5 text-ink-soft">
+					{description}
+				</span>
+			)}
+			<div className="mt-2 flex items-center gap-2">
+				<Input
+					type="number"
+					min={min}
+					max={max}
+					value={String(value)}
+					onChange={(event) => {
+						const raw = event.target.value;
+						onChange(raw === "" ? 0 : Number(raw));
+					}}
+					className="h-10 w-full max-w-36 border-line bg-sand font-mono text-sm text-ink"
+				/>
+				<span className="text-xs text-ink-soft">{unit}</span>
+			</div>
+			<span className="mt-1 block text-[10px] text-ink-soft">
+				Allowed: {min}–{max}
+			</span>
+		</label>
+	);
+}
+
+export default function AdminSecurityConfigurationPage() {
+	const [config, setConfig] = useState<SecurityConfig>(emptyConfig);
+	const [savedConfig, setSavedConfig] =
+		useState<SecurityConfig>(emptyConfig);
+	const [dirty, setDirty] = useState(false);
+	const [loading, setLoading] = useState(true);
+	const [saving, setSaving] = useState(false);
+	const [error, setError] = useState("");
+
+	const fetchAll = async () => {
+		setLoading(true);
+		setError("");
+		try {
+			const res = await http.get("/admin/config/security/");
+			const resp: Resp = res.data;
+			if (resp.error) {
+				setError(resp.data || "Could not load security configuration.");
+				return;
+			}
+			const payload: any = resp.code ?? {};
+
+			const loaded: SecurityConfig = {
+				mfaMandatoryForStaff: Boolean(
+					payload.mfa_mandatory_for_staff ??
+						payload.mfaMandatoryForStaff ??
+						true
+				),
+				mfaEncouragedForTrade: Boolean(
+					payload.mfa_encouraged_for_trade ??
+						payload.mfaEncouragedForTrade ??
+						true
+				),
+				mfaGracePeriodHours: Number(
+					payload.mfa_grace_period_hours ??
+						payload.mfaGracePeriodHours ??
+						24
+				),
+				sessionTimeoutMinutes: Number(
+					payload.session_timeout_minutes ??
+						payload.sessionTimeoutMinutes ??
+						30
+				),
+				concurrentSessionsAllowed: Number(
+					payload.concurrent_sessions_allowed ??
+						payload.concurrentSessionsAllowed ??
+						3
+				),
+				reauthenticationForSensitiveActions: Boolean(
+					payload.reauthentication_for_sensitive_actions ??
+						payload.reauthenticationForSensitiveActions ??
+						true
+				),
+				trustedDevicesEnabled: Boolean(
+					payload.trusted_devices_enabled ??
+						payload.trustedDevicesEnabled ??
+						false
+				),
+				breachedPasswordScreening: Boolean(
+					payload.breached_password_screening ??
+						payload.breachedPasswordScreening ??
+						true
+				),
+				minimumPasswordLength: Number(
+					payload.minimum_password_length ??
+						payload.minimumPasswordLength ??
+						12
+				),
+				progressiveLockoutEnabled: Boolean(
+					payload.progressive_lockout_enabled ??
+						payload.progressiveLockoutEnabled ??
+						true
+				),
+				lockoutThreshold: Number(
+					payload.lockout_threshold ?? payload.lockoutThreshold ?? 5
+				),
+				lockoutDurationMinutes: Number(
+					payload.lockout_duration_minutes ??
+						payload.lockoutDurationMinutes ??
+						30
+				),
+				breakGlassRequiresDualApproval: Boolean(
+					payload.break_glass_requires_dual_approval ??
+						payload.breakGlassRequiresDualApproval ??
+						true
+				),
+				regulatorReadOnlyAccess: Boolean(
+					payload.regulator_read_only_access ??
+						payload.regulatorReadOnlyAccess ??
+						false
+				),
+				regulatorAccessDurationHours: Number(
+					payload.regulator_access_duration_hours ??
+						payload.regulatorAccessDurationHours ??
+						24
+				),
+				auditAllAuthEvents: Boolean(
+					payload.audit_all_auth_events ??
+						payload.auditAllAuthEvents ??
+						true
+				),
+				securityAlertsEnabled: Boolean(
+					payload.security_alerts_enabled ??
+						payload.securityAlertsEnabled ??
+						true
+				),
+				alertOnPrivilegeChanges: Boolean(
+					payload.alert_on_privilege_changes ??
+						payload.alertOnPrivilegeChanges ??
+						true
+				),
+				alertOnRepeatedLoginFailures: Boolean(
+					payload.alert_on_repeated_login_failures ??
+						payload.alertOnRepeatedLoginFailures ??
+						true
+				),
+				deviceManagementEnabled: Boolean(
+					payload.device_management_enabled ??
+						payload.deviceManagementEnabled ??
+						true
+				),
+				remoteSignOutEnabled: Boolean(
+					payload.remote_sign_out_enabled ??
+						payload.remoteSignOutEnabled ??
+						true
+				),
+			};
+
+			setConfig(loaded);
+			setSavedConfig(loaded);
+			setDirty(false);
+		} catch (err: any) {
+			setError(
+				err?.response?.data?.message ||
+					"Could not load security configuration."
+			);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	useEffect(() => {
+		void fetchAll();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const update = <K extends keyof SecurityConfig>(
 		key: K,
 		value: SecurityConfig[K]
 	) => {
-		setConfig((prev) => ({ ...prev, [key]: value }));
-		markDirty();
+		setConfig((current) => ({ ...current, [key]: value }));
+		setDirty(true);
 	};
 
-	const handleSave = () => {
-		if (config.sessionTimeoutMinutes < 5) {
-			toast.error("Session timeout must be at least 5 minutes.");
-			return;
+	const validate = () => {
+		const numberRules: {
+			key: keyof SecurityConfig;
+			label: string;
+			min: number;
+			max: number;
+		}[] = [
+			{
+				key: "mfaGracePeriodHours",
+				label: "MFA grace period",
+				min: 0,
+				max: 720,
+			},
+			{
+				key: "sessionTimeoutMinutes",
+				label: "Session timeout",
+				min: 5,
+				max: 480,
+			},
+			{
+				key: "concurrentSessionsAllowed",
+				label: "Concurrent sessions",
+				min: 1,
+				max: 20,
+			},
+			{
+				key: "minimumPasswordLength",
+				label: "Minimum password length",
+				min: 12,
+				max: 128,
+			},
+			{
+				key: "lockoutThreshold",
+				label: "Lockout threshold",
+				min: 1,
+				max: 20,
+			},
+			{
+				key: "lockoutDurationMinutes",
+				label: "Lockout duration",
+				min: 1,
+				max: 1440,
+			},
+			{
+				key: "regulatorAccessDurationHours",
+				label: "Regulator access duration",
+				min: 1,
+				max: 168,
+			},
+		];
+
+		for (const rule of numberRules) {
+			const value = config[rule.key];
+			if (
+				typeof value !== "number" ||
+				!Number.isFinite(value) ||
+				value < rule.min ||
+				value > rule.max
+			) {
+				toast.error(
+					`${rule.label} must be between ${rule.min} and ${rule.max}.`
+				);
+				return false;
+			}
 		}
-		if (config.lockoutThreshold < 1) {
-			toast.error("Lockout threshold must be at least 1.");
-			return;
-		}
-		if (
-			config.regulatorReadOnlyAccess &&
-			config.regulatorAccessDurationHours < 1
-		) {
-			toast.error(
-				"Regulator read-only access requires a positive duration in hours."
+		return true;
+	};
+
+	const handleSave = async () => {
+		if (!dirty || saving) return;
+		if (!validate()) return;
+
+		setSaving(true);
+		try {
+			const payload = {
+				mfa_mandatory_for_staff: config.mfaMandatoryForStaff,
+				mfa_encouraged_for_trade: config.mfaEncouragedForTrade,
+				mfa_grace_period_hours: config.mfaGracePeriodHours,
+				session_timeout_minutes: config.sessionTimeoutMinutes,
+				concurrent_sessions_allowed: config.concurrentSessionsAllowed,
+				reauthentication_for_sensitive_actions:
+					config.reauthenticationForSensitiveActions,
+				trusted_devices_enabled: config.trustedDevicesEnabled,
+				breached_password_screening: config.breachedPasswordScreening,
+				minimum_password_length: config.minimumPasswordLength,
+				progressive_lockout_enabled: config.progressiveLockoutEnabled,
+				lockout_threshold: config.lockoutThreshold,
+				lockout_duration_minutes: config.lockoutDurationMinutes,
+				break_glass_requires_dual_approval:
+					config.breakGlassRequiresDualApproval,
+				regulator_read_only_access: config.regulatorReadOnlyAccess,
+				regulator_access_duration_hours:
+					config.regulatorAccessDurationHours,
+				audit_all_auth_events: config.auditAllAuthEvents,
+				security_alerts_enabled: config.securityAlertsEnabled,
+				alert_on_privilege_changes: config.alertOnPrivilegeChanges,
+				alert_on_repeated_login_failures:
+					config.alertOnRepeatedLoginFailures,
+				device_management_enabled: config.deviceManagementEnabled,
+				remote_sign_out_enabled: config.remoteSignOutEnabled,
+			};
+
+			const res = await http.post(
+				"/admin/config/security/update/",
+				payload
 			);
-			return;
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(
+					resp.data || "Could not save the security configuration."
+				);
+				return;
+			}
+			toast.success("Security configuration saved. Change logged.");
+			await fetchAll();
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message ||
+					"Could not save the security configuration."
+			);
+		} finally {
+			setSaving(false);
 		}
-		toast.success("Security configuration saved. Change logged.");
-		setDirty(false);
 	};
 
-	const handleDiscard = () => {
-		setConfig(initialConfig);
-		setDirty(false);
+	const handleDiscard = async () => {
+		await fetchAll();
 		toast.message("Changes discarded.");
 	};
+
+	if (loading) {
+		return (
+			<AppShell
+				title="Access & Security"
+				eyebrow="Administration · Configuration"
+			>
+				<div className="flex items-center justify-center rounded-2xl bg-paper p-10 ring-1 ring-line">
+					<span className="size-6 animate-spin rounded-full border-2 border-orange/25 border-t-orange" />
+				</div>
+			</AppShell>
+		);
+	}
+
+	if (error) {
+		return (
+			<AppShell
+				title="Access & Security"
+				eyebrow="Administration · Configuration"
+			>
+				<div className="rounded-2xl bg-paper p-6 ring-1 ring-line sm:p-8">
+					<div className="flex items-start gap-3">
+						<div className="grid size-10 shrink-0 place-items-center rounded-md bg-carmine text-white">
+							<AlertTriangle className="size-5" />
+						</div>
+						<div>
+							<p className="font-display text-base font-bold text-ink">
+								Could not load security configuration
+							</p>
+							<p className="mt-1 text-sm leading-6 text-ink-soft">{error}</p>
+						</div>
+					</div>
+					<div className="mt-5">
+						<Button
+							onClick={() => void fetchAll()}
+							className="bg-orange text-white hover:bg-orange-deep"
+						>
+							Try again
+						</Button>
+					</div>
+				</div>
+			</AppShell>
+		);
+	}
 
 	return (
 		<AppShell
 			title="Access & Security"
 			eyebrow="Administration · Configuration"
 		>
-			<div className="flex flex-wrap items-end justify-between gap-4">
-				<div className="min-w-0">
-					<Link
-						to="/admin/configuration"
-						className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft hover:text-orange"
-					>
-						<ArrowLeft className="size-3.5" />
-						Back to configuration
-					</Link>
-					<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-						Access &amp; Security
-					</h2>
-					<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-						Configure authentication controls, session behaviour, lockout
-						policy, and administrative access. Every authentication,
-						authorisation, and delegation event is logged.
-					</p>
-				</div>
-
-				<div className="flex flex-wrap items-center gap-2">
-					{dirty && <StatusBadge label="Unsaved changes" tone="warning" />}
-					<Button
-						type="button"
-						variant="outline"
-						onClick={handleDiscard}
-						disabled={!dirty}
-						className="border-line bg-paper text-ink hover:bg-sand disabled:opacity-60"
-					>
-						Discard
-					</Button>
-					<Button
-						type="button"
-						onClick={handleSave}
-						disabled={!dirty}
-						className="bg-orange text-white hover:bg-orange-deep disabled:opacity-60"
-					>
-						<Save className="size-4" />
-						Save changes
-					</Button>
-				</div>
-			</div>
-
-			<div className="rounded-xl bg-paper p-5 ring-1 ring-line">
-				<div className="flex flex-wrap items-start gap-3">
-					<div className="grid size-10 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-						<ShieldCheck className="size-5" />
-					</div>
+			<div className="space-y-6 pb-8">
+				<div className="flex flex-wrap items-end justify-between gap-4">
 					<div className="min-w-0">
-						<p className="text-sm font-semibold text-ink">
-							Security &amp; privacy by design
-						</p>
-						<p className="mt-1 text-xs leading-5 text-ink-soft">
-							Least privilege, MFA for staff, encrypted secrets, and full
-							auditability of every authentication and authorisation decision.
-							Administrative interfaces are protected by network policy and
-							MFA; break-glass access requires dual approval and alerts.
+						<Link
+							to="/admin/configuration"
+							className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft hover:text-orange"
+						>
+							<ArrowLeft className="size-3.5" />
+							Back to configuration
+						</Link>
+
+						<h2 className="mt-2 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+							Access &amp; Security
+						</h2>
+
+						<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+							Configure authentication policies, session protection,
+							administrator access and security monitoring. Every change
+							is logged.
 						</p>
 					</div>
-				</div>
-			</div>
 
-			<section className="rounded-2xl bg-paper ring-1 ring-line">
-				<div className="border-b border-line p-5">
-					<h3 className="font-display text-sm font-bold text-ink">
-						Multi-Factor Authentication
-					</h3>
-					<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-						Controls who must enrol in MFA and who is strongly encouraged.
-					</p>
+					<div className="flex flex-wrap items-center gap-2">
+						{dirty && (
+							<StatusBadge label="Unsaved changes" tone="warning" />
+						)}
+					</div>
 				</div>
-				<ul className="divide-y divide-line">
-					<RuleRow
+
+				<section className="rounded-2xl bg-paper p-5 ring-1 ring-line">
+					<div className="mb-2">
+						<h3 className="font-display text-sm font-bold text-ink">
+							Multi-factor authentication
+						</h3>
+						<p className="mt-1 text-xs leading-5 text-ink-soft">
+							Control MFA requirements for internal staff and external
+							trade users.
+						</p>
+					</div>
+
+					<SettingRow
 						icon={Fingerprint}
 						label="MFA mandatory for staff"
-						desc="Enforce two-factor authentication for all internal roles. No exceptions."
-						on={config.mfaMandatoryForStaff}
-						onToggle={() =>
-							update("mfaMandatoryForStaff", !config.mfaMandatoryForStaff)
-						}
+						description="Require additional verification for internal accounts."
+						checked={config.mfaMandatoryForStaff}
+						onChange={(value) => update("mfaMandatoryForStaff", value)}
 					/>
-					<RuleRow
+					<SettingRow
 						icon={Fingerprint}
-						label="MFA strongly encouraged for trade users"
-						desc="Prompt importers, agents, and transporters to enrol but do not block."
-						on={config.mfaEncouragedForTrade}
-						onToggle={() =>
-							update("mfaEncouragedForTrade", !config.mfaEncouragedForTrade)
-						}
+						label="MFA encouraged for trade users"
+						description="Encourage importers, agents and transporters to enrol."
+						checked={config.mfaEncouragedForTrade}
+						onChange={(value) => update("mfaEncouragedForTrade", value)}
 					/>
-				</ul>
-			</section>
 
-			<section className="rounded-2xl bg-paper ring-1 ring-line">
-				<div className="border-b border-line p-5">
-					<h3 className="font-display text-sm font-bold text-ink">
-						Session Controls
-					</h3>
-					<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-						Idle timeout, concurrent session limits, and remote sign-out
-						capabilities.
-					</p>
-				</div>
-				<div className="grid gap-4 p-5 sm:grid-cols-2">
-					<NumberField
-						label="Session timeout"
-						icon={Clock}
-						unit="minutes idle"
-						value={config.sessionTimeoutMinutes}
-						onChange={(v) => update("sessionTimeoutMinutes", v)}
-					/>
-					<NumberField
-						label="Concurrent sessions"
-						icon={UserCheck}
-						unit="max per account"
-						value={config.concurrentSessionsAllowed}
-						onChange={(v) => update("concurrentSessionsAllowed", v)}
-					/>
-				</div>
-				<ul className="divide-y divide-line border-t border-line">
-					<RuleRow
-						icon={Eye}
-						label="Device list"
-						desc="Show active sessions and devices per user account."
-						on={config.deviceListEnabled}
-						onToggle={() =>
-							update("deviceListEnabled", !config.deviceListEnabled)
-						}
-					/>
-					<RuleRow
-						icon={UserX}
-						label="Remote sign-out"
-						desc="Allow users and admins to terminate other sessions."
-						on={config.remoteSignOutEnabled}
-						onToggle={() =>
-							update("remoteSignOutEnabled", !config.remoteSignOutEnabled)
-						}
-					/>
-				</ul>
-			</section>
-
-			<section className="rounded-2xl bg-paper ring-1 ring-line">
-				<div className="border-b border-line p-5">
-					<h3 className="font-display text-sm font-bold text-ink">
-						Password Policy
-					</h3>
-					<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-						Screening and lockout behaviour for failed authentication attempts.
-					</p>
-				</div>
-				<ul className="divide-y divide-line">
-					<RuleRow
-						icon={KeyRound}
-						label="Breached-password screening"
-						desc="Reject passwords found in known breach corpora at set and change time."
-						on={config.breachedPasswordScreening}
-						onToggle={() =>
-							update(
-								"breachedPasswordScreening",
-								!config.breachedPasswordScreening
-							)
-						}
-					/>
-					<RuleRow
-						icon={Lock}
-						label="Progressive lockout on failed attempts"
-						desc="Temporarily lock accounts after repeated failed sign-in attempts."
-						on={config.progressiveLockoutEnabled}
-						onToggle={() =>
-							update(
-								"progressiveLockoutEnabled",
-								!config.progressiveLockoutEnabled
-							)
-						}
-					/>
-					{config.progressiveLockoutEnabled && (
-						<div className="grid gap-4 px-5 py-4 sm:grid-cols-2">
+					{config.mfaMandatoryForStaff && (
+						<div className="mt-4 border-t border-line pt-4">
 							<NumberField
-								label="Lockout threshold"
-								icon={AlertTriangle}
-								unit="failed attempts"
-								value={config.lockoutThreshold}
-								onChange={(v) => update("lockoutThreshold", v)}
-							/>
-							<NumberField
-								label="Lockout duration"
-								icon={Clock}
-								unit="minutes"
-								value={config.lockoutDurationMinutes}
-								onChange={(v) => update("lockoutDurationMinutes", v)}
-							/>
-						</div>
-					)}
-				</ul>
-			</section>
-
-			<section className="rounded-2xl bg-paper ring-1 ring-line">
-				<div className="border-b border-line p-5">
-					<h3 className="font-display text-sm font-bold text-ink">
-						Administrative Access
-					</h3>
-					<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-						Privileged access controls for administrative and regulatory
-						read-only access.
-					</p>
-				</div>
-				<ul className="divide-y divide-line">
-					<RuleRow
-						icon={LockKeyhole}
-						label="Break-glass access requires dual approval"
-						desc="Emergency admin access requires a second approver and triggers an alert."
-						on={config.breakGlassRequiresDualApproval}
-						onToggle={() =>
-							update(
-								"breakGlassRequiresDualApproval",
-								!config.breakGlassRequiresDualApproval
-							)
-						}
-					/>
-					<RuleRow
-						icon={ShieldCheck}
-						label="Regulator / auditor read-only access"
-						desc="Permit time-boxed read-only access on request. Every access is logged."
-						on={config.regulatorReadOnlyAccess}
-						onToggle={() =>
-							update(
-								"regulatorReadOnlyAccess",
-								!config.regulatorReadOnlyAccess
-							)
-						}
-					/>
-					{config.regulatorReadOnlyAccess && (
-						<div className="px-5 py-4">
-							<NumberField
-								label="Default access duration"
-								icon={Clock}
+								label="MFA enrolment grace period"
+								description="Time allowed for existing staff accounts to enrol."
+								value={config.mfaGracePeriodHours}
+								min={0}
+								max={720}
 								unit="hours"
-								value={config.regulatorAccessDurationHours}
-								onChange={(v) =>
-									update("regulatorAccessDurationHours", v)
+								onChange={(value) =>
+									update("mfaGracePeriodHours", value)
 								}
 							/>
 						</div>
 					)}
-				</ul>
-			</section>
+				</section>
 
-			<section className="rounded-2xl bg-paper ring-1 ring-line">
-				<div className="border-b border-line p-5">
-					<h3 className="font-display text-sm font-bold text-ink">
-						Audit
-					</h3>
-					<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-						Which authentication and authorisation events are written to the
-						audit log.
-					</p>
-				</div>
-				<ul className="divide-y divide-line">
-					<RuleRow
-						icon={ShieldCheck}
-						label="Log all authentication and authorisation events"
-						desc="Sign-in, sign-out, MFA challenges, delegation changes, and permission decisions."
-						on={config.auditAllAuthEvents}
-						onToggle={() =>
-							update("auditAllAuthEvents", !config.auditAllAuthEvents)
+				<section className="rounded-2xl bg-paper p-5 ring-1 ring-line">
+					<div className="mb-2">
+						<h3 className="font-display text-sm font-bold text-ink">
+							Session controls
+						</h3>
+						<p className="mt-1 text-xs leading-5 text-ink-soft">
+							Limit session exposure and provide account holders with
+							control over active sessions.
+						</p>
+					</div>
+
+					<div className="grid gap-5 border-b border-line py-4 sm:grid-cols-2">
+						<NumberField
+							label="Idle session timeout"
+							description="Automatically expire inactive sessions."
+							value={config.sessionTimeoutMinutes}
+							min={5}
+							max={480}
+							unit="minutes"
+							onChange={(value) =>
+								update("sessionTimeoutMinutes", value)
+							}
+						/>
+						<NumberField
+							label="Concurrent sessions"
+							description="Maximum active sessions per account."
+							value={config.concurrentSessionsAllowed}
+							min={1}
+							max={20}
+							unit="sessions"
+							onChange={(value) =>
+								update("concurrentSessionsAllowed", value)
+							}
+						/>
+					</div>
+
+					<SettingRow
+						icon={LockKeyhole}
+						label="Re-authentication for sensitive actions"
+						description="Require recent verification before sensitive administrative or financial actions."
+						checked={config.reauthenticationForSensitiveActions}
+						onChange={(value) =>
+							update("reauthenticationForSensitiveActions", value)
 						}
 					/>
-				</ul>
-			</section>
+					<SettingRow
+						icon={Laptop}
+						label="Trusted devices"
+						description="Allow device-trust with expiry and revocation controls."
+						checked={config.trustedDevicesEnabled}
+						onChange={(value) => update("trustedDevicesEnabled", value)}
+					/>
+					<SettingRow
+						icon={UserCheck}
+						label="Device and session management"
+						description="Provide an interface for reviewing active devices and sessions."
+						checked={config.deviceManagementEnabled}
+						onChange={(value) => update("deviceManagementEnabled", value)}
+					/>
+					<SettingRow
+						icon={UserX}
+						label="Remote sign-out"
+						description="Allow users or authorised administrators to revoke sessions."
+						checked={config.remoteSignOutEnabled}
+						onChange={(value) => update("remoteSignOutEnabled", value)}
+					/>
+				</section>
 
-			<div className="rounded-2xl bg-paper p-5 ring-1 ring-line">
-				<div className="flex flex-wrap items-start gap-3">
-					<AlertTriangle className="mt-0.5 size-4 shrink-0 text-orange-deep" />
-					<div className="min-w-0">
-						<p className="text-[13px] font-semibold text-ink">
-							Access policy changes take effect immediately
+				<section className="rounded-2xl bg-paper p-5 ring-1 ring-line">
+					<div className="mb-2">
+						<h3 className="font-display text-sm font-bold text-ink">
+							Password and login protection
+						</h3>
+						<p className="mt-1 text-xs leading-5 text-ink-soft">
+							Set password requirements and protections against repeated
+							failed login attempts.
 						</p>
-						<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-							Tightening a policy (e.g. enabling mandatory MFA) applies to the
-							next sign-in; loosening a policy does not retroactively restore
-							sessions already terminated. Break-glass and regulator access are
-							always logged with actor, purpose, and duration. Role definitions
-							and permission assignments live on the user and role
-							administration screens.
+					</div>
+
+					<div className="border-b border-line py-4">
+						<NumberField
+							label="Minimum password length"
+							description="Use a longer passphrase-friendly minimum for account passwords."
+							value={config.minimumPasswordLength}
+							min={12}
+							max={128}
+							unit="characters"
+							onChange={(value) =>
+								update("minimumPasswordLength", value)
+							}
+						/>
+					</div>
+
+					<SettingRow
+						icon={KeyRound}
+						label="Breached-password screening"
+						description="Reject known compromised passwords when users set or change passwords."
+						checked={config.breachedPasswordScreening}
+						onChange={(value) =>
+							update("breachedPasswordScreening", value)
+						}
+					/>
+					<SettingRow
+						icon={Lock}
+						label="Progressive account lockout"
+						description="Temporarily restrict sign-in after repeated failed attempts."
+						checked={config.progressiveLockoutEnabled}
+						onChange={(value) =>
+							update("progressiveLockoutEnabled", value)
+						}
+					/>
+
+					{config.progressiveLockoutEnabled && (
+						<div className="grid gap-5 border-t border-line pt-5 sm:grid-cols-2">
+							<NumberField
+								label="Failed attempt threshold"
+								value={config.lockoutThreshold}
+								min={1}
+								max={20}
+								unit="attempts"
+								onChange={(value) =>
+									update("lockoutThreshold", value)
+								}
+							/>
+							<NumberField
+								label="Lockout duration"
+								value={config.lockoutDurationMinutes}
+								min={1}
+								max={1440}
+								unit="minutes"
+								onChange={(value) =>
+									update("lockoutDurationMinutes", value)
+								}
+							/>
+						</div>
+					)}
+				</section>
+
+				<section className="rounded-2xl bg-paper p-5 ring-1 ring-line">
+					<div className="mb-2">
+						<h3 className="font-display text-sm font-bold text-ink">
+							Privileged and regulatory access
+						</h3>
+						<p className="mt-1 text-xs leading-5 text-ink-soft">
+							Protect emergency administration and any temporary auditor
+							or regulator access.
 						</p>
+					</div>
+
+					<SettingRow
+						icon={LockKeyhole}
+						label="Dual approval for emergency access"
+						description="Require a second authorised approver for emergency privileged access."
+						checked={config.breakGlassRequiresDualApproval}
+						onChange={(value) =>
+							update("breakGlassRequiresDualApproval", value)
+						}
+					/>
+					<SettingRow
+						icon={ShieldCheck}
+						label="Regulator / auditor read-only access"
+						description="Enable time-limited, read-only access on request."
+						checked={config.regulatorReadOnlyAccess}
+						onChange={(value) =>
+							update("regulatorReadOnlyAccess", value)
+						}
+					/>
+
+					{config.regulatorReadOnlyAccess && (
+						<div className="mt-4 border-t border-line pt-4">
+							<NumberField
+								label="Default access duration"
+								description="Maximum default duration for a temporary access grant."
+								value={config.regulatorAccessDurationHours}
+								min={1}
+								max={168}
+								unit="hours"
+								onChange={(value) =>
+									update("regulatorAccessDurationHours", value)
+								}
+							/>
+						</div>
+					)}
+				</section>
+
+				<section className="rounded-2xl bg-paper p-5 ring-1 ring-line">
+					<div className="mb-2">
+						<h3 className="font-display text-sm font-bold text-ink">
+							Audit and security alerts
+						</h3>
+						<p className="mt-1 text-xs leading-5 text-ink-soft">
+							Configure which security events should be recorded or
+							surfaced for review.
+						</p>
+					</div>
+
+					<SettingRow
+						icon={ShieldCheck}
+						label="Authentication and authorisation audit"
+						description="Record sign-ins, sign-outs, MFA events, access denials and permission changes."
+						checked={config.auditAllAuthEvents}
+						onChange={(value) => update("auditAllAuthEvents", value)}
+					/>
+					<SettingRow
+						icon={BellRing}
+						label="Security alerts"
+						description="Route security alerts to authorised staff."
+						checked={config.securityAlertsEnabled}
+						onChange={(value) =>
+							update("securityAlertsEnabled", value)
+						}
+					/>
+
+					{config.securityAlertsEnabled && (
+						<div className="border-t border-line pt-2">
+							<SettingRow
+								icon={UserCheck}
+								label="Alert on privilege changes"
+								description="Surface changes to roles, permissions and privileged accounts."
+								checked={config.alertOnPrivilegeChanges}
+								onChange={(value) =>
+									update("alertOnPrivilegeChanges", value)
+								}
+							/>
+							<SettingRow
+								icon={AlertTriangle}
+								label="Alert on repeated login failures"
+								description="Surface repeated authentication failures for security review."
+								checked={config.alertOnRepeatedLoginFailures}
+								onChange={(value) =>
+									update("alertOnRepeatedLoginFailures", value)
+								}
+							/>
+						</div>
+					)}
+				</section>
+
+				<div className="rounded-xl border border-line bg-paper p-4">
+					<div className="flex items-start gap-3">
+						<AlertTriangle className="mt-0.5 size-5 shrink-0 text-orange-deep" />
+						<div>
+							<p className="text-sm font-semibold text-ink">
+								Backend enforcement is required
+							</p>
+							<p className="mt-1 text-xs leading-5 text-ink-soft">
+								MFA, password rules, session expiry, lockout, permissions,
+								dual approval, security alerts and regulator access are all
+								enforced server-side. Frontend controls alone do not
+								provide security.
+							</p>
+						</div>
+					</div>
+				</div>
+
+				<div className="sticky bottom-4 z-10 rounded-2xl bg-slate p-4 text-sand ring-1 ring-slate shadow-xl">
+					<div className="flex flex-wrap items-center justify-between gap-3">
+						<div className="min-w-0">
+							<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+								{dirty ? "Unsaved changes" : "All changes saved"}
+							</p>
+							<p className="mt-0.5 text-[12px] leading-5 text-sand/75">
+								{dirty
+									? "Save to apply authentication, session, and access changes."
+									: "No pending changes."}
+							</p>
+						</div>
+						<div className="flex flex-wrap items-center gap-2">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={handleDiscard}
+								disabled={!dirty || saving}
+								className="border-sand/25 bg-transparent text-sand hover:bg-sand/10 disabled:opacity-40"
+							>
+								Discard
+							</Button>
+							<Button
+								type="button"
+								onClick={handleSave}
+								disabled={!dirty || saving}
+								className="bg-orange text-white hover:bg-orange-deep disabled:opacity-60"
+							>
+								<Save className="mr-2 size-4" />
+								{saving ? "Saving…" : "Save changes"}
+							</Button>
+						</div>
 					</div>
 				</div>
 			</div>
 		</AppShell>
-	);
-}
-
-function NumberField({
-	label,
-	icon: Icon,
-	unit,
-	value,
-	onChange,
-}: {
-	label: string;
-	icon: typeof Clock;
-	unit: string;
-	value: number;
-	onChange: (value: number) => void;
-}) {
-	return (
-		<label className="block">
-			<span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-				<Icon className="size-3.5 text-orange" />
-				{label}
-			</span>
-			<div className="mt-1.5 flex items-center gap-2">
-				<Input
-					value={String(value)}
-					onChange={(e) => onChange(Number(e.target.value) || 0)}
-					className="h-11 w-40 border-line bg-sand font-mono text-sm text-ink"
-				/>
-				<span className="font-mono text-[11px] text-ink-soft">{unit}</span>
-			</div>
-		</label>
-	);
-}
-
-function RuleRow({
-	icon: Icon,
-	label,
-	desc,
-	on,
-	onToggle,
-}: {
-	icon: typeof ShieldCheck;
-	label: string;
-	desc: string;
-	on: boolean;
-	onToggle: () => void;
-}) {
-	return (
-		<li className="flex flex-wrap items-start justify-between gap-4 p-5">
-			<div className="flex min-w-[240px] flex-1 items-start gap-3">
-				<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-					<Icon className="size-4" />
-				</div>
-				<div className="min-w-0">
-					<p className="text-[13px] font-semibold text-ink">{label}</p>
-					<p className="mt-0.5 text-[11px] leading-5 text-ink-soft">{desc}</p>
-				</div>
-			</div>
-			<button
-				type="button"
-				onClick={onToggle}
-				aria-pressed={on}
-				className={cn(
-					"inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors",
-					on ? "bg-orange" : "bg-sand-2"
-				)}
-			>
-				<span
-					className={cn(
-						"size-5 rounded-full bg-white shadow-sm transition-transform",
-						on ? "translate-x-5" : "translate-x-0.5"
-					)}
-				/>
-			</button>
-		</li>
 	);
 }

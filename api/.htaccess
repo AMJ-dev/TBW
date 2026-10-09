@@ -79,7 +79,15 @@ RewriteRule ^admin/config/documents/update/$ src/admin-config/update-documents.p
 RewriteRule ^admin/config/notifications/$ src/admin-config/notifications.php [NC]
 RewriteRule ^admin/config/notifications/update/$ src/admin-config/update-notifications.php [NC]
 
-# 
+RewriteRule ^admin/config/maintenance/$ src/admin-config/maintenance.php [NC]
+RewriteRule ^admin/config/maintenance/update/$ src/admin-config/update-maintenance.php [NC]
+RewriteRule ^admin/config/integrations/$ src/admin-config/integrations.php [NC]
+RewriteRule ^admin/config/integrations/update/$ src/admin-config/update-integrations.php [NC]
+RewriteRule ^admin/config/security/$ src/admin-config/security.php [NC]
+RewriteRule ^admin/config/security/update/$ src/admin-config/update-security.php [NC]
+RewriteRule ^admin/config/feature-flags/$ src/admin-config/feature-flags.php [NC]
+RewriteRule ^admin/config/feature-flags/update/$ src/admin-config/update-feature-flags.php [NC]
+
 
 RewriteRule ^portal/users/$ src/portal/get-users.php [NC]
 RewriteRule ^portal/roles/$ src/portal/get-roles.php [NC]
