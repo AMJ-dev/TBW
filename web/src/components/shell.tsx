@@ -321,13 +321,13 @@ const sections = [
                 label: "Appointments",
                 to: "/gate/appointments",
                 icon: Clock3,
-                access: ["system", "organisation"],
+                access: ["system"],
             },
             {
                 label: "Gate Passes",
                 to: "/gate/passes",
                 icon: QrCode,
-                access: ["system", "organisation"],
+                access: ["system"],
             },
             {
                 label: "Gate-in console",
@@ -363,6 +363,12 @@ const sections = [
             {
                 label: "Bookings",
                 to: "/portal/bookings",
+                icon: Clock3,
+                access: ["organisation"],
+            },
+            {
+                label: "Appointments",
+                to: "/gate/appointments",
                 icon: Clock3,
                 access: ["organisation"],
             },
@@ -549,6 +555,12 @@ const sections = [
                 to: "/portal/containers",
                 icon: Container,
                 access: ["system", "organisation"],
+            },
+            {
+                label: "Gate dashboard",
+                to: "/gate/dashboard",
+                icon: LayoutDashboard,
+                access: ["organisation"],
             },
             {
                 label: "Packages",
