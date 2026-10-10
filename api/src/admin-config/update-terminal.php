@@ -1,288 +1,677 @@
 <?php
-    require_once dirname(__DIR__, 2) . "/include/verify-user.php";
+require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
-    function terminalConfigString(mixed $value, int $max = 255): string {
-        if (!is_string($value) && !is_numeric($value)) {
-            return "";
-        }
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    http_response_code(405);
+    echo json_encode([
+        "error" => true,
+        "data" => "Method not allowed",
+        "code" => null
+    ]);
+    exit;
+}
 
-        return mb_substr(trim((string)$value), 0, $max);
+try {
+    $terminalName = trim($_POST["terminal_name"] ?? "");
+    $terminalCode = trim($_POST["terminal_code"] ?? "");
+    $operatingHours = trim($_POST["operating_hours"] ?? "");
+    $changeReason = trim($_POST["change_reason"] ?? "");
+
+    if ($terminalName === "" || $terminalCode === "") {
+        throw new InvalidArgumentException(
+            "Terminal name and terminal code are required."
+        );
     }
 
-    try {
-        if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-            http_response_code(405);
-            echo json_encode(["error" => true, "data" => "Method not allowed", "code" => null]);
-            exit;
+    if (
+        strlen($terminalName) > 255 ||
+        strlen($terminalCode) > 80 ||
+        strlen($operatingHours) > 100 ||
+        strlen($changeReason) > 500
+    ) {
+        throw new InvalidArgumentException(
+            "One or more fields exceed the allowed length."
+        );
+    }
+
+    $locations = $_POST["locations"] ?? [];
+    $services = $_POST["cargo_services"] ?? [];
+    $holds = $_POST["hold_reasons"] ?? [];
+    $areas = $_POST["operational_areas"] ?? [];
+
+    foreach ([
+        "locations" => &$locations,
+        "cargo_services" => &$services,
+        "hold_reasons" => &$holds,
+        "operational_areas" => &$areas
+    ] as $key => &$value) {
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+
+            if (
+                json_last_error() !== JSON_ERROR_NONE ||
+                !is_array($decoded)
+            ) {
+                throw new InvalidArgumentException(
+                    "Invalid " . str_replace("_", " ", $key) . " data."
+                );
+            }
+
+            $value = $decoded;
         }
 
-        $name = terminalConfigString($_POST["terminal_name"] ?? "", 255);
-        $code = strtoupper(terminalConfigString($_POST["terminal_code"] ?? "", 80));
-        $hours = terminalConfigString($_POST["operating_hours"] ?? "", 100);
-        $locations = $_POST["locations"] ?? null;
-        $services = $_POST["cargo_services"] ?? null;
-        $holds = $_POST["hold_reasons"] ?? null;
+        if (!is_array($value)) {
+            throw new InvalidArgumentException(
+                "Invalid " . str_replace("_", " ", $key) . " data."
+            );
+        }
+    }
+    unset($value);
 
-        if ($name === "" || $code === "") {
-            http_response_code(422);
-            echo json_encode(["error" => true, "data" => "Terminal name and terminal code are required", "code" => null]);
-            exit;
+    $allowedKinds = ["yard", "warehouse"];
+    $allowedStatuses = ["active", "inactive", "maintenance"];
+    $allowedUnits = ["TEU", "sqm", "pallets", "positions", "tonnes"];
+
+    $normalisedLocations = [];
+    $locationCodes = [];
+    $locationIds = [];
+
+    foreach ($locations as $location) {
+        if (!is_array($location)) {
+            throw new InvalidArgumentException("Invalid location entry.");
         }
 
-        if (!is_array($locations) || !is_array($services) || !is_array($holds)) {
-            http_response_code(422);
-            echo json_encode(["error" => true, "data" => "Locations, cargo services, and hold reasons must be submitted as arrays", "code" => null]);
-            exit;
+        $id = trim((string) ($location["id"] ?? ""));
+        $code = trim((string) ($location["code"] ?? ""));
+        $name = trim((string) ($location["name"] ?? ""));
+        $kind = $location["kind"] ?? "yard";
+        $status = $location["status"] ?? "active";
+        $capacityUnit = $location["capacity_unit"] ?? "TEU";
+        $capacity = $location["capacity"] ?? null;
+
+        if ($code === "" || $name === "") {
+            throw new InvalidArgumentException(
+                "Every location needs a code and name."
+            );
         }
 
-        $locationRows = [];
-        $locationCodes = [];
-        $allowedKinds = ["yard", "warehouse"];
-        $allowedStatuses = ["active", "inactive", "maintenance"];
-        $allowedUnits = ["TEU", "sqm", "pallets", "positions", "tonnes"];
+        if (strlen($code) > 80 || strlen($name) > 255) {
+            throw new InvalidArgumentException(
+                "Location code or name is too long."
+            );
+        }
 
-        foreach ($locations as $item) {
+        if (!in_array($kind, $allowedKinds, true)) {
+            throw new InvalidArgumentException(
+                "Invalid location type for " . $code . "."
+            );
+        }
+
+        if (!in_array($status, $allowedStatuses, true)) {
+            throw new InvalidArgumentException(
+                "Invalid status for " . $code . "."
+            );
+        }
+
+        if (!in_array($capacityUnit, $allowedUnits, true)) {
+            throw new InvalidArgumentException(
+                "Invalid capacity unit for " . $code . "."
+            );
+        }
+
+        if (isset($locationCodes[strtolower($code)])) {
+            throw new InvalidArgumentException(
+                "Duplicate location code: " . $code
+            );
+        }
+
+        $locationCodes[strtolower($code)] = true;
+
+        if (
+            !preg_match(
+                '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+                $id
+            ) ||
+            isset($locationIds[$id])
+        ) {
+            $id = generateId();
+        }
+
+        $locationIds[$id] = true;
+
+        if ($capacity === "" || $capacity === null) {
+            $capacity = null;
+        } elseif (
+            !is_numeric($capacity) ||
+            !is_finite((float) $capacity) ||
+            (float) $capacity < 0
+        ) {
+            throw new InvalidArgumentException(
+                "Invalid capacity for " . $code . "."
+            );
+        } else {
+            $capacity = (float) $capacity;
+        }
+
+        $equipmentItems = $location["equipment"] ?? [];
+
+        if (is_string($equipmentItems)) {
+            $decodedEquipment = json_decode($equipmentItems, true);
+
+            if (
+                json_last_error() === JSON_ERROR_NONE &&
+                is_array($decodedEquipment)
+            ) {
+                $equipmentItems = $decodedEquipment;
+            } else {
+                $equipmentItems = $equipmentItems === ""
+                    ? []
+                    : explode(",", $equipmentItems);
+            }
+        }
+
+        if (!is_array($equipmentItems)) {
+            throw new InvalidArgumentException(
+                "Invalid equipment for " . $code . "."
+            );
+        }
+
+        $equipmentLabels = [];
+        $equipmentSeen = [];
+
+        foreach ($equipmentItems as $equipment) {
+            if (is_array($equipment)) {
+                $label = trim((string) (
+                    $equipment["label"] ?? $equipment["name"] ?? ""
+                ));
+            } elseif (is_string($equipment)) {
+                $label = trim($equipment);
+            } else {
+                throw new InvalidArgumentException(
+                    "Invalid equipment entry for " . $code . "."
+                );
+            }
+
+            if ($label === "" || strlen($label) > 255) {
+                throw new InvalidArgumentException(
+                    "Equipment names must contain between 1 and 255 characters."
+                );
+            }
+
+            $equipmentKey = strtolower($label);
+
+            if (isset($equipmentSeen[$equipmentKey])) {
+                throw new InvalidArgumentException(
+                    "Duplicate equipment on location " . $code . "."
+                );
+            }
+
+            $equipmentSeen[$equipmentKey] = true;
+            $equipmentLabels[] = $label;
+        }
+
+        $equipmentString = implode(", ", $equipmentLabels);
+
+        if (strlen($equipmentString) > 1000) {
+            throw new InvalidArgumentException(
+                "Equipment data is too long for " . $code . "."
+            );
+        }
+
+        $normalisedLocations[] = [
+            "id" => $id,
+            "code" => $code,
+            "name" => $name,
+            "kind" => $kind,
+            "bonded" => !empty($location["bonded"]) ? 1 : 0,
+            "status" => $status,
+            "capacity" => $capacity,
+            "capacity_unit" => $capacityUnit,
+            "cargo_types" => trim((string) ($location["cargo_types"] ?? "")),
+            "security" => trim((string) ($location["security"] ?? "")),
+            "equipment" => $equipmentString,
+            "zone_code" => trim((string) ($location["zone"] ?? "")),
+            "block_code" => trim((string) ($location["block"] ?? "")),
+            "row_code" => trim((string) ($location["row"] ?? "")),
+            "slot_code" => trim((string) ($location["slot"] ?? "")),
+            "tier_code" => trim((string) ($location["tier"] ?? "")),
+            "aisle_code" => trim((string) ($location["aisle"] ?? "")),
+            "rack_code" => trim((string) ($location["rack"] ?? "")),
+            "bin_code" => trim((string) ($location["bin"] ?? ""))
+        ];
+    }
+
+    foreach ($normalisedLocations as $location) {
+        foreach ([
+            "cargo_types" => 1000,
+            "security" => 1000,
+            "zone_code" => 80,
+            "block_code" => 80,
+            "row_code" => 80,
+            "slot_code" => 80,
+            "tier_code" => 80,
+            "aisle_code" => 80,
+            "rack_code" => 80,
+            "bin_code" => 80
+        ] as $field => $maxLength) {
+            if (strlen($location[$field]) > $maxLength) {
+                throw new InvalidArgumentException(
+                    "A location field exceeds the allowed length."
+                );
+            }
+        }
+
+        if ($location["zone_code"] === "") {
+            throw new InvalidArgumentException(
+                "Every location needs a zone."
+            );
+        }
+    }
+
+    $normaliseGroup = function ($items, $groupName) {
+        $result = [];
+        $seen = [];
+        $ids = [];
+
+        foreach ($items as $item) {
             if (!is_array($item)) {
-                http_response_code(422);
-                echo json_encode(["error" => true, "data" => "Invalid location entry", "code" => null]);
-                exit;
+                throw new InvalidArgumentException(
+                    "Invalid entry in " . $groupName . "."
+                );
             }
 
-            $locationCode = strtoupper(terminalConfigString($item["code"] ?? "", 80));
-            $locationName = terminalConfigString($item["name"] ?? "", 255);
-            $kind = terminalConfigString($item["kind"] ?? "yard", 20);
-            $status = terminalConfigString($item["status"] ?? "active", 20);
-            $unit = terminalConfigString($item["capacity_unit"] ?? "TEU", 20);
-            $capacity = $item["capacity"] ?? null;
+            $label = trim((string) ($item["label"] ?? ""));
 
-            if ($locationCode === "" || $locationName === "") {
-                http_response_code(422);
-                echo json_encode(["error" => true, "data" => "Every location requires a code and name", "code" => null]);
-                exit;
+            if ($label === "" || strlen($label) > 255) {
+                throw new InvalidArgumentException(
+                    "Every entry in " . $groupName . " needs a valid label."
+                );
             }
 
-            if (!in_array($kind, $allowedKinds, true) || !in_array($status, $allowedStatuses, true) || !in_array($unit, $allowedUnits, true)) {
-                http_response_code(422);
-                echo json_encode(["error" => true, "data" => "A location contains an invalid type, status, or capacity unit", "code" => null]);
-                exit;
+            $labelKey = strtolower($label);
+
+            if (isset($seen[$labelKey])) {
+                throw new InvalidArgumentException(
+                    "Duplicate entry in " . $groupName . ": " . $label
+                );
             }
 
-            if ($capacity !== null && $capacity !== "" && (!is_numeric($capacity) || (float)$capacity < 0)) {
-                http_response_code(422);
-                echo json_encode(["error" => true, "data" => "Location capacity must be a non-negative number", "code" => null]);
-                exit;
+            $seen[$labelKey] = true;
+
+            $id = trim((string) ($item["id"] ?? ""));
+
+            if (
+                !preg_match(
+                    '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i',
+                    $id
+                ) ||
+                isset($ids[$id])
+            ) {
+                $id = generateId();
             }
 
-            $locationKey = strtolower($locationCode);
+            $ids[$id] = true;
 
-            if (isset($locationCodes[$locationKey])) {
-                http_response_code(422);
-                echo json_encode(["error" => true, "data" => "Duplicate location code: " . $locationCode, "code" => null]);
-                exit;
-            }
-
-            $locationCodes[$locationKey] = true;
-
-            $locationRows[] = [
-                "code" => $locationCode,
-                "name" => $locationName,
-                "kind" => $kind,
-                "bonded" => filter_var($item["bonded"] ?? false, FILTER_VALIDATE_BOOLEAN) ? 1 : 0,
-                "status" => $status,
-                "capacity" => $capacity === null || $capacity === "" ? null : (float)$capacity,
-                "capacity_unit" => $unit,
-                "cargo_types" => terminalConfigString($item["cargo_types"] ?? "", 1000),
-                "security" => terminalConfigString($item["security"] ?? "", 1000),
-                "equipment" => terminalConfigString($item["equipment"] ?? "", 1000),
-                "block_code" => terminalConfigString($item["block"] ?? "", 80),
-                "row_code" => terminalConfigString($item["row"] ?? "", 80),
-                "slot_code" => terminalConfigString($item["slot"] ?? "", 80),
-                "tier_code" => terminalConfigString($item["tier"] ?? "", 80),
-                "aisle_code" => terminalConfigString($item["aisle"] ?? "", 80),
-                "rack_code" => terminalConfigString($item["rack"] ?? "", 80),
-                "bin_code" => terminalConfigString($item["bin"] ?? "", 80)
+            $result[] = [
+                "id" => $id,
+                "label" => $label
             ];
         }
 
-        $serviceRows = [];
-        $serviceLabels = [];
+        return $result;
+    };
 
-        foreach ($services as $item) {
-            if (!is_array($item)) {
-                http_response_code(422);
-                echo json_encode(["error" => true, "data" => "Invalid cargo service entry", "code" => null]);
-                exit;
-            }
+    $services = $normaliseGroup($services, "cargo services");
+    $holds = $normaliseGroup($holds, "hold reasons");
+    $areas = $normaliseGroup($areas, "operational areas");
 
-            $label = terminalConfigString($item["label"] ?? "", 255);
+    $conn->beginTransaction();
 
-            if ($label === "") {
-                http_response_code(422);
-                echo json_encode(["error" => true, "data" => "Every cargo service requires a label", "code" => null]);
-                exit;
-            }
+    $q = $conn->prepare("
+        SELECT terminal_name, terminal_code, operating_hours
+        FROM terminal_configuration
+        WHERE id = 1
+        FOR UPDATE
+    ");
+    $q->execute();
+    $beforeTerminal = $q->fetch(PDO::FETCH_ASSOC);
 
-            $key = mb_strtolower($label);
+    $q = $conn->query("
+        SELECT *
+        FROM terminal_locations
+        ORDER BY code
+    ");
+    $beforeLocations = $q->fetchAll(PDO::FETCH_ASSOC);
 
-            if (isset($serviceLabels[$key])) {
-                http_response_code(422);
-                echo json_encode(["error" => true, "data" => "Duplicate cargo service: " . $label, "code" => null]);
-                exit;
-            }
+    $q = $conn->query("
+        SELECT *
+        FROM terminal_cargo_services
+        ORDER BY label
+    ");
+    $beforeServices = $q->fetchAll(PDO::FETCH_ASSOC);
 
-            $serviceLabels[$key] = true;
-            $serviceRows[] = $label;
+    $q = $conn->query("
+        SELECT *
+        FROM terminal_hold_reasons
+        ORDER BY label
+    ");
+    $beforeHolds = $q->fetchAll(PDO::FETCH_ASSOC);
+
+    $q = $conn->query("
+        SELECT *
+        FROM terminal_operational_areas
+        ORDER BY label
+    ");
+    $beforeAreas = $q->fetchAll(PDO::FETCH_ASSOC);
+
+    $beforeData = json_encode([
+        "terminal" => $beforeTerminal,
+        "locations" => $beforeLocations,
+        "cargo_services" => $beforeServices,
+        "hold_reasons" => $beforeHolds,
+        "operational_areas" => $beforeAreas,
+        "change_reason" => $changeReason
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    $q = $conn->prepare("
+        INSERT INTO terminal_configuration (
+            id, terminal_name, terminal_code, operating_hours
+        ) VALUES (
+            1, :name, :code, :hours
+        )
+        ON DUPLICATE KEY UPDATE
+            terminal_name = VALUES(terminal_name),
+            terminal_code = VALUES(terminal_code),
+            operating_hours = VALUES(operating_hours)
+    ");
+
+    $q->bindValue(":name", $terminalName, PDO::PARAM_STR);
+    $q->bindValue(":code", $terminalCode, PDO::PARAM_STR);
+    $q->bindValue(":hours", $operatingHours, PDO::PARAM_STR);
+    $q->execute();
+
+    $q = $conn->prepare("
+        INSERT INTO terminal_locations (
+            id, code, name, kind, bonded, status, capacity,
+            capacity_unit, cargo_types, security, equipment,
+            zone_code, block_code, row_code, slot_code, tier_code,
+            aisle_code, rack_code, bin_code
+        ) VALUES (
+            :id, :code, :name, :kind, :bonded, :status, :capacity,
+            :capacity_unit, :cargo_types, :security, :equipment,
+            :zone_code, :block_code, :row_code, :slot_code, :tier_code,
+            :aisle_code, :rack_code, :bin_code
+        )
+        ON DUPLICATE KEY UPDATE
+            code = VALUES(code),
+            name = VALUES(name),
+            kind = VALUES(kind),
+            bonded = VALUES(bonded),
+            status = VALUES(status),
+            capacity = VALUES(capacity),
+            capacity_unit = VALUES(capacity_unit),
+            cargo_types = VALUES(cargo_types),
+            security = VALUES(security),
+            equipment = VALUES(equipment),
+            zone_code = VALUES(zone_code),
+            block_code = VALUES(block_code),
+            row_code = VALUES(row_code),
+            slot_code = VALUES(slot_code),
+            tier_code = VALUES(tier_code),
+            aisle_code = VALUES(aisle_code),
+            rack_code = VALUES(rack_code),
+            bin_code = VALUES(bin_code)
+    ");
+
+    foreach ($normalisedLocations as $location) {
+        $q->bindValue(":id", $location["id"], PDO::PARAM_STR);
+        $q->bindValue(":code", $location["code"], PDO::PARAM_STR);
+        $q->bindValue(":name", $location["name"], PDO::PARAM_STR);
+        $q->bindValue(":kind", $location["kind"], PDO::PARAM_STR);
+        $q->bindValue(":bonded", $location["bonded"], PDO::PARAM_INT);
+        $q->bindValue(":status", $location["status"], PDO::PARAM_STR);
+
+        if ($location["capacity"] === null) {
+            $q->bindValue(":capacity", null, PDO::PARAM_NULL);
+        } else {
+            $q->bindValue(
+                ":capacity",
+                (string) $location["capacity"],
+                PDO::PARAM_STR
+            );
         }
 
-        $holdRows = [];
-        $holdLabels = [];
-
-        foreach ($holds as $item) {
-            if (!is_array($item)) {
-                http_response_code(422);
-                echo json_encode(["error" => true, "data" => "Invalid hold reason entry", "code" => null]);
-                exit;
-            }
-
-            $label = terminalConfigString($item["label"] ?? "", 255);
-
-            if ($label === "") {
-                http_response_code(422);
-                echo json_encode(["error" => true, "data" => "Every hold reason requires a label", "code" => null]);
-                exit;
-            }
-
-            $key = mb_strtolower($label);
-
-            if (isset($holdLabels[$key])) {
-                http_response_code(422);
-                echo json_encode(["error" => true, "data" => "Duplicate hold reason: " . $label, "code" => null]);
-                exit;
-            }
-
-            $holdLabels[$key] = true;
-            $holdRows[] = $label;
-        }
-
-        $q = $conn->prepare("SELECT terminal_name, terminal_code, operating_hours FROM terminal_configuration WHERE id = 1 LIMIT 1");
+        $q->bindValue(
+            ":capacity_unit",
+            $location["capacity_unit"],
+            PDO::PARAM_STR
+        );
+        $q->bindValue(
+            ":cargo_types",
+            $location["cargo_types"],
+            PDO::PARAM_STR
+        );
+        $q->bindValue(":security", $location["security"], PDO::PARAM_STR);
+        $q->bindValue(":equipment", $location["equipment"], PDO::PARAM_STR);
+        $q->bindValue(":zone_code", $location["zone_code"], PDO::PARAM_STR);
+        $q->bindValue(":block_code", $location["block_code"], PDO::PARAM_STR);
+        $q->bindValue(":row_code", $location["row_code"], PDO::PARAM_STR);
+        $q->bindValue(":slot_code", $location["slot_code"], PDO::PARAM_STR);
+        $q->bindValue(":tier_code", $location["tier_code"], PDO::PARAM_STR);
+        $q->bindValue(":aisle_code", $location["aisle_code"], PDO::PARAM_STR);
+        $q->bindValue(":rack_code", $location["rack_code"], PDO::PARAM_STR);
+        $q->bindValue(":bin_code", $location["bin_code"], PDO::PARAM_STR);
         $q->execute();
-        $before = $q->fetch(PDO::FETCH_ASSOC) ?: [];
-
-        $q = $conn->prepare("SELECT code, name, kind, bonded, status, capacity, capacity_unit, cargo_types, security, equipment, block_code, row_code, slot_code, tier_code, aisle_code, rack_code, bin_code FROM terminal_locations ORDER BY code");
-        $q->execute();
-        $before["locations"] = $q->fetchAll(PDO::FETCH_ASSOC);
-
-        $q = $conn->prepare("SELECT label FROM terminal_cargo_services WHERE is_active = 1 ORDER BY label");
-        $q->execute();
-        $before["cargo_services"] = $q->fetchAll(PDO::FETCH_COLUMN);
-
-        $q = $conn->prepare("SELECT label FROM terminal_hold_reasons WHERE is_active = 1 ORDER BY label");
-        $q->execute();
-        $before["hold_reasons"] = $q->fetchAll(PDO::FETCH_COLUMN);
-
-        $conn->beginTransaction();
-
-        $q = $conn->prepare("INSERT INTO terminal_configuration (id, terminal_name, terminal_code, operating_hours) VALUES (1, :name, :code, :hours) ON DUPLICATE KEY UPDATE terminal_name = VALUES(terminal_name), terminal_code = VALUES(terminal_code), operating_hours = VALUES(operating_hours)");
-        $q->bindValue(":name", $name, PDO::PARAM_STR);
-        $q->bindValue(":code", $code, PDO::PARAM_STR);
-        $q->bindValue(":hours", $hours, PDO::PARAM_STR);
-        $q->execute();
-
-        $q = $conn->prepare("UPDATE terminal_locations SET status = 'inactive'");
-        $q->execute();
-
-        foreach ($locationRows as $item) {
-            $q = $conn->prepare("SELECT id FROM terminal_locations WHERE code = :code LIMIT 1");
-            $q->bindValue(":code", $item["code"], PDO::PARAM_STR);
-            $q->execute();
-            $existingId = $q->fetchColumn();
-
-            if ($existingId) {
-                $q = $conn->prepare("UPDATE terminal_locations SET name = :name, kind = :kind, bonded = :bonded, status = :status, capacity = :capacity, capacity_unit = :capacity_unit, cargo_types = :cargo_types, security = :security, equipment = :equipment, block_code = :block_code, row_code = :row_code, slot_code = :slot_code, tier_code = :tier_code, aisle_code = :aisle_code, rack_code = :rack_code, bin_code = :bin_code WHERE id = :id");
-                $q->bindValue(":id", $existingId, PDO::PARAM_STR);
-            } else {
-                $q = $conn->prepare("INSERT INTO terminal_locations (id, code, name, kind, bonded, status, capacity, capacity_unit, cargo_types, security, equipment, block_code, row_code, slot_code, tier_code, aisle_code, rack_code, bin_code) VALUES (:id, :code, :name, :kind, :bonded, :status, :capacity, :capacity_unit, :cargo_types, :security, :equipment, :block_code, :row_code, :slot_code, :tier_code, :aisle_code, :rack_code, :bin_code)");
-                $q->bindValue(":id", generateId(), PDO::PARAM_STR);
-                $q->bindValue(":code", $item["code"], PDO::PARAM_STR);
-            }
-
-            $q->bindValue(":name", $item["name"], PDO::PARAM_STR);
-            $q->bindValue(":kind", $item["kind"], PDO::PARAM_STR);
-            $q->bindValue(":bonded", $item["bonded"], PDO::PARAM_INT);
-            $q->bindValue(":status", $item["status"], PDO::PARAM_STR);
-            $q->bindValue(":capacity", $item["capacity"], $item["capacity"] === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
-            $q->bindValue(":capacity_unit", $item["capacity_unit"], PDO::PARAM_STR);
-            $q->bindValue(":cargo_types", $item["cargo_types"], PDO::PARAM_STR);
-            $q->bindValue(":security", $item["security"], PDO::PARAM_STR);
-            $q->bindValue(":equipment", $item["equipment"], PDO::PARAM_STR);
-            $q->bindValue(":block_code", $item["block_code"], PDO::PARAM_STR);
-            $q->bindValue(":row_code", $item["row_code"], PDO::PARAM_STR);
-            $q->bindValue(":slot_code", $item["slot_code"], PDO::PARAM_STR);
-            $q->bindValue(":tier_code", $item["tier_code"], PDO::PARAM_STR);
-            $q->bindValue(":aisle_code", $item["aisle_code"], PDO::PARAM_STR);
-            $q->bindValue(":rack_code", $item["rack_code"], PDO::PARAM_STR);
-            $q->bindValue(":bin_code", $item["bin_code"], PDO::PARAM_STR);
-            $q->execute();
-        }
-
-        $q = $conn->prepare("UPDATE terminal_cargo_services SET is_active = 0");
-        $q->execute();
-
-        foreach ($serviceRows as $label) {
-            $q = $conn->prepare("INSERT INTO terminal_cargo_services (id, label, is_active) VALUES (:id, :label, 1) ON DUPLICATE KEY UPDATE is_active = 1");
-            $q->bindValue(":id", generateId(), PDO::PARAM_STR);
-            $q->bindValue(":label", $label, PDO::PARAM_STR);
-            $q->execute();
-        }
-
-        $q = $conn->prepare("UPDATE terminal_hold_reasons SET is_active = 0");
-        $q->execute();
-
-        foreach ($holdRows as $label) {
-            $q = $conn->prepare("INSERT INTO terminal_hold_reasons (id, label, is_active) VALUES (:id, :label, 1) ON DUPLICATE KEY UPDATE is_active = 1");
-            $q->bindValue(":id", generateId(), PDO::PARAM_STR);
-            $q->bindValue(":label", $label, PDO::PARAM_STR);
-            $q->execute();
-        }
-
-        $after = [
-            "terminal_name" => $name,
-            "terminal_code" => $code,
-            "operating_hours" => $hours,
-            "locations" => $locationRows,
-            "cargo_services" => $serviceRows,
-            "hold_reasons" => $holdRows
-        ];
-
-        $actorId = isset($my_details->id) ? (string)$my_details->id : null;
-        $ip = $_SERVER["REMOTE_ADDR"] ?? null;
-        $agent = substr((string)($_SERVER["HTTP_USER_AGENT"] ?? ""), 0, 500);
-
-        $q = $conn->prepare("INSERT INTO terminal_configuration_audit (id, actor_id, action, before_data, after_data, ip_address, user_agent) VALUES (:id, :actor_id, 'terminal_configuration_updated', :before_data, :after_data, :ip_address, :user_agent)");
-        $q->bindValue(":id", generateId(), PDO::PARAM_STR);
-        $q->bindValue(":actor_id", $actorId, $actorId === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
-        $q->bindValue(":before_data", json_encode($before, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), PDO::PARAM_STR);
-        $q->bindValue(":after_data", json_encode($after, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), PDO::PARAM_STR);
-        $q->bindValue(":ip_address", $ip, $ip === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
-        $q->bindValue(":user_agent", $agent, PDO::PARAM_STR);
-        $q->execute();
-
-        $conn->commit();
-
-        echo json_encode([
-            "error" => false,
-            "data" => "Terminal configuration saved successfully",
-            "code" => [
-                "terminal_name" => $name,
-                "terminal_code" => $code,
-                "operating_hours" => $hours
-            ]
-        ]);
-    } catch (Throwable $e) {
-        if (isset($conn) && $conn instanceof PDO && $conn->inTransaction()) {
-            $conn->rollBack();
-        }
-
-        http_response_code(500);
-        echo json_encode(["error" => true, "data" => "Unable to save terminal configuration", "code" => null]);
     }
+
+    $savedLocationIds = array_column($normalisedLocations, "id");
+
+    if ($savedLocationIds) {
+        $placeholders = implode(
+            ", ",
+            array_fill(0, count($savedLocationIds), "?")
+        );
+
+        $q = $conn->prepare("
+            UPDATE terminal_locations
+            SET status = 'inactive'
+            WHERE id NOT IN ($placeholders)
+        ");
+
+        foreach ($savedLocationIds as $index => $id) {
+            $q->bindValue($index + 1, $id, PDO::PARAM_STR);
+        }
+
+        $q->execute();
+    } else {
+        $conn->exec("
+            UPDATE terminal_locations
+            SET status = 'inactive'
+        ");
+    }
+
+    foreach ([
+        [
+            "table" => "terminal_cargo_services",
+            "items" => $services
+        ],
+        [
+            "table" => "terminal_hold_reasons",
+            "items" => $holds
+        ],
+        [
+            "table" => "terminal_operational_areas",
+            "items" => $areas
+        ]
+    ] as $group) {
+        $table = $group["table"];
+
+        $conn->exec("UPDATE `$table` SET is_active = 0");
+
+        $find = $conn->prepare("
+            SELECT id
+            FROM `$table`
+            WHERE id = :id OR label = :label
+            LIMIT 1
+        ");
+
+        $insert = $conn->prepare("
+            INSERT INTO `$table` (id, label, is_active)
+            VALUES (:id, :label, 1)
+        ");
+
+        $update = $conn->prepare("
+            UPDATE `$table`
+            SET label = :label, is_active = 1
+            WHERE id = :id
+        ");
+
+        foreach ($group["items"] as $item) {
+            $find->bindValue(":id", $item["id"], PDO::PARAM_STR);
+            $find->bindValue(":label", $item["label"], PDO::PARAM_STR);
+            $find->execute();
+
+            $existingId = $find->fetchColumn();
+
+            if ($existingId !== false) {
+                $update->bindValue(":id", $existingId, PDO::PARAM_STR);
+                $update->bindValue(
+                    ":label",
+                    $item["label"],
+                    PDO::PARAM_STR
+                );
+                $update->execute();
+            } else {
+                $insert->bindValue(":id", $item["id"], PDO::PARAM_STR);
+                $insert->bindValue(
+                    ":label",
+                    $item["label"],
+                    PDO::PARAM_STR
+                );
+                $insert->execute();
+            }
+        }
+    }
+
+    $q = $conn->query("
+        SELECT terminal_name, terminal_code, operating_hours
+        FROM terminal_configuration
+        WHERE id = 1
+    ");
+    $afterTerminal = $q->fetch(PDO::FETCH_ASSOC);
+
+    $q = $conn->query("
+        SELECT *
+        FROM terminal_locations
+        ORDER BY code
+    ");
+    $afterLocations = $q->fetchAll(PDO::FETCH_ASSOC);
+
+    $q = $conn->query("
+        SELECT *
+        FROM terminal_cargo_services
+        ORDER BY label
+    ");
+    $afterServices = $q->fetchAll(PDO::FETCH_ASSOC);
+
+    $q = $conn->query("
+        SELECT *
+        FROM terminal_hold_reasons
+        ORDER BY label
+    ");
+    $afterHolds = $q->fetchAll(PDO::FETCH_ASSOC);
+
+    $q = $conn->query("
+        SELECT *
+        FROM terminal_operational_areas
+        ORDER BY label
+    ");
+    $afterAreas = $q->fetchAll(PDO::FETCH_ASSOC);
+
+    $afterData = json_encode([
+        "terminal" => $afterTerminal,
+        "locations" => $afterLocations,
+        "cargo_services" => $afterServices,
+        "hold_reasons" => $afterHolds,
+        "operational_areas" => $afterAreas
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    $q = $conn->prepare("
+        INSERT INTO terminal_configuration_audit (
+            id,
+            actor_id,
+            action,
+            before_data,
+            after_data,
+            ip_address,
+            user_agent
+        ) VALUES (
+            :id,
+            :actor_id,
+            :action,
+            :before_data,
+            :after_data,
+            :ip_address,
+            :user_agent
+        )
+    ");
+
+    $q->bindValue(":id", generateId(), PDO::PARAM_STR);
+    $q->bindValue(":actor_id", (string) $my_details->id, PDO::PARAM_STR);
+    $q->bindValue(
+        ":action",
+        "terminal_configuration_updated",
+        PDO::PARAM_STR
+    );
+    $q->bindValue(":before_data", $beforeData, PDO::PARAM_STR);
+    $q->bindValue(":after_data", $afterData, PDO::PARAM_STR);
+
+    $ipAddress = $_SERVER["REMOTE_ADDR"] ?? null;
+
+    if ($ipAddress === null) {
+        $q->bindValue(":ip_address", null, PDO::PARAM_NULL);
+    } else {
+        $q->bindValue(":ip_address", $ipAddress, PDO::PARAM_STR);
+    }
+
+    $q->bindValue(
+        ":user_agent",
+        substr($_SERVER["HTTP_USER_AGENT"] ?? "", 0, 500),
+        PDO::PARAM_STR
+    );
+    $q->execute();
+
+    $conn->commit();
+
+    echo json_encode([
+        "error" => false,
+        "data" => "Terminal configuration updated successfully",
+        "code" => [
+            "terminal_name" => $terminalName,
+            "terminal_code" => $terminalCode,
+            "operating_hours" => $operatingHours
+        ]
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+} catch (InvalidArgumentException $e) {
+    if ($conn->inTransaction()) {
+        $conn->rollBack();
+    }
+
+    http_response_code(422);
+    echo json_encode([
+        "error" => true,
+        "data" => $e->getMessage(),
+        "code" => null
+    ]);
+} catch (Throwable $e) {
+    if ($conn->inTransaction()) {
+        $conn->rollBack();
+    }
+
+    http_response_code(500);
+    echo json_encode([
+        "error" => true,
+        "data" => $e->getMessage(),
+        "code" => null
+    ]);
+}
