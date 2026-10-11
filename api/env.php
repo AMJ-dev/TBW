@@ -30,7 +30,7 @@
     // $email_host="smtp.resend.com";
     // $email_port=465; 
     // $email_user="resend";
-    // $email_password="re_gPbTjFE2_BVEUNvhFdpf7CvTYJFBSfYVk";
+    // $email_password="****";
     // $sender_email = "info@lovebite.online";
     // $info_email = "sender@lovebite.online";
     
