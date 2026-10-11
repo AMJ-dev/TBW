@@ -306,7 +306,6 @@ const sections = [
             },
         ],
     },
-
     {
         title: "Gate",
         access: ["system", "organisation"],
@@ -315,7 +314,7 @@ const sections = [
                 label: "Gate dashboard",
                 to: "/gate/dashboard",
                 icon: LayoutDashboard,
-                access: ["system", "organisation"],
+                access: ["system"],
             },
             {
                 label: "Appointments",
@@ -345,11 +344,10 @@ const sections = [
                 label: "Vehicle registry",
                 to: "/gate/vehicles",
                 icon: UsersRound,
-                access: ["system", "organisation"],
+                access: ["system"],
             },
         ],
     },
-
     {
         title: "Stakeholder Portal",
         access: ["organisation"],
@@ -358,6 +356,12 @@ const sections = [
                 label: "Portal dashboard",
                 to: "/portal/dashboard",
                 icon: LayoutDashboard,
+                access: ["organisation"],
+            },
+            {
+                label: "Shipments",
+                to: "/portal/shipments",
+                icon: Package,
                 access: ["organisation"],
             },
             {
@@ -428,7 +432,6 @@ const sections = [
             },
         ],
     },
-
     {
         title: "Finance",
         access: ["system", "organisation"],
@@ -501,7 +504,6 @@ const sections = [
             },
         ],
     },
-
     {
         title: "Reports",
         access: ["system", "organisation"],
@@ -533,7 +535,6 @@ const sections = [
             },
         ],
     },
-
     {
         title: "Cargo",
         access: ["system", "organisation"],
@@ -557,9 +558,9 @@ const sections = [
                 access: ["system", "organisation"],
             },
             {
-                label: "Gate dashboard",
-                to: "/gate/dashboard",
-                icon: LayoutDashboard,
+                label: "Vehicle registry",
+                to: "/gate/vehicles",
+                icon: UsersRound,
                 access: ["organisation"],
             },
             {

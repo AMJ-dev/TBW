@@ -4,20 +4,11 @@
     try {
         if ($_SERVER["REQUEST_METHOD"] !== "GET") {
             http_response_code(405);
-            echo json_encode([
-                "error" => true,
-                "data" => "Method not allowed",
-                "code" => null
-            ]);
+            echo json_encode(["error" => true, "data" => "Method not allowed", "code" => null]);
             exit;
         }
 
-        $q = $conn->prepare("
-            SELECT terminal_name, terminal_code, operating_hours
-            FROM terminal_configuration
-            WHERE id = 1
-            LIMIT 1
-        ");
+        $q = $conn->prepare("SELECT terminal_name, terminal_code, operating_hours FROM terminal_configuration WHERE id = 1 LIMIT 1");
         $q->execute();
 
         $terminal = $q->fetch(PDO::FETCH_ASSOC) ?: [
@@ -27,25 +18,10 @@
         ];
 
         $q = $conn->prepare("
-            SELECT
-                id,
-                code,
-                name,
-                kind,
-                bonded,
-                status,
-                capacity,
-                capacity_unit,
-                cargo_types,
-                security,
-                equipment,
-                zone_code AS zone,
-                block_code AS `block`,
-                row_code AS `row`,
-                slot_code AS slot,
-                tier_code AS tier,
-                aisle_code AS aisle,
-                rack_code AS rack,
+            SELECT id, code, name, kind, bonded, status, capacity, capacity_unit,
+                cargo_types, security, equipment, zone_code AS zone,
+                block_code AS `block`, row_code AS `row`, slot_code AS slot,
+                tier_code AS tier, aisle_code AS aisle, rack_code AS rack,
                 bin_code AS bin
             FROM terminal_locations
             ORDER BY code ASC
@@ -55,57 +31,31 @@
 
         foreach ($locations as &$location) {
             $location["bonded"] = (bool) $location["bonded"];
-
             $location["capacity"] = $location["capacity"] === null
                 ? null
                 : (float) $location["capacity"];
 
-            $location["equipment"] = array_values(array_map(
-                function ($label) {
-                    return [
-                        "id" => generateId(),
-                        "label" => trim($label)
-                    ];
-                },
-                array_filter(
-                    array_map(
-                        "trim",
-                        explode(",", (string) $location["equipment"])
-                    ),
-                    function ($label) {
-                        return $label !== "";
-                    }
-                )
-            ));
+            $location["equipment"] = array_values(array_filter(array_map(
+                "trim",
+                explode(",", (string) $location["equipment"])
+            ), fn($label) => $label !== ""));
         }
         unset($location);
 
-        $q = $conn->prepare("
-            SELECT id, label
-            FROM terminal_cargo_services
-            WHERE is_active = 1
-            ORDER BY label ASC
-        ");
-        $q->execute();
+        $q = $conn->query("SELECT id, label FROM terminal_cargo_services WHERE is_active = 1 ORDER BY label ASC");
         $services = $q->fetchAll(PDO::FETCH_ASSOC);
 
-        $q = $conn->prepare("
-            SELECT id, label
-            FROM terminal_hold_reasons
-            WHERE is_active = 1
-            ORDER BY label ASC
-        ");
-        $q->execute();
+        $q = $conn->query("SELECT id, label FROM terminal_hold_reasons WHERE is_active = 1 ORDER BY label ASC");
         $holds = $q->fetchAll(PDO::FETCH_ASSOC);
 
-        $q = $conn->prepare("
-            SELECT id, label
-            FROM terminal_operational_areas
-            WHERE is_active = 1
-            ORDER BY label ASC
-        ");
-        $q->execute();
+        $q = $conn->query("SELECT id, label FROM terminal_operational_areas WHERE is_active = 1 ORDER BY label ASC");
         $areas = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        $q = $conn->query("SELECT id, label FROM terminal_cargo_categories WHERE is_active = 1 ORDER BY label ASC");
+        $categories = $q->fetchAll(PDO::FETCH_ASSOC);
+
+        $q = $conn->query("SELECT id, label FROM terminal_packaging_types WHERE is_active = 1 ORDER BY label ASC");
+        $packagingTypes = $q->fetchAll(PDO::FETCH_ASSOC);
 
         echo json_encode([
             "error" => false,
@@ -117,7 +67,9 @@
                 "locations" => $locations,
                 "cargo_services" => $services,
                 "hold_reasons" => $holds,
-                "operational_areas" => $areas
+                "operational_areas" => $areas,
+                "cargo_categories" => $categories,
+                "packaging_types" => $packagingTypes
             ]
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     } catch (Throwable $e) {
