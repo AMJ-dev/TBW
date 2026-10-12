@@ -84,6 +84,7 @@ interface TerminalConfig {
 	operationalAreas: OperationalArea[];
 	cargoCategories: LabelRow[];
 	packagingTypes: LabelRow[];
+	shipmentTypes: LabelRow[];
 }
 
 const emptyConfig: TerminalConfig = {
@@ -96,6 +97,7 @@ const emptyConfig: TerminalConfig = {
 	operationalAreas: [],
 	cargoCategories: [],
 	packagingTypes: [],
+	shipmentTypes: [],
 };
 
 const capacityUnits: { value: CapacityUnit; label: string }[] = [
@@ -198,7 +200,9 @@ export default function AdminTerminalConfigurationPage() {
 				return;
 			}
 			const payload: any = resp.code ?? {};
-
+			const rawShipmentTypes: any[] = Array.isArray(payload.shipment_types)
+				? payload.shipment_types
+				: [];
 			const rawLocations: any[] = Array.isArray(payload.locations)
 				? payload.locations
 				: [];
@@ -245,6 +249,7 @@ export default function AdminTerminalConfigurationPage() {
 				operationalAreas: rawAreas.map(normaliseLabelRow),
 				cargoCategories: rawCategories.map(normaliseLabelRow),
 				packagingTypes: rawPackaging.map(normaliseLabelRow),
+				shipmentTypes: rawShipmentTypes.map(normaliseLabelRow),
 			});
 			setChangeReason("");
 			setEquipmentDrafts({});
@@ -401,6 +406,7 @@ export default function AdminTerminalConfigurationPage() {
 		| "holdReasons"
 		| "operationalAreas"
 		| "cargoCategories"
+		| "shipmentTypes"
 		| "packagingTypes";
 
 	const addListRow = (key: ListKey, prefix: string) => {
@@ -505,6 +511,11 @@ export default function AdminTerminalConfigurationPage() {
 				"Duplicate cargo service",
 			],
 			[
+				config.shipmentTypes,
+				"Every shipment type needs a name, or remove the empty row.",
+				"Duplicate shipment type",
+			],
+			[
 				config.holdReasons,
 				"Every hold reason needs a label, or remove the empty row.",
 				"Duplicate hold reason",
@@ -573,6 +584,10 @@ export default function AdminTerminalConfigurationPage() {
 					aisle: location.aisle.trim(),
 					rack: location.rack.trim(),
 					bin: location.bin.trim(),
+				})),
+				shipment_types: config.shipmentTypes.map((row) => ({
+					id: row.id,
+					label: row.label.trim(),
 				})),
 				cargo_services: config.cargoServices.map((row) => ({
 					id: row.id,
@@ -1232,7 +1247,19 @@ export default function AdminTerminalConfigurationPage() {
 						</ul>
 					)}
 				</section>
-
+				<ListSection
+					title="Shipment types"
+					description="Shipment types available to users when creating a shipment. Only active types should appear in shipment forms."
+					icon={Package}
+					addLabel="Add shipment type"
+					rows={config.shipmentTypes}
+					placeholder="e.g. Import"
+					onAdd={() => addListRow("shipmentTypes", "shipment-type")}
+					onUpdate={(id, label) =>
+						updateListRow("shipmentTypes", id, label)
+					}
+					onRemove={(id) => removeListRow("shipmentTypes", id)}
+				/>
 				<ListSection
 					title="Operational areas"
 					description="Non-storage destinations used in operational workflows. The yard page uses these as movement targets alongside storage positions."

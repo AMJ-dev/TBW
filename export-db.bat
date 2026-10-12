@@ -1,5 +1,7 @@
 mysqldump -u root -p trinu > database/trinu.sql
-
+cd web
+npm run build
+cd ..
 git add . 
 git commit -m "working"
 git push

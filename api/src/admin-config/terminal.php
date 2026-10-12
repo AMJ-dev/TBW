@@ -119,6 +119,13 @@ try {
         ORDER BY label ASC
     ");
     $packagingTypes = $q->fetchAll(PDO::FETCH_ASSOC);
+    $q = $conn->query("
+        SELECT id, label, is_active
+        FROM terminal_shipment_types
+        WHERE is_active = 1
+        ORDER BY label ASC
+    ");
+    $shipmentTypes = $q->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([
         "error" => false,
@@ -132,7 +139,8 @@ try {
             "hold_reasons" => $holds,
             "operational_areas" => $areas,
             "cargo_categories" => $categories,
-            "packaging_types" => $packagingTypes
+            "packaging_types" => $packagingTypes,
+            "shipment_types" => $shipmentTypes
         ]
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } catch (Throwable $e) {

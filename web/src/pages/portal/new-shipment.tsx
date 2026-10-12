@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { http, type Resp } from "@/lib/httpClient";
 
 type ContainerItem = {
 	containerNo: string;
@@ -36,25 +35,6 @@ type ShipmentDocument = {
 	id: string;
 	file: File;
 	type: string;
-};
-
-interface OptionRow {
-	id: string;
-	label: string;
-}
-
-interface ConfigOptions {
-	shipmentTypes: OptionRow[];
-	cargoCategories: OptionRow[];
-	packagingTypes: OptionRow[];
-	containerSizes: OptionRow[];
-}
-
-const emptyOptions: ConfigOptions = {
-	shipmentTypes: [],
-	cargoCategories: [],
-	packagingTypes: [],
-	containerSizes: [],
 };
 
 const documentTypes = [
@@ -77,31 +57,11 @@ const labelClass =
 
 const emptyContainer = (): ContainerItem => ({
 	containerNo: "",
-	size: "",
+	size: "20ft",
 	sealNo: "",
 	packageCount: "",
 	grossWeight: "",
 });
-
-const normaliseOptions = (raw: any): OptionRow[] => {
-	if (!Array.isArray(raw)) return [];
-	return raw
-		.map((item: any) => {
-			if (typeof item === "string") {
-				return { id: item, label: item };
-			}
-			return {
-				id: String(
-					item?.id ??
-						item?.key ??
-						item?.label ??
-						crypto.randomUUID()
-				),
-				label: item?.label ?? item?.name ?? "",
-			};
-		})
-		.filter((row) => row.label.trim());
-};
 
 export default function NewPortalShipmentPage() {
 	const navigate = useNavigate();
@@ -109,13 +69,9 @@ export default function NewPortalShipmentPage() {
 	const [step, setStep] = useState(1);
 	const [saving, setSaving] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
-	const [loadingOptions, setLoadingOptions] = useState(true);
-
-	const [options, setOptions] = useState<ConfigOptions>(emptyOptions);
-	const [optionsError, setOptionsError] = useState("");
 
 	const [form, setForm] = useState({
-		shipmentType: "",
+		shipmentType: "FCL",
 		billOfLading: "",
 		bookingNumber: "",
 		vesselName: "",
@@ -129,8 +85,8 @@ export default function NewPortalShipmentPage() {
 		consigneeEmail: "",
 		consigneePhone: "",
 		cargoDescription: "",
-		cargoCategory: "",
-		packageType: "",
+		cargoCategory: "General Cargo",
+		packageType: "Cartons",
 		packageCount: "",
 		grossWeight: "",
 		volume: "",
@@ -152,77 +108,6 @@ export default function NewPortalShipmentPage() {
 	);
 	const [declarationAccepted, setDeclarationAccepted] = useState(false);
 
-	const fetchOptions = async () => {
-		setLoadingOptions(true);
-		setOptionsError("");
-		try {
-			const res = await http.get("/portal/shipment/config/");
-			const resp: Resp = res.data;
-			if (resp.error) {
-				setOptionsError(
-					resp.data || "Could not load shipment configuration."
-				);
-				return;
-			}
-			const payload: any = resp.code ?? {};
-
-			const loaded: ConfigOptions = {
-				shipmentTypes: normaliseOptions(
-					payload.shipment_types ?? payload.shipmentTypes
-				),
-				cargoCategories: normaliseOptions(
-					payload.cargo_categories ?? payload.cargoCategories
-				),
-				packagingTypes: normaliseOptions(
-					payload.packaging_types ?? payload.packagingTypes
-				),
-				containerSizes: normaliseOptions(
-					payload.container_sizes ?? payload.containerSizes
-				),
-			};
-
-			setOptions(loaded);
-
-			setForm((current) => ({
-				...current,
-				shipmentType:
-					current.shipmentType ||
-					loaded.shipmentTypes[0]?.label ||
-					"",
-				cargoCategory:
-					current.cargoCategory ||
-					loaded.cargoCategories[0]?.label ||
-					"",
-				packageType:
-					current.packageType ||
-					loaded.packagingTypes[0]?.label ||
-					"",
-			}));
-
-			setContainers((current) =>
-				current.map((container) => ({
-					...container,
-					size:
-						container.size ||
-						loaded.containerSizes[0]?.label ||
-						"",
-				}))
-			);
-		} catch (err: any) {
-			setOptionsError(
-				err?.response?.data?.message ||
-					"Could not load shipment configuration."
-			);
-		} finally {
-			setLoadingOptions(false);
-		}
-	};
-
-	useEffect(() => {
-		void fetchOptions();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
-
 	const updateField = (name: string, value: string) => {
 		setForm((current) => ({ ...current, [name]: value }));
 	};
@@ -240,13 +125,7 @@ export default function NewPortalShipmentPage() {
 	};
 
 	const addContainer = () => {
-		setContainers((current) => [
-			...current,
-			{
-				...emptyContainer(),
-				size: options.containerSizes[0]?.label ?? "",
-			},
-		]);
+		setContainers((current) => [...current, emptyContainer()]);
 	};
 
 	const removeContainer = (index: number) => {
@@ -271,9 +150,7 @@ export default function NewPortalShipmentPage() {
 
 		if (invalid.length) {
 			toast.error(
-				`${invalid.length} file${
-					invalid.length === 1 ? " was" : "s were"
-				} skipped — files must be PDF, images, Excel or Word documents up to 10 MB each.`
+				"Files must be PDF, images, Excel or Word documents up to 10 MB each."
 			);
 		}
 
@@ -281,8 +158,6 @@ export default function NewPortalShipmentPage() {
 			(file) =>
 				file.size <= maxSize && allowedExtensions.test(file.name)
 		);
-
-		if (valid.length === 0) return;
 
 		setDocuments((current) => [
 			...current,
@@ -292,10 +167,6 @@ export default function NewPortalShipmentPage() {
 				type: documentType,
 			})),
 		]);
-
-		toast.success(
-			`${valid.length} file${valid.length === 1 ? "" : "s"} attached.`
-		);
 	};
 
 	const removeDocument = (id: string) => {
@@ -305,29 +176,29 @@ export default function NewPortalShipmentPage() {
 	};
 
 	const validateStep = () => {
-		if (step === 1) {
-			if (
-				!form.shipmentType ||
-				!form.billOfLading.trim() ||
-				!form.originCountry.trim() ||
-				!form.originPort.trim() ||
-				!form.destinationPort.trim()
-			) {
-				toast.error("Complete all required shipping details.");
-				return false;
-			}
-		}
+        if (step === 1) {
+            if (
+                !form.shipmentType ||
+                !form.billOfLading.trim() ||
+                !form.originCountry.trim() ||
+                !form.originPort.trim() ||
+                !form.destinationPort.trim()
+            ) {
+                toast.error("Complete all required shipping details.");
+                return false;
+            }
+        }
 
 		if (step === 2) {
-			if (!form.cargoDescription.trim()) {
-				toast.error("Enter a cargo description.");
-				return false;
-			}
+            if (!form.cargoDescription.trim()) {
+                toast.error("Enter a cargo description.");
+                return false;
+            }
 
-			if (!form.consignee.trim() || !form.packageCount.trim()) {
-				toast.error("Enter the consignee and total package count.");
-				return false;
-			}
+            if (!form.consignee.trim() || !form.packageCount.trim()) {
+                toast.error("Enter the consignee and total package count.");
+                return false;
+            }
 
 			if (
 				!/^\d+(\.\d+)?$/.test(form.packageCount) ||
@@ -439,101 +310,42 @@ export default function NewPortalShipmentPage() {
 
 		setSubmitting(true);
 		try {
-			const formData = new FormData();
+			const payload = {
+				...form,
+				containers:
+					form.shipmentType === "FCL"
+						? containers.filter((container) =>
+								container.containerNo.trim()
+							)
+						: [],
+				documents: documents.map((document) => ({
+					name: document.file.name,
+					type: document.type,
+				})),
+			};
 
-			formData.append("shipment_type", form.shipmentType);
-			formData.append("bill_of_lading", form.billOfLading.trim());
-			formData.append("booking_number", form.bookingNumber.trim());
-			formData.append("vessel_name", form.vesselName.trim());
-			formData.append("voyage_number", form.voyageNumber.trim());
-			formData.append("shipping_line", form.shippingLine.trim());
-			formData.append("origin_country", form.originCountry.trim());
-			formData.append("origin_port", form.originPort.trim());
-			formData.append("destination_port", form.destinationPort.trim());
-			formData.append("expected_arrival", form.expectedArrival);
-			formData.append("consignee", form.consignee.trim());
-			formData.append("consignee_email", form.consigneeEmail.trim());
-			formData.append("consignee_phone", form.consigneePhone.trim());
-			formData.append(
-				"cargo_description",
-				form.cargoDescription.trim()
-			);
-			formData.append("cargo_category", form.cargoCategory);
-			formData.append("package_type", form.packageType);
-			formData.append("package_count", form.packageCount);
-			formData.append("gross_weight", form.grossWeight);
-			formData.append("volume", form.volume);
-			formData.append("hs_code", form.hsCode.trim());
-			formData.append("dangerous_goods", form.dangerousGoods);
-			formData.append(
-				"temperature_controlled",
-				form.temperatureControlled
-			);
-			formData.append("temperature", form.temperature.trim());
-			formData.append(
-				"special_instructions",
-				form.specialInstructions.trim()
-			);
-			formData.append(
-				"customs_reference",
-				form.customsReference.trim()
+			const existing = JSON.parse(
+				localStorage.getItem("portal-shipment-drafts") || "[]"
 			);
 
-			const validContainers =
-				form.shipmentType === "FCL"
-					? containers.filter((container) =>
-							container.containerNo.trim()
-						)
-					: [];
-			formData.append(
-				"containers",
-				JSON.stringify(
-					validContainers.map((container) => ({
-						container_no: container.containerNo
-							.trim()
-							.toUpperCase(),
-						size: container.size,
-						seal_no: container.sealNo.trim(),
-						package_count: container.packageCount,
-						gross_weight: container.grossWeight,
-					}))
-				)
+			localStorage.setItem(
+				"portal-shipment-pending-submissions",
+				JSON.stringify([
+					{
+						id: `draft-${Date.now()}`,
+						...payload,
+						status: "Draft - Not Submitted to Terminal",
+						createdAt: new Date().toISOString(),
+					},
+					...existing,
+				])
 			);
-
-			formData.append(
-				"documents",
-				JSON.stringify(
-					documents.map((document, index) => ({
-						type: document.type,
-						name: document.file.name,
-						size: document.file.size,
-						index,
-					}))
-				)
-			);
-
-			documents.forEach((document, index) => {
-				formData.append(`document_file_${index}`, document.file);
-			});
-
-			const res = await http.post("/portal/shipments/", formData, {
-				headers: { "Content-Type": "multipart/form-data" },
-			});
-			const resp: Resp = res.data;
-			if (resp.error) {
-				toast.error(resp.data || "Could not submit the shipment.");
-				return;
-			}
 
 			toast.success(
-				resp.data || "Shipment declaration submitted for review."
+				"Saved locally. Connect the shipment API to submit it to the terminal."
 			);
-			navigate("/portal/shipments");
-		} catch (err: any) {
-			toast.error(
-				err?.response?.data?.message ||
-					"Could not submit the shipment."
-			);
+		} catch {
+			toast.error("Unable to prepare the shipment submission.");
 		} finally {
 			setSubmitting(false);
 		}
@@ -545,62 +357,13 @@ export default function NewPortalShipmentPage() {
 		{ number: 3, label: "Documents & review", icon: FileCheck2 },
 	];
 
-	if (loadingOptions) {
-		return (
-			<AppShell
-				title="Submit Shipment"
-				eyebrow="Stakeholder Portal · New Shipment"
-			>
-				<div className="mx-auto max-w-5xl">
-					<div className="flex items-center justify-center rounded-2xl bg-paper p-10 ring-1 ring-line">
-						<span className="size-6 animate-spin rounded-full border-2 border-orange/25 border-t-orange" />
-					</div>
-				</div>
-			</AppShell>
-		);
-	}
-
-	if (optionsError) {
-		return (
-			<AppShell
-				title="Submit Shipment"
-				eyebrow="Stakeholder Portal · New Shipment"
-			>
-				<div className="mx-auto max-w-3xl">
-					<div className="rounded-2xl bg-paper p-6 ring-1 ring-line sm:p-8">
-						<div className="flex items-start gap-3">
-							<div className="grid size-10 shrink-0 place-items-center rounded-md bg-carmine text-white">
-								<X className="size-5" />
-							</div>
-							<div>
-								<p className="font-display text-base font-bold text-ink">
-									Could not load shipment configuration
-								</p>
-								<p className="mt-1 text-sm leading-6 text-ink-soft">
-									{optionsError}
-								</p>
-							</div>
-						</div>
-						<div className="mt-5">
-							<Button
-								onClick={() => void fetchOptions()}
-								className="bg-orange text-white hover:bg-orange-deep"
-							>
-								Try again
-							</Button>
-						</div>
-					</div>
-				</div>
-			</AppShell>
-		);
-	}
-
 	return (
 		<AppShell
 			title="Submit Shipment"
 			eyebrow="Stakeholder Portal · New Shipment"
 		>
 			<div className="mx-auto max-w-5xl space-y-6 pb-24">
+				{/* Top bar */}
 				<div className="flex flex-wrap items-center justify-between gap-3">
 					<Button
 						variant="ghost"
@@ -622,6 +385,7 @@ export default function NewPortalShipmentPage() {
 					</Button>
 				</div>
 
+				{/* Hero */}
 				<motion.section
 					initial={{ opacity: 0, y: 12 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -667,6 +431,7 @@ export default function NewPortalShipmentPage() {
 					</div>
 				</motion.section>
 
+				{/* Stepper */}
 				<section className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
 					{steps.map((item) => {
 						const Icon = item.icon;
@@ -722,6 +487,7 @@ export default function NewPortalShipmentPage() {
 					})}
 				</section>
 
+				{/* Form */}
 				<form
 					onSubmit={(event) => {
 						event.preventDefault();
@@ -762,19 +528,16 @@ export default function NewPortalShipmentPage() {
 												)
 											}
 										>
-											{options.shipmentTypes.length === 0 && (
-												<option value="">
-													No shipment types configured
-												</option>
-											)}
-											{options.shipmentTypes.map((option) => (
-												<option
-													key={option.id}
-													value={option.label}
-												>
-													{option.label}
-												</option>
-											))}
+											<option value="FCL">
+												Full Container Load (FCL)
+											</option>
+											<option value="LCL">
+												Less than Container Load (LCL)
+											</option>
+											<option value="Bulk">Bulk cargo</option>
+											<option value="General Cargo">
+												General cargo
+											</option>
 										</select>
 									</label>
 
@@ -939,12 +702,7 @@ export default function NewPortalShipmentPage() {
 									/>
 
 									<div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
-										<label
-											className={cn(
-												labelClass,
-												"sm:col-span-2"
-											)}
-										>
+										<label className={cn(labelClass, "sm:col-span-2")}>
 											Cargo description
 											<span className="text-coral"> *</span>
 											<textarea
@@ -974,20 +732,15 @@ export default function NewPortalShipmentPage() {
 													)
 												}
 											>
-												{options.cargoCategories.length ===
-													0 && (
-													<option value="">
-														No cargo categories configured
-													</option>
-												)}
-												{options.cargoCategories.map((option) => (
-													<option
-														key={option.id}
-														value={option.label}
-													>
-														{option.label}
-													</option>
-												))}
+												<option>General Cargo</option>
+												<option>Electronics</option>
+												<option>Food Products</option>
+												<option>Pharmaceuticals</option>
+												<option>Machinery</option>
+												<option>Automotive</option>
+												<option>Construction Materials</option>
+												<option>Chemicals</option>
+												<option>Other</option>
 											</select>
 										</label>
 
@@ -996,10 +749,7 @@ export default function NewPortalShipmentPage() {
 											<Input
 												value={form.hsCode}
 												onChange={(event) =>
-													updateField(
-														"hsCode",
-														event.target.value
-													)
+													updateField("hsCode", event.target.value)
 												}
 												placeholder="Customs tariff code"
 												className="mt-1.5 h-11 border-line bg-sand font-mono text-ink"
@@ -1018,19 +768,14 @@ export default function NewPortalShipmentPage() {
 													)
 												}
 											>
-												{options.packagingTypes.length === 0 && (
-													<option value="">
-														No packaging types configured
-													</option>
-												)}
-												{options.packagingTypes.map((option) => (
-													<option
-														key={option.id}
-														value={option.label}
-													>
-														{option.label}
-													</option>
-												))}
+												<option>Cartons</option>
+												<option>Bags</option>
+												<option>Pallets</option>
+												<option>Crates</option>
+												<option>Drums</option>
+												<option>Bundles</option>
+												<option>Loose cargo</option>
+												<option>Other</option>
 											</select>
 										</label>
 
@@ -1080,10 +825,7 @@ export default function NewPortalShipmentPage() {
 												step="any"
 												value={form.volume}
 												onChange={(event) =>
-													updateField(
-														"volume",
-														event.target.value
-													)
+													updateField("volume", event.target.value)
 												}
 												placeholder="Total cargo volume"
 												className="mt-1.5 h-11 border-line bg-sand font-mono text-ink"
@@ -1124,7 +866,7 @@ export default function NewPortalShipmentPage() {
 										</label>
 
 										<label className={labelClass}>
-												Consignee phone
+											Consignee phone
 											<Input
 												type="tel"
 												value={form.consigneePhone}
@@ -1259,209 +1001,140 @@ export default function NewPortalShipmentPage() {
 										</div>
 
 										<div className="space-y-4 p-5 sm:p-6">
-											{containers.map(
-												(container, index) => (
-													<div
-														key={index}
-														className="rounded-xl bg-sand p-4 ring-1 ring-line"
-													>
-														<div className="mb-4 flex items-center justify-between">
-															<div className="flex items-center gap-3">
-																<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-																	<Package className="size-4" />
-																</div>
-																<p className="text-[13px] font-semibold text-ink">
-																	Container{" "}
-																	{index + 1}
-																</p>
+											{containers.map((container, index) => (
+												<div
+													key={index}
+													className="rounded-xl bg-sand p-4 ring-1 ring-line"
+												>
+													<div className="mb-4 flex items-center justify-between">
+														<div className="flex items-center gap-3">
+															<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
+																<Package className="size-4" />
 															</div>
-
-															{containers.length >
-																1 && (
-																<Button
-																	type="button"
-																	variant="ghost"
-																	size="sm"
-																	onClick={() =>
-																		removeContainer(
-																			index
-																		)
-																	}
-																	aria-label="Remove container"
-																	className="text-carmine hover:bg-carmine/10"
-																>
-																	<Trash2 className="size-3.5" />
-																	Remove
-																</Button>
-															)}
+															<p className="text-[13px] font-semibold text-ink">
+																Container {index + 1}
+															</p>
 														</div>
 
-														<div className="grid gap-4 sm:grid-cols-2">
-															<label
-																className={
-																	labelClass
+														{containers.length > 1 && (
+															<Button
+																type="button"
+																variant="ghost"
+																size="sm"
+																onClick={() =>
+																	removeContainer(index)
 																}
+																aria-label="Remove container"
+																className="text-carmine hover:bg-carmine/10"
 															>
-																Container
-																number
-																<span className="text-coral">
-																	{" "}
-																	*
-																</span>
-																<Input
-																	value={
-																		container.containerNo
-																	}
-																	onChange={(
-																		event
-																	) =>
-																		updateContainer(
-																			index,
-																			"containerNo",
-																			event.target.value.toUpperCase()
-																		)
-																	}
-																	placeholder="e.g. ABCD1234567"
-																	className="mt-1.5 h-11 border-line bg-paper font-mono text-ink"
-																/>
-															</label>
-
-															<label
-																className={
-																	labelClass
-																}
-															>
-																Container size
-																<select
-																	className={
-																		inputClass
-																	}
-																	value={
-																		container.size
-																	}
-																	onChange={(
-																		event
-																	) =>
-																		updateContainer(
-																			index,
-																			"size",
-																			event.target.value
-																		)
-																	}
-																>
-																	{options
-																		.containerSizes
-																		.length ===
-																		0 && (
-																		<option value="">
-																			No
-																			container
-																			sizes
-																			configured
-																		</option>
-																	)}
-																	{options.containerSizes.map(
-																		(option) => (
-																			<option
-																				key={
-																					option.id
-																				}
-																				value={
-																					option.label
-																				}
-																			>
-																				{
-																					option.label
-																				}
-																			</option>
-																		)
-																	)}
-																</select>
-															</label>
-
-															<label
-																className={
-																	labelClass
-																}
-															>
-																Seal number
-																<Input
-																	value={
-																		container.sealNo
-																	}
-																	onChange={(
-																		event
-																	) =>
-																		updateContainer(
-																			index,
-																			"sealNo",
-																			event.target.value
-																		)
-																	}
-																	placeholder="Seal reference"
-																	className="mt-1.5 h-11 border-line bg-paper text-ink"
-																/>
-															</label>
-
-															<label
-																className={
-																	labelClass
-																}
-															>
-																Packages in
-																container
-																<Input
-																	type="number"
-																	min="0"
-																	value={
-																		container.packageCount
-																	}
-																	onChange={(
-																		event
-																	) =>
-																		updateContainer(
-																			index,
-																			"packageCount",
-																			event.target.value
-																		)
-																	}
-																	placeholder="Optional"
-																	className="mt-1.5 h-11 border-line bg-paper font-mono text-ink"
-																/>
-															</label>
-
-															<label
-																className={cn(
-																	labelClass,
-																	"sm:col-span-2"
-																)}
-															>
-																Gross weight
-																(kg)
-																<Input
-																	type="number"
-																	min="0"
-																	step="any"
-																	value={
-																		container.grossWeight
-																	}
-																	onChange={(
-																		event
-																	) =>
-																		updateContainer(
-																			index,
-																			"grossWeight",
-																			event.target.value
-																		)
-																	}
-																	placeholder="Optional container gross weight"
-																	className="mt-1.5 h-11 border-line bg-paper font-mono text-ink"
-																/>
-															</label>
-														</div>
+																<Trash2 className="size-3.5" />
+																Remove
+															</Button>
+														)}
 													</div>
-												)
-											)}
+
+													<div className="grid gap-4 sm:grid-cols-2">
+														<label className={labelClass}>
+															Container number
+															<span className="text-coral"> *</span>
+															<Input
+																value={container.containerNo}
+																onChange={(event) =>
+																	updateContainer(
+																		index,
+																		"containerNo",
+																		event.target.value.toUpperCase()
+																	)
+																}
+																placeholder="e.g. ABCD1234567"
+																className="mt-1.5 h-11 border-line bg-paper font-mono text-ink"
+															/>
+														</label>
+
+														<label className={labelClass}>
+															Container size
+															<select
+																className={inputClass}
+																value={container.size}
+																onChange={(event) =>
+																	updateContainer(
+																		index,
+																		"size",
+																		event.target.value
+																	)
+																}
+															>
+																<option value="20ft">20 ft</option>
+																<option value="40ft">40 ft</option>
+																<option value="40ft HC">
+																	40 ft High Cube
+																</option>
+																<option value="45ft">45 ft</option>
+																<option value="Reefer">Reefer</option>
+																<option value="Other">Other</option>
+															</select>
+														</label>
+
+														<label className={labelClass}>
+															Seal number
+															<Input
+																value={container.sealNo}
+																onChange={(event) =>
+																	updateContainer(
+																		index,
+																		"sealNo",
+																		event.target.value
+																	)
+																}
+																placeholder="Seal reference"
+																className="mt-1.5 h-11 border-line bg-paper text-ink"
+															/>
+														</label>
+
+														<label className={labelClass}>
+															Packages in container
+															<Input
+																type="number"
+																min="0"
+																value={container.packageCount}
+																onChange={(event) =>
+																	updateContainer(
+																		index,
+																		"packageCount",
+																		event.target.value
+																	)
+																}
+																placeholder="Optional"
+																className="mt-1.5 h-11 border-line bg-paper font-mono text-ink"
+															/>
+														</label>
+
+														<label
+															className={cn(
+																labelClass,
+																"sm:col-span-2"
+															)}
+														>
+															Gross weight (kg)
+															<Input
+																type="number"
+																min="0"
+																step="any"
+																value={container.grossWeight}
+																onChange={(event) =>
+																	updateContainer(
+																		index,
+																		"grossWeight",
+																		event.target.value
+																	)
+																}
+																placeholder="Optional container gross weight"
+																className="mt-1.5 h-11 border-line bg-paper font-mono text-ink"
+															/>
+														</label>
+													</div>
+												</div>
+											))}
 										</div>
 									</div>
 								)}
@@ -1479,44 +1152,37 @@ export default function NewPortalShipmentPage() {
 								<div className="rounded-2xl bg-paper ring-1 ring-line">
 									<SectionHeader
 										title="Supporting documents"
-										description="Attach one or more shipping and cargo documents for terminal review."
+										description="Attach available shipping and cargo documents for terminal review."
 									/>
 
 									<div className="p-5 sm:p-6">
 										<div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
 											<label className={labelClass}>
-												Default document type
+												Document type
 												<select
 													value={documentType}
 													onChange={(event) =>
-														setDocumentType(
-															event.target.value
-														)
+														setDocumentType(event.target.value)
 													}
 													className={inputClass}
 												>
 													{documentTypes.map((type) => (
-														<option key={type}>
-															{type}
-														</option>
+														<option key={type}>{type}</option>
 													))}
 												</select>
 											</label>
 
 											<label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-line bg-sand text-[13px] font-semibold text-ink-soft transition hover:border-orange/40 hover:bg-orange/5 hover:text-orange-deep">
 												<Upload className="size-4" />
-												Choose one or more files
+												Choose files
 												<input
 													type="file"
 													multiple
 													accept=".pdf,.png,.jpg,.jpeg,.xls,.xlsx,.doc,.docx"
 													className="sr-only"
 													onChange={(event) => {
-														handleFiles(
-															event.target.files
-														);
-														event.target.value =
-															"";
+														handleFiles(event.target.files);
+														event.target.value = "";
 													}}
 												/>
 											</label>
@@ -1536,133 +1202,41 @@ export default function NewPortalShipmentPage() {
 														No documents attached
 													</p>
 													<p className="mt-1 text-xs text-ink-soft">
-														Upload your bill of lading,
-														manifest and supporting
-														documents. You can attach as
-														many as you need.
+														Upload your bill of lading, manifest and
+														supporting documents.
 													</p>
 												</div>
 											) : (
-												<>
-													<div className="flex flex-wrap items-center justify-between gap-2">
-														<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-															{documents.length}{" "}
-															{documents.length === 1
-																? "file attached"
-																: "files attached"}
-														</p>
-
-														{documents.length >
-															1 && (
-															<button
-																type="button"
-																onClick={() =>
-																	setDocuments(
-																		[]
-																	)
-																}
-																className="font-mono text-[10px] uppercase tracking-[0.12em] text-carmine hover:text-carmine/80"
-															>
-																Remove all
-															</button>
-														)}
-													</div>
-
-													{documents.map((document) => (
-														<div
-															key={document.id}
-															className="flex flex-wrap items-center gap-3 rounded-xl bg-sand p-3 ring-1 ring-line"
-														>
-															<div className="grid size-10 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-																<FileText className="size-4" />
-															</div>
-
-															<div className="min-w-[200px] flex-1">
-																<p className="truncate text-[13px] font-semibold text-ink">
-																	{
-																		document
-																			.file
-																			.name
-																	}
-																</p>
-																<p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-																	{(
-																		document
-																			.file
-																			.size /
-																		1024
-																	).toFixed(
-																		1
-																	)}{" "}
-																	KB
-																</p>
-															</div>
-
-															<label className="block min-w-[200px]">
-																<span className="sr-only">
-																	Document
-																	type
-																</span>
-																<select
-																	value={
-																		document.type
-																	}
-																	onChange={(
-																		event
-																	) =>
-																		setDocuments(
-																			(
-																				current
-																			) =>
-																				current.map(
-																					(
-																						entry
-																					) =>
-																						entry.id ===
-																						document.id
-																							? {
-																									...entry,
-																									type: event
-																										.target
-																										.value,
-																							  }
-																							: entry
-																				)
-																		)
-																	}
-																	className="h-9 w-full rounded-md border border-line bg-paper px-2 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25"
-																>
-																	{documentTypes.map(
-																		(type) => (
-																			<option
-																				key={
-																					type
-																				}
-																			>
-																				{
-																					type
-																				}
-																			</option>
-																		)
-																	)}
-																</select>
-															</label>
-
-															<button
-																type="button"
-																onClick={() =>
-																	removeDocument(
-																		document.id
-																	)
-																}
-																aria-label={`Remove ${document.file.name}`}
-																className="grid size-8 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
-															>
-																<X className="size-3.5" />
-															</button>
+												documents.map((document) => (
+													<div
+														key={document.id}
+														className="flex items-center gap-3 rounded-xl bg-sand p-3 ring-1 ring-line"
+													>
+														<div className="grid size-10 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
+															<FileText className="size-4" />
 														</div>
-													))}
-												</>
+														<div className="min-w-0 flex-1">
+															<p className="truncate text-[13px] font-semibold text-ink">
+																{document.file.name}
+															</p>
+															<p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+																{document.type} ·{" "}
+																{(document.file.size / 1024).toFixed(
+																	1
+																)}{" "}
+																KB
+															</p>
+														</div>
+														<button
+															type="button"
+															onClick={() => removeDocument(document.id)}
+															aria-label="Remove document"
+															className="grid size-8 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
+														>
+															<X className="size-3.5" />
+														</button>
+													</div>
+												))
 											)}
 										</div>
 
@@ -1673,18 +1247,18 @@ export default function NewPortalShipmentPage() {
 											<ul className="mt-3 space-y-2 text-[12px] leading-5 text-ink-soft">
 												<li className="flex items-start gap-2">
 													<CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-orange-deep" />
-													Ensure the bill of lading and
-													cargo details are accurate.
+													Ensure the bill of lading and cargo details
+													are accurate.
 												</li>
 												<li className="flex items-start gap-2">
 													<CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-orange-deep" />
-													Verify container numbers,
-													quantities and seal references.
+													Verify container numbers, quantities and
+													seal references.
 												</li>
 												<li className="flex items-start gap-2">
 													<CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-orange-deep" />
-													Attach every document required
-													for your shipment.
+													Attach all documents required for your
+													shipment.
 												</li>
 											</ul>
 										</div>
@@ -1701,15 +1275,11 @@ export default function NewPortalShipmentPage() {
 										{[
 											{
 												label: "Bill of lading",
-												value:
-													form.billOfLading ||
-													"Not provided",
+												value: form.billOfLading || "Not provided",
 											},
 											{
 												label: "Shipment type",
-												value:
-													form.shipmentType ||
-													"Not provided",
+												value: form.shipmentType,
 											},
 											{
 												label: "Cargo",
@@ -1719,44 +1289,33 @@ export default function NewPortalShipmentPage() {
 											},
 											{
 												label: "Consignee",
-												value:
-													form.consignee ||
-													"Not provided",
+												value: form.consignee || "Not provided",
 											},
 											{
 												label: "Route",
-												value: `${
-													form.originPort || "Origin"
-												} → ${
-													form.destinationPort ||
-													"Destination"
+												value: `${form.originPort || "Origin"} → ${
+													form.destinationPort || "Destination"
 												}`,
 											},
 											{
 												label: "Total packages",
 												value:
-													form.packageCount ||
-													"Not provided",
+													form.packageCount || "Not provided",
 											},
 											{
 												label: "Containers entered",
 												value:
 													form.shipmentType === "FCL"
 														? String(
-																containers.filter(
-																	(
-																		container
-																	) =>
-																		container.containerNo.trim()
+																containers.filter((container) =>
+																	container.containerNo.trim()
 																).length
-														  )
+															)
 														: "Not applicable",
 											},
 											{
 												label: "Documents attached",
-												value: String(
-													documents.length
-												),
+												value: String(documents.length),
 											},
 										].map((item) => (
 											<div
@@ -1779,27 +1338,23 @@ export default function NewPortalShipmentPage() {
 												type="checkbox"
 												checked={declarationAccepted}
 												onChange={(event) =>
-													setDeclarationAccepted(
-														event.target.checked
-													)
+													setDeclarationAccepted(event.target.checked)
 												}
 												className="mt-0.5 size-4 shrink-0 accent-orange"
 											/>
 											<span className="text-[12px] leading-5 text-ink">
-												I confirm that the shipment
-												information provided is accurate to
-												the best of my knowledge and that the
-												supporting documents relate to this
-												declaration.
+												I confirm that the shipment information
+												provided is accurate to the best of my
+												knowledge and that the supporting documents
+												relate to this declaration.
 											</span>
 										</label>
 
 										<p className="mt-3 text-[11px] leading-5 text-ink-soft">
-											Submitting a declaration does not
-											confirm terminal acceptance, customs
-											clearance or cargo release. Those
-											decisions are handled by the
-											appropriate authorised parties.
+											Submitting a declaration does not confirm
+											terminal acceptance, customs clearance or
+											cargo release. Those decisions are handled by
+											the appropriate authorised parties.
 										</p>
 									</div>
 								</div>
@@ -1807,6 +1362,7 @@ export default function NewPortalShipmentPage() {
 						)}
 					</AnimatePresence>
 
+					{/* Sticky bottom action bar */}
 					<div className="sticky bottom-4 z-10 rounded-2xl bg-slate p-4 text-sand ring-1 ring-slate shadow-xl">
 						<div className="flex flex-wrap items-center justify-between gap-3">
 							<div className="min-w-0">
@@ -1842,13 +1398,11 @@ export default function NewPortalShipmentPage() {
 								) : (
 									<Button
 										type="submit"
-										disabled={
-											submitting || !declarationAccepted
-										}
+										disabled={submitting || !declarationAccepted}
 										className="gap-2 bg-orange text-white hover:bg-orange-deep disabled:opacity-60"
 									>
 										{submitting
-											? "Submitting…"
+											? "Preparing…"
 											: "Submit declaration"}
 										<CheckCircle2 className="size-4" />
 									</Button>
@@ -1861,6 +1415,10 @@ export default function NewPortalShipmentPage() {
 		</AppShell>
 	);
 }
+
+/* --------------------------------------------------------------------- */
+/* Helper components                                                      */
+/* --------------------------------------------------------------------- */
 
 function SectionHeader({
 	title,
