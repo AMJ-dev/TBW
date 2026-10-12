@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -22,6 +22,43 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { http, type Resp } from "@/lib/httpClient";
+
+type OptionRow = {
+    id: string;
+    label: string;
+};
+
+type ConfigOptions = {
+    shipmentTypes: OptionRow[];
+    cargoCategories: OptionRow[];
+    packagingTypes: OptionRow[];
+    supportingDocuments: OptionRow[];
+};
+
+const emptyOptions: ConfigOptions = {
+    shipmentTypes: [],
+    cargoCategories: [],
+    packagingTypes: [],
+    supportingDocuments: [],
+};
+
+const normaliseOptions = (raw: unknown): OptionRow[] => {
+    if (!Array.isArray(raw)) return [];
+
+    return raw
+        .map((item: any) => {
+            if (typeof item === "string") {
+                return { id: item, label: item };
+            }
+
+            return {
+                id: String(item?.id ?? item?.key ?? item?.label ?? ""),
+                label: String(item?.label ?? item?.name ?? ""),
+            };
+        })
+        .filter((item) => item.id && item.label.trim());
+};
 
 type ContainerItem = {
 	containerNo: string;
@@ -69,7 +106,9 @@ export default function NewPortalShipmentPage() {
 	const [step, setStep] = useState(1);
 	const [saving, setSaving] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
-
+	const [loadingOptions, setLoadingOptions] = useState(true);
+	const [optionsError, setOptionsError] = useState("");
+	const [options, setOptions] = useState<ConfigOptions>(emptyOptions);
 	const [form, setForm] = useState({
 		shipmentType: "FCL",
 		billOfLading: "",
@@ -98,6 +137,80 @@ export default function NewPortalShipmentPage() {
 		customsReference: "",
 	});
 
+	const fetchOptions = async () => {
+		setLoadingOptions(true);
+		setOptionsError("");
+
+		try {
+			const res = await http.get("/portal/shipment/config/");
+			const resp: Resp = res.data;
+
+			if (resp.error) {
+				setOptionsError(
+					typeof resp.data === "string"
+						? resp.data
+						: "Could not load shipment configuration."
+				);
+				return;
+			}
+
+			const payload: any = resp.code ?? {};
+
+			const loaded: ConfigOptions = {
+				shipmentTypes: normaliseOptions(
+					payload.shipment_types ?? payload.shipmentTypes
+				),
+				cargoCategories: normaliseOptions(
+					payload.cargo_categories ?? payload.cargoCategories
+				),
+				packagingTypes: normaliseOptions(
+					payload.packaging_types ?? payload.packagingTypes
+				),
+				supportingDocuments: normaliseOptions(
+					payload.supporting_documents ??
+						payload.supportingDocuments ??
+						payload.document_types ??
+						payload.documentTypes
+				),
+			};
+
+			setOptions(loaded);
+
+			setForm((current) => ({
+				...current,
+				shipmentType:
+					loaded.shipmentTypes.find(
+						(item) => item.label === current.shipmentType
+					)?.label ?? loaded.shipmentTypes[0]?.label ?? "",
+				cargoCategory:
+					loaded.cargoCategories.find(
+						(item) => item.label === current.cargoCategory
+					)?.label ?? loaded.cargoCategories[0]?.label ?? "",
+				packageType:
+					loaded.packagingTypes.find(
+						(item) => item.label === current.packageType
+					)?.label ?? loaded.packagingTypes[0]?.label ?? "",
+			}));
+
+			setDocumentType((current) =>
+				loaded.supportingDocuments.find(
+					(item) => item.label === current
+				)?.label ?? loaded.supportingDocuments[0]?.label ?? ""
+			);
+		} catch (err: any) {
+			setOptionsError(
+				err?.response?.data?.message ||
+					"Could not load shipment configuration."
+			);
+		} finally {
+			setLoadingOptions(false);
+		}
+	};
+
+	useEffect(() => {
+		void fetchOptions();
+	}, []);
+	
 	const [containers, setContainers] = useState<ContainerItem[]>([
 		emptyContainer(),
 	]);
@@ -272,27 +385,66 @@ export default function NewPortalShipmentPage() {
 	const saveDraft = async () => {
 		setSaving(true);
 		try {
-			const draft = {
-				form,
-				containers,
-				documents: documents.map((document) => ({
-					name: document.file.name,
-					size: document.file.size,
-					type: document.type,
-				})),
-				updatedAt: new Date().toISOString(),
-			};
+			const formData = new FormData();
 
-			const existing = JSON.parse(
-				localStorage.getItem("portal-shipment-drafts") || "[]"
+			formData.append("shipment_type", form.shipmentType);
+			formData.append("bill_of_lading", form.billOfLading.trim());
+			formData.append("cargo_description", form.cargoDescription.trim());
+			formData.append("cargo_category", form.cargoCategory);
+			formData.append("package_type", form.packageType);
+			formData.append("package_count", form.packageCount);
+			formData.append("gross_weight", form.grossWeight);
+			formData.append("volume", form.volume);
+
+			formData.append(
+				"containers",
+				JSON.stringify(
+					form.shipmentType === "FCL"
+						? containers.filter((item) => item.containerNo.trim())
+						: []
+				)
 			);
 
-			localStorage.setItem(
-				"portal-shipment-drafts",
-				JSON.stringify([draft, ...existing])
+			formData.append(
+				"documents",
+				JSON.stringify(
+					documents.map((item, index) => ({
+						name: item.file.name,
+						type: item.type,
+						size: item.file.size,
+						index,
+					}))
+				)
 			);
 
-			toast.success("Shipment draft saved on this device.");
+			documents.forEach((item, index) => {
+				formData.append(`document_file_${index}`, item.file);
+			});
+
+			const res = await http.post("/portal/shipments/", formData, {
+				headers: {
+					"Content-Type": "multipart/form-data",
+				},
+			});
+
+			const resp: Resp = res.data;
+
+			if (resp.error) {
+				toast.error(
+					typeof resp.data === "string"
+						? resp.data
+						: "Could not submit the shipment."
+				);
+				return;
+			}
+
+			toast.success(
+				typeof resp.data === "string"
+					? resp.data
+					: "Shipment submitted successfully."
+			);
+
+			navigate("/portal/shipments");
 		} catch {
 			toast.error("Unable to save the shipment draft.");
 		} finally {
@@ -522,22 +674,16 @@ export default function NewPortalShipmentPage() {
 											className={inputClass}
 											value={form.shipmentType}
 											onChange={(event) =>
-												updateField(
-													"shipmentType",
-													event.target.value
-												)
+												updateField("shipmentType", event.target.value)
 											}
+											required
 										>
-											<option value="FCL">
-												Full Container Load (FCL)
-											</option>
-											<option value="LCL">
-												Less than Container Load (LCL)
-											</option>
-											<option value="Bulk">Bulk cargo</option>
-											<option value="General Cargo">
-												General cargo
-											</option>
+											<option value="">Select shipment type</option>
+											{options.shipmentTypes.map((item) => (
+												<option key={item.id} value={item.label}>
+													{item.label}
+												</option>
+											))}
 										</select>
 									</label>
 
@@ -726,21 +872,16 @@ export default function NewPortalShipmentPage() {
 												className={inputClass}
 												value={form.cargoCategory}
 												onChange={(event) =>
-													updateField(
-														"cargoCategory",
-														event.target.value
-													)
+													updateField("cargoCategory", event.target.value)
 												}
+												required
 											>
-												<option>General Cargo</option>
-												<option>Electronics</option>
-												<option>Food Products</option>
-												<option>Pharmaceuticals</option>
-												<option>Machinery</option>
-												<option>Automotive</option>
-												<option>Construction Materials</option>
-												<option>Chemicals</option>
-												<option>Other</option>
+												<option value="">Select cargo category</option>
+												{options.cargoCategories.map((item) => (
+													<option key={item.id} value={item.label}>
+														{item.label}
+													</option>
+												))}
 											</select>
 										</label>
 
@@ -762,20 +903,16 @@ export default function NewPortalShipmentPage() {
 												className={inputClass}
 												value={form.packageType}
 												onChange={(event) =>
-													updateField(
-														"packageType",
-														event.target.value
-													)
+													updateField("packageType", event.target.value)
 												}
+												required
 											>
-												<option>Cartons</option>
-												<option>Bags</option>
-												<option>Pallets</option>
-												<option>Crates</option>
-												<option>Drums</option>
-												<option>Bundles</option>
-												<option>Loose cargo</option>
-												<option>Other</option>
+												<option value="">Select packaging type</option>
+												{options.packagingTypes.map((item) => (
+													<option key={item.id} value={item.label}>
+														{item.label}
+													</option>
+												))}
 											</select>
 										</label>
 
@@ -1161,13 +1298,14 @@ export default function NewPortalShipmentPage() {
 												Document type
 												<select
 													value={documentType}
-													onChange={(event) =>
-														setDocumentType(event.target.value)
-													}
+													onChange={(event) => setDocumentType(event.target.value)}
 													className={inputClass}
 												>
-													{documentTypes.map((type) => (
-														<option key={type}>{type}</option>
+													<option value="">Select document type</option>
+													{options.supportingDocuments.map((item) => (
+														<option key={item.id} value={item.label}>
+															{item.label}
+														</option>
 													))}
 												</select>
 											</label>
