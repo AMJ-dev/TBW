@@ -239,7 +239,7 @@ try {
 
     $q = $conn->prepare("
         INSERT INTO portal_shipments (
-            id, shipment_reference, user_id, organization_id, shipment_type, bill_of_lading, booking_number,
+            id, shipment_reference, user_id, organisation_id, shipment_type, bill_of_lading, booking_number,
             vessel_name, voyage_number, shipping_line, origin_country,
             origin_port, destination_port, expected_arrival, consignee,
             consignee_email, consignee_phone, cargo_description,
@@ -247,7 +247,7 @@ try {
             volume, hs_code, dangerous_goods, temperature_controlled,
             temperature, special_instructions, customs_reference, status
         ) VALUES (
-            :id, :shipment_reference, :user_id, :organization_id, :shipment_type, :bill_of_lading, :booking_number,
+            :id, :shipment_reference, :user_id, :organisation_id, :shipment_type, :bill_of_lading, :booking_number,
             :vessel_name, :voyage_number, :shipping_line, :origin_country,
             :origin_port, :destination_port, :expected_arrival, :consignee,
             :consignee_email, :consignee_phone, :cargo_description,
@@ -260,7 +260,7 @@ try {
     $q->bindValue(":id", $shipmentId);
     $q->bindValue(":shipment_reference", $shipmentReference);
     $q->bindValue(":user_id", $userId);
-    $q->bindValue(":organization_id", $my_details->organisation_id);
+    $q->bindValue(":organisation_id", $my_details->organisation_id);
     $q->bindValue(":shipment_type", $shipmentType);
     $q->bindValue(":bill_of_lading", trim($_POST["bill_of_lading"] ?? "") ?: null);
     $q->bindValue(":booking_number", trim($_POST["booking_number"] ?? "") ?: null);
@@ -513,6 +513,6 @@ try {
     echo json_encode([
         "error" => true,
         "data" => "Could not save the shipment.",
-        "code" => null
+        "code" => $e->getMessage()
     ]);
 }
