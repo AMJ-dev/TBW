@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
 	AlertTriangle,
@@ -7,10 +7,12 @@ import {
 	ArrowRight,
 	CalendarDays,
 	CheckCircle2,
+	ChevronDown,
 	ClipboardList,
 	Clock3,
 	Container as ContainerIcon,
 	Download,
+	FileCheck2,
 	FileText,
 	Hash,
 	Info,
@@ -23,6 +25,7 @@ import {
 	ShieldCheck,
 	Thermometer,
 	User,
+	XCircle,
 } from "lucide-react";
 import { AppShell, StatusBadge, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
@@ -52,10 +55,30 @@ type ShipmentDocument = {
 	document_label?: string | null;
 };
 
+type Reviewer = {
+	id: string;
+	full_name: string;
+	email: string;
+	phone?: string;
+	pics?: string | null;
+};
+
+type ReviewEvent = {
+	id: string;
+	shipment_id?: string;
+	reviewer_id: string;
+	reviewer: Reviewer | null;
+	decision: string;
+	from_status: string | null;
+	to_status: string | null;
+	reason: string | null;
+	created_at: string;
+};
+
 type ShipmentRecord = {
 	id: string;
 	user_id?: string;
-    shipment_reference?: string | null;
+	shipment_reference?: string | null;
 	organisation_id?: string;
 	shipment_type?: string;
 	bill_of_lading?: string;
@@ -89,6 +112,9 @@ type ShipmentRecord = {
 	document_count?: number;
 	containers?: ShipmentContainer[];
 	documents?: ShipmentDocument[];
+	reviews?: ReviewEvent[];
+	latest_review?: ReviewEvent | null;
+	latest_review_reason?: string | null;
 };
 
 const statusLabel = (status?: string): string => {
@@ -134,6 +160,40 @@ const formatBytes = (bytes?: number | null): string => {
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+const decisionTone: Record<
+	string,
+	{ bg: string; text: string; ring: string; label: string; icon: typeof CheckCircle2 }
+> = {
+	APPROVED: {
+		bg: "bg-teal/10",
+		text: "text-teal-deep",
+		ring: "ring-teal/30",
+		label: "Approved",
+		icon: CheckCircle2,
+	},
+	REJECTED: {
+		bg: "bg-coral/10",
+		text: "text-coral",
+		ring: "ring-coral/30",
+		label: "Rejected",
+		icon: XCircle,
+	},
+	RETURNED: {
+		bg: "bg-orange/10",
+		text: "text-orange-deep",
+		ring: "ring-orange/30",
+		label: "Returned",
+		icon: FileCheck2,
+	},
+	CHANGES_REQUESTED: {
+		bg: "bg-orange/10",
+		text: "text-orange-deep",
+		ring: "ring-orange/30",
+		label: "Changes requested",
+		icon: FileCheck2,
+	},
+};
+
 export default function PortalShipmentDetailsPage() {
 	const { id } = useParams<{ id: string }>();
 	const navigate = useNavigate();
@@ -141,6 +201,7 @@ export default function PortalShipmentDetailsPage() {
 	const [shipment, setShipment] = useState<ShipmentRecord | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState("");
+	const [showReviews, setShowReviews] = useState(true);
 
 	const load = async () => {
 		if (!id) return;
@@ -175,6 +236,9 @@ export default function PortalShipmentDetailsPage() {
 					: [],
 				documents: Array.isArray(record.documents)
 					? record.documents
+					: [],
+				reviews: Array.isArray(record.reviews)
+					? record.reviews
 					: [],
 			});
 		} catch (err: any) {
@@ -251,6 +315,7 @@ export default function PortalShipmentDetailsPage() {
 
 	const containers = shipment.containers ?? [];
 	const documents = shipment.documents ?? [];
+	const reviews = shipment.reviews ?? [];
 	const route =
 		shipment.origin_port || shipment.destination_port
 			? `${shipment.origin_port || "Origin"} → ${
@@ -401,11 +466,11 @@ export default function PortalShipmentDetailsPage() {
 									mono
 								/>
 								<Field
-										icon={Hash}
-										label="Shipment reference"
-										value={shipment.shipment_reference ?? "—"}
-										mono
-									/>
+									icon={Hash}
+									label="Shipment reference"
+									value={shipment.shipment_reference ?? "—"}
+									mono
+								/>
 								<Field
 									icon={Hash}
 									label="Booking number"
@@ -477,11 +542,7 @@ export default function PortalShipmentDetailsPage() {
 										label="Expected arrival"
 										value={formatDate(shipment.expected_arrival)}
 									/>
-									<Field
-										icon={MapPin}
-										label="Route"
-										value={route}
-									/>
+									<Field icon={MapPin} label="Route" value={route} />
 								</dl>
 							</div>
 						</Panel>
@@ -725,8 +786,7 @@ export default function PortalShipmentDetailsPage() {
 										No documents attached
 									</p>
 									<p className="mt-1 text-[11px] leading-5 text-ink-soft">
-										Upload supporting documents from the documents
-										centre.
+										Upload supporting documents from the documents centre.
 									</p>
 								</div>
 							) : (
@@ -772,6 +832,51 @@ export default function PortalShipmentDetailsPage() {
 								</ul>
 							)}
 						</Panel>
+
+						{reviews.length > 0 && (
+							<Panel
+								icon={ShieldCheck}
+								title="Review history"
+								description={`${reviews.length} review${
+									reviews.length === 1 ? "" : "s"
+								} recorded for this declaration.`}
+								badge={
+									<button
+										type="button"
+										onClick={() => setShowReviews((v) => !v)}
+										className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft hover:text-ink"
+									>
+										{showReviews ? "Hide" : "Show"}
+										<ChevronDown
+											className={cn(
+												"size-3 transition-transform",
+												showReviews && "rotate-180"
+											)}
+										/>
+									</button>
+								}
+							>
+								<AnimatePresence initial={false}>
+									{showReviews && (
+										<motion.ol
+											initial={{ height: 0, opacity: 0 }}
+											animate={{ height: "auto", opacity: 1 }}
+											exit={{ height: 0, opacity: 0 }}
+											transition={{ duration: 0.2 }}
+											className="relative space-y-5 overflow-hidden p-5 pl-8 before:absolute before:bottom-5 before:left-[22px] before:top-5 before:w-px before:bg-line"
+										>
+											{reviews.map((review, index) => (
+												<ReviewItem
+													key={review.id}
+													review={review}
+													isLatest={index === 0}
+												/>
+											))}
+										</motion.ol>
+									)}
+								</AnimatePresence>
+							</Panel>
+						)}
 
 						<Panel
 							icon={ClipboardList}
@@ -820,9 +925,9 @@ export default function PortalShipmentDetailsPage() {
 									</p>
 									<p className="mt-1 text-[11px] leading-5 text-ink-soft">
 										Submitting a declaration does not confirm terminal
-										acceptance, customs clearance or cargo release.
-										Those decisions are handled by the appropriate
-										authorised parties.
+										acceptance, customs clearance or cargo release. Those
+										decisions are handled by the appropriate authorised
+										parties.
 									</p>
 								</div>
 							</div>
@@ -1024,10 +1129,10 @@ function TimelineRow({
 		tone === "success"
 			? "bg-teal-500/10 text-teal-700"
 			: tone === "warning"
-				? "bg-orange/10 text-orange-deep"
-				: tone === "critical"
-					? "bg-carmine/10 text-carmine"
-					: "bg-sky-500/10 text-sky-700";
+			? "bg-orange/10 text-orange-deep"
+			: tone === "critical"
+			? "bg-carmine/10 text-carmine"
+			: "bg-sky-500/10 text-sky-700";
 
 	return (
 		<li className="flex items-start gap-3 p-4">
@@ -1051,6 +1156,117 @@ function TimelineRow({
 				>
 					{value}
 				</p>
+			</div>
+		</li>
+	);
+}
+
+function ReviewAvatar({ reviewer }: { reviewer: Reviewer | null }) {
+	if (!reviewer) {
+		return (
+			<span className="grid size-9 shrink-0 place-items-center rounded-full bg-sand text-ink-soft ring-2 ring-paper">
+				<User className="size-4" />
+			</span>
+		);
+	}
+
+	const hasPhoto = reviewer.pics && !reviewer.pics.endsWith("avatar.png");
+
+	if (hasPhoto) {
+		return (
+			<img
+				src={resolveSrc(reviewer.pics ?? "")}
+				alt={reviewer.full_name}
+				className="size-9 shrink-0 rounded-full object-cover ring-2 ring-paper"
+			/>
+		);
+	}
+
+	const initials = reviewer.full_name
+		.split(" ")
+		.filter(Boolean)
+		.map((p) => p.charAt(0))
+		.slice(0, 2)
+		.join("")
+		.toUpperCase();
+
+	return (
+		<span className="grid size-9 shrink-0 place-items-center rounded-full bg-ink font-display text-[11px] font-semibold text-sand ring-2 ring-paper">
+			{initials || "—"}
+		</span>
+	);
+}
+
+function ReviewItem({
+	review,
+	isLatest,
+}: {
+	review: ReviewEvent;
+	isLatest: boolean;
+}) {
+	const tone =
+		decisionTone[review.decision] ?? {
+			bg: "bg-sand-2",
+			text: "text-ink-soft",
+			ring: "ring-line",
+			label: review.decision,
+			icon: FileText,
+		};
+	const Icon = tone.icon;
+
+	return (
+		<li className="relative">
+			<div className="absolute -left-[26px] top-1.5">
+				<ReviewAvatar reviewer={review.reviewer} />
+				{isLatest && (
+					<span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-orange ring-2 ring-paper" />
+				)}
+			</div>
+
+			<div className="ml-6 rounded-xl border border-line bg-background p-3.5">
+				<div className="flex flex-wrap items-start justify-between gap-2">
+					<div className="min-w-0">
+						<p className="text-[13px] font-semibold text-ink">
+							{review.reviewer?.full_name || "Operator"}
+						</p>
+						{review.reviewer?.email && (
+							<p className="mt-0.5 font-mono text-[10px] text-ink-soft">
+								{review.reviewer.email}
+							</p>
+						)}
+					</div>
+					<span className="font-mono text-[10px] text-ink-soft">
+						{formatDateTime(review.created_at)}
+					</span>
+				</div>
+
+				<div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+					<span
+						className={cn(
+							"inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ring-1 ring-inset",
+							tone.bg,
+							tone.text,
+							tone.ring
+						)}
+					>
+						<Icon className="size-3" />
+						{tone.label}
+					</span>
+
+					{review.from_status && review.to_status && (
+						<span className="inline-flex items-center gap-1 rounded-full bg-sand-2 px-2 py-0.5 font-mono text-[10px] text-ink-soft ring-1 ring-line">
+							{statusLabel(review.from_status)}
+							<ArrowRight className="size-2.5" />
+							{statusLabel(review.to_status)}
+						</span>
+					)}
+				</div>
+
+				{review.reason && (
+					<p className="mt-2.5 rounded-lg bg-sand/60 p-2.5 text-[12px] leading-5 text-ink-soft">
+						{review.reason}
+					</p>
+				)}
 			</div>
 		</li>
 	);

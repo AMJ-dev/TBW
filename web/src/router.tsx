@@ -93,7 +93,8 @@ const OperationsCycleCountPage = lazy(() => import("@/pages/operations/cycle-cou
 const OperationsValueAddedPage = lazy(() => import("@/pages/operations/value-added"));
 const OperationsOverridesPage = lazy(() => import("@/pages/operations/overrides"));
 const OperationsShipmentsPage = lazy(() => import("@/pages/operations/shipment"));
-const OperationsShipmentReviewPage = lazy(() => import("@/pages/operations/shipment/review"));
+const OperationsReviewPage = lazy(() => import("@/pages/operations/shipment/review"));
+const OperationsShipmentReviewPage = lazy(() => import("@/pages/operations/shipment/shipment-review-details"));
 
 const PortalDashboardPage = lazy(() => import("@/pages/portal/dashboard"));
 const PortalBookingsPage = lazy(() => import("@/pages/portal/bookings"));
@@ -104,7 +105,6 @@ const PackageDetailPage = lazy(() => import("@/pages/portal/cargo/package"));
 const ServiceRequestPage = lazy(() => import("@/pages/portal/cargo/service-request"));
 const DiscrepancyClaimPage = lazy(() => import("@/pages/portal/cargo/claim"));
 const PortalDocumentsPage = lazy(() => import("@/pages/portal/documents"));
-const DocumentUploadPage = lazy(() => import("@/pages/portal/documents/upload"));
 const PortalInvoicesPage = lazy(() => import("@/pages/portal/invoices"));
 const PortalPaymentsPage = lazy(() => import("@/pages/portal/payments"));
 const InvoiceDisputePage = lazy(() => import("@/pages/portal/payments/dispute"));
@@ -229,6 +229,7 @@ export default function Routers() {
 						<Route path="/operations/value-added" element={<OperationsValueAddedPage />} />
 						<Route path="/operations/overrides" element={<OperationsOverridesPage />} />
 						<Route path="/operations/shipments" element={<OperationsShipmentsPage />} />
+						<Route path="/operations/review" element={<OperationsReviewPage />} />
 						<Route path="/operations/shipments/:id" element={<OperationsShipmentReviewPage />} />
 
 						<Route path="/portal" element={<PortalDashboardPage />} />
@@ -245,7 +246,6 @@ export default function Routers() {
 						<Route path="/portal/cargo/:id/service-request" element={<ServiceRequestPage />} />
 						<Route path="/portal/cargo/:id/claim" element={<DiscrepancyClaimPage />} />
 						<Route path="/portal/documents" element={<PortalDocumentsPage />} />
-						<Route path="/portal/documents/upload" element={<DocumentUploadPage />} />
 						<Route path="/portal/invoices" element={<PortalInvoicesPage />} />
 						<Route path="/portal/payments" element={<PortalPaymentsPage />} />
 						<Route path="/portal/payments/dispute" element={<InvoiceDisputePage />} />

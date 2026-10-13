@@ -9,6 +9,10 @@ import {
     ListChecks, HelpCircle, LayoutDashboard, LogOut, Menu,
     PackageCheck, Package, QrCode, Search, Settings, ShieldCheck,
     Truck, User, UsersRound, Warehouse, X,
+    CarFront,
+    CreditCard,
+    ReceiptText,
+    CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -152,6 +156,92 @@ const sections = [
         title: "Administration",
         access: ["system"],
         items: [
+            { label: "Overview", to: "/admin", icon: LayoutDashboard, exact: true, access: ["system"] },
+            { label: "Organisations", to: "/admin/organisations", icon: Boxes, access: ["system"] },
+            { label: "Users", to: "/admin/users", icon: UsersRound, access: ["system"] },
+            { label: "Roles & Permissions", to: "/admin/roles", icon: ShieldCheck, access: ["system"] },
+            { label: "Configuration", to: "/admin/configuration", icon: Settings, access: ["system"] },
+            { label: "Audit Log", to: "/admin/audit", icon: Activity, access: ["system"] },
+        ],
+    },
+    {
+        title: "Operations",
+        access: ["system"],
+        items: [
+            { label: "Dashboard", to: "/operations/dashboard", icon: LayoutDashboard, access: ["system"] },
+            { label: "Declaration Review", to: "/operations/shipments/review", icon: ClipboardCheck, access: ["system"]},
+            { label: "Manifest Intake", to: "/operations/manifest", icon: FileSpreadsheet, access: ["system"] },
+            { label: "Receiving", to: "/operations/receiving", icon: PackageCheck, access: ["system"] },
+            { label: "Yard", to: "/operations/yard", icon: Grid2X2, access: ["system"] },
+            { label: "Warehouse", to: "/operations/warehouse", icon: Warehouse, access: ["system"] },
+            { label: "Examination", to: "/operations/examination", icon: ClipboardCheck, access: ["system"] },
+            { label: "Seal Events", to: "/operations/seals", icon: ShieldCheck, access: ["system"] },
+            { label: "Inventory", to: "/operations/inventory", icon: Boxes, access: ["system"] },
+            { label: "Value-added Services", to: "/operations/value-added", icon: Settings, access: ["system"] },
+            { label: "Holds & Exceptions", to: "/operations/holds", icon: AlertTriangle, access: ["system"] },
+        ],
+    },
+    {
+        title: "Gate",
+        access: ["system"],
+        items: [
+            { label: "Dashboard", to: "/gate/dashboard", icon: LayoutDashboard, access: ["system"] },
+            { label: "Appointments", to: "/gate/appointments", icon: Clock3, access: ["system"] },
+            { label: "Gate Passes", to: "/gate/passes", icon: QrCode, access: ["system"] },
+            { label: "Gate-in", to: "/gate/in", icon: Truck, access: ["system"] },
+            { label: "Gate-out", to: "/gate/out", icon: Truck, access: ["system"] },
+            { label: "Vehicle Registry", to: "/gate/vehicles", icon: CarFront, access: ["system"] },
+        ],
+    },
+    {
+        title: "Stakeholder Portal",
+        access: ["organisation"],
+        items: [
+            { label: "Dashboard", to: "/portal/dashboard", icon: LayoutDashboard, access: ["organisation"] },
+            { label: "My Shipments", to: "/portal/shipments", icon: Package, access: ["organisation"] },
+            { label: "Bookings", to: "/portal/bookings", icon: CalendarDays, access: ["organisation"] },
+            { label: "Appointments", to: "/portal/appointments", icon: Clock3, access: ["organisation"] },
+            { label: "Documents", to: "/portal/documents", icon: FileText, access: ["organisation"] },
+            { label: "Invoices", to: "/portal/invoices", icon: FileSpreadsheet, access: ["organisation"] },
+            { label: "Payments", to: "/portal/payments", icon: CreditCard, access: ["organisation"] },
+            { label: "Statement of Account", to: "/portal/statement", icon: ReceiptText, access: ["organisation"] },
+            { label: "KYC & Signatories", to: "/portal/kyc", icon: ShieldCheck, access: ["organisation"] },
+            { label: "Portal Users", to: "/portal/users", icon: UsersRound, access: ["organisation"] },
+        ],
+    },
+    {
+        title: "Finance",
+        access: ["system"],
+        items: [
+            { label: "Dashboard", to: "/finance/dashboard", icon: BarChart3, access: ["system"] },
+            { label: "Invoice Ledger", to: "/finance/invoices", icon: FileCheck2, access: ["system"] },
+            { label: "Payments & Receipts", to: "/finance/payments", icon: ReceiptText, access: ["system"] },
+            { label: "Tariffs", to: "/finance/tariffs", icon: FileSpreadsheet, access: ["system"] },
+            { label: "Credit Management", to: "/finance/credit", icon: ShieldCheck, access: ["system"] },
+            { label: "Collections", to: "/finance/collections", icon: Clock3, access: ["system"] },
+            { label: "Approvals", to: "/finance/approvals", icon: Check, access: ["system"] },
+            { label: "Tax Rules", to: "/finance/tax", icon: Settings, access: ["system"] },
+            { label: "Reconciliation", to: "/finance/reconciliation", icon: ClipboardCheck, access: ["system"] },
+        ],
+    },
+    {
+        title: "Reports",
+        access: ["system"],
+        items: [
+            { label: "Operations Report", to: "/reports/operations", icon: Truck, access: ["system"] },
+            { label: "Financial Report", to: "/reports/financial", icon: FileSpreadsheet, access: ["system"] },
+            { label: "Compliance Report", to: "/reports/compliance", icon: ShieldCheck, access: ["system"] },
+        ],
+    },
+];
+
+
+/*
+const sections = [
+    {
+        title: "Administration",
+        access: ["system"],
+        items: [
             { label: "Admin overview", to: "/admin", icon: LayoutDashboard, exact: true, access: ["system"] },
             { label: "Organisations", to: "/admin/organisations", icon: Boxes, access: ["system"] },
             { label: "Users", to: "/admin/users", icon: UsersRound, access: ["system"] },
@@ -200,7 +290,6 @@ const sections = [
             { label: "Bookings", to: "/portal/bookings", icon: Clock3, access: ["organisation"] },
             { label: "Appointments", to: "/gate/appointments", icon: Clock3, access: ["organisation"] },
             { label: "Documents", to: "/portal/documents", icon: FileText, access: ["organisation"] },
-            { label: "Upload documents", to: "/portal/documents/upload", icon: FileCheck2, access: ["organisation"] },
             { label: "Invoices", to: "/portal/invoices", icon: FileSpreadsheet, access: ["organisation"] },
             { label: "Payments", to: "/portal/payments", icon: ClipboardCheck, access: ["organisation"] },
             { label: "Statement of account", to: "/portal/statement", icon: FileText, access: ["organisation"] },
@@ -253,6 +342,7 @@ const sections = [
         ],
     },
 ];
+*/
 
 function RejectedPanel() {
     return (

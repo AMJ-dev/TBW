@@ -34,3 +34,11 @@
 | Data/privacy administration     |                 ❌ |                          Yes |
 | System/security administration  |                 ❌ |                          Yes |
 |                                 |                     |                              |
+
+
+HELD and OVERSTAYED
+completes KYC
+declares the shipment
+uploads documents
+identifies its cargo.
+The complete journey at a glance add the link to all of it
