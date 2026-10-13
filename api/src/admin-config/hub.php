@@ -225,19 +225,6 @@
                 "enabled" => true
             ],
             [
-                "key" => "feature_flags",
-                "title" => "Feature Flags",
-                "desc" => "Control platform capabilities without requiring a code deployment.",
-                "href" => "/admin/configuration/feature-flags",
-                "icon" => "Flag",
-                "group" => "governance",
-                "state" => "Available",
-                "stateTone" => "success",
-                "lastChanged" => "Configured",
-                "featured" => false,
-                "enabled" => true
-            ],
-            [
                 "key" => "maintenance",
                 "title" => "Maintenance & Notices",
                 "desc" => "Control maintenance mode, scheduled notices and planned downtime messaging.",

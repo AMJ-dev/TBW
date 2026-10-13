@@ -43,6 +43,7 @@ try {
         SELECT
             s.id,
             s.user_id,
+            s.shipment_reference,
             s.organisation_id,
             s.shipment_type,
             s.bill_of_lading,

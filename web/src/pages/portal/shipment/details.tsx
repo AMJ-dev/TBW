@@ -30,10 +30,6 @@ import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
 import { resolveSrc } from "@/lib/functions";
 
-/* ------------------------------------------------------------------ */
-/* Types                                                               */
-/* ------------------------------------------------------------------ */
-
 type ShipmentContainer = {
 	id: string;
 	container_no: string;
@@ -59,6 +55,7 @@ type ShipmentDocument = {
 type ShipmentRecord = {
 	id: string;
 	user_id?: string;
+    shipment_reference?: string | null;
 	organisation_id?: string;
 	shipment_type?: string;
 	bill_of_lading?: string;
@@ -93,10 +90,6 @@ type ShipmentRecord = {
 	containers?: ShipmentContainer[];
 	documents?: ShipmentDocument[];
 };
-
-/* ------------------------------------------------------------------ */
-/* Helpers                                                             */
-/* ------------------------------------------------------------------ */
 
 const statusLabel = (status?: string): string => {
 	if (!status) return "Unknown";
@@ -140,10 +133,6 @@ const formatBytes = (bytes?: number | null): string => {
 	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
 	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
-
-/* ------------------------------------------------------------------ */
-/* Page                                                                */
-/* ------------------------------------------------------------------ */
 
 export default function PortalShipmentDetailsPage() {
 	const { id } = useParams<{ id: string }>();
@@ -204,8 +193,6 @@ export default function PortalShipmentDetailsPage() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [id]);
 
-	/* ----------------------------- Loading ---------------------------- */
-
 	if (loading) {
 		return (
 			<AppShell title="Shipment details" eyebrow="Stakeholder Portal">
@@ -224,8 +211,6 @@ export default function PortalShipmentDetailsPage() {
 			</AppShell>
 		);
 	}
-
-	/* ----------------------------- Error ------------------------------ */
 
 	if (error || !shipment) {
 		return (
@@ -264,8 +249,6 @@ export default function PortalShipmentDetailsPage() {
 		);
 	}
 
-	/* ----------------------------- Body ------------------------------- */
-
 	const containers = shipment.containers ?? [];
 	const documents = shipment.documents ?? [];
 	const route =
@@ -284,7 +267,6 @@ export default function PortalShipmentDetailsPage() {
 			eyebrow="Stakeholder Portal · Shipment"
 		>
 			<div className="space-y-5 pb-8">
-				{/* Back link */}
 				<Link
 					to="/portal/shipments"
 					className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft hover:text-orange"
@@ -293,7 +275,6 @@ export default function PortalShipmentDetailsPage() {
 					Back to shipments
 				</Link>
 
-				{/* Hero — light card, matching the list page */}
 				<motion.section
 					initial={{ opacity: 0, y: 10 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -316,7 +297,14 @@ export default function PortalShipmentDetailsPage() {
 							<h1 className="mt-3 max-w-3xl font-display text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
 								{shipment.bill_of_lading || "Untitled shipment"}
 							</h1>
-
+							{shipment.shipment_reference && (
+								<div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-orange/20 bg-orange/5 px-3 py-2">
+									<Hash className="size-4 text-orange" />
+									<span className="font-mono text-xs font-semibold tracking-wide text-orange-deep">
+										{shipment.shipment_reference}
+									</span>
+								</div>
+							)}
 							<p className="mt-2 max-w-2xl text-sm text-muted-foreground">
 								{shipment.cargo_description ||
 									"No cargo description was provided for this declaration."}
@@ -355,7 +343,6 @@ export default function PortalShipmentDetailsPage() {
 					</div>
 				</motion.section>
 
-				{/* Summary tiles */}
 				<section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 					<SummaryTile
 						icon={ContainerIcon}
@@ -399,11 +386,8 @@ export default function PortalShipmentDetailsPage() {
 					/>
 				</section>
 
-				{/* Body */}
 				<div className="grid gap-5 lg:grid-cols-[1.4fr_1fr] lg:items-start">
-					{/* Left column */}
 					<div className="space-y-5">
-						{/* Shipping information */}
 						<Panel
 							icon={Ship}
 							title="Shipping information"
@@ -416,6 +400,12 @@ export default function PortalShipmentDetailsPage() {
 									value={shipment.bill_of_lading ?? "—"}
 									mono
 								/>
+								<Field
+										icon={Hash}
+										label="Shipment reference"
+										value={shipment.shipment_reference ?? "—"}
+										mono
+									/>
 								<Field
 									icon={Hash}
 									label="Booking number"
@@ -446,7 +436,6 @@ export default function PortalShipmentDetailsPage() {
 							</dl>
 						</Panel>
 
-						{/* Route & schedule */}
 						<Panel
 							icon={MapPin}
 							title="Route & schedule"
@@ -497,7 +486,6 @@ export default function PortalShipmentDetailsPage() {
 							</div>
 						</Panel>
 
-						{/* Cargo declaration */}
 						<Panel
 							icon={Package}
 							title="Cargo declaration"
@@ -590,7 +578,6 @@ export default function PortalShipmentDetailsPage() {
 							</div>
 						</Panel>
 
-						{/* Containers */}
 						<Panel
 							icon={ContainerIcon}
 							title="Containers"
@@ -684,9 +671,7 @@ export default function PortalShipmentDetailsPage() {
 						</Panel>
 					</div>
 
-					{/* Sidebar */}
 					<div className="space-y-5">
-						{/* Consignee */}
 						<Panel
 							icon={User}
 							title="Consignee"
@@ -713,7 +698,6 @@ export default function PortalShipmentDetailsPage() {
 							</dl>
 						</Panel>
 
-						{/* Documents */}
 						<Panel
 							icon={FileText}
 							title="Supporting documents"
@@ -789,7 +773,6 @@ export default function PortalShipmentDetailsPage() {
 							)}
 						</Panel>
 
-						{/* Timeline */}
 						<Panel
 							icon={ClipboardList}
 							title="Declaration timeline"
@@ -826,7 +809,6 @@ export default function PortalShipmentDetailsPage() {
 							</ul>
 						</Panel>
 
-						{/* Notice */}
 						<div className="rounded-2xl bg-paper p-4 ring-1 ring-line">
 							<div className="flex items-start gap-3">
 								<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
@@ -851,10 +833,6 @@ export default function PortalShipmentDetailsPage() {
 		</AppShell>
 	);
 }
-
-/* ------------------------------------------------------------------ */
-/* Helper components                                                   */
-/* ------------------------------------------------------------------ */
 
 function QuickStat({
 	icon: Icon,

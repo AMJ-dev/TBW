@@ -48,7 +48,6 @@ const AdminUserDetailsPage = lazy(() => import("@/pages/admin/user-details"));
 
 const AdminCargoConfigurationPage = lazy(() => import("@/pages/admin/configuration/cargo"));
 const AdminDocumentsConfigurationPage = lazy(() => import("@/pages/admin/configuration/documents"));
-const AdminFeatureFlagsConfigurationPage = lazy(() => import("@/pages/admin/configuration/feature-flags"));
 const AdminFinancialConfigurationPage = lazy(() => import("@/pages/admin/configuration/financial"));
 const AdminGateConfigurationPage = lazy(() => import("@/pages/admin/configuration/gate"));
 const AdminIntegrationsConfigurationPage = lazy(() => import("@/pages/admin/configuration/integrations"));
@@ -93,7 +92,8 @@ const OperationsStuffingPage = lazy(() => import("@/pages/operations/stuffing"))
 const OperationsCycleCountPage = lazy(() => import("@/pages/operations/cycle-count"));
 const OperationsValueAddedPage = lazy(() => import("@/pages/operations/value-added"));
 const OperationsOverridesPage = lazy(() => import("@/pages/operations/overrides"));
-const OperationsShipmentsPage = lazy(() => import("@/pages/operations/shipments"));
+const OperationsShipmentsPage = lazy(() => import("@/pages/operations/shipment"));
+const OperationsShipmentReviewPage = lazy(() => import("@/pages/operations/shipment/review"));
 
 const PortalDashboardPage = lazy(() => import("@/pages/portal/dashboard"));
 const PortalBookingsPage = lazy(() => import("@/pages/portal/bookings"));
@@ -181,7 +181,6 @@ export default function Routers() {
 						<Route path="/admin/configuration/terminal" element={<AdminTerminalConfigurationPage />} />
 						<Route path="/admin/configuration/cargo" element={<AdminCargoConfigurationPage />} />
 						<Route path="/admin/configuration/documents" element={<AdminDocumentsConfigurationPage />} />
-						<Route path="/admin/configuration/feature-flags" element={<AdminFeatureFlagsConfigurationPage />} />
 						<Route path="/admin/configuration/gate" element={<AdminGateConfigurationPage />} />
 						<Route path="/admin/configuration/integrations" element={<AdminIntegrationsConfigurationPage />} />
 						<Route path="/admin/configuration/maintenance" element={<AdminMaintenanceConfigurationPage />} />
@@ -230,6 +229,7 @@ export default function Routers() {
 						<Route path="/operations/value-added" element={<OperationsValueAddedPage />} />
 						<Route path="/operations/overrides" element={<OperationsOverridesPage />} />
 						<Route path="/operations/shipments" element={<OperationsShipmentsPage />} />
+						<Route path="/operations/shipments/:id" element={<OperationsShipmentReviewPage />} />
 
 						<Route path="/portal" element={<PortalDashboardPage />} />
 						<Route path="/portal/dashboard" element={<PortalDashboardPage />} />

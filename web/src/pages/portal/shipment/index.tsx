@@ -205,8 +205,8 @@ export default function PortalShipmentsPage() {
 		setLoading(true);
 		setError("");
 		try {
-			const response = await http.get("/portal/shipments/");
-			const resp: Resp = response.data;
+			const res = await http.get("/portal/shipments/");
+			const resp: Resp = res.data;
 
 			if (resp.error) {
 				throw new Error(

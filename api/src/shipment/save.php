@@ -232,13 +232,14 @@ try {
     }
 
     $shipmentId = generateId();
+    $shipmentReference = "TRN-SHP-" . date("Y") . "-" . strtoupper(bin2hex(random_bytes(6)));
 
     $conn->beginTransaction();
     $transactionStarted = true;
 
     $q = $conn->prepare("
         INSERT INTO portal_shipments (
-            id, user_id, organization_id, shipment_type, bill_of_lading, booking_number,
+            id, shipment_reference, user_id, organization_id, shipment_type, bill_of_lading, booking_number,
             vessel_name, voyage_number, shipping_line, origin_country,
             origin_port, destination_port, expected_arrival, consignee,
             consignee_email, consignee_phone, cargo_description,
@@ -246,7 +247,7 @@ try {
             volume, hs_code, dangerous_goods, temperature_controlled,
             temperature, special_instructions, customs_reference, status
         ) VALUES (
-            :id, :user_id, :organization_id, :shipment_type, :bill_of_lading, :booking_number,
+            :id, :shipment_reference, :user_id, :organization_id, :shipment_type, :bill_of_lading, :booking_number,
             :vessel_name, :voyage_number, :shipping_line, :origin_country,
             :origin_port, :destination_port, :expected_arrival, :consignee,
             :consignee_email, :consignee_phone, :cargo_description,
@@ -257,6 +258,7 @@ try {
     ");
 
     $q->bindValue(":id", $shipmentId);
+    $q->bindValue(":shipment_reference", $shipmentReference);
     $q->bindValue(":user_id", $userId);
     $q->bindValue(":organization_id", $my_details->organisation_id);
     $q->bindValue(":shipment_type", $shipmentType);
@@ -477,6 +479,7 @@ try {
         "data" => "Shipment declaration submitted for review.",
         "code" => [
             "shipment_id" => $shipmentId,
+            "shipment_reference" => $shipmentReference,
             "status" => "pending_review"
         ]
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
