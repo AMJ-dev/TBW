@@ -101,6 +101,6 @@ RewriteRule ^portal/shipment/config/$ src/shipment/config.php [NC]
 RewriteRule ^portal/shipment/([0-9a-zA-Z-]+)/$ src/shipment/details.php?id=$1 [NC]
 
 RewriteRule ^operator/shipments/$ src/shipment/all.php [NC]
-RewriteRule ^operator/shipment/review/$ src/shipment/review.php [NC]
+RewriteRule ^operator/shipments/review/$ src/shipment/review.php [NC]
 RewriteRule ^operator/shipment/transition/$ src/shipment/transition.php [NC]
 RewriteRule ^operator/shipment/([0-9a-zA-Z-]+)/$ src/shipment/op-details.php?id=$1 [NC]
