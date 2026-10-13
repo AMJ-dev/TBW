@@ -208,12 +208,62 @@ try {
         "containers" => $containers,
         "documents" => $documents
     ];
+ $reviewStmt = $conn->prepare("
+        SELECT
+            sdr.id,
+            sdr.shipment_id,
+            sdr.reviewer_id,
+            reviewer.full_name AS reviewer_name,
+            reviewer.email AS reviewer_email,
+            reviewer.phone AS reviewer_phone,
+            reviewer.pics AS reviewer_pics,
+            sdr.decision,
+            sdr.from_status,
+            sdr.to_status,
+            sdr.reason,
+            sdr.created_at
+        FROM shipment_declaration_reviews sdr
+        LEFT JOIN users reviewer ON reviewer.id = sdr.reviewer_id
+        WHERE sdr.shipment_id = :shipment_id
+        ORDER BY sdr.created_at DESC
+    ");
 
+    $reviewStmt->bindValue(":shipment_id", $shipmentId);
+    $reviewStmt->execute();
+    $reviewRows = $reviewStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $reviews = [];
+
+    foreach ($reviewRows as $review) {
+        $reviews[] = [
+            "id" => (string) $review["id"],
+            "shipment_id" => (string) $review["shipment_id"],
+            "reviewer_id" => (string) $review["reviewer_id"],
+            "reviewer" => [
+                "id" => (string) $review["reviewer_id"],
+                "full_name" => $review["reviewer_name"],
+                "email" => $review["reviewer_email"],
+                "phone" => $review["reviewer_phone"],
+                "pics" => $review["reviewer_pics"]
+            ],
+            "decision" => (string) $review["decision"],
+            "from_status" => (string) $review["from_status"],
+            "to_status" => (string) $review["to_status"],
+            "reason" => $review["reason"],
+            "created_at" => (string) $review["created_at"]
+        ];
+    }
+
+    $latestReview = $reviews[0] ?? null;
+    
     echo json_encode([
         "error" => false,
         "data" => "Shipment loaded.",
         "code" => [
-            "shipment" => $shipment
+            "shipment" => $shipment,
+            "reviews" => $reviews,
+            "latest_review" => $latestReview,
+            "latest_review_reason" => $latestReview["reason"] ?? null
         ]
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
