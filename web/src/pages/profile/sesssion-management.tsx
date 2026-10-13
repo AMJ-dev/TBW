@@ -14,7 +14,7 @@ import {
 	Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell, Metric, StatusBadge } from "@/components/shell";
+import { AppShell, Metric, StatusBadge } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { http, type Resp } from "@/lib/httpClient";
 

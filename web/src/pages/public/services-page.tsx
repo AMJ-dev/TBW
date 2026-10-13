@@ -1,7 +1,7 @@
 import { Link } from "@/components/router-link";
 import { ArrowRight, Boxes, Check, FileCheck2, Truck, Warehouse } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
+import { PublicFrame, PublicKicker } from "@/components/public-shell";
 
 const services = [
 	{

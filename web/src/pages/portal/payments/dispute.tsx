@@ -11,7 +11,7 @@ import {
 	Upload,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell } from "@/components/shell";
+import { AppShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LocalFilePicker } from "@/components/ui/local-file-picker";

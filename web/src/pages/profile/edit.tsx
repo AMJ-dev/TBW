@@ -22,7 +22,7 @@ import { useDeviceInfo } from "@/hooks/useDeviceInfo";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AppShell, Avatar } from "@/components/shell";
+import { AppShell, Avatar } from "@/components/auth-shell";
 import { cn } from "@/lib/utils";
 import { resolveSrc } from "@/lib/functions";
 

@@ -9,7 +9,7 @@ import {
 	Warehouse,
 	X,
 } from "lucide-react";
-import { AppShell, StatusBadge, Metric, statusTone } from "@/components/shell";
+import { AppShell, StatusBadge, Metric, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { notifications } from "@/data/mock";

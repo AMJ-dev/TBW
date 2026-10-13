@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, Boxes, Grid2X2, Warehouse, X } from "lucide-react";
-import { AppShell, StatusBadge, Metric } from "@/components/shell";
+import { AppShell, StatusBadge, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 
 type SlotState = "occupied" | "reserved" | "hold" | "available";

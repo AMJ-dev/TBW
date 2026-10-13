@@ -26,7 +26,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
+import { PublicFrame, PublicKicker } from "@/components/public-shell";
 import { http, type Resp } from "@/lib/httpClient";
 import { sectorOptions } from "@/lib/constants";
 

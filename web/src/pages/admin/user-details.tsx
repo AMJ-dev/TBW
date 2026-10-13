@@ -18,7 +18,7 @@ import {
 	XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell, StatusBadge, Metric, statusTone } from "@/components/shell";
+import { AppShell, StatusBadge, Metric, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";

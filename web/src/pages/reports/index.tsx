@@ -22,7 +22,7 @@ import {
 	X,
 } from "lucide-react";
 import { Link } from "@/components/router-link";
-import { AppShell, StatusBadge, statusTone, Metric } from "@/components/shell";
+import { AppShell, StatusBadge, statusTone, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { client_url } from "@/lib/constants";

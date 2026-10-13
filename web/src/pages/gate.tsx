@@ -9,7 +9,7 @@ import {
 	ShieldCheck,
 	Truck,
 } from "lucide-react";
-import { AppShell, StatusBadge, Metric } from "@/components/shell";
+import { AppShell, StatusBadge, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 
 const gateModules = [

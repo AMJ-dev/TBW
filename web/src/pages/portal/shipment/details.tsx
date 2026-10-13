@@ -24,7 +24,7 @@ import {
 	Thermometer,
 	User,
 } from "lucide-react";
-import { AppShell, StatusBadge, statusTone } from "@/components/shell";
+import { AppShell, StatusBadge, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";

@@ -17,7 +17,7 @@ import {
 	Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell, StatusBadge } from "@/components/shell";
+import { AppShell, StatusBadge } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";

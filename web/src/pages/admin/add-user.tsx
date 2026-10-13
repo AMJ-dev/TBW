@@ -11,7 +11,7 @@ import {
 	UsersRound,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell, StatusBadge, statusTone } from "@/components/shell";
+import { AppShell, StatusBadge, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";

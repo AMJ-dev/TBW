@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PublicFrame, PublicKicker, PublicStatus } from "@/components/public/public-shell";
+import { PublicFrame, PublicKicker, PublicStatus } from "@/components/public-shell";
 import { client_url } from "@/lib/constants";
 
 type VerifiedDocument = {

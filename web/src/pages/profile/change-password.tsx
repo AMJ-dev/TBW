@@ -13,7 +13,7 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AppShell } from "@/components/shell";
+import { AppShell } from "@/components/auth-shell";
 import UserContext from "@/lib/userContext";
 import { http, type Resp } from "@/lib/httpClient";
 

@@ -8,7 +8,7 @@ import {
 	Sparkles,
 	Target,
 } from "lucide-react";
-import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
+import { PublicFrame, PublicKicker } from "@/components/public-shell";
 
 export default function AboutPage() {
 	const values = [

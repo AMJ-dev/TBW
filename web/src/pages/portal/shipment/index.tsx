@@ -15,7 +15,7 @@ import {
 	Ship,
 	SlidersHorizontal,
 } from "lucide-react";
-import { AppShell, Metric } from "@/components/shell";
+import { AppShell, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";

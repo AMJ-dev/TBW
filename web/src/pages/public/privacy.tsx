@@ -2,7 +2,7 @@ import { type ReactNode } from "react";
 import { Link } from "@/components/router-link";
 import { ArrowRight, Mail, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
+import { PublicFrame, PublicKicker } from "@/components/public-shell";
 
 const sections = [
 	{

@@ -18,7 +18,7 @@ import {
 	ShieldCheck,
 	User,
 } from "lucide-react";
-import { AppShell, Avatar } from "@/components/shell";
+import { AppShell, Avatar } from "@/components/auth-shell";
 import UserContext from "@/lib/userContext";
 import { http, type Resp } from "@/lib/httpClient";
 

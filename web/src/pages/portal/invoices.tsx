@@ -17,7 +17,7 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import { AppShell, StatusBadge, statusTone, Metric } from "@/components/shell";
+import { AppShell, StatusBadge, statusTone, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
