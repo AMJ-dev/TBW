@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-	Boxes,
+	ArrowLeft,
+	ArrowRight,
 	CheckCircle2,
-	Clock,
+	ChevronDown,
 	Download,
 	Filter,
 	PackageCheck,
@@ -11,12 +12,16 @@ import {
 	Scale,
 	Search,
 	Ship,
-	Truck,
-	X,
 } from "lucide-react";
-import { AppShell, StatusBadge, statusTone, Metric } from "@/components/auth-shell";
+import {
+	AppShell,
+	StatusBadge,
+	statusTone,
+	Metric,
+} from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 interface ReceivingRecord {
 	id: string;
@@ -82,111 +87,196 @@ const initialReceiving: ReceivingRecord[] = [
 	},
 ];
 
+const SHIPPING_LINES = [
+	"Maersk Line",
+	"MSC Mediterranean",
+	"CMA CGM Group",
+	"Hapag-Lloyd",
+];
+
+const ORIGIN_PORTS = [
+	"Apapa Port",
+	"Tin Can Island Port",
+	"Onne Port Complex",
+	"Lekki Deep Sea Port",
+];
+
+const RECEIVING_BAYS = [
+	"Receiving Bay 01",
+	"Receiving Bay 02",
+	"Receiving Bay 03",
+	"Receiving Bay 04",
+];
+
+const STATUS_FILTERS = [
+	"ALL",
+	"Received",
+	"Expected",
+	"Inspecting",
+] as const;
+
+type StatusFilter = (typeof STATUS_FILTERS)[number];
+
+const labelClass =
+	"block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft";
+
 export default function OperationsReceivingRoute() {
 	const [records, setRecords] = useState<ReceivingRecord[]>(initialReceiving);
 	const [searchQuery, setSearchQuery] = useState("");
-	const [statusFilter, setStatusFilter] = useState("ALL");
-	const [isModalOpen, setIsModalOpen] = useState(false);
-
-	const [containerNo, setContainerNo] = useState("");
-	const [sealNo, setSealNo] = useState("");
-	const [shippingLine, setShippingLine] = useState("Maersk Line");
-	const [originPort, setOriginPort] = useState("Apapa Port");
-	const [grossWeight, setGrossWeight] = useState("");
-	const [receivedBay, setReceivedBay] = useState("Receiving Bay 01");
+	const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+	const [view, setView] = useState<"list" | "intake">("list");
 
 	const filteredRecords = useMemo(() => {
 		return records.filter((r) => {
+			const q = searchQuery.trim().toLowerCase();
 			const matchQuery =
-				r.containerNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				r.sealNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				r.shippingLine.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				r.vesselFeed.toLowerCase().includes(searchQuery.toLowerCase());
+				!q ||
+				r.containerNo.toLowerCase().includes(q) ||
+				r.sealNo.toLowerCase().includes(q) ||
+				r.shippingLine.toLowerCase().includes(q) ||
+				r.vesselFeed.toLowerCase().includes(q);
 
 			const matchStatus =
-				statusFilter === "ALL" ? true : r.status.toUpperCase() === statusFilter.toUpperCase();
+				statusFilter === "ALL"
+					? true
+					: r.status.toUpperCase() === statusFilter.toUpperCase();
 
 			return matchQuery && matchStatus;
 		});
 	}, [records, searchQuery, statusFilter]);
 
-	const handleIntake = (e: React.FormEvent) => {
-		e.preventDefault();
-		if (!containerNo || !sealNo || !grossWeight) {
-			toast.error("Please fill in container number, seal, and verified weight.");
-			return;
-		}
+	const handleIntake = (item: ReceivingRecord) => {
+		setRecords((prev) => [item, ...prev]);
+		setView("list");
+		toast.success(
+			`Container ${item.containerNo} checked in locally at ${item.receivedBay}.`
+		);
+	};
 
-		const newRecord: ReceivingRecord = {
-			id: `rcv-${records.length + 1}`,
-			containerNo: containerNo.toUpperCase(),
-			sealNo: sealNo.toUpperCase(),
-			shippingLine,
-			vesselFeed: "Feeder transfer",
-			originPort,
-			grossWeight: grossWeight.includes("kg") ? grossWeight : `${grossWeight} kg`,
-			receivedBay,
-			status: "Received",
-			timestamp: "Just now · Logged",
-		};
-
-		setRecords([newRecord, ...records]);
-		setIsModalOpen(false);
-		setContainerNo("");
-		setSealNo("");
-		setGrossWeight("");
-		toast.success(`Container ${containerNo} checked in locally at ${receivedBay}.`);
+	const handleExport = () => {
+		toast.success(
+			"Inbound receiving tally sheet exported locally."
+		);
 	};
 
 	return (
-		<AppShell title="Receiving & Intake" eyebrow="Operations · Inbound Terminal Tally">
+		<AppShell
+			title="Receiving & Intake"
+			eyebrow="Operations · Inbound Terminal Tally"
+		>
+			<div className="overflow-hidden">
+				{view === "list" ? (
+					<ListView
+						key="list"
+						records={records}
+						filteredRecords={filteredRecords}
+						searchQuery={searchQuery}
+						statusFilter={statusFilter}
+						onSearchChange={setSearchQuery}
+						onStatusChange={setStatusFilter}
+						onNewIntake={() => setView("intake")}
+						onExport={handleExport}
+					/>
+				) : (
+					<IntakeView
+						key="intake"
+						onCancel={() => setView("list")}
+						onSubmit={handleIntake}
+						existingCount={records.length}
+					/>
+				)}
+			</div>
+		</AppShell>
+	);
+}
+
+function ListView({
+	records,
+	filteredRecords,
+	searchQuery,
+	statusFilter,
+	onSearchChange,
+	onStatusChange,
+	onNewIntake,
+	onExport,
+}: {
+	records: ReceivingRecord[];
+	filteredRecords: ReceivingRecord[];
+	searchQuery: string;
+	statusFilter: StatusFilter;
+	onSearchChange: (v: string) => void;
+	onStatusChange: (v: StatusFilter) => void;
+	onNewIntake: () => void;
+	onExport: () => void;
+}) {
+	return (
+		<div
+			className="space-y-5 pb-8"
+			style={{
+				animation:
+					"slideInFromRight 260ms cubic-bezier(0.32, 0.72, 0, 1)",
+			}}
+		>
+			<style>{`
+				@keyframes slideInFromRight {
+					from { opacity: 0; transform: translateX(24px); }
+					to { opacity: 1; transform: translateX(0); }
+				}
+				@keyframes slideInFromLeft {
+					from { opacity: 0; transform: translateX(-24px); }
+					to { opacity: 1; transform: translateX(0); }
+				}
+			`}</style>
+
 			<div className="flex flex-wrap items-end justify-between gap-4">
-				<div>
+				<div className="min-w-0">
 					<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">
-						Inbound Logistics · Feeder Intake
+						Inbound logistics · Feeder intake
 					</p>
 					<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-						Inbound cargo receiving & gate tally
+						Inbound cargo receiving &amp; gate tally
 					</h2>
 					<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-						Confirm feeder manifests, seal integrity, weighbridge gross mass, and initial
-						yard bay allocation.
+						Confirm feeder manifests, seal integrity, weighbridge gross
+						mass, and initial yard bay allocation.
 					</p>
 				</div>
 				<div className="flex gap-2">
 					<Button
 						variant="outline"
-						className="border-line bg-paper text-ink"
-						onClick={() => toast.success("Inbound receiving tally sheet exported locally.")}
+						className="border-line bg-paper text-ink hover:bg-sand"
+						onClick={onExport}
 					>
-						<Download className="size-4" /> Export Tally Sheet
+						<Download className="size-4" /> Export tally sheet
 					</Button>
 					<Button
 						className="bg-orange text-white hover:bg-orange-deep"
-						onClick={() => setIsModalOpen(true)}
+						onClick={onNewIntake}
 					>
-						<Plus className="size-4" /> Receive Container
+						<Plus className="size-4" /> Receive container
 					</Button>
 				</div>
 			</div>
 
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 				<Metric
-					label="Received Today"
-					value={String(records.filter((r) => r.status === "Received").length)}
+					label="Received today"
+					value={String(
+						records.filter((r) => r.status === "Received").length
+					)}
 					detail="Across 4 feeder runs"
 					tone="success"
 					icon={PackageCheck}
 				/>
 				<Metric
-					label="Expected Feeder"
-					value="8 Containers"
+					label="Expected feeder"
+					value="8 containers"
 					detail="Arriving from Lagos ports"
 					tone="info"
 					icon={Ship}
 				/>
 				<Metric
-					label="Seal Integrity"
+					label="Seal integrity"
 					value="Verified"
 					detail="All seals matched at intake"
 					tone="success"
@@ -207,7 +297,7 @@ export default function OperationsReceivingRoute() {
 						<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
 						<Input
 							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
+							onChange={(e) => onSearchChange(e.target.value)}
 							placeholder="Search by container, seal number, shipping line, or vessel..."
 							className="h-10 border-line bg-sand pl-9 text-sm text-ink"
 						/>
@@ -217,195 +307,373 @@ export default function OperationsReceivingRoute() {
 						<span className="flex items-center gap-1 text-xs text-ink-soft">
 							<Filter className="size-3.5" /> Status:
 						</span>
-						{["ALL", "Received", "Expected", "Inspecting"].map((s) => (
+						{STATUS_FILTERS.map((s) => (
 							<button
 								key={s}
-								onClick={() => setStatusFilter(s)}
-								className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+								type="button"
+								onClick={() => onStatusChange(s)}
+								className={cn(
+									"rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
 									statusFilter === s
 										? "bg-ink text-sand"
 										: "bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink"
-								}`}
+								)}
 							>
-								{s}
+								{s === "ALL" ? "All" : s}
 							</button>
 						))}
 					</div>
 				</div>
 
-				<div className="overflow-x-auto">
-					<table className="w-full min-w-[850px] text-left text-sm">
-						<thead>
-							<tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-								<th className="px-4 py-3 font-medium">Container No.</th>
-								<th className="px-4 py-3 font-medium">Verified Seal</th>
-								<th className="px-4 py-3 font-medium">Carrier / Feeder Vessel</th>
-								<th className="px-4 py-3 font-medium">Origin Port</th>
-								<th className="px-4 py-3 font-medium">Gross Weight (VGM)</th>
-								<th className="px-4 py-3 font-medium">Receiving Bay</th>
-								<th className="px-4 py-3 font-medium">Status</th>
-								<th className="px-4 py-3 font-medium text-right">Intake Time</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-line">
-							{filteredRecords.map((r) => (
-								<tr key={r.id} className="transition-colors hover:bg-sand/60">
-									<td className="px-4 py-3.5 font-mono text-xs font-bold text-ink">
-										{r.containerNo}
-									</td>
-									<td className="px-4 py-3.5 font-mono text-xs text-orange-deep">
-										{r.sealNo}
-									</td>
-									<td className="px-4 py-3.5 text-xs text-ink">
-										<p className="font-semibold">{r.shippingLine}</p>
-										<p className="text-[10px] text-ink-soft">{r.vesselFeed}</p>
-									</td>
-									<td className="px-4 py-3.5 text-xs text-ink-soft">{r.originPort}</td>
-									<td className="px-4 py-3.5 font-mono text-xs text-ink">{r.grossWeight}</td>
-									<td className="px-4 py-3.5 font-mono text-xs text-ink-soft">{r.receivedBay}</td>
-									<td className="px-4 py-3.5">
-										<StatusBadge label={r.status} tone={statusTone(r.status)} />
-									</td>
-									<td className="px-4 py-3.5 text-right font-mono text-xs text-ink-soft">
-										{r.timestamp}
-									</td>
+				{filteredRecords.length === 0 ? (
+					<div className="p-12 text-center">
+						<PackageCheck className="mx-auto size-7 text-ink-soft" />
+						<p className="mt-3 font-medium text-ink">
+							No inbound containers match your filters.
+						</p>
+						<p className="mt-1 text-[12px] text-ink-soft">
+							Try a different container, seal, or status.
+						</p>
+					</div>
+				) : (
+					<div className="overflow-x-auto">
+						<table className="w-full min-w-[850px] text-left text-sm">
+							<thead>
+								<tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+									<th className="px-4 py-3 font-medium">
+										Container No.
+									</th>
+									<th className="px-4 py-3 font-medium">
+										Verified seal
+									</th>
+									<th className="px-4 py-3 font-medium">
+										Carrier / feeder vessel
+									</th>
+									<th className="px-4 py-3 font-medium">
+										Origin port
+									</th>
+									<th className="px-4 py-3 font-medium">
+										Gross weight (VGM)
+									</th>
+									<th className="px-4 py-3 font-medium">
+										Receiving bay
+									</th>
+									<th className="px-4 py-3 font-medium">
+										Status
+									</th>
+									<th className="px-4 py-3 text-right font-medium">
+										Intake time
+									</th>
 								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
+							</thead>
+							<tbody className="divide-y divide-line">
+								{filteredRecords.map((r) => (
+									<tr
+										key={r.id}
+										className="transition-colors hover:bg-sand/60"
+									>
+										<td className="px-4 py-3.5 font-mono text-xs font-bold text-ink">
+											{r.containerNo}
+										</td>
+										<td className="px-4 py-3.5 font-mono text-xs text-orange-deep">
+											{r.sealNo}
+										</td>
+										<td className="px-4 py-3.5 text-xs text-ink">
+											<p className="font-semibold">
+												{r.shippingLine}
+											</p>
+											<p className="text-[10px] text-ink-soft">
+												{r.vesselFeed}
+											</p>
+										</td>
+										<td className="px-4 py-3.5 text-xs text-ink-soft">
+											{r.originPort}
+										</td>
+										<td className="px-4 py-3.5 font-mono text-xs text-ink">
+											{r.grossWeight}
+										</td>
+										<td className="px-4 py-3.5 font-mono text-xs text-ink-soft">
+											{r.receivedBay}
+										</td>
+										<td className="px-4 py-3.5">
+											<StatusBadge
+												label={r.status}
+												tone={statusTone(r.status)}
+											/>
+										</td>
+										<td className="px-4 py-3.5 text-right font-mono text-xs text-ink-soft">
+											{r.timestamp}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
 
 				<div className="flex items-center justify-between border-t border-line px-4 py-3 font-mono text-[10px] text-ink-soft">
 					<span>
-						Showing {filteredRecords.length} of {records.length} inbound containers
+						Showing {filteredRecords.length} of {records.length} inbound
+						containers
 					</span>
 					<span>Verified gross mass recorded at intake</span>
 				</div>
 			</section>
+		</div>
+	);
+}
 
-			{isModalOpen && (
-				<div
-					className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4 backdrop-blur-sm"
-					onMouseDown={(e) => e.target === e.currentTarget && setIsModalOpen(false)}
+function IntakeView({
+	onCancel,
+	onSubmit,
+	existingCount,
+}: {
+	onCancel: () => void;
+	onSubmit: (item: ReceivingRecord) => void;
+	existingCount: number;
+}) {
+	const [containerNo, setContainerNo] = useState("");
+	const [sealNo, setSealNo] = useState("");
+	const [shippingLine, setShippingLine] = useState(SHIPPING_LINES[0] ?? "");
+	const [originPort, setOriginPort] = useState(ORIGIN_PORTS[0] ?? "");
+	const [grossWeight, setGrossWeight] = useState("");
+	const [receivedBay, setReceivedBay] = useState(RECEIVING_BAYS[0] ?? "");
+
+	const handleSubmit = (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!containerNo.trim() || !sealNo.trim() || !grossWeight.trim()) {
+			toast.error(
+				"Please fill in container number, seal, and verified weight."
+			);
+			return;
+		}
+
+		const trimmedWeight = grossWeight.trim();
+		const item: ReceivingRecord = {
+			id: `rcv-${existingCount + 1}`,
+			containerNo: containerNo.trim().toUpperCase(),
+			sealNo: sealNo.trim().toUpperCase(),
+			shippingLine,
+			vesselFeed: "Feeder transfer",
+			originPort,
+			grossWeight: trimmedWeight.includes("kg")
+				? trimmedWeight
+				: `${trimmedWeight} kg`,
+			receivedBay,
+			status: "Received",
+			timestamp: "Just now · Logged",
+		};
+
+		onSubmit(item);
+	};
+
+	return (
+		<form
+			onSubmit={handleSubmit}
+			className="space-y-6 pb-24"
+			style={{
+				animation:
+					"slideInFromLeft 260ms cubic-bezier(0.32, 0.72, 0, 1)",
+			}}
+		>
+			<style>{`
+				@keyframes slideInFromLeft {
+					from { opacity: 0; transform: translateX(-24px); }
+					to { opacity: 1; transform: translateX(0); }
+				}
+			`}</style>
+
+			<div className="flex flex-wrap items-center justify-between gap-3">
+				<Button
+					type="button"
+					variant="ghost"
+					onClick={onCancel}
+					className="-ml-3 gap-2 text-ink-soft hover:text-ink"
 				>
-					<div className="w-full max-w-lg rounded-xl bg-paper p-6 shadow-2xl ring-1 ring-line">
-						<div className="flex items-center justify-between border-b border-line pb-4">
-							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-deep">
-									Terminal Gate Intake
-								</p>
-								<h3 className="mt-1 font-display text-xl font-bold text-ink">
-									Receive Container at Gate
-								</h3>
-							</div>
-							<Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
-								<X />
-							</Button>
-						</div>
+					<ArrowLeft className="size-4" />
+					Back to receiving log
+				</Button>
+			</div>
 
-						<form onSubmit={handleIntake} className="mt-5 space-y-4">
-							<div className="grid grid-cols-2 gap-3">
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Container Number
-									</label>
-									<Input
-										required
-										placeholder="e.g. TRIU1234564"
-										value={containerNo}
-										onChange={(e) => setContainerNo(e.target.value)}
-										className="mt-1.5 border-line bg-sand font-mono text-ink"
-									/>
-								</div>
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Bolt Seal Number
-									</label>
-									<Input
-										required
-										placeholder="e.g. SL-992819"
-										value={sealNo}
-										onChange={(e) => setSealNo(e.target.value)}
-										className="mt-1.5 border-line bg-sand font-mono text-ink"
-									/>
-								</div>
-							</div>
+			<div className="min-w-0">
+				<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">
+					Inbound logistics · Feeder intake
+				</p>
+				<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+					Receive container at gate
+				</h2>
+				<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+					Confirm feeder manifest, seal integrity, weighbridge gross
+					mass, and assign the container to a receiving bay.
+				</p>
+			</div>
 
-							<div className="grid grid-cols-2 gap-3">
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Carrier / Line
-									</label>
-									<select
-										value={shippingLine}
-										onChange={(e) => setShippingLine(e.target.value)}
-										className="mt-1.5 h-10 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none"
-									>
-										<option>Maersk Line</option>
-										<option>MSC Mediterranean</option>
-										<option>CMA CGM Group</option>
-										<option>Hapag-Lloyd</option>
-									</select>
-								</div>
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Origin Port
-									</label>
-									<select
-										value={originPort}
-										onChange={(e) => setOriginPort(e.target.value)}
-										className="mt-1.5 h-10 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none"
-									>
-										<option>Apapa Port</option>
-										<option>Tin Can Island Port</option>
-										<option>Onne Port Complex</option>
-										<option>Lekki Deep Sea Port</option>
-									</select>
-								</div>
-							</div>
+			<section className="rounded-2xl bg-paper ring-1 ring-line">
+				<div className="border-b border-line p-5 sm:p-6">
+					<h3 className="font-display text-sm font-bold text-ink">
+						Container
+					</h3>
+					<p className="mt-1 text-xs leading-5 text-ink-soft">
+						Identify the container and its verified seal.
+					</p>
+				</div>
+				<div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
+					<label className="block">
+						<span className={labelClass}>
+							Container number{" "}
+							<span className="text-coral">*</span>
+						</span>
+						<Input
+							required
+							placeholder="e.g. TRIU1234564"
+							value={containerNo}
+							onChange={(e) =>
+								setContainerNo(e.target.value.toUpperCase())
+							}
+							className="mt-1.5 h-11 border-line bg-sand font-mono text-ink"
+						/>
+					</label>
 
-							<div className="grid grid-cols-2 gap-3">
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Gross Weight (kg)
-									</label>
-									<Input
-										required
-										placeholder="e.g. 21,500"
-										value={grossWeight}
-										onChange={(e) => setGrossWeight(e.target.value)}
-										className="mt-1.5 border-line bg-sand font-mono text-ink"
-									/>
-								</div>
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Receiving Bay
-									</label>
-									<select
-										value={receivedBay}
-										onChange={(e) => setReceivedBay(e.target.value)}
-										className="mt-1.5 h-10 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none"
-									>
-										<option>Receiving Bay 01</option>
-										<option>Receiving Bay 02</option>
-										<option>Receiving Bay 03</option>
-										<option>Receiving Bay 04</option>
-									</select>
-								</div>
-							</div>
+					<label className="block">
+						<span className={labelClass}>
+							Bolt seal number{" "}
+							<span className="text-coral">*</span>
+						</span>
+						<Input
+							required
+							placeholder="e.g. SL-992819"
+							value={sealNo}
+							onChange={(e) =>
+								setSealNo(e.target.value.toUpperCase())
+							}
+							className="mt-1.5 h-11 border-line bg-sand font-mono text-ink"
+						/>
+					</label>
+				</div>
+			</section>
 
-							<div className="flex justify-end gap-2 border-t border-line pt-4">
-								<Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-									Cancel
-								</Button>
-								<Button type="submit" className="bg-orange text-white hover:bg-orange-deep">
-									Confirm Gate Intake
-								</Button>
-							</div>
-						</form>
+			<section className="rounded-2xl bg-paper ring-1 ring-line">
+				<div className="border-b border-line p-5 sm:p-6">
+					<h3 className="font-display text-sm font-bold text-ink">
+						Carrier & route
+					</h3>
+					<p className="mt-1 text-xs leading-5 text-ink-soft">
+						Feeder carrier, origin port, and receiving bay.
+					</p>
+				</div>
+				<div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
+					<label className="block">
+						<span className={labelClass}>Carrier / line</span>
+						<SelectField
+							value={shippingLine}
+							onChange={setShippingLine}
+							options={SHIPPING_LINES}
+						/>
+					</label>
+
+					<label className="block">
+						<span className={labelClass}>Origin port</span>
+						<SelectField
+							value={originPort}
+							onChange={setOriginPort}
+							options={ORIGIN_PORTS}
+						/>
+					</label>
+
+					<label className="block">
+						<span className={labelClass}>
+							Gross weight (kg){" "}
+							<span className="text-coral">*</span>
+						</span>
+						<Input
+							required
+							placeholder="e.g. 21,500"
+							value={grossWeight}
+							onChange={(e) => setGrossWeight(e.target.value)}
+							className="mt-1.5 h-11 border-line bg-sand font-mono text-ink"
+						/>
+					</label>
+
+					<label className="block">
+						<span className={labelClass}>Receiving bay</span>
+						<SelectField
+							value={receivedBay}
+							onChange={setReceivedBay}
+							options={RECEIVING_BAYS}
+						/>
+					</label>
+				</div>
+			</section>
+
+			<section className="rounded-2xl bg-paper ring-1 ring-line">
+				<div className="p-5 sm:p-6">
+					<div className="rounded-lg bg-sand p-3 ring-1 ring-line">
+						<p className={labelClass}>Recorded as</p>
+						<p className="mt-1 font-mono text-[11px] text-ink">
+							{containerNo || "CONTAINER"} ·{" "}
+							{sealNo || "SEAL"} · {receivedBay} · Received
+						</p>
 					</div>
 				</div>
-			)}
-		</AppShell>
+			</section>
+
+			<div className="sticky bottom-4 z-10 rounded-2xl bg-slate p-4 text-sand ring-1 ring-slate shadow-xl">
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<div className="min-w-0">
+						<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+							Terminal gate intake
+						</p>
+						<p className="mt-0.5 text-[12px] leading-5 text-sand/75">
+							{containerNo || "Container pending"} ·{" "}
+							{receivedBay}
+						</p>
+					</div>
+					<div className="flex flex-wrap items-center gap-2">
+						<Button
+							type="button"
+							variant="outline"
+							onClick={onCancel}
+							className="border-sand/25 bg-transparent text-sand hover:bg-sand/10"
+						>
+							Cancel
+						</Button>
+						<Button
+							type="submit"
+							className="gap-2 bg-orange text-white hover:bg-orange-deep"
+						>
+							Confirm gate intake
+							<ArrowRight className="size-4" />
+						</Button>
+					</div>
+				</div>
+			</div>
+		</form>
+	);
+}
+
+function SelectField({
+	value,
+	onChange,
+	options,
+}: {
+	value: string;
+	onChange: (value: string) => void;
+	options: string[];
+}) {
+	return (
+		<div className="relative mt-1.5">
+			<select
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				className="h-11 w-full appearance-none rounded-md border border-line bg-sand px-3 pr-9 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25"
+			>
+				{options.map((o) => (
+					<option key={o} value={o}>
+						{o}
+					</option>
+				))}
+			</select>
+			<ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-ink-soft" />
+		</div>
 	);
 }

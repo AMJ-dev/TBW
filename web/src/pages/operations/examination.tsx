@@ -2,21 +2,34 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
 	AlertTriangle,
+	ArrowLeft,
 	ArrowRight,
 	Boxes,
 	CheckCircle2,
+	ChevronDown,
 	ClipboardCheck,
 	Download,
-	Eye,
 	Filter,
 	Plus,
 	Search,
-	ShieldCheck,
-	X,
 } from "lucide-react";
-import { AppShell, StatusBadge, statusTone, Metric } from "@/components/auth-shell";
+import {
+	AppShell,
+	StatusBadge,
+	statusTone,
+	Metric,
+} from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+
+type ExamType =
+	| "100% Physical"
+	| "Joint Inspection"
+	| "Scanner Review"
+	| "Document Reconciliation";
+
+type ExamStatus = "Scheduled" | "In Progress" | "Outcome recorded" | "Held";
 
 interface ExaminationRecord {
 	id: string;
@@ -25,9 +38,9 @@ interface ExaminationRecord {
 	consignee: string;
 	customsOfficer: string;
 	bayArea: string;
-	examType: "100% Physical" | "Joint Inspection" | "Scanner Review" | "Document Reconciliation";
+	examType: ExamType;
 	scheduledTime: string;
-	status: "Scheduled" | "In Progress" | "Outcome recorded" | "Held";
+	status: ExamStatus;
 }
 
 const initialExaminations: ExaminationRecord[] = [
@@ -77,103 +90,176 @@ const initialExaminations: ExaminationRecord[] = [
 	},
 ];
 
+const EXAM_TYPES: ExamType[] = [
+	"100% Physical",
+	"Joint Inspection",
+	"Scanner Review",
+	"Document Reconciliation",
+];
+
+const BAY_AREAS = [
+	"Bay Area 01",
+	"Bay Area 02",
+	"Bay Area 03",
+	"Bay Area 04",
+];
+
+const STATUS_FILTERS: (ExamStatus | "ALL")[] = [
+	"ALL",
+	"Scheduled",
+	"In Progress",
+	"Outcome recorded",
+	"Held",
+];
+
+const labelClass =
+	"block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft";
+
 export default function OperationsExaminationRoute() {
 	const [exams, setExams] = useState<ExaminationRecord[]>(initialExaminations);
 	const [searchQuery, setSearchQuery] = useState("");
-	const [statusFilter, setStatusFilter] = useState("ALL");
-	const [isModalOpen, setIsModalOpen] = useState(false);
-
-	const [containerNo, setContainerNo] = useState("");
-	const [consignee, setConsignee] = useState("");
-	const [examType, setExamType] = useState<ExaminationRecord["examType"]>("100% Physical");
-	const [bayArea, setBayArea] = useState("Bay Area 01");
+	const [statusFilter, setStatusFilter] = useState<ExamStatus | "ALL">("ALL");
+	const [view, setView] = useState<"list" | "intake">("list");
 
 	const filteredExams = useMemo(() => {
 		return exams.filter((e) => {
+			const q = searchQuery.trim().toLowerCase();
 			const matchQuery =
-				e.containerNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				e.consignee.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				e.customsOfficer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				e.cargoRef.toLowerCase().includes(searchQuery.toLowerCase());
+				!q ||
+				e.containerNo.toLowerCase().includes(q) ||
+				e.consignee.toLowerCase().includes(q) ||
+				e.customsOfficer.toLowerCase().includes(q) ||
+				e.cargoRef.toLowerCase().includes(q);
 
 			const matchStatus =
-				statusFilter === "ALL" ? true : e.status.toUpperCase() === statusFilter.toUpperCase();
+				statusFilter === "ALL" ? true : e.status === statusFilter;
 
 			return matchQuery && matchStatus;
 		});
 	}, [exams, searchQuery, statusFilter]);
 
-	const handleScheduleExam = (e: React.FormEvent) => {
-		e.preventDefault();
-		if (!containerNo || !consignee) {
-			toast.error("Please provide container number and consignee.");
-			return;
-		}
+	const handleSchedule = (item: ExaminationRecord) => {
+		setExams((prev) => [item, ...prev]);
+		setView("list");
+		toast.success(
+			`Examination scheduled locally for ${item.containerNo}.`
+		);
+	};
 
-		const newExam: ExaminationRecord = {
-			id: `exm-${exams.length + 1}`,
-			containerNo: containerNo.toUpperCase(),
-			cargoRef: `TRN-IMP-00${2485 + exams.length}`,
-			consignee,
-			customsOfficer: "Awaiting assignment",
-			bayArea,
-			examType,
-			scheduledTime: "Today · Next Slot",
-			status: "Scheduled",
-		};
-
-		setExams([newExam, ...exams]);
-		setIsModalOpen(false);
-		setContainerNo("");
-		setConsignee("");
-		toast.success(`Examination scheduled locally for ${containerNo}.`);
+	const handleExport = () => {
+		toast.success("Examination schedule exported locally.");
 	};
 
 	return (
 		<AppShell title="Examination Bay" eyebrow="Operations · Coordination">
+			<div className="overflow-hidden">
+				{view === "list" ? (
+					<ListView
+						key="list"
+						exams={exams}
+						filteredExams={filteredExams}
+						searchQuery={searchQuery}
+						statusFilter={statusFilter}
+						onSearchChange={setSearchQuery}
+						onStatusChange={setStatusFilter}
+						onNewSchedule={() => setView("intake")}
+						onExport={handleExport}
+					/>
+				) : (
+					<IntakeView
+						key="intake"
+						onCancel={() => setView("list")}
+						onSubmit={handleSchedule}
+						existingCount={exams.length}
+					/>
+				)}
+			</div>
+		</AppShell>
+	);
+}
+
+function ListView({
+	exams,
+	filteredExams,
+	searchQuery,
+	statusFilter,
+	onSearchChange,
+	onStatusChange,
+	onNewSchedule,
+	onExport,
+}: {
+	exams: ExaminationRecord[];
+	filteredExams: ExaminationRecord[];
+	searchQuery: string;
+	statusFilter: ExamStatus | "ALL";
+	onSearchChange: (v: string) => void;
+	onStatusChange: (v: ExamStatus | "ALL") => void;
+	onNewSchedule: () => void;
+	onExport: () => void;
+}) {
+	return (
+		<div
+			className="space-y-5 pb-8"
+			style={{
+				animation:
+					"slideInFromRight 260ms cubic-bezier(0.32, 0.72, 0, 1)",
+			}}
+		>
+			<style>{`
+				@keyframes slideInFromRight {
+					from { opacity: 0; transform: translateX(24px); }
+					to { opacity: 1; transform: translateX(0); }
+				}
+				@keyframes slideInFromLeft {
+					from { opacity: 0; transform: translateX(-24px); }
+					to { opacity: 1; transform: translateX(0); }
+				}
+			`}</style>
+
 			<div className="flex flex-wrap items-end justify-between gap-4">
-				<div>
+				<div className="min-w-0">
 					<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">
-						Examination Area · Coordination desk
+						Examination area · Coordination desk
 					</p>
 					<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-						Examination coordination & bay control
+						Examination coordination &amp; bay control
 					</h2>
 					<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-						Coordinate container positioning from yard to designated examination bays. The
-						platform provides facilities and coordination; outcomes are recorded as
-						provided by the competent authority.
+						Coordinate container positioning from yard to designated
+						examination bays. The platform provides facilities and
+						coordination; outcomes are recorded as provided by the
+						competent authority.
 					</p>
 				</div>
 				<div className="flex gap-2">
 					<Button
 						variant="outline"
-						className="border-line bg-paper text-ink"
-						onClick={() => toast.success("Examination schedule exported locally.")}
+						className="border-line bg-paper text-ink hover:bg-sand"
+						onClick={onExport}
 					>
-						<Download className="size-4" /> Export Schedule
+						<Download className="size-4" /> Export schedule
 					</Button>
 					<Button
 						className="bg-orange text-white hover:bg-orange-deep"
-						onClick={() => setIsModalOpen(true)}
+						onClick={onNewSchedule}
 					>
-						<Plus className="size-4" /> Schedule Examination
+						<Plus className="size-4" /> Schedule examination
 					</Button>
 				</div>
 			</div>
 
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 				<Metric
-					label="Bays Occupied"
+					label="Bays occupied"
 					value="2 / 4"
 					detail="Active coordination slots"
 					tone="info"
 					icon={ClipboardCheck}
 				/>
 				<Metric
-					label="Scheduled Today"
+					label="Scheduled today"
 					value="8"
-					detail="3 Joint inspections"
+					detail="3 joint inspections"
 					tone="info"
 					icon={Boxes}
 				/>
@@ -185,7 +271,7 @@ export default function OperationsExaminationRoute() {
 					icon={CheckCircle2}
 				/>
 				<Metric
-					label="Exception Holds"
+					label="Exception holds"
 					value="1"
 					detail="Requires coordination review"
 					tone="critical"
@@ -199,7 +285,7 @@ export default function OperationsExaminationRoute() {
 						<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
 						<Input
 							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
+							onChange={(e) => onSearchChange(e.target.value)}
 							placeholder="Search by container, consignee, cargo ref, or officer..."
 							className="h-10 border-line bg-sand pl-9 text-sm text-ink"
 						/>
@@ -209,176 +295,352 @@ export default function OperationsExaminationRoute() {
 						<span className="flex items-center gap-1 text-xs text-ink-soft">
 							<Filter className="size-3.5" /> Status:
 						</span>
-						{["ALL", "Scheduled", "In Progress", "Outcome recorded", "Held"].map((s) => (
+						{STATUS_FILTERS.map((s) => (
 							<button
 								key={s}
-								onClick={() => setStatusFilter(s)}
-								className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+								type="button"
+								onClick={() => onStatusChange(s)}
+								className={cn(
+									"rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
 									statusFilter === s
 										? "bg-ink text-sand"
 										: "bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink"
-								}`}
+								)}
 							>
-								{s}
+								{s === "ALL" ? "All" : s}
 							</button>
 						))}
 					</div>
 				</div>
 
-				<div className="overflow-x-auto">
-					<table className="w-full min-w-[850px] text-left text-sm">
-						<thead>
-							<tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-								<th className="px-4 py-3 font-medium">Container / Ref</th>
-								<th className="px-4 py-3 font-medium">Consignee</th>
-								<th className="px-4 py-3 font-medium">Exam Type</th>
-								<th className="px-4 py-3 font-medium">Bay Assignment</th>
-								<th className="px-4 py-3 font-medium">Officer / Broker</th>
-								<th className="px-4 py-3 font-medium">Scheduled Time</th>
-								<th className="px-4 py-3 font-medium">Status</th>
-								<th className="px-4 py-3 font-medium text-right">Action</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-line">
-							{filteredExams.map((e) => (
-								<tr key={e.id} className="transition-colors hover:bg-sand/60">
-									<td className="px-4 py-3.5 font-mono text-xs">
-										<span className="font-bold text-ink">{e.containerNo}</span>
-										<span className="block text-[10px] text-ink-soft">{e.cargoRef}</span>
-									</td>
-									<td className="px-4 py-3.5 text-xs font-medium text-ink">{e.consignee}</td>
-									<td className="px-4 py-3.5 text-xs text-ink">{e.examType}</td>
-									<td className="px-4 py-3.5 font-mono text-xs font-semibold text-orange-deep">
-										{e.bayArea}
-									</td>
-									<td className="px-4 py-3.5 text-xs text-ink-soft">{e.customsOfficer}</td>
-									<td className="px-4 py-3.5 text-xs text-ink-soft">{e.scheduledTime}</td>
-									<td className="px-4 py-3.5">
-										<StatusBadge label={e.status} tone={statusTone(e.status)} />
-									</td>
-									<td className="px-4 py-3.5 text-right">
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() =>
-												toast.success(`Examination coordination note added for ${e.containerNo}.`)
-											}
-											className="text-xs font-semibold text-orange-deep hover:bg-orange/10"
-										>
-											Log Coordination Note
-										</Button>
-									</td>
+				{filteredExams.length === 0 ? (
+					<div className="p-12 text-center">
+						<ClipboardCheck className="mx-auto size-7 text-ink-soft" />
+						<p className="mt-3 font-medium text-ink">
+							No examination slots match your filters.
+						</p>
+						<p className="mt-1 text-[12px] text-ink-soft">
+							Try a different container, consignee, or status.
+						</p>
+					</div>
+				) : (
+					<div className="overflow-x-auto">
+						<table className="w-full min-w-[850px] text-left text-sm">
+							<thead>
+								<tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+									<th className="px-4 py-3 font-medium">
+										Container / ref
+									</th>
+									<th className="px-4 py-3 font-medium">
+										Consignee
+									</th>
+									<th className="px-4 py-3 font-medium">
+										Exam type
+									</th>
+									<th className="px-4 py-3 font-medium">
+										Bay assignment
+									</th>
+									<th className="px-4 py-3 font-medium">
+										Officer / broker
+									</th>
+									<th className="px-4 py-3 font-medium">
+										Scheduled time
+									</th>
+									<th className="px-4 py-3 font-medium">Status</th>
+									<th className="px-4 py-3 text-right font-medium">
+										Action
+									</th>
 								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
+							</thead>
+							<tbody className="divide-y divide-line">
+								{filteredExams.map((e) => (
+									<tr
+										key={e.id}
+										className="transition-colors hover:bg-sand/60"
+									>
+										<td className="px-4 py-3.5 font-mono text-xs">
+											<span className="font-bold text-ink">
+												{e.containerNo}
+											</span>
+											<span className="block text-[10px] text-ink-soft">
+												{e.cargoRef}
+											</span>
+										</td>
+										<td className="px-4 py-3.5 text-xs font-medium text-ink">
+											{e.consignee}
+										</td>
+										<td className="px-4 py-3.5 text-xs text-ink">
+											{e.examType}
+										</td>
+										<td className="px-4 py-3.5 font-mono text-xs font-semibold text-orange-deep">
+											{e.bayArea}
+										</td>
+										<td className="px-4 py-3.5 text-xs text-ink-soft">
+											{e.customsOfficer}
+										</td>
+										<td className="px-4 py-3.5 text-xs text-ink-soft">
+											{e.scheduledTime}
+										</td>
+										<td className="px-4 py-3.5">
+											<StatusBadge
+												label={e.status}
+												tone={statusTone(e.status)}
+											/>
+										</td>
+										<td className="px-4 py-3.5 text-right">
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() =>
+													toast.success(
+														`Examination coordination note added for ${e.containerNo}.`
+													)
+												}
+												className="text-xs font-semibold text-orange-deep hover:bg-orange/10"
+											>
+												Log coordination note
+											</Button>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
 
 				<div className="flex items-center justify-between border-t border-line px-4 py-3 font-mono text-[10px] text-ink-soft">
 					<span>
-						Showing {filteredExams.length} of {exams.length} examination slots
+						Showing {filteredExams.length} of {exams.length} examination
+						slots
 					</span>
 					<span>
-						Coordination record only — outcomes remain with the competent authority
+						Coordination record only — outcomes remain with the competent
+						authority
 					</span>
 				</div>
 			</section>
+		</div>
+	);
+}
 
-			{isModalOpen && (
-				<div
-					className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4 backdrop-blur-sm"
-					onMouseDown={(e) => e.target === e.currentTarget && setIsModalOpen(false)}
+function IntakeView({
+	onCancel,
+	onSubmit,
+	existingCount,
+}: {
+	onCancel: () => void;
+	onSubmit: (item: ExaminationRecord) => void;
+	existingCount: number;
+}) {
+	const [containerNo, setContainerNo] = useState("");
+	const [consignee, setConsignee] = useState("");
+	const [examType, setExamType] = useState<ExamType>(EXAM_TYPES[0] ?? "100% Physical");
+	const [bayArea, setBayArea] = useState(BAY_AREAS[0] ?? "Bay Area 01");
+
+	const handleSubmit = (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!containerNo.trim() || !consignee.trim()) {
+			toast.error("Please provide container number and consignee.");
+			return;
+		}
+
+		const item: ExaminationRecord = {
+			id: `exm-${existingCount + 1}`,
+			containerNo: containerNo.trim().toUpperCase(),
+			cargoRef: `TRN-IMP-00${2485 + existingCount}`,
+			consignee: consignee.trim(),
+			customsOfficer: "Awaiting assignment",
+			bayArea,
+			examType,
+			scheduledTime: "Today · Next slot",
+			status: "Scheduled",
+		};
+
+		onSubmit(item);
+	};
+
+	return (
+		<form
+			onSubmit={handleSubmit}
+			className="space-y-5 pb-24"
+			style={{
+				animation:
+					"slideInFromLeft 260ms cubic-bezier(0.32, 0.72, 0, 1)",
+			}}
+		>
+			<style>{`
+				@keyframes slideInFromLeft {
+					from { opacity: 0; transform: translateX(-24px); }
+					to { opacity: 1; transform: translateX(0); }
+				}
+			`}</style>
+
+			<div className="flex flex-wrap items-center justify-between gap-3">
+				<Button
+					type="button"
+					variant="ghost"
+					onClick={onCancel}
+					className="-ml-3 gap-2 text-ink-soft hover:text-ink"
 				>
-					<div className="w-full max-w-lg rounded-xl bg-paper p-6 shadow-2xl ring-1 ring-line">
-						<div className="flex items-center justify-between border-b border-line pb-4">
-							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-deep">
-									Examination Coordination
-								</p>
-								<h3 className="mt-1 font-display text-xl font-bold text-ink">
-									Schedule Examination Coordination
-								</h3>
-							</div>
-							<Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
-								<X />
-							</Button>
-						</div>
+					<ArrowLeft className="size-4" />
+					Back to examination log
+				</Button>
+			</div>
 
-						<form onSubmit={handleScheduleExam} className="mt-5 space-y-4">
-							<div>
-								<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-									Container Identification
-								</label>
-								<Input
-									required
-									placeholder="e.g. TRIU1234564"
-									value={containerNo}
-									onChange={(e) => setContainerNo(e.target.value)}
-									className="mt-1.5 border-line bg-sand font-mono text-ink"
-								/>
-							</div>
+			<div className="min-w-0">
+				<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">
+					Examination area · Coordination desk
+				</p>
+				<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+					Schedule examination coordination
+				</h2>
+				<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+					Coordinate container positioning from yard to a designated
+					examination bay. This is a coordination record only — outcomes
+					remain with the competent authority.
+				</p>
+			</div>
 
-							<div>
-								<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-									Consignee / Owner
-								</label>
-								<Input
-									required
-									placeholder="e.g. Atlantic Trade Nigeria Ltd"
-									value={consignee}
-									onChange={(e) => setConsignee(e.target.value)}
-									className="mt-1.5 border-line bg-sand text-ink"
-								/>
-							</div>
+			<section className="rounded-2xl bg-paper ring-1 ring-line">
+				<div className="border-b border-line p-5 sm:p-6">
+					<h3 className="font-display text-sm font-bold text-ink">
+						Container
+					</h3>
+					<p className="mt-1 text-xs leading-5 text-ink-soft">
+						Identify the container and its consignee.
+					</p>
+				</div>
+				<div className="space-y-5 p-5 sm:p-6">
+					<label className="block">
+						<span className={labelClass}>
+							Container identification{" "}
+							<span className="text-coral">*</span>
+						</span>
+						<Input
+							required
+							placeholder="e.g. TRIU1234564"
+							value={containerNo}
+							onChange={(e) =>
+								setContainerNo(e.target.value.toUpperCase())
+							}
+							className="mt-1.5 h-11 border-line bg-sand font-mono text-ink"
+						/>
+					</label>
 
-							<div className="grid grid-cols-2 gap-3">
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Examination Procedure
-									</label>
-									<select
-										value={examType}
-										onChange={(e) =>
-											setExamType(e.target.value as ExaminationRecord["examType"])
-										}
-										className="mt-1.5 h-10 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none"
-									>
-										<option>100% Physical</option>
-										<option>Joint Inspection</option>
-										<option>Scanner Review</option>
-										<option>Document Reconciliation</option>
-									</select>
-								</div>
+					<label className="block">
+						<span className={labelClass}>
+							Consignee / owner{" "}
+							<span className="text-coral">*</span>
+						</span>
+						<Input
+							required
+							placeholder="e.g. Atlantic Trade Nigeria Ltd"
+							value={consignee}
+							onChange={(e) => setConsignee(e.target.value)}
+							className="mt-1.5 h-11 border-line bg-sand text-ink"
+						/>
+					</label>
+				</div>
+			</section>
 
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Bay Assignment
-									</label>
-									<select
-										value={bayArea}
-										onChange={(e) => setBayArea(e.target.value)}
-										className="mt-1.5 h-10 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none"
-									>
-										<option>Bay Area 01</option>
-										<option>Bay Area 02</option>
-										<option>Bay Area 03</option>
-										<option>Bay Area 04</option>
-									</select>
-								</div>
-							</div>
+			<section className="rounded-2xl bg-paper ring-1 ring-line">
+				<div className="border-b border-line p-5 sm:p-6">
+					<h3 className="font-display text-sm font-bold text-ink">
+						Coordination
+					</h3>
+					<p className="mt-1 text-xs leading-5 text-ink-soft">
+						Choose the examination procedure and bay assignment.
+					</p>
+				</div>
+				<div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
+					<label className="block">
+						<span className={labelClass}>Examination procedure</span>
+						<SelectField
+							value={examType}
+							onChange={(v) => setExamType(v as ExamType)}
+							options={EXAM_TYPES}
+						/>
+					</label>
 
-							<div className="flex justify-end gap-2 border-t border-line pt-4">
-								<Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-									Cancel
-								</Button>
-								<Button type="submit" className="bg-orange text-white hover:bg-orange-deep">
-									Schedule Coordination
-								</Button>
-							</div>
-						</form>
+					<label className="block">
+						<span className={labelClass}>Bay assignment</span>
+						<SelectField
+							value={bayArea}
+							onChange={setBayArea}
+							options={BAY_AREAS}
+						/>
+					</label>
+				</div>
+			</section>
+
+			<section className="rounded-2xl bg-paper ring-1 ring-line">
+				<div className="p-5 sm:p-6">
+					<div className="rounded-lg bg-sand p-3 ring-1 ring-line">
+						<p className={labelClass}>Recorded as</p>
+						<p className="mt-1 font-mono text-[11px] text-ink">
+							{containerNo || "CONTAINER"} · {bayArea} · {examType} ·
+							Scheduled
+						</p>
 					</div>
 				</div>
-			)}
-		</AppShell>
+			</section>
+
+			<div className="sticky bottom-4 z-10 rounded-2xl bg-slate p-4 text-sand ring-1 ring-slate shadow-xl">
+				<div className="flex flex-wrap items-center justify-between gap-3">
+					<div className="min-w-0">
+						<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
+							Examination coordination
+						</p>
+						<p className="mt-0.5 text-[12px] leading-5 text-sand/75">
+							{containerNo || "Container pending"} · {bayArea}
+						</p>
+					</div>
+					<div className="flex flex-wrap items-center gap-2">
+						<Button
+							type="button"
+							variant="outline"
+							onClick={onCancel}
+							className="border-sand/25 bg-transparent text-sand hover:bg-sand/10"
+						>
+							Cancel
+						</Button>
+						<Button
+							type="submit"
+							className="gap-2 bg-orange text-white hover:bg-orange-deep"
+						>
+							Schedule coordination
+							<ArrowRight className="size-4" />
+						</Button>
+					</div>
+				</div>
+			</div>
+		</form>
+	);
+}
+
+function SelectField({
+	value,
+	onChange,
+	options,
+}: {
+	value: string;
+	onChange: (value: string) => void;
+	options: string[];
+}) {
+	return (
+		<div className="relative mt-1.5">
+			<select
+				value={value}
+				onChange={(e) => onChange(e.target.value)}
+				className="h-11 w-full appearance-none rounded-md border border-line bg-sand px-3 pr-9 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25"
+			>
+				{options.map((o) => (
+					<option key={o} value={o}>
+						{o}
+					</option>
+				))}
+			</select>
+			<ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-ink-soft" />
+		</div>
 	);
 }
