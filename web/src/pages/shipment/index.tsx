@@ -111,14 +111,8 @@ const normaliseContainer = (raw: any): ShipmentContainer => ({
 	container_no: String(raw?.container_no ?? ""),
 	size: raw?.size ?? null,
 	seal_no: raw?.seal_no ?? null,
-	package_count:
-		raw?.package_count === null || raw?.package_count === undefined
-			? null
-			: Number(raw.package_count),
-	gross_weight:
-		raw?.gross_weight === null || raw?.gross_weight === undefined
-			? null
-			: Number(raw.gross_weight),
+	package_count: raw?.package_count === null || raw?.package_count === undefined ? null : Number(raw.package_count),
+	gross_weight: raw?.gross_weight === null || raw?.gross_weight === undefined ? null : Number(raw.gross_weight),
 });
 
 const normaliseDocument = (raw: any): ShipmentDocument => ({
@@ -153,34 +147,20 @@ const normaliseShipment = (raw: any): Shipment => ({
 	cargo_description: raw?.cargo_description ?? null,
 	cargo_category: String(raw?.cargo_category ?? ""),
 	package_type: String(raw?.package_type ?? ""),
-	package_count:
-		raw?.package_count === null || raw?.package_count === undefined
-			? null
-			: Number(raw.package_count),
-	gross_weight:
-		raw?.gross_weight === null || raw?.gross_weight === undefined
-			? null
-			: Number(raw.gross_weight),
-	volume:
-		raw?.volume === null || raw?.volume === undefined
-			? null
-			: Number(raw.volume),
+	package_count: raw?.package_count === null || raw?.package_count === undefined ? null : Number(raw.package_count),
+	gross_weight: raw?.gross_weight === null || raw?.gross_weight === undefined ? null : Number(raw.gross_weight),
+	volume: raw?.volume === null || raw?.volume === undefined ? null : Number(raw.volume),
 	hs_code: raw?.hs_code ?? null,
 	dangerous_goods: raw?.dangerous_goods === "yes" ? "yes" : "no",
-	temperature_controlled:
-		raw?.temperature_controlled === "yes" ? "yes" : "no",
+	temperature_controlled: raw?.temperature_controlled === "yes" ? "yes" : "no",
 	temperature: raw?.temperature ?? null,
 	special_instructions: raw?.special_instructions ?? null,
 	customs_reference: raw?.customs_reference ?? null,
 	status: (raw?.status ?? "pending_review") as ShipmentStatus,
 	created_at: String(raw?.created_at ?? ""),
 	updated_at: String(raw?.updated_at ?? ""),
-	containers: Array.isArray(raw?.containers)
-		? raw.containers.map(normaliseContainer)
-		: [],
-	documents: Array.isArray(raw?.documents)
-		? raw.documents.map(normaliseDocument)
-		: [],
+	containers: Array.isArray(raw?.containers) ? raw.containers.map(normaliseContainer) : [],
+	documents: Array.isArray(raw?.documents) ? raw.documents.map(normaliseDocument) : [],
 });
 
 const STATUS_OPTIONS: StatusFilter[] = [

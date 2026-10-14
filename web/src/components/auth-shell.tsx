@@ -169,7 +169,7 @@ const sections = [
         access: ["system"],
         items: [
             { label: "Dashboard", to: "/operations/dashboard", icon: LayoutDashboard, access: ["system"] },
-            { label: "Declaration Review", to: "/operations/review", icon: ClipboardCheck, access: ["system"]},
+            { label: "Declaration Review", to: "/operations/shipments/review", icon: ClipboardCheck, access: ["system"]},
             { label: "Manifest Intake", to: "/operations/manifest", icon: FileSpreadsheet, access: ["system"] },
             { label: "Receiving", to: "/operations/receiving", icon: PackageCheck, access: ["system"] },
             { label: "Yard", to: "/operations/yard", icon: Grid2X2, access: ["system"] },
