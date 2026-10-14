@@ -323,15 +323,18 @@ export default function NewPortalShipmentPage() {
 	const documentsForRequirement = (documentKey: string) =>
 		documents.filter((doc) => doc.documentKey === documentKey);
 
-	const validateDocuments = () => {
-		const missing: string[] = [];
+	const missingRequiredDocuments = () => {
+		return options.supportingDocuments
+			.filter(
+				(req) =>
+					req.required &&
+					documentsForRequirement(req.documentKey).length === 0
+			)
+			.map((req) => req.label);
+	};
 
-		options.supportingDocuments.forEach((req) => {
-			const count = documentsForRequirement(req.documentKey).length;
-			if (req.required && count === 0) {
-				missing.push(req.label);
-			}
-		});
+	const validateDocuments = () => {
+		const missing = missingRequiredDocuments();
 
 		if (missing.length) {
 			toast.error(
@@ -629,6 +632,10 @@ export default function NewPortalShipmentPage() {
 		{ number: 3, label: "Cargo & containers", icon: Package },
 		{ number: 4, label: "Documents & review", icon: FileCheck2 },
 	];
+
+	const missingDocs = missingRequiredDocuments();
+	const canSubmit =
+		declarationAccepted && missingDocs.length === 0 && !submitting;
 
 	return (
 		<AppShell
@@ -1455,6 +1462,30 @@ export default function NewPortalShipmentPage() {
 										description="Attach each required document. Only PDF, PNG, JPG and JPEG up to 10 MB are accepted."
 									/>
 
+									{missingDocs.length > 0 && (
+										<div className="mx-5 mt-5 rounded-xl border-l-4 border-coral bg-coral/5 p-4 ring-1 ring-coral/20 sm:mx-6">
+											<div className="flex items-start gap-3">
+												<X className="mt-0.5 size-4 shrink-0 text-coral" />
+												<div className="min-w-0">
+													<p className="text-[13px] font-semibold text-ink">
+														Missing required documents
+													</p>
+													<p className="mt-1 text-[12px] leading-5 text-ink-soft">
+														Attach{" "}
+														{missingDocs.length === 1
+															? "the required document"
+															: "all required documents"}{" "}
+														below before submitting:{" "}
+														<span className="font-semibold text-ink">
+															{missingDocs.join(", ")}
+														</span>
+														.
+													</p>
+												</div>
+											</div>
+										</div>
+									)}
+
 									<div className="space-y-4 p-5 sm:p-6">
 										{options.supportingDocuments.length === 0 ? (
 											<div className="rounded-xl border border-dashed border-line bg-sand/50 p-6 text-center text-[12px] text-ink-soft">
@@ -1469,11 +1500,19 @@ export default function NewPortalShipmentPage() {
 														documentsForRequirement(
 															requirement.documentKey
 														);
+													const missing =
+														requirement.required &&
+														attached.length === 0;
 
 													return (
 														<div
 															key={requirement.documentKey}
-															className="rounded-xl bg-sand p-4 ring-1 ring-line"
+															className={cn(
+																"rounded-xl p-4 ring-1",
+																missing
+																	? "bg-coral/5 ring-coral/25"
+																	: "bg-sand ring-line"
+															)}
 														>
 															<div className="flex flex-wrap items-start justify-between gap-3">
 																<div className="min-w-0">
@@ -1503,7 +1542,14 @@ export default function NewPortalShipmentPage() {
 																	</p>
 																</div>
 
-																<label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-line bg-paper px-3 text-[12px] font-semibold text-ink-soft transition hover:border-orange/40 hover:bg-orange/5 hover:text-orange-deep">
+																<label
+																	className={cn(
+																		"flex h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed px-3 text-[12px] font-semibold transition",
+																		missing
+																			? "border-coral/40 bg-paper text-coral hover:bg-coral/5"
+																			: "border-line bg-paper text-ink-soft hover:border-orange/40 hover:bg-orange/5 hover:text-orange-deep"
+																	)}
+																>
 																	<Upload className="size-3.5" />
 																	{attached.length && !requirement.allowMultiple
 																		? "Replace file"
@@ -1709,6 +1755,11 @@ export default function NewPortalShipmentPage() {
 								<p className="mt-0.5 text-[12px] leading-5 text-sand/75">
 									{steps[step - 1]?.label ?? ""}
 								</p>
+								{step === 4 && missingDocs.length > 0 && (
+									<p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-coral">
+										Missing: {missingDocs.join(", ")}
+									</p>
+								)}
 							</div>
 
 							<div className="flex flex-wrap items-center gap-2">
@@ -1735,7 +1786,7 @@ export default function NewPortalShipmentPage() {
 								) : (
 									<Button
 										type="submit"
-										disabled={submitting || !declarationAccepted}
+										disabled={!canSubmit}
 										className="gap-2 bg-orange text-white hover:bg-orange-deep disabled:opacity-60"
 									>
 										{submitting
