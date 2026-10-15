@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
 	AlertTriangle,
 	ArrowLeft,
@@ -56,6 +56,8 @@ interface ManifestRecord {
 	status: ManifestStatus;
 	receivedAt: string;
 	notes: string;
+	shipmentReference?: string;
+	shipmentReferences?: string;
 }
 
 interface RegisteredOrganisation {
@@ -128,8 +130,6 @@ const extractList = <T,>(payload: any): T[] => {
 
 export default function OperationsManifestRoute() {
 	const [manifests, setManifests] = useState<ManifestRecord[]>([]);
-	const [organisations, setOrganisations] = useState<RegisteredOrganisation[]>([]);
-	const [agents, setAgents] = useState<RegisteredAgent[]>([]);
 	const [query, setQuery] = useState("");
 	const [statusFilter, setStatusFilter] = useState<ManifestStatus | "all">("all");
 	const [selected, setSelected] = useState<ManifestRecord | null>(null);
@@ -167,6 +167,8 @@ export default function OperationsManifestRoute() {
 					status: (m.status ?? "Pre-advice") as ManifestStatus,
 					receivedAt: m.received_at ?? m.receivedAt ?? "—",
 					notes: m.notes ?? "",
+					shipmentReference: m.shipment_reference ?? "",
+					shipmentReferences: m.shipment_reference ?? m.shipment_bill_of_lading ?? "",
 				}))
 			);
 		} catch (err: any) {
@@ -177,52 +179,9 @@ export default function OperationsManifestRoute() {
 		}
 	};
 
-	const fetchReferences = async () => {
-		try {
-			const res = await http.get("operations/manifests/reference/");
-			const resp: Resp = res.data;
-			if (resp.error) {
-				toast.error(resp.data || "Could not load reference data.");
-				return;
-			}
-			const payload: any = resp.code ?? {};
-
-			const orgList: any[] = Array.isArray(payload.organisations)
-				? payload.organisations
-				: Array.isArray(payload.organizations)
-				? payload.organizations
-				: [];
-			setOrganisations(
-				orgList.map((o) => ({
-					id: o.id,
-					name: o.name ?? o.organisation_name ?? "—",
-					rcNumber: o.rc_number ?? o.rcNumber,
-					status: o.status ?? o.verification_status ?? "pending",
-				}))
-			);
-
-			const agentList: any[] = Array.isArray(payload.agents)
-				? payload.agents
-				: [];
-			setAgents(
-				agentList.map((a) => ({
-					id: a.id,
-					name: a.name ?? "—",
-					licenceNumber: a.licence_number ?? a.licenceNumber ?? "—",
-					contactEmail: a.contact_email ?? a.contactEmail,
-					contactPhone: a.contact_phone ?? a.contactPhone,
-				}))
-			);
-		} catch (err: any) {
-			toast.error(
-				err?.response?.data?.message || "Could not load reference data."
-			);
-		}
-	};
-
 	useEffect(() => {
 		void fetchManifests();
-		void fetchReferences();
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	const filtered = useMemo(() => {
@@ -250,10 +209,19 @@ export default function OperationsManifestRoute() {
 		return { total, validated, received, flagged };
 	}, [manifests]);
 
-	const handleIntake = async (next: ManifestRecord): Promise<boolean> => {
+	const handleIntake = async (
+		next: ManifestRecord & { uploadToken?: string }
+	): Promise<boolean> => {
 		setSubmitting(true);
 		try {
-			const res = await http.post("operations/manifests/save/", next);
+			const formData = new URLSearchParams();
+			Object.entries(next).forEach(([key, value]) => {
+				if (value !== undefined && value !== null) formData.append(key, String(value));
+			});
+			formData.append("consigneeType", (next as any).consigneeType ?? "organisation");
+			formData.append("consigneeOrganisationId", (next as any).consigneeOrganisationId ?? "");
+			formData.append("agentId", (next as any).agentId ?? "");
+			const res = await http.post("operations/manifests/save/", formData);
 			const resp: Resp = res.data;
 			if (resp.error) {
 				toast.error(resp.data || "Could not add the manifest.");
@@ -363,8 +331,6 @@ export default function OperationsManifestRoute() {
 						key="intake"
 						onCancel={() => setView("list")}
 						onSubmit={handleIntake}
-						organisations={organisations}
-						agents={agents}
 						submitting={submitting}
 					/>
 				)}
@@ -382,6 +348,22 @@ export default function OperationsManifestRoute() {
 					onFlag={async () => {
 						await handleFlag(selected.id);
 						setSelected(null);
+					}}
+					onMatch={async (shipmentId, reason) => {
+						const formData = new URLSearchParams();
+						formData.append("manifest_id", selected.id);
+						formData.append("shipment_id", shipmentId);
+						formData.append("reason", reason);
+						const res = await http.post(`operations/manifests/match/`, formData);
+						const resp: Resp = res.data;
+						if (resp.error) {
+							toast.error(resp.data || "Could not link shipment declaration.");
+							return false;
+						}
+					toast.success(resp.data || "Shipment declaration linked.");
+					await fetchManifests();
+					setSelected(null);
+					return true;
 					}}
 				/>
 			)}
@@ -572,6 +554,7 @@ function ListView({
 											<p className="font-mono text-[12px] text-ink">{m.bl}</p>
 											<p className="mt-0.5 text-[11px] text-ink-soft">{m.vessel}</p>
 											<p className="text-[10px] text-ink-soft">{m.shippingLine}</p>
+											{m.shipmentReferences && <p className="mt-1 text-[10px] text-emerald-700">Shipment: {m.shipmentReferences}</p>}
 										</td>
 										<td className="px-4 py-3.5">
 											<p className="text-[12px] font-medium text-ink">{m.consignee}</p>
@@ -635,14 +618,10 @@ function ListView({
 function IntakeView({
 	onCancel,
 	onSubmit,
-	organisations,
-	agents,
 	submitting,
 }: {
 	onCancel: () => void;
-	onSubmit: (m: ManifestRecord) => Promise<boolean>;
-	organisations: RegisteredOrganisation[];
-	agents: RegisteredAgent[];
+	onSubmit: (m: ManifestRecord & { uploadToken?: string }) => Promise<boolean>;
 	submitting: boolean;
 }) {
 	const [source, setSource] = useState<IntakeSource>("Manual");
@@ -653,9 +632,76 @@ function IntakeView({
 	const [originPort, setOriginPort] = useState("");
 	const [eta, setEta] = useState("");
 	const [containers, setContainers] = useState("");
+	const [containerNumbers, setContainerNumbers] = useState("");
 	const [packages, setPackages] = useState("");
 	const [grossWeight, setGrossWeight] = useState("");
 	const [consignee, setConsignee] = useState<ConsigneeValue>(emptyConsignee);
+
+	const [file, setFile] = useState<File | null>(null);
+	const [uploading, setUploading] = useState(false);
+	const [uploadToken, setUploadToken] = useState<string | null>(null);
+	const [uploadedName, setUploadedName] = useState<string | null>(null);
+	const fileInputRef = useRef<HTMLInputElement>(null);
+
+	const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		const f = e.target.files?.[0];
+		if (!f) return;
+		setFile(f);
+		setUploading(true);
+		setUploadToken(null);
+		setUploadedName(null);
+		try {
+			const formData = new FormData();
+			formData.append("file", f);
+			formData.append("source", source);
+
+			const res = await http.post("operations/manifests/upload/", formData);
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Could not parse the file.");
+				return;
+			}
+			const payload: any = resp.code ?? {};
+			setUploadToken(payload.upload_token ?? null);
+			setUploadedName(f.name);
+
+			const parsed = payload.parsed ?? {};
+			if (parsed.manifestRef ?? parsed.manifest_ref) {
+				setManifestRef(parsed.manifestRef ?? parsed.manifest_ref ?? "");
+			}
+			if (parsed.bl ?? parsed.bill_of_lading) {
+				setBl(parsed.bl ?? parsed.bill_of_lading ?? "");
+			}
+			if (parsed.vessel) setVessel(parsed.vessel);
+			if (parsed.shippingLine ?? parsed.shipping_line) {
+				setShippingLine(parsed.shippingLine ?? parsed.shipping_line ?? "");
+			}
+			if (parsed.originPort ?? parsed.origin_port) {
+				setOriginPort(parsed.originPort ?? parsed.origin_port ?? "");
+			}
+			if (parsed.eta) setEta(parsed.eta);
+			if (parsed.containers != null) setContainers(String(parsed.containers));
+			if (parsed.packages != null) setPackages(String(parsed.packages));
+			if (parsed.grossWeight ?? parsed.gross_weight) {
+				setGrossWeight(parsed.grossWeight ?? parsed.gross_weight ?? "");
+			}
+
+			toast.success("File parsed. Review the fields below before submitting.");
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message || "Could not upload the file."
+			);
+		} finally {
+			setUploading(false);
+		}
+	};
+
+	const clearFile = () => {
+		setFile(null);
+		setUploadToken(null);
+		setUploadedName(null);
+		if (fileInputRef.current) fileInputRef.current.value = "";
+	};
 
 	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -675,7 +721,12 @@ function IntakeView({
 			return;
 		}
 
-		const record: ManifestRecord = {
+		if (source !== "Manual" && !uploadToken) {
+			toast.error("Upload the manifest file before submitting.");
+			return;
+		}
+
+		const record: ManifestRecord & { uploadToken?: string } = {
 			id: "",
 			manifestRef: manifestRef.trim(),
 			bl: bl.trim(),
@@ -693,8 +744,19 @@ function IntakeView({
 			receivedAt: "",
 			notes: "",
 		};
+		if (uploadToken) record.uploadToken = uploadToken;
+		(record as any).containerNumbers = containerNumbers;
+		(record as any).consigneeType = consignee.type;
+		(record as any).consigneeOrganisationId = consignee.organisationId ?? "";
+		(record as any).agentId = consignee.agentId ?? "";
 
 		await onSubmit(record);
+	};
+
+	const acceptMap: Record<Exclude<IntakeSource, "Manual">, string> = {
+		EDI: ".edi,.txt",
+		CSV: ".csv",
+		XLSX: ".xlsx,.xls",
 	};
 
 	return (
@@ -717,7 +779,7 @@ function IntakeView({
 					type="button"
 					variant="ghost"
 					onClick={onCancel}
-					disabled={submitting}
+					disabled={submitting || uploading}
 					className="-ml-3 gap-2 text-ink-soft hover:text-ink"
 				>
 					<ArrowLeft className="size-4" />
@@ -733,9 +795,9 @@ function IntakeView({
 					Add a new manifest
 				</h2>
 				<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-					Enter the manifest reference and bill of lading — duplicates are
-					detected automatically. Consignee details help operations contact
-					the right party and resolve discrepancies.
+					Upload an EDI, CSV, or XLSX file and we'll parse the fields for
+					you. Or enter the manifest manually. Duplicates are detected
+					automatically before the manifest is accepted.
 				</p>
 			</div>
 
@@ -756,8 +818,11 @@ function IntakeView({
 								<button
 									key={s}
 									type="button"
-									disabled={submitting}
-									onClick={() => setSource(s)}
+									disabled={submitting || uploading}
+									onClick={() => {
+										setSource(s);
+										if (s === "Manual") clearFile();
+									}}
 									className={cn(
 										"rounded-xl border p-3 text-center transition-colors disabled:opacity-60",
 										active
@@ -765,22 +830,80 @@ function IntakeView({
 											: "border-line bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink"
 									)}
 								>
-									<p className="font-mono text-[11px] font-semibold">
-										{s}
-									</p>
+									<p className="font-mono text-[11px] font-semibold">{s}</p>
 								</button>
 							);
 						})}
 					</div>
+
 					{source !== "Manual" && (
-						<div className="mt-3 flex items-start gap-2 rounded-lg bg-sand p-3 ring-1 ring-line">
-							<Info className="mt-0.5 size-3.5 shrink-0 text-ink-soft" />
-								<p className="text-[11px] leading-5 text-ink-soft">
-									File-based intake ({source}) is not yet enabled for this facility.
-									Enter the manifest details manually below.
-								</p>
+						<div className="mt-4 rounded-xl border border-dashed border-line bg-sand p-4">
+							<div className="flex flex-wrap items-start gap-3">
+								<div className="grid size-10 shrink-0 place-items-center rounded-lg bg-paper text-orange-deep ring-1 ring-line">
+									{uploading ? (
+										<Loader2 className="size-4 animate-spin" />
+									) : (
+										<Upload className="size-4" />
+									)}
+								</div>
+								<div className="min-w-[200px] flex-1">
+									<p className="text-[13px] font-semibold text-ink">
+										{uploadedName
+											? `Uploaded: ${uploadedName}`
+											: `Upload ${source} file`}
+									</p>
+									<p className="mt-0.5 text-[11px] leading-5 text-ink-soft">
+										{uploading
+											? "Parsing file and extracting fields…"
+											: "We'll parse the file and pre-fill the fields below. Review them before submitting."}
+									</p>
+									{uploadedName && !uploading && (
+										<p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-teal-deep">
+											Parsed successfully
+										</p>
+									)}
+								</div>
+								<div className="flex flex-wrap items-center gap-2">
+									<input
+										ref={fileInputRef}
+										type="file"
+										accept={acceptMap[source as Exclude<IntakeSource, "Manual">]}
+										onChange={handleFileChange}
+										disabled={submitting || uploading}
+										className="hidden"
+									/>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={() => fileInputRef.current?.click()}
+										disabled={submitting || uploading}
+										className="border-line bg-paper text-ink hover:bg-sand"
+									>
+										<Upload className="mr-1.5 size-3.5" />
+										{uploadedName ? "Replace file" : "Choose file"}
+									</Button>
+									{uploadedName && (
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											onClick={clearFile}
+											disabled={submitting || uploading}
+											className="text-ink-soft hover:text-coral"
+										>
+											<X className="size-3.5" />
+										</Button>
+									)}
+								</div>
 							</div>
-						)}
+							{file && !uploading && uploadToken && (
+								<p className="mt-3 font-mono text-[10px] text-ink-soft">
+									{file.name} · {(file.size / 1024).toFixed(1)} KB
+								</p>
+							)}
+						</div>
+					)}
 				</div>
 			</section>
 
@@ -790,7 +913,7 @@ function IntakeView({
 						Manifest details
 					</h3>
 					<p className="mt-1 text-xs leading-5 text-ink-soft">
-						Primary references from the carrier.
+						Primary references from the carrier. Edit anything the parser got wrong.
 					</p>
 				</div>
 				<div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
@@ -849,6 +972,13 @@ function IntakeView({
 						mono
 					/>
 					<div className="sm:col-span-2">
+						<label className="block">
+							<span className={labelClass}>Container numbers (optional)</span>
+							<textarea rows={3} value={containerNumbers} onChange={(e) => setContainerNumbers(e.target.value)} placeholder="One container per line, or separate with commas" className={textareaClass} />
+						</label>
+						<p className="mt-1 text-[11px] text-ink-soft">Enter individual container numbers when available. Leave blank when the carrier manifest only provides a total.</p>
+					</div>
+					<div className="sm:col-span-2">
 						<Field
 							label="Gross weight"
 							placeholder="72,860 kg"
@@ -865,8 +995,6 @@ function IntakeView({
 					<ConsigneeDetails
 						value={consignee}
 						onChange={setConsignee}
-						organisations={organisations}
-						agents={agents}
 						disabled={submitting}
 						source="manifest"
 					/>
@@ -876,7 +1004,7 @@ function IntakeView({
 			<section className="rounded-2xl bg-paper ring-1 ring-line">
 				<div className="p-5 sm:p-6">
 					<div className="flex items-start gap-3">
-						<Upload className="mt-0.5 size-4 shrink-0 text-orange" />
+						<ClipboardCheck className="mt-0.5 size-4 shrink-0 text-orange" />
 						<div>
 							<p className="text-[13px] font-semibold text-ink">
 								Duplicate detection
@@ -899,6 +1027,7 @@ function IntakeView({
 						</p>
 						<p className="mt-0.5 text-[12px] leading-5 text-sand/75">
 							{manifestRef || "Reference pending"} · {source}
+							{uploadedName ? ` · ${uploadedName}` : ""}
 						</p>
 					</div>
 					<div className="flex flex-wrap items-center gap-2">
@@ -906,14 +1035,14 @@ function IntakeView({
 							type="button"
 							variant="outline"
 							onClick={onCancel}
-							disabled={submitting}
+							disabled={submitting || uploading}
 							className="border-sand/25 bg-transparent text-sand hover:bg-sand/10"
 						>
 							Cancel
 						</Button>
 						<Button
 							type="submit"
-							disabled={submitting}
+							disabled={submitting || uploading}
 							className="gap-2 bg-orange text-white hover:bg-orange-deep"
 						>
 							{submitting ? (
@@ -941,13 +1070,45 @@ function ManifestDetailDialog({
 	onClose,
 	onValidate,
 	onFlag,
+	onMatch,
 }: {
 	manifest: ManifestRecord;
 	actioning: boolean;
 	onClose: () => void;
 	onValidate: () => Promise<void>;
 	onFlag: () => Promise<void>;
+	onMatch: (shipmentId: string, reason: string) => Promise<boolean>;
 }) {
+	const [shipmentQuery, setShipmentQuery] = useState(manifest.bl);
+	const [shipmentResults, setShipmentResults] = useState<any[]>([]);
+	const [shipmentId, setShipmentId] = useState("");
+	const [matchReason, setMatchReason] = useState("");
+	const [searchingShipments, setSearchingShipments] = useState(false);
+	const [matchingShipment, setMatchingShipment] = useState(false);
+	useEffect(() => {
+		const q = shipmentQuery.trim();
+		if (q.length < 2) {
+			setShipmentResults([]);
+			return;
+		}
+		let cancelled = false;
+		const timer = window.setTimeout(async () => {
+			setSearchingShipments(true);
+			try {
+				const res = await http.post(`operations/manifests/shipments/`, { q: encodeURIComponent(q) });
+				const resp: Resp = res.data;
+				if (!cancelled) setShipmentResults(resp.error ? [] : extractList<any>(resp.code));
+			} catch {
+				if (!cancelled) setShipmentResults([]);
+			} finally {
+				if (!cancelled) setSearchingShipments(false);
+			}
+		}, 300);
+		return () => {
+			cancelled = true;
+			window.clearTimeout(timer);
+		};
+	}, [shipmentQuery]);
 	const canValidate = manifest.status === "Pre-advice";
 	const canFlag =
 		manifest.status !== "Discrepancy" && manifest.status !== "Duplicate";
@@ -1030,6 +1191,38 @@ function ManifestDetailDialog({
 						))}
 					</dl>
 
+					<section className="space-y-3 rounded-xl bg-sand p-4 ring-1 ring-line">
+						<div>
+							<p className="text-[13px] font-semibold text-ink">Shipment declaration matching</p>
+							<p className="mt-1 text-[11px] leading-5 text-ink-soft">Search portal shipment declarations and link the correct record. A bill-of-lading mismatch requires an explanation.</p>
+						</div>
+						<input value={shipmentQuery} onChange={(e) => { setShipmentQuery(e.target.value); setShipmentId(""); }} placeholder="Search by shipment reference, BL, consignee, vessel…" className="h-10 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-orange/30" />
+						{searchingShipments && <p className="text-xs text-ink-soft">Searching declarations…</p>}
+						{shipmentResults.length > 0 && (
+							<div className="max-h-44 space-y-1 overflow-y-auto">
+								{shipmentResults.map((s) => (
+									<button key={s.id} type="button" onClick={() => setShipmentId(s.id)} className={cn("w-full rounded-lg border p-3 text-left transition", shipmentId === s.id ? "border-orange bg-orange/10" : "border-line bg-paper hover:bg-sand-2")}>
+										<p className="text-xs font-semibold text-ink">{s.shipment_reference || s.id}</p>
+										<p className="mt-1 text-[11px] text-ink-soft">BL: {s.bill_of_lading || "—"} · {s.consignee || "No consignee"}</p>
+										<p className="mt-1 text-[10px] text-ink-soft">{s.organisation_name || "No organisation"} · {s.vessel_name || "No vessel"} · {s.status}</p>
+									</button>
+								))}
+							</div>
+						)}
+						{shipmentQuery.trim().length >= 2 && !searchingShipments && shipmentResults.length === 0 && <p className="text-xs text-ink-soft">No shipment declarations found.</p>}
+						{shipmentId && shipmentResults.find((s) => s.id === shipmentId) && shipmentResults.find((s) => s.id === shipmentId).bill_of_lading?.trim().toLowerCase() !== manifest.bl.trim().toLowerCase() && (
+							<label className="block">
+								<span className={labelClass}>Reason for BL mismatch <span className="text-coral">*</span></span>
+								<textarea rows={2} value={matchReason} onChange={(e) => setMatchReason(e.target.value)} className={textareaClass} placeholder="Explain why these records should be linked" />
+							</label>
+						)}
+						<div className="flex justify-end">
+							<Button type="button" disabled={!shipmentId || matchingShipment || (shipmentResults.find((s) => s.id === shipmentId)?.bill_of_lading?.trim().toLowerCase() !== manifest.bl.trim().toLowerCase() && !matchReason.trim())} onClick={async () => { setMatchingShipment(true); try { const ok = await onMatch(shipmentId, matchReason.trim()); if (ok) { setShipmentId(""); setMatchReason(""); } } finally { setMatchingShipment(false); } }} className="bg-orange text-white hover:bg-orange-deep">
+								{matchingShipment ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Check className="mr-1.5 size-4" />} Link shipment
+							</Button>
+						</div>
+					</section>
+
 					<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
 						<div className="flex items-start gap-3">
 							<ClipboardCheck className="mt-0.5 size-4 shrink-0 text-orange" />
@@ -1097,47 +1290,16 @@ function ManifestDetailDialog({
 function ConsigneeDetails({
 	value,
 	onChange,
-	organisations,
-	agents,
 	disabled = false,
 	source = "manual",
 }: {
 	value: ConsigneeValue;
 	onChange: (next: ConsigneeValue) => void;
-	organisations: RegisteredOrganisation[];
-	agents: RegisteredAgent[];
 	disabled?: boolean;
 	source?: "manifest" | "manual";
 }) {
 	const update = (patch: Partial<ConsigneeValue>) =>
 		onChange({ ...value, ...patch });
-
-	const [orgQuery, setOrgQuery] = useState("");
-	const [orgOpen, setOrgOpen] = useState(false);
-
-	const filteredOrgs = useMemo(() => {
-		const q = orgQuery.trim().toLowerCase();
-		if (!q) return organisations;
-		return organisations.filter(
-			(o) =>
-				o.name.toLowerCase().includes(q) ||
-				(o.rcNumber ?? "").toLowerCase().includes(q)
-		);
-	}, [organisations, orgQuery]);
-
-	const chooseOrg = (org: RegisteredOrganisation) => {
-		update({
-			organisationId: org.id,
-			organisationName: org.name,
-		});
-		setOrgOpen(false);
-		setOrgQuery("");
-	};
-
-	const clearOrg = () => {
-		update({ organisationId: null, organisationName: "" });
-		setOrgQuery("");
-	};
 
 	const isOrganisation = value.type === "organisation";
 
@@ -1205,164 +1367,28 @@ function ConsigneeDetails({
 			</div>
 
 			{isOrganisation ? (
-				<div className="relative">
+				<div>
 					<p className={labelClass}>
 						Organisation / company name
 						<span className="text-coral"> *</span>
 					</p>
-					<button
-						type="button"
-						disabled={disabled}
-						onClick={() => setOrgOpen((v) => !v)}
-						className={cn(
-							"mt-1.5 flex h-11 w-full items-center justify-between gap-2 rounded-md border border-line bg-sand px-3 text-left text-sm text-ink outline-none transition focus:ring-2 focus:ring-orange/30",
-							orgOpen && "ring-2 ring-orange/30",
-							disabled && "cursor-not-allowed opacity-60"
-						)}
-					>
-						<span className="flex min-w-0 items-center gap-2">
-							<Building2 className="size-3.5 shrink-0 text-ink-soft" />
-							{value.organisationName ? (
-								<span className="flex min-w-0 flex-col items-start">
-									<span className="truncate font-medium text-ink">
-										{value.organisationName}
-									</span>
-									{value.organisationId && (
-										<span className="font-mono text-[9px] uppercase tracking-[0.12em] text-orange-deep">
-											Linked to TRÏNŪ record
-										</span>
-									)}
-								</span>
-							) : (
-								<span className="truncate text-ink-soft">
-									Select a registered organisation or type a name…
-								</span>
-							)}
-						</span>
-						<span className="flex shrink-0 items-center gap-1">
-							{value.organisationName && !disabled && (
-								<span
-									role="button"
-									tabIndex={-1}
-									onClick={(e) => {
-										e.stopPropagation();
-										clearOrg();
-									}}
-									className="grid size-5 place-items-center rounded text-ink-soft hover:bg-sand-2 hover:text-ink"
-									aria-label="Clear organisation"
-								>
-									<X className="size-3" />
-								</span>
-							)}
-							<ChevronDown
-								className={cn(
-									"size-4 text-ink-soft transition-transform",
-									orgOpen && "rotate-180"
-								)}
-							/>
-						</span>
-					</button>
-
-					<input
-						required
-						value={value.organisationName}
-						onChange={(e) =>
+					<OrgSearchPicker
+						value={{
+							id: value.organisationId,
+							name: value.organisationName,
+						}}
+						onChange={(next) =>
 							update({
-								organisationName: e.target.value,
-								organisationId: null,
+								organisationId: next.id,
+								organisationName: next.name,
 							})
 						}
-						className="sr-only"
-						aria-hidden="true"
-						tabIndex={-1}
+						disabled={disabled}
 					/>
-
-					{orgOpen && !disabled && (
-						<>
-							<button
-								type="button"
-								aria-label="Close organisation picker"
-								className="fixed inset-0 z-40 cursor-default"
-								onClick={() => setOrgOpen(false)}
-							/>
-							<div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line">
-								<div className="flex items-center gap-2 border-b border-line px-3 py-2">
-									<Search className="size-3.5 shrink-0 text-ink-soft" />
-									<input
-										autoFocus
-										value={orgQuery}
-										onChange={(e) => setOrgQuery(e.target.value)}
-										placeholder="Search by name or RC number…"
-										className="h-8 w-full bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-soft/70"
-									/>
-								</div>
-
-								<div className="max-h-64 overflow-y-auto p-1">
-									{filteredOrgs.length === 0 ? (
-										<div className="px-3 py-6 text-center text-[12px] text-ink-soft">
-											No registered organisation matches.
-											<span className="mt-1 block text-[11px]">
-												Type the full name above to record an
-												unregistered consignee.
-											</span>
-										</div>
-									) : (
-										filteredOrgs.map((org) => {
-											const active = org.id === value.organisationId;
-											return (
-												<button
-													key={org.id}
-													type="button"
-													onClick={() => chooseOrg(org)}
-													className={cn(
-														"flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
-														active
-															? "bg-orange/10 ring-1 ring-orange/25"
-															: "hover:bg-sand"
-													)}
-												>
-													<span
-														className={cn(
-															"mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg",
-															active
-																? "bg-orange text-white"
-																: "bg-sand text-ink-soft ring-1 ring-line"
-														)}
-													>
-														{active ? (
-															<Check className="size-4" />
-														) : (
-															<Building2 className="size-4" />
-														)}
-													</span>
-													<span className="min-w-0 flex-1">
-														<span className="block truncate text-[13px] font-semibold text-ink">
-															{org.name}
-														</span>
-														{org.rcNumber && (
-															<span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-																{org.rcNumber}
-															</span>
-														)}
-													</span>
-													{org.status === "verified" && (
-														<span className="rounded-full bg-teal/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-teal-deep ring-1 ring-teal/25">
-															Verified
-														</span>
-													)}
-												</button>
-											);
-										})
-									)}
-								</div>
-							</div>
-						</>
-					)}
-
 					<p className="mt-2 text-[11px] leading-5 text-ink-soft">
-						Select a registered organisation to link this consignee
-						to an existing TRÏNŪ record. Otherwise enter the name
-						exactly as it appears on the manifest.
+						Start typing to search registered organisations. If it
+						isn't registered, type the full name as it appears on
+						the manifest.
 					</p>
 				</div>
 			) : (
@@ -1444,20 +1470,22 @@ function ConsigneeDetails({
 				/>
 			</label>
 
-			<div className="relative">
+			<div>
 				<p className={labelClass}>Licensed agent</p>
-				<AgentPicker
-					value={value.agentName}
-					disabled={disabled}
-					onChange={(name, id) =>
-						update({ agentName: name, agentId: id })
+				<AgentSearchPicker
+					value={{
+						id: value.agentId,
+						name: value.agentName,
+					}}
+					onChange={(next) =>
+						update({ agentId: next.id, agentName: next.name })
 					}
-					options={agents}
+					disabled={disabled}
 				/>
 				<p className="mt-2 text-[11px] leading-5 text-ink-soft">
 					{value.agentId
 						? "Linked to a verified TRÏNŪ agent record."
-						: "Select the licensed clearing agent responsible for this consignment."}
+						: "Start typing to search licensed clearing agents."}
 				</p>
 			</div>
 
@@ -1481,161 +1509,417 @@ function ConsigneeDetails({
 	);
 }
 
-function AgentPicker({
+function useDebounced<T>(value: T, delay = 300): T {
+	const [debounced, setDebounced] = useState(value);
+	useEffect(() => {
+		const t = setTimeout(() => setDebounced(value), delay);
+		return () => clearTimeout(t);
+	}, [value, delay]);
+	return debounced;
+}
+
+function OrgSearchPicker({
 	value,
 	onChange,
-	options,
 	disabled = false,
 }: {
-	value: string;
-	onChange: (name: string, id: string | null) => void;
-	options: RegisteredAgent[];
+	value: { id: string | null; name: string };
+	onChange: (next: { id: string | null; name: string }) => void;
 	disabled?: boolean;
 }) {
 	const [open, setOpen] = useState(false);
-	const [search, setSearch] = useState("");
+	const [query, setQuery] = useState("");
+	const [results, setResults] = useState<RegisteredOrganisation[]>([]);
+	const [searching, setSearching] = useState(false);
 
-	const filtered = useMemo(() => {
-		const q = search.trim().toLowerCase();
-		if (!q) return options;
-		return options.filter(
-			(a) =>
-				a.name.toLowerCase().includes(q) ||
-				a.licenceNumber.toLowerCase().includes(q)
-		);
-	}, [options, search]);
+	const debouncedQuery = useDebounced(query, 300);
+	const containerRef = useRef<HTMLDivElement>(null);
 
-	const choose = (agent: RegisteredAgent) => {
-		onChange(agent.name, agent.id);
+	useEffect(() => {
+		if (!open) return;
+		const q = debouncedQuery.trim();
+		if (q.length < 2) {
+			setResults([]);
+			setSearching(false);
+			return;
+		}
+		let cancelled = false;
+		(async () => {
+			setSearching(true);
+			try {
+				const res = await http.post(`operations/manifests/organisations/`, {q: encodeURIComponent(q)});
+				const resp: Resp = res.data;
+				if (cancelled) return;
+				if (resp.error) {
+					setResults([]);
+					return;
+				}
+				const list = extractList<any>(resp.code);
+				setResults(
+					list.map((o) => ({
+						id: o.id,
+						name: o.name ?? o.organisation_name ?? "—",
+						rcNumber: o.rc_number ?? o.rcNumber,
+						status: o.status ?? o.verification_status ?? "pending",
+					}))
+				);
+			} catch {
+				if (!cancelled) setResults([]);
+			} finally {
+				if (!cancelled) setSearching(false);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [debouncedQuery, open]);
+
+	useEffect(() => {
+		if (!open) return;
+		const onClick = (e: MouseEvent) => {
+			if (
+				containerRef.current &&
+				!containerRef.current.contains(e.target as Node)
+			) {
+				setOpen(false);
+			}
+		};
+		document.addEventListener("mousedown", onClick);
+		return () => document.removeEventListener("mousedown", onClick);
+	}, [open]);
+
+	const choose = (org: RegisteredOrganisation) => {
+		onChange({ id: org.id, name: org.name });
 		setOpen(false);
-		setSearch("");
+		setQuery("");
 	};
 
 	const clear = () => {
-		onChange("", null);
-		setSearch("");
+		onChange({ id: null, name: "" });
+		setQuery("");
 	};
 
 	return (
-		<div className="relative">
-			<button
-				type="button"
-				disabled={disabled}
-				onClick={() => setOpen((v) => !v)}
+		<div ref={containerRef} className="relative mt-1.5">
+			<div
 				className={cn(
-					"mt-1.5 flex h-11 w-full items-center justify-between gap-2 rounded-md border border-line bg-sand px-3 text-left text-sm text-ink outline-none transition focus:ring-2 focus:ring-orange/30",
-					open && "ring-2 ring-orange/30",
+					"flex h-11 w-full items-center gap-2 rounded-md border border-line bg-sand px-3 text-sm text-ink transition focus-within:ring-2 focus-within:ring-orange/30",
 					disabled && "cursor-not-allowed opacity-60"
 				)}
 			>
-				<span className="flex min-w-0 items-center gap-2">
-					<User className="size-3.5 shrink-0 text-ink-soft" />
-					{value ? (
-						<span className="truncate font-medium text-ink">{value}</span>
-					) : (
-						<span className="truncate text-ink-soft">
-							Select a licensed agent…
-						</span>
-					)}
-				</span>
-				<span className="flex shrink-0 items-center gap-1">
-					{value && !disabled && (
-						<span
-							role="button"
-							tabIndex={-1}
-							onClick={(e) => {
-								e.stopPropagation();
-								clear();
-							}}
-							className="grid size-5 place-items-center rounded text-ink-soft hover:bg-sand-2 hover:text-ink"
-							aria-label="Clear selected agent"
-						>
-							<X className="size-3" />
-						</span>
-					)}
+				<Building2 className="size-3.5 shrink-0 text-ink-soft" />
+				<input
+					type="text"
+					disabled={disabled}
+					value={open ? query : value.name}
+					placeholder={
+						value.name ? value.name : "Search or type organisation name…"
+					}
+					onFocus={() => {
+						if (disabled) return;
+						setOpen(true);
+						setQuery("");
+					}}
+					onChange={(e) => setQuery(e.target.value)}
+					className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-soft/70"
+				/>
+				{value.id && (
+					<span className="rounded-full bg-orange/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-orange-deep ring-1 ring-orange/25">
+						Linked
+					</span>
+				)}
+				{value.name && !disabled && (
+					<button
+						type="button"
+						onClick={clear}
+						className="grid size-5 shrink-0 place-items-center rounded text-ink-soft hover:bg-sand-2 hover:text-ink"
+						aria-label="Clear organisation"
+					>
+						<X className="size-3" />
+					</button>
+				)}
+				{searching ? (
+					<Loader2 className="size-3.5 shrink-0 animate-spin text-ink-soft" />
+				) : (
 					<ChevronDown
 						className={cn(
-							"size-4 text-ink-soft transition-transform",
+							"size-4 shrink-0 text-ink-soft transition-transform",
 							open && "rotate-180"
 						)}
 					/>
-				</span>
-			</button>
+				)}
+			</div>
 
-			{open && !disabled && (
-				<>
-					<button
-						type="button"
-						aria-label="Close agent picker"
-						className="fixed inset-0 z-40 cursor-default"
-						onClick={() => setOpen(false)}
-					/>
-					<div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line">
-						<div className="flex items-center gap-2 border-b border-line px-3 py-2">
-							<Search className="size-3.5 shrink-0 text-ink-soft" />
-							<input
-								autoFocus
-								value={search}
-								onChange={(e) => setSearch(e.target.value)}
-								placeholder="Search agent name or licence number…"
-								className="h-8 w-full bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-soft/70"
-							/>
-						</div>
-
-						<div className="max-h-64 overflow-y-auto p-1">
-							{filtered.length === 0 ? (
-								<div className="px-3 py-6 text-center text-[12px] text-ink-soft">
-									No licensed agent matches that search.
-								</div>
-							) : (
-								filtered.map((agent) => {
-									const active = agent.name === value;
-									return (
-										<button
-											key={agent.id}
-											type="button"
-											onClick={() => choose(agent)}
+			{open && (
+				<div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line">
+					<div className="max-h-64 overflow-y-auto p-1">
+						{query.trim().length < 2 ? (
+							<div className="px-3 py-6 text-center text-[12px] text-ink-soft">
+								Type at least 2 characters to search registered
+								organisations.
+							</div>
+						) : searching ? (
+							<div className="flex items-center justify-center gap-2 px-3 py-6 text-[12px] text-ink-soft">
+								<Loader2 className="size-3.5 animate-spin" />
+								Searching…
+							</div>
+						) : results.length === 0 ? (
+							<div className="px-3 py-6 text-center text-[12px] text-ink-soft">
+								No registered organisation matches.
+								<span className="mt-1 block text-[11px]">
+									Close this menu and type the full name manually to
+									record an unregistered consignee.
+								</span>
+							</div>
+						) : (
+							results.map((org) => {
+								const active = org.id === value.id;
+								return (
+									<button
+										key={org.id}
+										type="button"
+										onClick={() => choose(org)}
+										className={cn(
+											"flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+											active ? "bg-orange/10 ring-1 ring-orange/25" : "hover:bg-sand"
+										)}
+									>
+										<span
 											className={cn(
-												"flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+												"mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg",
 												active
-													? "bg-orange/10 ring-1 ring-orange/25"
-													: "hover:bg-sand"
+													? "bg-orange text-white"
+													: "bg-sand text-ink-soft ring-1 ring-line"
 											)}
 										>
-											<span
-												className={cn(
-													"mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg",
-													active
-														? "bg-orange text-white"
-														: "bg-sand text-ink-soft ring-1 ring-line"
-												)}
-											>
-												{active ? (
-													<Check className="size-4" />
-												) : (
-													<User className="size-4" />
-												)}
+											{active ? (
+												<Check className="size-4" />
+											) : (
+												<Building2 className="size-4" />
+											)}
+										</span>
+										<span className="min-w-0 flex-1">
+											<span className="block truncate text-[13px] font-semibold text-ink">
+												{org.name}
 											</span>
-											<span className="min-w-0 flex-1">
-												<span className="block truncate text-[13px] font-semibold text-ink">
-													{agent.name}
-												</span>
+											{org.rcNumber && (
 												<span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-													{agent.licenceNumber}
+													{org.rcNumber}
 												</span>
-												{(agent.contactEmail || agent.contactPhone) && (
-													<span className="mt-1 block truncate text-[11px] text-ink-soft">
-														{agent.contactEmail} · {agent.contactPhone}
-													</span>
-												)}
+											)}
+										</span>
+										{org.status === "verified" && (
+											<span className="rounded-full bg-teal/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-teal-deep ring-1 ring-teal/25">
+												Verified
 											</span>
-										</button>
-									);
-								})
-							)}
-						</div>
+										)}
+									</button>
+								);
+							})
+						)}
 					</div>
-				</>
+				</div>
+			)}
+		</div>
+	);
+}
+
+function AgentSearchPicker({
+	value,
+	onChange,
+	disabled = false,
+}: {
+	value: { id: string | null; name: string };
+	onChange: (next: { id: string | null; name: string }) => void;
+	disabled?: boolean;
+}) {
+	const [open, setOpen] = useState(false);
+	const [query, setQuery] = useState("");
+	const [results, setResults] = useState<RegisteredAgent[]>([]);
+	const [searching, setSearching] = useState(false);
+
+	const debouncedQuery = useDebounced(query, 300);
+	const containerRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (!open) return;
+		const q = debouncedQuery.trim();
+		if (q.length < 2) {
+			setResults([]);
+			setSearching(false);
+			return;
+		}
+		let cancelled = false;
+		(async () => {
+			setSearching(true);
+			try {
+				const res = await http.post(`operations/manifests/agents/`, { q: encodeURIComponent(q) });
+				const resp: Resp = res.data;
+				if (cancelled) return;
+				if (resp.error) {
+					setResults([]);
+					return;
+				}
+				const list = extractList<any>(resp.code);
+				setResults(
+					list.map((a) => ({
+						id: a.id,
+						name: a.name ?? "—",
+						licenceNumber: a.licence_number ?? a.licenceNumber ?? "—",
+						contactEmail: a.contact_email ?? a.contactEmail,
+						contactPhone: a.contact_phone ?? a.contactPhone,
+					}))
+				);
+			} catch {
+				if (!cancelled) setResults([]);
+			} finally {
+				if (!cancelled) setSearching(false);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [debouncedQuery, open]);
+
+	useEffect(() => {
+		if (!open) return;
+		const onClick = (e: MouseEvent) => {
+			if (
+				containerRef.current &&
+				!containerRef.current.contains(e.target as Node)
+			) {
+				setOpen(false);
+			}
+		};
+		document.addEventListener("mousedown", onClick);
+		return () => document.removeEventListener("mousedown", onClick);
+	}, [open]);
+
+	const choose = (agent: RegisteredAgent) => {
+		onChange({ id: agent.id, name: agent.name });
+		setOpen(false);
+		setQuery("");
+	};
+
+	const clear = () => {
+		onChange({ id: null, name: "" });
+		setQuery("");
+	};
+
+	return (
+		<div ref={containerRef} className="relative mt-1.5">
+			<div
+				className={cn(
+					"flex h-11 w-full items-center gap-2 rounded-md border border-line bg-sand px-3 text-sm text-ink transition focus-within:ring-2 focus-within:ring-orange/30",
+					disabled && "cursor-not-allowed opacity-60"
+				)}
+			>
+				<User className="size-3.5 shrink-0 text-ink-soft" />
+				<input
+					type="text"
+					disabled={disabled}
+					value={open ? query : value.name}
+					placeholder={
+						value.name ? value.name : "Search or type licensed agent…"
+					}
+					onFocus={() => {
+						if (disabled) return;
+						setOpen(true);
+						setQuery("");
+					}}
+					onChange={(e) => setQuery(e.target.value)}
+					className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-soft/70"
+				/>
+				{value.id && (
+					<span className="rounded-full bg-orange/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-orange-deep ring-1 ring-orange/25">
+						Linked
+					</span>
+				)}
+				{value.name && !disabled && (
+					<button
+						type="button"
+						onClick={clear}
+						className="grid size-5 shrink-0 place-items-center rounded text-ink-soft hover:bg-sand-2 hover:text-ink"
+						aria-label="Clear agent"
+					>
+						<X className="size-3" />
+					</button>
+				)}
+				{searching ? (
+					<Loader2 className="size-3.5 shrink-0 animate-spin text-ink-soft" />
+				) : (
+					<ChevronDown
+						className={cn(
+							"size-4 shrink-0 text-ink-soft transition-transform",
+							open && "rotate-180"
+						)}
+					/>
+				)}
+			</div>
+
+			{open && (
+				<div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line">
+					<div className="max-h-64 overflow-y-auto p-1">
+						{query.trim().length < 2 ? (
+							<div className="px-3 py-6 text-center text-[12px] text-ink-soft">
+								Type at least 2 characters to search licensed
+								agents.
+							</div>
+						) : searching ? (
+							<div className="flex items-center justify-center gap-2 px-3 py-6 text-[12px] text-ink-soft">
+								<Loader2 className="size-3.5 animate-spin" />
+								Searching…
+							</div>
+						) : results.length === 0 ? (
+							<div className="px-3 py-6 text-center text-[12px] text-ink-soft">
+								No licensed agent matches that search.
+							</div>
+						) : (
+							results.map((agent) => {
+								const active = agent.id === value.id;
+								return (
+									<button
+										key={agent.id}
+										type="button"
+										onClick={() => choose(agent)}
+										className={cn(
+											"flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+											active ? "bg-orange/10 ring-1 ring-orange/25" : "hover:bg-sand"
+										)}
+									>
+										<span
+											className={cn(
+												"mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg",
+												active
+													? "bg-orange text-white"
+													: "bg-sand text-ink-soft ring-1 ring-line"
+											)}
+										>
+											{active ? (
+												<Check className="size-4" />
+											) : (
+												<User className="size-4" />
+											)}
+										</span>
+										<span className="min-w-0 flex-1">
+											<span className="block truncate text-[13px] font-semibold text-ink">
+												{agent.name}
+											</span>
+											<span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+												{agent.licenceNumber}
+											</span>
+											{(agent.contactEmail || agent.contactPhone) && (
+												<span className="mt-1 block truncate text-[11px] text-ink-soft">
+													{agent.contactEmail} · {agent.contactPhone}
+												</span>
+											)}
+										</span>
+									</button>
+								);
+							})
+						)}
+					</div>
+				</div>
 			)}
 		</div>
 	);
