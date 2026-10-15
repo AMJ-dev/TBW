@@ -62,7 +62,6 @@
         } else $data="Invalid file";
         return ["error"=>$error, "data"=>$data];
     } 
-        
     function upload_multiple_files($file, $i, $accepted){ 
         $error=true;
         $target_path = gen_filename($file["name"][$i]); 

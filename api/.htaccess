@@ -105,3 +105,12 @@ RewriteRule ^operator/shipments/review/$ src/shipment/review.php [NC]
 
 RewriteRule ^operator/shipment/transition/$ src/shipment/transition.php [NC]
 RewriteRule ^operator/shipment/([0-9a-zA-Z-]+)/$ src/shipment/op-details.php?id=$1 [NC]
+
+RewriteRule ^operations/manifests/$ src/manifests/index.php [NC]
+RewriteRule ^operations/manifests/save/$ src/manifests/save.php [NC]
+RewriteRule ^operations/manifests/export/$ src/manifests/export.php [NC]
+RewriteRule ^operations/manifests/reference/$ src/manifests/reference.php [NC]
+RewriteRule ^operations/manifests/flag/([0-9a-zA-Z-]+)/$ src/manifests/flag.php?id=$1 [NC]
+RewriteRule ^operations/manifests/validate/([0-9a-zA-Z-]+)/$ src/manifests/validate.php?id=$1 [NC]
+# 
+# 

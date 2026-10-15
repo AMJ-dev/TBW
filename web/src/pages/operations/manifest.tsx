@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
 	AlertTriangle,
 	ArrowLeft,
@@ -11,6 +11,7 @@ import {
 	Download,
 	FileText,
 	Info,
+	Loader2,
 	Plus,
 	Search,
 	Ship,
@@ -22,6 +23,7 @@ import { toast } from "sonner";
 import { AppShell, Metric, StatusBadge, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
 
 type ManifestStatus =
@@ -85,170 +87,6 @@ interface ConsigneeValue {
 	agentName: string;
 }
 
-const registeredOrganisations: RegisteredOrganisation[] = [
-	{
-		id: "org-1",
-		name: "Atlantic Trade Nigeria Ltd",
-		rcNumber: "RC-93749834",
-		status: "verified",
-	},
-	{
-		id: "org-2",
-		name: "Kano Freight Forwarders",
-		rcNumber: "RC-22014566",
-		status: "verified",
-	},
-	{
-		id: "org-3",
-		name: "Coastal Freight Nigeria",
-		rcNumber: "RC-44098231",
-		status: "pending",
-	},
-	{
-		id: "org-4",
-		name: "Sahara Energy Logistics",
-		rcNumber: "RC-77092314",
-		status: "verified",
-	},
-	{
-		id: "org-5",
-		name: "Prime Haulage Ltd",
-		rcNumber: "RC-55310902",
-		status: "under_review",
-	},
-];
-
-const registeredAgents: RegisteredAgent[] = [
-	{
-		id: "ag-1",
-		name: "Meridian Customs Services",
-		licenceNumber: "NCS/AG/2026/00123",
-		contactEmail: "ops@meridiancustoms.ng",
-		contactPhone: "+234 803 100 2000",
-	},
-	{
-		id: "ag-2",
-		name: "Kano Line Haulers",
-		licenceNumber: "NCS/AG/2025/00882",
-		contactEmail: "clearance@kanoline.ng",
-		contactPhone: "+234 802 330 4400",
-	},
-	{
-		id: "ag-3",
-		name: "Atlantic Freight Brokers",
-		licenceNumber: "NCS/AG/2026/00211",
-		contactEmail: "docs@atlanticfreight.ng",
-		contactPhone: "+234 814 770 1100",
-	},
-	{
-		id: "ag-4",
-		name: "Sahel Clearing Company",
-		licenceNumber: "NCS/AG/2024/00910",
-		contactEmail: "operations@sahelclearing.ng",
-		contactPhone: "+234 805 660 2200",
-	},
-	{
-		id: "ag-5",
-		name: "Northgate Customs Partners",
-		licenceNumber: "NCS/AG/2026/00344",
-		contactEmail: "desk@northgate.ng",
-		contactPhone: "+234 816 442 9900",
-	},
-];
-
-const initialManifests: ManifestRecord[] = [
-	{
-		id: "m-1",
-		manifestRef: "MAN-2026-008721",
-		bl: "TRN-BL-2026-008721",
-		vessel: "Maersk Voyager V.2604",
-		shippingLine: "Maersk Line",
-		originPort: "Apapa Port",
-		eta: "06 Sep 2026 · 08:30",
-		containers: 4,
-		packages: 220,
-		grossWeight: "72,860 kg",
-		consignee: "Atlantic Trade Nigeria Ltd",
-		agent: "Meridian Customs Services",
-		source: "EDI",
-		status: "Received",
-		receivedAt: "05 Sep 2026 · 16:12",
-		notes: "Received via BAPLIE EDI. No discrepancies detected on automated validation.",
-	},
-	{
-		id: "m-2",
-		manifestRef: "MAN-2026-008742",
-		bl: "TRN-BL-2026-008742",
-		vessel: "MSC Nigeria Express",
-		shippingLine: "MSC Mediterranean",
-		originPort: "Tin Can Island Port",
-		eta: "07 Sep 2026 · 10:00",
-		containers: 2,
-		packages: 140,
-		grossWeight: "24,650 kg",
-		consignee: "Kano Freight Forwarders",
-		agent: "Kano Line Haulers",
-		source: "CSV",
-		status: "Validated",
-		receivedAt: "05 Sep 2026 · 09:40",
-		notes: "CSV intake validated. Awaiting gate arrival.",
-	},
-	{
-		id: "m-3",
-		manifestRef: "MAN-2026-008755",
-		bl: "TRN-BL-2026-008755",
-		vessel: "CMA CGM Africa Feeder",
-		shippingLine: "CMA CGM Group",
-		originPort: "Onne Port Complex",
-		eta: "09 Sep 2026 · 06:15",
-		containers: 6,
-		packages: 380,
-		grossWeight: "118,400 kg",
-		consignee: "Coastal Freight Nigeria",
-		agent: "Meridian Customs Services",
-		source: "XLSX",
-		status: "Pre-advice",
-		receivedAt: "06 Sep 2026 · 14:05",
-		notes: "Pre-advice received. Awaiting documents for validation.",
-	},
-	{
-		id: "m-4",
-		manifestRef: "MAN-2026-008771",
-		bl: "TRN-BL-2026-008771",
-		vessel: "Hapag Express 12",
-		shippingLine: "Hapag-Lloyd",
-		originPort: "Lekki Deep Sea Port",
-		eta: "10 Sep 2026 · 09:00",
-		containers: 3,
-		packages: 165,
-		grossWeight: "54,200 kg",
-		consignee: "Sahara Energy Logistics",
-		agent: "Meridian Customs Services",
-		source: "Manual",
-		status: "Discrepancy",
-		receivedAt: "06 Sep 2026 · 11:32",
-		notes: "Container count differs from shipping line pre-advice. Under review.",
-	},
-	{
-		id: "m-5",
-		manifestRef: "MAN-2026-008781",
-		bl: "TRN-BL-2026-008781",
-		vessel: "Maersk Voyager V.2604",
-		shippingLine: "Maersk Line",
-		originPort: "Apapa Port",
-		eta: "01 Sep 2026 · 07:00",
-		containers: 4,
-		packages: 210,
-		grossWeight: "68,900 kg",
-		consignee: "Prime Haulage Ltd",
-		agent: "Meridian Customs Services",
-		source: "EDI",
-		status: "Duplicate",
-		receivedAt: "01 Sep 2026 · 06:55",
-		notes: "Duplicate of MAN-2026-008721 manifest reference. Flagged for review.",
-	},
-];
-
 const statusFilters: (ManifestStatus | "all")[] = [
 	"all",
 	"Pre-advice",
@@ -281,12 +119,111 @@ const emptyConsignee: ConsigneeValue = {
 	agentName: "",
 };
 
+const extractList = <T,>(payload: any): T[] => {
+	if (Array.isArray(payload)) return payload as T[];
+	if (Array.isArray(payload?.results)) return payload.results as T[];
+	if (Array.isArray(payload?.data)) return payload.data as T[];
+	return [];
+};
+
 export default function OperationsManifestRoute() {
-	const [manifests, setManifests] = useState<ManifestRecord[]>(initialManifests);
+	const [manifests, setManifests] = useState<ManifestRecord[]>([]);
+	const [organisations, setOrganisations] = useState<RegisteredOrganisation[]>([]);
+	const [agents, setAgents] = useState<RegisteredAgent[]>([]);
 	const [query, setQuery] = useState("");
 	const [statusFilter, setStatusFilter] = useState<ManifestStatus | "all">("all");
 	const [selected, setSelected] = useState<ManifestRecord | null>(null);
 	const [view, setView] = useState<View>("list");
+	const [loading, setLoading] = useState(true);
+	const [submitting, setSubmitting] = useState(false);
+	const [actioning, setActioning] = useState(false);
+
+	const fetchManifests = async () => {
+		setLoading(true);
+		try {
+			const res = await http.get("operations/manifests/");
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Could not load manifests.");
+				setManifests([]);
+				return;
+			}
+			const list = extractList<any>(resp.code);
+			setManifests(
+				list.map((m) => ({
+					id: m.id,
+					manifestRef: m.manifest_ref ?? m.manifestRef ?? "—",
+					bl: m.bl ?? m.bill_of_lading ?? "—",
+					vessel: m.vessel ?? "—",
+					shippingLine: m.shipping_line ?? m.shippingLine ?? "—",
+					originPort: m.origin_port ?? m.originPort ?? "—",
+					eta: m.eta ?? "—",
+					containers: Number(m.containers ?? 0),
+					packages: Number(m.packages ?? 0),
+					grossWeight: m.gross_weight ?? m.grossWeight ?? "—",
+					consignee: m.consignee ?? "—",
+					agent: m.agent ?? "—",
+					source: (m.source ?? "Manual") as IntakeSource,
+					status: (m.status ?? "Pre-advice") as ManifestStatus,
+					receivedAt: m.received_at ?? m.receivedAt ?? "—",
+					notes: m.notes ?? "",
+				}))
+			);
+		} catch (err: any) {
+			toast.error(err?.response?.data?.message || "Could not load manifests.");
+			setManifests([]);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const fetchReferences = async () => {
+		try {
+			const res = await http.get("operations/manifests/reference/");
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Could not load reference data.");
+				return;
+			}
+			const payload: any = resp.code ?? {};
+
+			const orgList: any[] = Array.isArray(payload.organisations)
+				? payload.organisations
+				: Array.isArray(payload.organizations)
+				? payload.organizations
+				: [];
+			setOrganisations(
+				orgList.map((o) => ({
+					id: o.id,
+					name: o.name ?? o.organisation_name ?? "—",
+					rcNumber: o.rc_number ?? o.rcNumber,
+					status: o.status ?? o.verification_status ?? "pending",
+				}))
+			);
+
+			const agentList: any[] = Array.isArray(payload.agents)
+				? payload.agents
+				: [];
+			setAgents(
+				agentList.map((a) => ({
+					id: a.id,
+					name: a.name ?? "—",
+					licenceNumber: a.licence_number ?? a.licenceNumber ?? "—",
+					contactEmail: a.contact_email ?? a.contactEmail,
+					contactPhone: a.contact_phone ?? a.contactPhone,
+				}))
+			);
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message || "Could not load reference data."
+			);
+		}
+	};
+
+	useEffect(() => {
+		void fetchManifests();
+		void fetchReferences();
+	}, []);
 
 	const filtered = useMemo(() => {
 		return manifests.filter((m) => {
@@ -313,34 +250,93 @@ export default function OperationsManifestRoute() {
 		return { total, validated, received, flagged };
 	}, [manifests]);
 
-	const handleIntake = (next: ManifestRecord) => {
-		setManifests((prev) => [next, ...prev]);
-		setView("list");
-		toast.success("Manifest added locally.");
+	const handleIntake = async (next: ManifestRecord): Promise<boolean> => {
+		setSubmitting(true);
+		try {
+			const res = await http.post("operations/manifests/save/", next);
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Could not add the manifest.");
+				return false;
+			}
+			setView("list");
+			toast.success("Manifest added.");
+			await fetchManifests();
+			return true;
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message || "Could not add the manifest."
+			);
+			return false;
+		} finally {
+			setSubmitting(false);
+		}
 	};
 
-	const handleValidate = (id: string) => {
-		setManifests((prev) =>
-			prev.map((m) =>
-				m.id === id ? { ...m, status: "Validated" as ManifestStatus } : m
-			)
-		);
-		toast.success("Manifest marked as validated.");
+	const handleValidate = async (id: string) => {
+		setActioning(true);
+		try {
+			const res = await http.post(`operations/manifests/validate/${id}/`);
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Could not validate the manifest.");
+				return;
+			}
+			toast.success("Manifest marked as validated.");
+			await fetchManifests();
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message || "Could not validate the manifest."
+			);
+		} finally {
+			setActioning(false);
+		}
 	};
 
-	const handleFlag = (id: string) => {
-		setManifests((prev) =>
-			prev.map((m) =>
-				m.id === id
-					? {
-							...m,
-							status: "Discrepancy" as ManifestStatus,
-							notes: `${m.notes} Flagged for review by operations.`,
-					  }
-					: m
-			)
-		);
-		toast.success("Manifest flagged for review.");
+	const handleFlag = async (id: string) => {
+		setActioning(true);
+		try {
+			const res = await http.post(`operations/manifests/flag/${id}/`);
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Could not flag the manifest.");
+				return;
+			}
+			toast.success("Manifest flagged for review.");
+			await fetchManifests();
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message || "Could not flag the manifest."
+			);
+		} finally {
+			setActioning(false);
+		}
+	};
+
+	const handleExport = async () => {
+		try {
+			const res = await http.get("operations/manifests/export/");
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Export failed.");
+				return;
+			}
+			const csv = typeof resp.code === "string" ? resp.code : "";
+			const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement("a");
+			a.href = url;
+			a.download = `manifest-intake-${new Date()
+				.toISOString()
+				.slice(0, 10)}.csv`;
+			a.click();
+			URL.revokeObjectURL(url);
+			toast.success("Manifest intake log exported.");
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message || "Export failed. Please try again."
+			);
+		}
 	};
 
 	return (
@@ -354,17 +350,22 @@ export default function OperationsManifestRoute() {
 						stats={stats}
 						query={query}
 						statusFilter={statusFilter}
+						loading={loading}
+						actioning={actioning}
 						onQueryChange={setQuery}
 						onStatusChange={setStatusFilter}
 						onSelect={setSelected}
 						onNewIntake={() => setView("intake")}
+						onExport={handleExport}
 					/>
 				) : (
 					<IntakeView
 						key="intake"
 						onCancel={() => setView("list")}
 						onSubmit={handleIntake}
-						existingManifests={manifests}
+						organisations={organisations}
+						agents={agents}
+						submitting={submitting}
 					/>
 				)}
 			</div>
@@ -372,13 +373,14 @@ export default function OperationsManifestRoute() {
 			{selected && (
 				<ManifestDetailDialog
 					manifest={selected}
+					actioning={actioning}
 					onClose={() => setSelected(null)}
-					onValidate={() => {
-						handleValidate(selected.id);
+					onValidate={async () => {
+						await handleValidate(selected.id);
 						setSelected(null);
 					}}
-					onFlag={() => {
-						handleFlag(selected.id);
+					onFlag={async () => {
+						await handleFlag(selected.id);
 						setSelected(null);
 					}}
 				/>
@@ -393,20 +395,26 @@ function ListView({
 	stats,
 	query,
 	statusFilter,
+	loading,
+	actioning,
 	onQueryChange,
 	onStatusChange,
 	onSelect,
 	onNewIntake,
+	onExport,
 }: {
 	manifests: ManifestRecord[];
 	filtered: ManifestRecord[];
 	stats: { total: number; validated: number; received: number; flagged: number };
 	query: string;
 	statusFilter: ManifestStatus | "all";
+	loading: boolean;
+	actioning: boolean;
 	onQueryChange: (v: string) => void;
 	onStatusChange: (v: ManifestStatus | "all") => void;
 	onSelect: (m: ManifestRecord) => void;
 	onNewIntake: () => void;
+	onExport: () => void;
 }) {
 	return (
 		<div
@@ -444,7 +452,7 @@ function ListView({
 					<Button
 						variant="outline"
 						className="border-line bg-paper text-ink hover:bg-sand"
-						onClick={() => toast.success("Manifest intake log exported locally.")}
+						onClick={onExport}
 					>
 						<Download className="mr-1.5 size-4" /> Export log
 					</Button>
@@ -518,7 +526,12 @@ function ListView({
 					</div>
 				</div>
 
-				{filtered.length === 0 ? (
+				{loading ? (
+					<div className="flex items-center justify-center p-12">
+						<Loader2 className="size-6 animate-spin text-orange" />
+						<span className="ml-3 text-sm text-ink-soft">Loading manifests…</span>
+					</div>
+				) : filtered.length === 0 ? (
 					<div className="p-12 text-center">
 						<Ship className="mx-auto size-7 text-ink-soft" />
 						<p className="mt-3 font-medium text-ink">
@@ -595,6 +608,7 @@ function ListView({
 												variant="ghost"
 												size="sm"
 												onClick={() => onSelect(m)}
+												disabled={actioning}
 												className="text-xs font-semibold text-orange-deep hover:bg-orange/10"
 											>
 												View <ArrowRight className="ml-1 size-3.5" />
@@ -621,11 +635,15 @@ function ListView({
 function IntakeView({
 	onCancel,
 	onSubmit,
-	existingManifests,
+	organisations,
+	agents,
+	submitting,
 }: {
 	onCancel: () => void;
-	onSubmit: (m: ManifestRecord) => void;
-	existingManifests: ManifestRecord[];
+	onSubmit: (m: ManifestRecord) => Promise<boolean>;
+	organisations: RegisteredOrganisation[];
+	agents: RegisteredAgent[];
+	submitting: boolean;
 }) {
 	const [source, setSource] = useState<IntakeSource>("Manual");
 	const [manifestRef, setManifestRef] = useState("");
@@ -639,8 +657,9 @@ function IntakeView({
 	const [grossWeight, setGrossWeight] = useState("");
 	const [consignee, setConsignee] = useState<ConsigneeValue>(emptyConsignee);
 
-	const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
+
 		if (!manifestRef.trim() || !bl.trim()) {
 			toast.error("Manifest reference and bill of lading are required.");
 			return;
@@ -656,44 +675,26 @@ function IntakeView({
 			return;
 		}
 
-		const duplicate = existingManifests.find(
-			(m) =>
-				m.manifestRef.toLowerCase() === manifestRef.toLowerCase() ||
-				m.bl.toLowerCase() === bl.toLowerCase()
-		);
-		const status: ManifestStatus = duplicate ? "Duplicate" : "Pre-advice";
-		const notes = duplicate
-			? `Duplicate of ${duplicate.manifestRef} detected automatically on intake.`
-			: "Pre-advice received via manual intake. Awaiting validation.";
-
-		onSubmit({
-			id: `m-${Date.now()}`,
-			manifestRef,
-			bl,
-			vessel,
-			shippingLine,
-			originPort,
-			eta,
+		const record: ManifestRecord = {
+			id: "",
+			manifestRef: manifestRef.trim(),
+			bl: bl.trim(),
+			vessel: vessel.trim(),
+			shippingLine: shippingLine.trim(),
+			originPort: originPort.trim(),
+			eta: eta.trim(),
 			containers: Number(containers) || 0,
 			packages: Number(packages) || 0,
-			grossWeight,
+			grossWeight: grossWeight.trim(),
 			consignee: consigneeName,
 			agent: consignee.agentName,
 			source,
-			status,
-			receivedAt: new Date().toLocaleString("en-GB", {
-				day: "2-digit",
-				month: "short",
-				year: "numeric",
-				hour: "2-digit",
-				minute: "2-digit",
-			}),
-			notes,
-		});
+			status: "Pre-advice",
+			receivedAt: "",
+			notes: "",
+		};
 
-		if (duplicate) {
-			toast.warning("Duplicate manifest detected. Record flagged for review.");
-		}
+		await onSubmit(record);
 	};
 
 	return (
@@ -716,6 +717,7 @@ function IntakeView({
 					type="button"
 					variant="ghost"
 					onClick={onCancel}
+					disabled={submitting}
 					className="-ml-3 gap-2 text-ink-soft hover:text-ink"
 				>
 					<ArrowLeft className="size-4" />
@@ -754,9 +756,10 @@ function IntakeView({
 								<button
 									key={s}
 									type="button"
+									disabled={submitting}
 									onClick={() => setSource(s)}
 									className={cn(
-										"rounded-xl border p-3 text-center transition-colors",
+										"rounded-xl border p-3 text-center transition-colors disabled:opacity-60",
 										active
 											? "border-orange bg-orange/5 text-orange-deep ring-1 ring-orange/30"
 											: "border-line bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink"
@@ -769,13 +772,15 @@ function IntakeView({
 							);
 						})}
 					</div>
-					{(source === "EDI" || source === "CSV" || source === "XLSX") && (
-						<p className="mt-3 text-[11px] leading-5 text-ink-soft">
-							In production, this source would ingest the file automatically.
-							For this prototype, fill in the fields below to simulate the
-							parsed result.
-						</p>
-					)}
+					{source !== "Manual" && (
+						<div className="mt-3 flex items-start gap-2 rounded-lg bg-sand p-3 ring-1 ring-line">
+							<Info className="mt-0.5 size-3.5 shrink-0 text-ink-soft" />
+								<p className="text-[11px] leading-5 text-ink-soft">
+									File-based intake ({source}) is not yet enabled for this facility.
+									Enter the manifest details manually below.
+								</p>
+							</div>
+						)}
 				</div>
 			</section>
 
@@ -860,8 +865,9 @@ function IntakeView({
 					<ConsigneeDetails
 						value={consignee}
 						onChange={setConsignee}
-						organisations={registeredOrganisations}
-						agents={registeredAgents}
+						organisations={organisations}
+						agents={agents}
+						disabled={submitting}
 						source="manifest"
 					/>
 				</div>
@@ -900,16 +906,27 @@ function IntakeView({
 							type="button"
 							variant="outline"
 							onClick={onCancel}
+							disabled={submitting}
 							className="border-sand/25 bg-transparent text-sand hover:bg-sand/10"
 						>
 							Cancel
 						</Button>
 						<Button
 							type="submit"
+							disabled={submitting}
 							className="gap-2 bg-orange text-white hover:bg-orange-deep"
 						>
-							Add manifest
-							<ArrowRight className="size-4" />
+							{submitting ? (
+								<>
+									<Loader2 className="size-4 animate-spin" />
+									Adding…
+								</>
+							) : (
+								<>
+									Add manifest
+									<ArrowRight className="size-4" />
+								</>
+							)}
 						</Button>
 					</div>
 				</div>
@@ -920,14 +937,16 @@ function IntakeView({
 
 function ManifestDetailDialog({
 	manifest,
+	actioning,
 	onClose,
 	onValidate,
 	onFlag,
 }: {
 	manifest: ManifestRecord;
+	actioning: boolean;
 	onClose: () => void;
-	onValidate: () => void;
-	onFlag: () => void;
+	onValidate: () => Promise<void>;
+	onFlag: () => Promise<void>;
 }) {
 	const canValidate = manifest.status === "Pre-advice";
 	const canFlag =
@@ -955,6 +974,7 @@ function ManifestDetailDialog({
 						variant="ghost"
 						size="icon"
 						onClick={onClose}
+						disabled={actioning}
 						aria-label="Close dialog"
 					>
 						<X />
@@ -1029,7 +1049,12 @@ function ManifestDetailDialog({
 				</div>
 
 				<div className="flex flex-wrap items-center justify-between gap-2 border-t border-line p-5 sm:p-6">
-					<Button variant="ghost" onClick={onClose} className="text-ink-soft">
+					<Button
+						variant="ghost"
+						onClick={onClose}
+						disabled={actioning}
+						className="text-ink-soft"
+					>
 						Close
 					</Button>
 					<div className="flex flex-wrap gap-2">
@@ -1037,17 +1062,29 @@ function ManifestDetailDialog({
 							<Button
 								variant="outline"
 								onClick={onFlag}
+								disabled={actioning}
 								className="border-line bg-paper text-coral hover:bg-coral/10"
 							>
-								<AlertTriangle className="mr-1.5 size-4" /> Flag for review
+								{actioning ? (
+									<Loader2 className="mr-1.5 size-4 animate-spin" />
+								) : (
+									<AlertTriangle className="mr-1.5 size-4" />
+								)}
+								Flag for review
 							</Button>
 						)}
 						{canValidate && (
 							<Button
 								onClick={onValidate}
+								disabled={actioning}
 								className="bg-orange text-white hover:bg-orange-deep"
 							>
-								<Check className="mr-1.5 size-4" /> Mark as validated
+								{actioning ? (
+									<Loader2 className="mr-1.5 size-4 animate-spin" />
+								) : (
+									<Check className="mr-1.5 size-4" />
+								)}
+								Mark as validated
 							</Button>
 						)}
 					</div>
@@ -1062,12 +1099,14 @@ function ConsigneeDetails({
 	onChange,
 	organisations,
 	agents,
+	disabled = false,
 	source = "manual",
 }: {
 	value: ConsigneeValue;
 	onChange: (next: ConsigneeValue) => void;
 	organisations: RegisteredOrganisation[];
 	agents: RegisteredAgent[];
+	disabled?: boolean;
 	source?: "manifest" | "manual";
 }) {
 	const update = (patch: Partial<ConsigneeValue>) =>
@@ -1132,7 +1171,8 @@ function ConsigneeDetails({
 									"flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-2 text-[12px] font-medium transition-colors",
 									active
 										? "border-orange bg-orange/5 text-orange-deep ring-1 ring-orange/25"
-										: "border-line bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink"
+										: "border-line bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink",
+									disabled && "cursor-not-allowed opacity-60"
 								)}
 							>
 								<input
@@ -1140,6 +1180,7 @@ function ConsigneeDetails({
 									name="consignee-type"
 									value={option.key}
 									checked={active}
+									disabled={disabled}
 									onChange={() =>
 										update({
 											type: option.key,
@@ -1171,10 +1212,12 @@ function ConsigneeDetails({
 					</p>
 					<button
 						type="button"
+						disabled={disabled}
 						onClick={() => setOrgOpen((v) => !v)}
 						className={cn(
 							"mt-1.5 flex h-11 w-full items-center justify-between gap-2 rounded-md border border-line bg-sand px-3 text-left text-sm text-ink outline-none transition focus:ring-2 focus:ring-orange/30",
-							orgOpen && "ring-2 ring-orange/30"
+							orgOpen && "ring-2 ring-orange/30",
+							disabled && "cursor-not-allowed opacity-60"
 						)}
 					>
 						<span className="flex min-w-0 items-center gap-2">
@@ -1197,7 +1240,7 @@ function ConsigneeDetails({
 							)}
 						</span>
 						<span className="flex shrink-0 items-center gap-1">
-							{value.organisationName && (
+							{value.organisationName && !disabled && (
 								<span
 									role="button"
 									tabIndex={-1}
@@ -1234,7 +1277,7 @@ function ConsigneeDetails({
 						tabIndex={-1}
 					/>
 
-					{orgOpen && (
+					{orgOpen && !disabled && (
 						<>
 							<button
 								type="button"
@@ -1330,10 +1373,11 @@ function ConsigneeDetails({
 					</span>
 					<Input
 						required
+						disabled={disabled}
 						value={value.fullName}
 						onChange={(e) => update({ fullName: e.target.value })}
 						placeholder="Enter full name"
-						className={inputClass}
+						className={cn(inputClass, disabled && "cursor-not-allowed opacity-60")}
 					/>
 				</label>
 			)}
@@ -1342,10 +1386,11 @@ function ConsigneeDetails({
 				<label className="block">
 					<span className={labelClass}>Contact person</span>
 					<Input
+						disabled={disabled}
 						value={value.contactPerson}
 						onChange={(e) => update({ contactPerson: e.target.value })}
 						placeholder="Name of contact person"
-						className={inputClass}
+						className={cn(inputClass, disabled && "cursor-not-allowed opacity-60")}
 					/>
 				</label>
 			)}
@@ -1355,10 +1400,11 @@ function ConsigneeDetails({
 					<span className={labelClass}>Email address</span>
 					<Input
 						type="email"
+						disabled={disabled}
 						value={value.email}
 						onChange={(e) => update({ email: e.target.value })}
 						placeholder="contact@company.com"
-						className={inputClass}
+						className={cn(inputClass, disabled && "cursor-not-allowed opacity-60")}
 					/>
 				</label>
 
@@ -1366,10 +1412,11 @@ function ConsigneeDetails({
 					<span className={labelClass}>Phone number</span>
 					<Input
 						type="tel"
+						disabled={disabled}
 						value={value.phone}
 						onChange={(e) => update({ phone: e.target.value })}
 						placeholder="+234 …"
-						className={inputClass}
+						className={cn(inputClass, disabled && "cursor-not-allowed opacity-60")}
 					/>
 				</label>
 			</div>
@@ -1378,20 +1425,22 @@ function ConsigneeDetails({
 				<span className={labelClass}>Address</span>
 				<textarea
 					rows={3}
+					disabled={disabled}
 					value={value.address}
 					onChange={(e) => update({ address: e.target.value })}
 					placeholder="Street address, city and state"
-					className={textareaClass}
+					className={cn(textareaClass, disabled && "cursor-not-allowed opacity-60")}
 				/>
 			</label>
 
 			<label className="block">
 				<span className={labelClass}>Country</span>
 				<Input
+					disabled={disabled}
 					value={value.country}
 					onChange={(e) => update({ country: e.target.value })}
 					placeholder="e.g. Nigeria"
-					className={inputClass}
+					className={cn(inputClass, disabled && "cursor-not-allowed opacity-60")}
 				/>
 			</label>
 
@@ -1399,6 +1448,7 @@ function ConsigneeDetails({
 				<p className={labelClass}>Licensed agent</p>
 				<AgentPicker
 					value={value.agentName}
+					disabled={disabled}
 					onChange={(name, id) =>
 						update({ agentName: name, agentId: id })
 					}
@@ -1435,10 +1485,12 @@ function AgentPicker({
 	value,
 	onChange,
 	options,
+	disabled = false,
 }: {
 	value: string;
 	onChange: (name: string, id: string | null) => void;
 	options: RegisteredAgent[];
+	disabled?: boolean;
 }) {
 	const [open, setOpen] = useState(false);
 	const [search, setSearch] = useState("");
@@ -1468,10 +1520,12 @@ function AgentPicker({
 		<div className="relative">
 			<button
 				type="button"
+				disabled={disabled}
 				onClick={() => setOpen((v) => !v)}
 				className={cn(
 					"mt-1.5 flex h-11 w-full items-center justify-between gap-2 rounded-md border border-line bg-sand px-3 text-left text-sm text-ink outline-none transition focus:ring-2 focus:ring-orange/30",
-					open && "ring-2 ring-orange/30"
+					open && "ring-2 ring-orange/30",
+					disabled && "cursor-not-allowed opacity-60"
 				)}
 			>
 				<span className="flex min-w-0 items-center gap-2">
@@ -1485,7 +1539,7 @@ function AgentPicker({
 					)}
 				</span>
 				<span className="flex shrink-0 items-center gap-1">
-					{value && (
+					{value && !disabled && (
 						<span
 							role="button"
 							tabIndex={-1}
@@ -1508,7 +1562,7 @@ function AgentPicker({
 				</span>
 			</button>
 
-			{open && (
+			{open && !disabled && (
 				<>
 					<button
 						type="button"
