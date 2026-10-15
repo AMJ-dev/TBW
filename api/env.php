@@ -19,23 +19,6 @@
     $redis_ip = "192.168.205.67";
     $redis_port = 6379;
     $redis_password="Group2020@";
-
-    // $email_host="mail.evcarsng.com";
-    // $email_port=465; 
-    // $email_user="info@evcarsng.com";
-    // $email_password='vmh;)~#TpW0GkFiV';
-    // $sender_email = "sender@evcarsng.com";
-    // $info_email = "info@evcarsng.com";
-    
-    // $sms_sender = "TRINU";
-    // $sms_api_token = "u6MNFnajPKvyVj7bW0av21j5D3YuVNcUNEehecKfrRdLWdw71NKnw9Yv5zDD";
-
-    // $email_host="smtp.resend.com";
-    // $email_port=465; 
-    // $email_user="resend";
-    // $email_password="****";
-    // $sender_email = "info@lovebite.online";
-    // $info_email = "sender@lovebite.online";
     
     $admin_email = "admin@trinubondedwarehouse.com";
 

@@ -1062,7 +1062,7 @@ export default function OperationsShipmentReviewPage() {
 
     setSubmitting(true);
     try {
-      const body = new URLSearchParams();
+      const body = new FormData();
       body.set("id", id);
       body.set("action", decision);
       body.set("note", actionNote.trim());
@@ -1103,7 +1103,7 @@ export default function OperationsShipmentReviewPage() {
 
     setSubmitting(true);
     try {
-      const body = new URLSearchParams();
+      const body = new FormData();
       body.set("id", id);
       body.set("to_status", toCode);
       body.set("note", actionNote.trim());

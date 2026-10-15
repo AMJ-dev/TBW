@@ -12,8 +12,10 @@ import {
 	FileText,
 	Info,
 	Loader2,
+	Mail,
 	Plus,
 	Search,
+	Send,
 	Ship,
 	Upload,
 	User,
@@ -37,6 +39,8 @@ type IntakeSource = "EDI" | "CSV" | "XLSX" | "Manual";
 
 type ConsigneeType = "organisation" | "individual";
 
+type ConsigneeStatus = "linked" | "unregistered";
+
 type View = "list" | "intake";
 
 interface ManifestRecord {
@@ -51,6 +55,11 @@ interface ManifestRecord {
 	packages: number;
 	grossWeight: string;
 	consignee: string;
+	consigneeOrganisationId?: string | null;
+	consigneeStatus?: ConsigneeStatus;
+	consigneeEmail?: string | null;
+	consigneePhone?: string | null;
+	consigneeAddress?: string | null;
 	agent: string;
 	source: IntakeSource;
 	status: ManifestStatus;
@@ -79,6 +88,7 @@ interface ConsigneeValue {
 	type: ConsigneeType;
 	organisationId: string | null;
 	organisationName: string;
+	status: ConsigneeStatus;
 	contactPerson: string;
 	fullName: string;
 	email: string;
@@ -111,6 +121,7 @@ const emptyConsignee: ConsigneeValue = {
 	type: "organisation",
 	organisationId: null,
 	organisationName: "",
+	status: "unregistered",
 	contactPerson: "",
 	fullName: "",
 	email: "",
@@ -162,6 +173,11 @@ export default function OperationsManifestRoute() {
 					packages: Number(m.packages ?? 0),
 					grossWeight: m.gross_weight ?? m.grossWeight ?? "—",
 					consignee: m.consignee ?? "—",
+					consigneeOrganisationId: m.consignee_organisation_id ?? null,
+					consigneeStatus: (m.consignee_status ?? "unregistered") as ConsigneeStatus,
+					consigneeEmail: m.consignee_email ?? null,
+					consigneePhone: m.consignee_phone ?? null,
+					consigneeAddress: m.consignee_address ?? null,
 					agent: m.agent ?? "—",
 					source: (m.source ?? "Manual") as IntakeSource,
 					status: (m.status ?? "Pre-advice") as ManifestStatus,
@@ -214,12 +230,16 @@ export default function OperationsManifestRoute() {
 	): Promise<boolean> => {
 		setSubmitting(true);
 		try {
-			const formData = new URLSearchParams();
+			const formData = new FormData();
 			Object.entries(next).forEach(([key, value]) => {
 				if (value !== undefined && value !== null) formData.append(key, String(value));
 			});
 			formData.append("consigneeType", (next as any).consigneeType ?? "organisation");
 			formData.append("consigneeOrganisationId", (next as any).consigneeOrganisationId ?? "");
+			formData.append("consigneeStatus", (next as any).consigneeStatus ?? "unregistered");
+			formData.append("consigneeEmail", (next as any).consigneeEmail ?? "");
+			formData.append("consigneePhone", (next as any).consigneePhone ?? "");
+			formData.append("consigneeAddress", (next as any).consigneeAddress ?? "");
 			formData.append("agentId", (next as any).agentId ?? "");
 			const res = await http.post("operations/manifests/save/", formData);
 			const resp: Resp = res.data;
@@ -350,7 +370,7 @@ export default function OperationsManifestRoute() {
 						setSelected(null);
 					}}
 					onMatch={async (shipmentId, reason) => {
-						const formData = new URLSearchParams();
+						const formData = new FormData();
 						formData.append("manifest_id", selected.id);
 						formData.append("shipment_id", shipmentId);
 						formData.append("reason", reason);
@@ -360,10 +380,13 @@ export default function OperationsManifestRoute() {
 							toast.error(resp.data || "Could not link shipment declaration.");
 							return false;
 						}
-					toast.success(resp.data || "Shipment declaration linked.");
-					await fetchManifests();
-					setSelected(null);
-					return true;
+						toast.success(resp.data || "Shipment declaration linked.");
+						await fetchManifests();
+						setSelected(null);
+						return true;
+					}}
+					onRefresh={async () => {
+						await fetchManifests();
 					}}
 				/>
 			)}
@@ -554,10 +577,23 @@ function ListView({
 											<p className="font-mono text-[12px] text-ink">{m.bl}</p>
 											<p className="mt-0.5 text-[11px] text-ink-soft">{m.vessel}</p>
 											<p className="text-[10px] text-ink-soft">{m.shippingLine}</p>
-											{m.shipmentReferences && <p className="mt-1 text-[10px] text-emerald-700">Shipment: {m.shipmentReferences}</p>}
+											{m.shipmentReferences && (
+												<p className="mt-1 text-[10px] text-emerald-700">
+													Shipment: {m.shipmentReferences}
+												</p>
+											)}
 										</td>
 										<td className="px-4 py-3.5">
-											<p className="text-[12px] font-medium text-ink">{m.consignee}</p>
+											<div className="flex flex-wrap items-center gap-2">
+												<p className="text-[12px] font-medium text-ink">
+													{m.consignee}
+												</p>
+												{m.consigneeStatus === "unregistered" && (
+													<span className="rounded bg-amber/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-orange-deep ring-1 ring-orange/25">
+														Not yet in TRÏNŪ
+													</span>
+												)}
+											</div>
 											<p className="mt-0.5 text-[11px] text-ink-soft">{m.agent}</p>
 										</td>
 										<td className="px-4 py-3.5">
@@ -721,6 +757,15 @@ function IntakeView({
 			return;
 		}
 
+		if (consignee.type === "organisation" && !consignee.organisationId) {
+			if (!consignee.email.trim() && !consignee.phone.trim()) {
+				toast.error(
+					"This consignee is not yet in TRÏNŪ. Provide at least an email or phone number so we can follow up."
+				);
+				return;
+			}
+		}
+
 		if (source !== "Manual" && !uploadToken) {
 			toast.error("Upload the manifest file before submitting.");
 			return;
@@ -738,6 +783,11 @@ function IntakeView({
 			packages: Number(packages) || 0,
 			grossWeight: grossWeight.trim(),
 			consignee: consigneeName,
+			consigneeOrganisationId: consignee.organisationId,
+			consigneeStatus: consignee.organisationId ? "linked" : "unregistered",
+			consigneeEmail: consignee.email.trim() || null,
+			consigneePhone: consignee.phone.trim() || null,
+			consigneeAddress: consignee.address.trim() || null,
 			agent: consignee.agentName,
 			source,
 			status: "Pre-advice",
@@ -747,7 +797,6 @@ function IntakeView({
 		if (uploadToken) record.uploadToken = uploadToken;
 		(record as any).containerNumbers = containerNumbers;
 		(record as any).consigneeType = consignee.type;
-		(record as any).consigneeOrganisationId = consignee.organisationId ?? "";
 		(record as any).agentId = consignee.agentId ?? "";
 
 		await onSubmit(record);
@@ -974,9 +1023,18 @@ function IntakeView({
 					<div className="sm:col-span-2">
 						<label className="block">
 							<span className={labelClass}>Container numbers (optional)</span>
-							<textarea rows={3} value={containerNumbers} onChange={(e) => setContainerNumbers(e.target.value)} placeholder="One container per line, or separate with commas" className={textareaClass} />
+							<textarea
+								rows={3}
+								value={containerNumbers}
+								onChange={(e) => setContainerNumbers(e.target.value)}
+								placeholder="One container per line, or separate with commas"
+								className={textareaClass}
+							/>
 						</label>
-						<p className="mt-1 text-[11px] text-ink-soft">Enter individual container numbers when available. Leave blank when the carrier manifest only provides a total.</p>
+						<p className="mt-1 text-[11px] text-ink-soft">
+							Enter individual container numbers when available. Leave blank
+							when the carrier manifest only provides a total.
+						</p>
 					</div>
 					<div className="sm:col-span-2">
 						<Field
@@ -1071,6 +1129,7 @@ function ManifestDetailDialog({
 	onValidate,
 	onFlag,
 	onMatch,
+	onRefresh,
 }: {
 	manifest: ManifestRecord;
 	actioning: boolean;
@@ -1078,6 +1137,7 @@ function ManifestDetailDialog({
 	onValidate: () => Promise<void>;
 	onFlag: () => Promise<void>;
 	onMatch: (shipmentId: string, reason: string) => Promise<boolean>;
+	onRefresh: () => Promise<void>;
 }) {
 	const [shipmentQuery, setShipmentQuery] = useState(manifest.bl);
 	const [shipmentResults, setShipmentResults] = useState<any[]>([]);
@@ -1085,6 +1145,12 @@ function ManifestDetailDialog({
 	const [matchReason, setMatchReason] = useState("");
 	const [searchingShipments, setSearchingShipments] = useState(false);
 	const [matchingShipment, setMatchingShipment] = useState(false);
+
+	const [inviteEmail, setInviteEmail] = useState(manifest.consigneeEmail ?? "");
+	const [inviting, setInviting] = useState(false);
+
+	const isUnregistered = manifest.consigneeStatus === "unregistered";
+
 	useEffect(() => {
 		const q = shipmentQuery.trim();
 		if (q.length < 2) {
@@ -1095,9 +1161,12 @@ function ManifestDetailDialog({
 		const timer = window.setTimeout(async () => {
 			setSearchingShipments(true);
 			try {
-				const res = await http.post(`operations/manifests/shipments/`, { q: encodeURIComponent(q) });
+				const searchParams = new FormData();
+				searchParams.append("q", q);
+				const res = await http.post(`operations/manifests/shipments/`, searchParams);
 				const resp: Resp = res.data;
-				if (!cancelled) setShipmentResults(resp.error ? [] : extractList<any>(resp.code));
+				if (!cancelled)
+					setShipmentResults(resp.error ? [] : extractList<any>(resp.code));
 			} catch {
 				if (!cancelled) setShipmentResults([]);
 			} finally {
@@ -1109,9 +1178,68 @@ function ManifestDetailDialog({
 			window.clearTimeout(timer);
 		};
 	}, [shipmentQuery]);
+
 	const canValidate = manifest.status === "Pre-advice";
 	const canFlag =
 		manifest.status !== "Discrepancy" && manifest.status !== "Duplicate";
+
+	const handleSendInvite = async () => {
+		if (!inviteEmail.trim()) {
+			toast.error("Enter an email address to send the invite.");
+			return;
+		}
+		setInviting(true);
+		try {
+			const formData = new FormData();
+			formData.append("manifest_id", manifest.id);
+			formData.append("email", inviteEmail.trim());
+			const res = await http.post(
+				"operations/manifests/invite-consignee/",
+				formData
+			);
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Could not send the invite.");
+				return;
+			}
+			toast.success(`Onboarding invite sent to ${inviteEmail.trim()}.`);
+			await onRefresh();
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message || "Could not send the invite."
+			);
+		} finally {
+			setInviting(false);
+		}
+	};
+
+	const handleCopyInviteLink = async () => {
+		try {
+			const formData = new FormData();
+			formData.append("manifest_id", manifest.id);
+			const res = await http.post(
+				"operations/manifests/invite-link/",
+				formData
+			);
+			const resp: Resp = res.data;
+			if (resp.error) {
+				toast.error(resp.data || "Could not generate invite link.");
+				return;
+			}
+			const payload: any = resp.code ?? {};
+			const link = payload.link ?? payload.url ?? "";
+			if (!link) {
+				toast.error("Invite link was empty.");
+				return;
+			}
+			await navigator.clipboard.writeText(link);
+			toast.success("Invite link copied to clipboard.");
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message || "Could not generate invite link."
+			);
+		}
+	};
 
 	return (
 		<div
@@ -1156,6 +1284,11 @@ function ManifestDetailDialog({
 								Duplicate detected
 							</span>
 						)}
+						{isUnregistered && (
+							<span className="rounded bg-amber/15 px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-orange-deep ring-1 ring-orange/25">
+								Consignee not yet in TRÏNŪ
+							</span>
+						)}
 					</div>
 
 					<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
@@ -1191,34 +1324,179 @@ function ManifestDetailDialog({
 						))}
 					</dl>
 
+					{isUnregistered && (
+						<div className="rounded-xl border border-orange/25 bg-orange/5 p-4">
+							<div className="flex items-start gap-3">
+								<Info className="mt-0.5 size-4 shrink-0 text-orange-deep" />
+								<div className="min-w-0">
+									<p className="text-[13px] font-semibold text-ink">
+										Consignee not yet in TRÏNŪ
+									</p>
+									<p className="mt-1 text-[12px] leading-5 text-ink-soft">
+										This consignee is recorded by the name on the
+										manifest. You can continue with the shipment.
+										Send them an onboarding invite so future
+										shipments link automatically to their
+										organisation account.
+									</p>
+									<div className="mt-3 space-y-3">
+										<label className="block">
+											<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+												Email
+											</span>
+											<Input
+												type="email"
+												value={inviteEmail}
+												onChange={(e) =>
+													setInviteEmail(e.target.value)
+												}
+												placeholder="consignee@example.com"
+												className="mt-1.5 h-11 border-line bg-paper text-ink"
+											/>
+										</label>
+										<div className="flex flex-wrap gap-2">
+											<Button
+												type="button"
+												onClick={handleSendInvite}
+												disabled={inviting}
+												className="bg-orange text-white hover:bg-orange-deep"
+											>
+												{inviting ? (
+													<Loader2 className="mr-1.5 size-4 animate-spin" />
+												) : (
+													<Send className="mr-1.5 size-4" />
+												)}
+												Send onboarding invite
+											</Button>
+											<Button
+												type="button"
+												variant="outline"
+												onClick={handleCopyInviteLink}
+												className="border-line bg-paper text-ink hover:bg-sand"
+											>
+												<Mail className="mr-1.5 size-4" />
+												Copy invite link
+											</Button>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					)}
+
 					<section className="space-y-3 rounded-xl bg-sand p-4 ring-1 ring-line">
 						<div>
-							<p className="text-[13px] font-semibold text-ink">Shipment declaration matching</p>
-							<p className="mt-1 text-[11px] leading-5 text-ink-soft">Search portal shipment declarations and link the correct record. A bill-of-lading mismatch requires an explanation.</p>
+							<p className="text-[13px] font-semibold text-ink">
+								Shipment declaration matching
+							</p>
+							<p className="mt-1 text-[11px] leading-5 text-ink-soft">
+								Search portal shipment declarations and link the correct
+								record. A bill-of-lading mismatch requires an explanation.
+							</p>
 						</div>
-						<input value={shipmentQuery} onChange={(e) => { setShipmentQuery(e.target.value); setShipmentId(""); }} placeholder="Search by shipment reference, BL, consignee, vessel…" className="h-10 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-orange/30" />
-						{searchingShipments && <p className="text-xs text-ink-soft">Searching declarations…</p>}
+						<input
+							value={shipmentQuery}
+							onChange={(e) => {
+								setShipmentQuery(e.target.value);
+								setShipmentId("");
+							}}
+							placeholder="Search by shipment reference, BL, consignee, vessel…"
+							className="h-10 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-orange/30"
+						/>
+						{searchingShipments && (
+							<p className="text-xs text-ink-soft">Searching declarations…</p>
+						)}
 						{shipmentResults.length > 0 && (
 							<div className="max-h-44 space-y-1 overflow-y-auto">
 								{shipmentResults.map((s) => (
-									<button key={s.id} type="button" onClick={() => setShipmentId(s.id)} className={cn("w-full rounded-lg border p-3 text-left transition", shipmentId === s.id ? "border-orange bg-orange/10" : "border-line bg-paper hover:bg-sand-2")}>
-										<p className="text-xs font-semibold text-ink">{s.shipment_reference || s.id}</p>
-										<p className="mt-1 text-[11px] text-ink-soft">BL: {s.bill_of_lading || "—"} · {s.consignee || "No consignee"}</p>
-										<p className="mt-1 text-[10px] text-ink-soft">{s.organisation_name || "No organisation"} · {s.vessel_name || "No vessel"} · {s.status}</p>
+									<button
+										key={s.id}
+										type="button"
+										onClick={() => setShipmentId(s.id)}
+										className={cn(
+											"w-full rounded-lg border p-3 text-left transition",
+											shipmentId === s.id
+												? "border-orange bg-orange/10"
+												: "border-line bg-paper hover:bg-sand-2"
+										)}
+									>
+										<p className="text-xs font-semibold text-ink">
+											{s.shipment_reference || s.id}
+										</p>
+										<p className="mt-1 text-[11px] text-ink-soft">
+											BL: {s.bill_of_lading || "—"} ·{" "}
+											{s.consignee || "No consignee"}
+										</p>
+										<p className="mt-1 text-[10px] text-ink-soft">
+											{s.organisation_name || "No organisation"} ·{" "}
+											{s.vessel_name || "No vessel"} · {s.status}
+										</p>
 									</button>
 								))}
 							</div>
 						)}
-						{shipmentQuery.trim().length >= 2 && !searchingShipments && shipmentResults.length === 0 && <p className="text-xs text-ink-soft">No shipment declarations found.</p>}
-						{shipmentId && shipmentResults.find((s) => s.id === shipmentId) && shipmentResults.find((s) => s.id === shipmentId).bill_of_lading?.trim().toLowerCase() !== manifest.bl.trim().toLowerCase() && (
-							<label className="block">
-								<span className={labelClass}>Reason for BL mismatch <span className="text-coral">*</span></span>
-								<textarea rows={2} value={matchReason} onChange={(e) => setMatchReason(e.target.value)} className={textareaClass} placeholder="Explain why these records should be linked" />
-							</label>
-						)}
+						{shipmentQuery.trim().length >= 2 &&
+							!searchingShipments &&
+							shipmentResults.length === 0 && (
+								<p className="text-xs text-ink-soft">
+									No shipment declarations found.
+								</p>
+							)}
+						{shipmentId &&
+							shipmentResults.find((s) => s.id === shipmentId) &&
+							shipmentResults
+								.find((s) => s.id === shipmentId)
+								.bill_of_lading?.trim()
+								.toLowerCase() !== manifest.bl.trim().toLowerCase() && (
+								<label className="block">
+									<span className={labelClass}>
+										Reason for BL mismatch{" "}
+										<span className="text-coral">*</span>
+									</span>
+									<textarea
+										rows={2}
+										value={matchReason}
+										onChange={(e) => setMatchReason(e.target.value)}
+										className={textareaClass}
+										placeholder="Explain why these records should be linked"
+									/>
+								</label>
+							)}
 						<div className="flex justify-end">
-							<Button type="button" disabled={!shipmentId || matchingShipment || (shipmentResults.find((s) => s.id === shipmentId)?.bill_of_lading?.trim().toLowerCase() !== manifest.bl.trim().toLowerCase() && !matchReason.trim())} onClick={async () => { setMatchingShipment(true); try { const ok = await onMatch(shipmentId, matchReason.trim()); if (ok) { setShipmentId(""); setMatchReason(""); } } finally { setMatchingShipment(false); } }} className="bg-orange text-white hover:bg-orange-deep">
-								{matchingShipment ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Check className="mr-1.5 size-4" />} Link shipment
+							<Button
+								type="button"
+								disabled={
+									!shipmentId ||
+									matchingShipment ||
+									(shipmentResults.find((s) => s.id === shipmentId)
+										?.bill_of_lading?.trim()
+										.toLowerCase() !==
+										manifest.bl.trim().toLowerCase() &&
+										!matchReason.trim())
+								}
+								onClick={async () => {
+									setMatchingShipment(true);
+									try {
+										const ok = await onMatch(
+											shipmentId,
+											matchReason.trim()
+										);
+										if (ok) {
+											setShipmentId("");
+											setMatchReason("");
+										}
+									} finally {
+										setMatchingShipment(false);
+									}
+								}}
+								className="bg-orange text-white hover:bg-orange-deep"
+							>
+								{matchingShipment ? (
+									<Loader2 className="mr-1.5 size-4 animate-spin" />
+								) : (
+									<Check className="mr-1.5 size-4" />
+								)}
+								Link shipment
 							</Button>
 						</div>
 					</section>
@@ -1302,6 +1580,8 @@ function ConsigneeDetails({
 		onChange({ ...value, ...patch });
 
 	const isOrganisation = value.type === "organisation";
+	const isUnregistered =
+		isOrganisation && !value.organisationId && !!value.organisationName;
 
 	return (
 		<div className="space-y-5">
@@ -1310,8 +1590,8 @@ function ConsigneeDetails({
 					Consignee details
 				</h3>
 				<p className="mt-1 text-xs leading-5 text-ink-soft">
-					Information about the party receiving the cargo. Used by
-					Operations to verify the recipient and resolve discrepancies.
+					Who is receiving the cargo. Used by Operations to verify the
+					recipient and resolve discrepancies.
 				</p>
 			</div>
 
@@ -1381,14 +1661,16 @@ function ConsigneeDetails({
 							update({
 								organisationId: next.id,
 								organisationName: next.name,
+								status: next.id ? "linked" : "unregistered",
 							})
 						}
 						disabled={disabled}
 					/>
 					<p className="mt-2 text-[11px] leading-5 text-ink-soft">
-						Start typing to search registered organisations. If it
-						isn't registered, type the full name as it appears on
-						the manifest.
+						Start typing to search registered organisations. If the
+						consignee isn't in TRÏNŪ yet, you can continue — we'll
+						record them by the name on the manifest and follow up
+						with an onboarding invite.
 					</p>
 				</div>
 			) : (
@@ -1408,6 +1690,24 @@ function ConsigneeDetails({
 				</label>
 			)}
 
+			{isUnregistered && (
+				<div className="rounded-xl border border-orange/25 bg-orange/5 p-3.5">
+					<div className="flex items-start gap-3">
+						<Info className="mt-0.5 size-4 shrink-0 text-orange-deep" />
+						<div className="min-w-0">
+							<p className="text-[12px] font-semibold text-ink">
+								This consignee is not yet in TRÏNŪ
+							</p>
+							<p className="mt-1 text-[11px] leading-5 text-ink-soft">
+								We'll record them by the name you entered. Provide at
+								least one contact method below so Operations can
+								follow up and send an onboarding invite.
+							</p>
+						</div>
+					</div>
+				</div>
+			)}
+
 			{isOrganisation && (
 				<label className="block">
 					<span className={labelClass}>Contact person</span>
@@ -1423,7 +1723,10 @@ function ConsigneeDetails({
 
 			<div className="grid gap-5 sm:grid-cols-2">
 				<label className="block">
-					<span className={labelClass}>Email address</span>
+					<span className={labelClass}>
+						Email address
+						{isUnregistered && <span className="text-coral"> ·</span>}
+					</span>
 					<Input
 						type="email"
 						disabled={disabled}
@@ -1435,7 +1738,10 @@ function ConsigneeDetails({
 				</label>
 
 				<label className="block">
-					<span className={labelClass}>Phone number</span>
+					<span className={labelClass}>
+						Phone number
+						{isUnregistered && <span className="text-coral"> ·</span>}
+					</span>
 					<Input
 						type="tel"
 						disabled={disabled}
@@ -1547,7 +1853,9 @@ function OrgSearchPicker({
 		(async () => {
 			setSearching(true);
 			try {
-				const res = await http.post(`operations/manifests/organisations/`, {q: encodeURIComponent(q)});
+				const searchParams = new FormData();
+				searchParams.append("q", q);
+				const res = await http.post(`operations/manifests/organisations/`, searchParams);
 				const resp: Resp = res.data;
 				if (cancelled) return;
 				if (resp.error) {
@@ -1599,6 +1907,15 @@ function OrgSearchPicker({
 		setQuery("");
 	};
 
+	const typedName = query.trim();
+	const canUseAsUnregistered = typedName.length >= 2 && !searching;
+
+	const useAsUnregistered = () => {
+		onChange({ id: null, name: typedName });
+		setOpen(false);
+		setQuery("");
+	};
+
 	return (
 		<div ref={containerRef} className="relative mt-1.5">
 			<div
@@ -1613,7 +1930,9 @@ function OrgSearchPicker({
 					disabled={disabled}
 					value={open ? query : value.name}
 					placeholder={
-						value.name ? value.name : "Search or type organisation name…"
+						value.name
+							? value.name
+							: "Search registered organisations…"
 					}
 					onFocus={() => {
 						if (disabled) return;
@@ -1626,6 +1945,11 @@ function OrgSearchPicker({
 				{value.id && (
 					<span className="rounded-full bg-orange/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-orange-deep ring-1 ring-orange/25">
 						Linked
+					</span>
+				)}
+				{value.name && !value.id && (
+					<span className="rounded-full bg-amber/15 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-orange-deep ring-1 ring-orange/25">
+						Not yet in TRÏNŪ
 					</span>
 				)}
 				{value.name && !disabled && (
@@ -1652,7 +1976,7 @@ function OrgSearchPicker({
 
 			{open && (
 				<div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line">
-					<div className="max-h-64 overflow-y-auto p-1">
+					<div className="max-h-72 overflow-y-auto p-1">
 						{query.trim().length < 2 ? (
 							<div className="px-3 py-6 text-center text-[12px] text-ink-soft">
 								Type at least 2 characters to search registered
@@ -1663,59 +1987,84 @@ function OrgSearchPicker({
 								<Loader2 className="size-3.5 animate-spin" />
 								Searching…
 							</div>
-						) : results.length === 0 ? (
-							<div className="px-3 py-6 text-center text-[12px] text-ink-soft">
-								No registered organisation matches.
-								<span className="mt-1 block text-[11px]">
-									Close this menu and type the full name manually to
-									record an unregistered consignee.
-								</span>
-							</div>
 						) : (
-							results.map((org) => {
-								const active = org.id === value.id;
-								return (
-									<button
-										key={org.id}
-										type="button"
-										onClick={() => choose(org)}
-										className={cn(
-											"flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
-											active ? "bg-orange/10 ring-1 ring-orange/25" : "hover:bg-sand"
-										)}
-									>
-										<span
+							<>
+								{results.map((org) => {
+									const active = org.id === value.id;
+									return (
+										<button
+											key={org.id}
+											type="button"
+											onClick={() => choose(org)}
 											className={cn(
-												"mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg",
+												"flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
 												active
-													? "bg-orange text-white"
-													: "bg-sand text-ink-soft ring-1 ring-line"
+													? "bg-orange/10 ring-1 ring-orange/25"
+													: "hover:bg-sand"
 											)}
 										>
-											{active ? (
-												<Check className="size-4" />
-											) : (
-												<Building2 className="size-4" />
-											)}
-										</span>
-										<span className="min-w-0 flex-1">
-											<span className="block truncate text-[13px] font-semibold text-ink">
-												{org.name}
+											<span
+												className={cn(
+													"mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg",
+													active
+														? "bg-orange text-white"
+														: "bg-sand text-ink-soft ring-1 ring-line"
+												)}
+											>
+												{active ? (
+													<Check className="size-4" />
+												) : (
+													<Building2 className="size-4" />
+												)}
 											</span>
-											{org.rcNumber && (
-												<span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-													{org.rcNumber}
+											<span className="min-w-0 flex-1">
+												<span className="block truncate text-[13px] font-semibold text-ink">
+													{org.name}
+												</span>
+												{org.rcNumber && (
+													<span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+														{org.rcNumber}
+													</span>
+												)}
+											</span>
+											{org.status === "verified" && (
+												<span className="rounded-full bg-teal/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-teal-deep ring-1 ring-teal/25">
+													Verified
 												</span>
 											)}
+										</button>
+									);
+								})}
+
+								{results.length === 0 && (
+									<div className="px-3 py-4 text-center text-[12px] text-ink-soft">
+										No registered organisation matches.
+									</div>
+								)}
+
+								{canUseAsUnregistered && (
+									<button
+										type="button"
+										onClick={useAsUnregistered}
+										className="cursor-pointer mt-1 flex w-full items-start gap-3 rounded-lg bg-orange/5 px-3 py-3 text-left transition-colors ring-1 ring-orange/20 hover:bg-orange/10"
+									>
+										<span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-orange text-white">
+											<Plus className="size-4" />
 										</span>
-										{org.status === "verified" && (
-											<span className="rounded-full bg-teal/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-teal-deep ring-1 ring-teal/25">
-												Verified
+										<span className="min-w-0 flex-1">
+											<span className="block text-[13px] font-semibold text-ink">
+												Use "{typedName}" as an unregistered
+												consignee
 											</span>
-										)}
+											<span className="mt-1 block text-[11px] leading-5 text-ink-soft">
+												We'll record them by the name on the
+												manifest. You can send an onboarding
+												invite after the manifest is added.
+											</span>
+										</span>
 									</button>
-								);
-							})
+								)}
+							</>
 						)}
 					</div>
 				</div>
@@ -1753,7 +2102,9 @@ function AgentSearchPicker({
 		(async () => {
 			setSearching(true);
 			try {
-				const res = await http.post(`operations/manifests/agents/`, { q: encodeURIComponent(q) });
+				const searchParams = new FormData();
+				searchParams.append("q", q);
+				const res = await http.post(`operations/manifests/agents/`, searchParams);
 				const resp: Resp = res.data;
 				if (cancelled) return;
 				if (resp.error) {
@@ -1820,7 +2171,7 @@ function AgentSearchPicker({
 					disabled={disabled}
 					value={open ? query : value.name}
 					placeholder={
-						value.name ? value.name : "Search or type licensed agent…"
+						value.name ? value.name : "Search licensed agents…"
 					}
 					onFocus={() => {
 						if (disabled) return;

@@ -42,7 +42,6 @@
     function humandatetime($timestamp){
         return date("F jS, Y h:i A", strtotime($timestamp));
     }
-
     function rm_special_char($char){
         return preg_replace("/[^a-zA-Z0-9\.]/", "1", $char);
     }
