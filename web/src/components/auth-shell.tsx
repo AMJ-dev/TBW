@@ -169,8 +169,8 @@ const sections = [
         access: ["system"],
         items: [
             { label: "Dashboard", to: "/operations/dashboard", icon: LayoutDashboard, access: ["system"] },
-            { label: "Declaration Review", to: "/operations/shipments/review", icon: ClipboardCheck, access: ["system"]},
             { label: "Manifest Intake", to: "/operations/manifest", icon: FileSpreadsheet, access: ["system"] },
+            { label: "Declaration Review", to: "/operations/shipments/review", icon: ClipboardCheck, access: ["system"]},
             { label: "Receiving", to: "/operations/receiving", icon: PackageCheck, access: ["system"] },
             { label: "Yard", to: "/operations/yard", icon: Grid2X2, access: ["system"] },
             { label: "Warehouse", to: "/operations/warehouse", icon: Warehouse, access: ["system"] },
@@ -235,114 +235,6 @@ const sections = [
     },
 ];
 
-
-/*
-const sections = [
-    {
-        title: "Administration",
-        access: ["system"],
-        items: [
-            { label: "Admin overview", to: "/admin", icon: LayoutDashboard, exact: true, access: ["system"] },
-            { label: "Organisations", to: "/admin/organisations", icon: Boxes, access: ["system"] },
-            { label: "Users", to: "/admin/users", icon: UsersRound, access: ["system"] },
-            { label: "Roles & permissions", to: "/admin/roles", icon: ShieldCheck, access: ["system"] },
-            { label: "Configuration", to: "/admin/configuration", icon: Settings, access: ["system"] },
-            { label: "Audit Log", to: "/admin/audit", icon: Activity, access: ["system"] },
-        ],
-    },
-    {
-        title: "Operations",
-        access: ["system"],
-        items: [
-            { label: "Operations dashboard", to: "/operations/dashboard", icon: LayoutDashboard, access: ["system"] },
-            { label: "All Shipments", to: "/operations/shipments", icon: Package, access: ["system"] },
-            { label: "Manifest intake", to: "/operations/manifest", icon: FileSpreadsheet, access: ["system"] },
-            { label: "Receiving", to: "/operations/receiving", icon: PackageCheck, access: ["system"] },
-            { label: "Yard", to: "/operations/yard", icon: Grid2X2, access: ["system"] },
-            { label: "Warehouse", to: "/operations/warehouse", icon: Warehouse, access: ["system"] },
-            { label: "Examination", to: "/operations/examination", icon: ClipboardCheck, access: ["system", "organisation"] },
-            { label: "Seal events", to: "/operations/seals", icon: ShieldCheck, access: ["system"] },
-            { label: "Inventory", to: "/operations/inventory", icon: Boxes, access: ["system", "organisation"] },
-            { label: "Stuffing work orders", to: "/operations/stuffing", icon: PackageCheck, access: ["system"] },
-            { label: "Cycle counts", to: "/operations/cycle-count", icon: ListChecks, access: ["system"] },
-            { label: "Value-added services", to: "/operations/value-added", icon: Settings, access: ["system", "organisation"] },
-            { label: "Overrides", to: "/operations/overrides", icon: ShieldCheck, access: ["system"] },
-        ],
-    },
-    {
-        title: "Gate",
-        access: ["system", "organisation"],
-        items: [
-            { label: "Gate dashboard", to: "/gate/dashboard", icon: LayoutDashboard, access: ["system"] },
-            { label: "Appointments", to: "/gate/appointments", icon: Clock3, access: ["system"] },
-            { label: "Gate Passes", to: "/gate/passes", icon: QrCode, access: ["system"] },
-            { label: "Gate-in console", to: "/gate/in", icon: Truck, access: ["system"] },
-            { label: "Gate-out console", to: "/gate/out", icon: Truck, access: ["system"] },
-            { label: "Vehicle registry", to: "/gate/vehicles", icon: UsersRound, access: ["system"] },
-        ],
-    },
-    {
-        title: "Stakeholder Portal",
-        access: ["organisation"],
-        items: [
-            { label: "Portal dashboard", to: "/portal/dashboard", icon: LayoutDashboard, access: ["organisation"] },
-            { label: "Shipments", to: "/portal/shipments", icon: Package, access: ["organisation"] },
-            { label: "Bookings", to: "/portal/bookings", icon: Clock3, access: ["organisation"] },
-            { label: "Appointments", to: "/gate/appointments", icon: Clock3, access: ["organisation"] },
-            { label: "Documents", to: "/portal/documents", icon: FileText, access: ["organisation"] },
-            { label: "Invoices", to: "/portal/invoices", icon: FileSpreadsheet, access: ["organisation"] },
-            { label: "Payments", to: "/portal/payments", icon: ClipboardCheck, access: ["organisation"] },
-            { label: "Statement of account", to: "/portal/statement", icon: FileText, access: ["organisation"] },
-            { label: "KYC & signatories", to: "/portal/kyc", icon: ShieldCheck, access: ["organisation"] },
-            { label: "Delegated access", to: "/portal/delegation", icon: UsersRound, access: ["organisation"] },
-            { label: "Portal users", to: "/portal/users", icon: UsersRound, access: ["organisation"] },
-            { label: "Session management", to: "/session-management", icon: ShieldCheck, access: ["system", "organisation"] },
-        ],
-    },
-    {
-        title: "Finance",
-        access: ["system", "organisation"],
-        items: [
-            { label: "Finance dashboard", to: "/finance/dashboard", icon: BarChart3, access: ["system", "organisation"] },
-            { label: "Invoice ledger", to: "/finance/invoices", icon: FileCheck2, access: ["system", "organisation"] },
-            { label: "Payments & receipts", to: "/finance/payments", icon: ClipboardCheck, access: ["system", "organisation"] },
-            { label: "Tariffs", to: "/finance/tariffs", icon: FileSpreadsheet, access: ["system"] },
-            { label: "Credit application", to: "/finance/credit/apply", icon: FileText, access: ["system", "organisation"] },
-            { label: "Credit limits", to: "/finance/credit/limits", icon: ShieldCheck, access: ["system"] },
-            { label: "Collections", to: "/finance/collections", icon: Clock3, access: ["system"] },
-            { label: "Customer statements", to: "/finance/statements", icon: FileText, access: ["system", "organisation"] },
-            { label: "Approvals", to: "/finance/approvals", icon: Check, access: ["system", "organisation"] },
-            { label: "Tax rules", to: "/finance/tax", icon: FileSpreadsheet, access: ["system"] },
-            { label: "Reconciliation", to: "/finance/reconciliation", icon: ClipboardCheck, access: ["system", "organisation"] },
-        ],
-    },
-    {
-        title: "Reports",
-        access: ["system", "organisation"],
-        items: [
-            { label: "Report catalog", to: "/reports", icon: BarChart3, exact: true, access: ["system", "organisation"] },
-            { label: "Operations report", to: "/reports/operations", icon: Truck, access: ["system", "organisation"] },
-            { label: "Financial report", to: "/reports/financial", icon: FileSpreadsheet, access: ["system", "organisation"] },
-            { label: "Compliance report", to: "/reports/compliance", icon: ShieldCheck, access: ["system", "organisation"] },
-        ],
-    },
-    {
-        title: "Cargo",
-        access: ["system", "organisation"],
-        items: [
-            { label: "Cargo records", to: "/portal/cargo", icon: Boxes, access: ["organisation"] },
-            { label: "Consignments", to: "/portal/consignments", icon: PackageCheck, access: ["system", "organisation"] },
-            { label: "Containers", to: "/portal/containers", icon: Container, access: ["system", "organisation"] },
-            { label: "Vehicle registry", to: "/gate/vehicles", icon: UsersRound, access: ["organisation"] },
-            { label: "Packages", to: "/portal/packages", icon: Package, access: ["system", "organisation"] },
-            { label: "Bills of Lading", to: "/portal/bills-of-lading", icon: FileText, access: ["system", "organisation"] },
-            { label: "Manifests", to: "/portal/manifests", icon: FileSpreadsheet, access: ["system", "organisation"] },
-            { label: "Tracking", to: "/tracking", icon: Search, access: ["system", "organisation"] },
-            { label: "Holds & Exceptions", to: "/operations/holds", icon: AlertTriangle, access: ["system", "organisation"] },
-        ],
-    },
-];
-*/
 
 function RejectedPanel() {
     return (
