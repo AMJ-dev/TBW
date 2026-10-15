@@ -370,11 +370,7 @@ export default function OperationsManifestRoute() {
 						setSelected(null);
 					}}
 					onMatch={async (shipmentId, reason) => {
-						const formData = new FormData();
-						formData.append("manifest_id", selected.id);
-						formData.append("shipment_id", shipmentId);
-						formData.append("reason", reason);
-						const res = await http.post(`operations/manifests/match/`, formData);
+						const res = await http.post(`operations/manifests/match/`, {"manifest_id": selected.id, "shipment_id": shipmentId, "reason": reason});
 						const resp: Resp = res.data;
 						if (resp.error) {
 							toast.error(resp.data || "Could not link shipment declaration.");
@@ -1161,9 +1157,7 @@ function ManifestDetailDialog({
 		const timer = window.setTimeout(async () => {
 			setSearchingShipments(true);
 			try {
-				const searchParams = new FormData();
-				searchParams.append("q", q);
-				const res = await http.post(`operations/manifests/shipments/`, searchParams);
+				const res = await http.post(`operations/manifests/shipments/`, {q});
 				const resp: Resp = res.data;
 				if (!cancelled)
 					setShipmentResults(resp.error ? [] : extractList<any>(resp.code));
@@ -1190,13 +1184,7 @@ function ManifestDetailDialog({
 		}
 		setInviting(true);
 		try {
-			const formData = new FormData();
-			formData.append("manifest_id", manifest.id);
-			formData.append("email", inviteEmail.trim());
-			const res = await http.post(
-				"operations/manifests/invite-consignee/",
-				formData
-			);
+			const res = await http.post("operations/manifests/invite-consignee/", {"manifest_id": manifest.id, "email": inviteEmail.trim()});
 			const resp: Resp = res.data;
 			if (resp.error) {
 				toast.error(resp.data || "Could not send the invite.");
@@ -1215,12 +1203,7 @@ function ManifestDetailDialog({
 
 	const handleCopyInviteLink = async () => {
 		try {
-			const formData = new FormData();
-			formData.append("manifest_id", manifest.id);
-			const res = await http.post(
-				"operations/manifests/invite-link/",
-				formData
-			);
+			const res = await http.post("operations/manifests/invite-link/", {"manifest_id": manifest.id});
 			const resp: Resp = res.data;
 			if (resp.error) {
 				toast.error(resp.data || "Could not generate invite link.");
@@ -1853,9 +1836,7 @@ function OrgSearchPicker({
 		(async () => {
 			setSearching(true);
 			try {
-				const searchParams = new FormData();
-				searchParams.append("q", q);
-				const res = await http.post(`operations/manifests/organisations/`, searchParams);
+				const res = await http.post(`operations/manifests/organisations/`, {q});
 				const resp: Resp = res.data;
 				if (cancelled) return;
 				if (resp.error) {
@@ -2102,9 +2083,7 @@ function AgentSearchPicker({
 		(async () => {
 			setSearching(true);
 			try {
-				const searchParams = new FormData();
-				searchParams.append("q", q);
-				const res = await http.post(`operations/manifests/agents/`, searchParams);
+				const res = await http.post(`operations/manifests/agents/`, {q});
 				const resp: Resp = res.data;
 				if (cancelled) return;
 				if (resp.error) {
