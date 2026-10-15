@@ -346,7 +346,7 @@
             }
         }
 
-        $token = rtrim(strtr(base64_encode(random_bytes(48)), '+/', '-_'), '=');
+        $token = generateId();
         $tokenHash = hash("sha256", $token);
         $invitationId = generateId();
         $expiresAt = date("Y-m-d H:i:s", time() + 72 * 60 * 60);

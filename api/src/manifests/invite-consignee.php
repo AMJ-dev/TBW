@@ -19,12 +19,6 @@ if ($manifestId === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     echo json_encode(['error'=>true,'data'=>'A manifest ID and valid consignee email are required.','code'=>null]);
     exit;
 }
-$baseUrl = trim((string)(getenv('TRINU_CONSIGNEE_INVITE_URL') ?: ''));
-if ($baseUrl === '' || !filter_var($baseUrl, FILTER_VALIDATE_URL) || !in_array(strtolower((string)parse_url($baseUrl, PHP_URL_SCHEME)), ['https','http'], true)) {
-    http_response_code(500);
-    echo json_encode(['error'=>true,'data'=>'Configure TRINU_CONSIGNEE_INVITE_URL to the public consignee onboarding page URL.','code'=>null]);
-    exit;
-}
 try {
     $stmt = $conn->prepare('SELECT id,consignee,consignee_status FROM operation_manifests WHERE id=? LIMIT 1');
     $stmt->execute([$manifestId]);
@@ -39,7 +33,7 @@ try {
         echo json_encode(['error'=>true,'data'=>'This consignee is already linked to an organisation.','code'=>null]);
         exit;
     }
-    $token = bin2hex(random_bytes(32));
+    $token = generateId();
     $hash = hash('sha256', $token);
     $expiresAt = date('Y-m-d H:i:s', time() + 7 * 86400);
     $conn->beginTransaction();
@@ -50,8 +44,7 @@ try {
     $saveEmail = $conn->prepare('UPDATE operation_manifests SET consignee_email=? WHERE id=?');
     $saveEmail->execute([$email,$manifestId]);
     $conn->commit();
-    $separator = str_contains($baseUrl, '?') ? '&' : '?';
-    $link = $baseUrl . $separator . http_build_query(['token'=>$token]);
+    $link = $baseURL ."register/". $token;
     $subject = 'TRÏNŪ consignee onboarding invitation';
     $safeName = htmlspecialchars((string)$manifest['consignee'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     $safeLink = htmlspecialchars($link, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');

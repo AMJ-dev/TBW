@@ -153,6 +153,7 @@ export default function Routers() {
 
 					<Route path="/login" element={<LoginPage />} />
 					<Route path="/register" element={<RegisterPage />} />
+					<Route path="/register/:token" element={<RegisterPage />} />
 					<Route path="/invitation/:token" element={<InvitationPage />} />
 					<Route path="/forgot-password" element={<ForgotPasswordPage />} />
 					<Route path="/reset-password" element={<ResetPasswordPage />} />
