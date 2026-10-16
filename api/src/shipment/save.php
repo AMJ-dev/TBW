@@ -32,6 +32,11 @@ try {
         throw new InvalidArgumentException("Please accept the shipment declaration before submitting.");
     }
 
+    $requestedStatus = trim($_POST["status"] ?? "pending_review");
+    $status = in_array($requestedStatus, ["draft", "pending_review"], true)
+        ? $requestedStatus
+        : "pending_review";
+
     $shipmentType = trim($_POST["shipment_type"] ?? "");
     $cargoCategory = trim($_POST["cargo_category"] ?? "");
     $packageType = trim($_POST["package_type"] ?? "");
@@ -253,7 +258,7 @@ try {
             :consignee_email, :consignee_phone, :cargo_description,
             :cargo_category, :package_type, :package_count, :gross_weight,
             :volume, :hs_code, :dangerous_goods, :temperature_controlled,
-            :temperature, :special_instructions, :customs_reference, 'pending_review'
+            :temperature, :special_instructions, :customs_reference, :status
         )
     ");
 
@@ -298,6 +303,7 @@ try {
         trim($_POST["special_instructions"] ?? "") ?: null
     );
     $q->bindValue(":customs_reference", trim($_POST["customs_reference"] ?? "") ?: null);
+    $q->bindValue(":status", $status);
     $q->execute();
 
     $containerInsert = $conn->prepare("
@@ -356,9 +362,7 @@ try {
             }
         }
 
-        $sealNo = trim(
-            $container["sealNo"] ?? $container["seal_no"] ?? ""
-        ) ?: null;
+        $sealNo = trim((string) ($container["sealNo"] ?? $container["seal_no"] ?? "")) ?: null;
 
         $containerInsert->bindValue(":id", generateId());
         $containerInsert->bindValue(":shipment_id", $shipmentId);
@@ -476,11 +480,11 @@ try {
 
     echo json_encode([
         "error" => false,
-        "data" => "Shipment declaration submitted for review.",
+        "data" => $status === "draft" ? "Shipment draft saved." : "Shipment declaration submitted for review.",
         "code" => [
             "shipment_id" => $shipmentId,
             "shipment_reference" => $shipmentReference,
-            "status" => "pending_review"
+            "status" => $status
         ]
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 

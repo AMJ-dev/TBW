@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
 	ArrowLeft,
 	ArrowRight,
@@ -101,6 +101,44 @@ type ShipmentDocument = {
 	documentLabel: string;
 };
 
+interface ExistingShipment {
+	id: string;
+	shipment_reference?: string;
+	status?: string;
+	shipment_type?: string;
+	bill_of_lading?: string;
+	booking_number?: string;
+	customs_reference?: string;
+	shipping_line?: string;
+	vessel_name?: string;
+	voyage_number?: string;
+	origin_country?: string;
+	origin_port?: string;
+	destination_port?: string;
+	expected_arrival?: string;
+	consignee?: string;
+	consignee_email?: string;
+	consignee_phone?: string;
+	cargo_description?: string;
+	cargo_category?: string;
+	package_type?: string;
+	package_count?: number | string;
+	gross_weight?: number | string;
+	volume?: number | string;
+	hs_code?: string;
+	dangerous_goods?: string;
+	temperature_controlled?: string;
+	temperature?: string;
+	special_instructions?: string;
+	containers?: Array<{
+		container_no?: string;
+		size?: string;
+		seal_no?: string;
+		package_count?: number | string;
+		gross_weight?: number | string;
+	}>;
+}
+
 const inputClass =
 	"mt-1.5 h-11 w-full rounded-md border border-line bg-sand px-3 text-sm text-ink outline-none transition placeholder:text-ink-soft/60 focus:ring-2 focus:ring-orange/30";
 
@@ -121,13 +159,24 @@ const emptyContainer = (): ContainerItem => ({
 const ALLOWED_EXTENSIONS = /\.(pdf|png|jpe?g)$/i;
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+const extractRecord = (raw: any): ExistingShipment | null => {
+	if (!raw || typeof raw !== "object") return null;
+	if (raw.shipment && typeof raw.shipment === "object") return raw.shipment;
+	return raw as ExistingShipment;
+};
+
 export default function NewPortalShipmentPage() {
 	const navigate = useNavigate();
+	const params = useParams<{ id?: string }>();
+	const [searchParams] = useSearchParams();
+	const routeId = params?.id ?? searchParams.get("id") ?? "";
 
+	const [shipmentId, setShipmentId] = useState<string>(routeId);
 	const [step, setStep] = useState(1);
 	const [saving, setSaving] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 	const [loadingOptions, setLoadingOptions] = useState(true);
+	const [loadingShipment, setLoadingShipment] = useState(false);
 	const [optionsError, setOptionsError] = useState("");
 	const [options, setOptions] = useState<ConfigOptions>(emptyOptions);
 	const [form, setForm] = useState({
@@ -163,6 +212,8 @@ export default function NewPortalShipmentPage() {
 	]);
 	const [documents, setDocuments] = useState<ShipmentDocument[]>([]);
 	const [declarationAccepted, setDeclarationAccepted] = useState(false);
+
+	const isEditing = Boolean(shipmentId);
 
 	const fetchOptions = async () => {
 		setLoadingOptions(true);
@@ -230,9 +281,103 @@ export default function NewPortalShipmentPage() {
 		}
 	};
 
+	const fetchShipment = async (id: string) => {
+		setLoadingShipment(true);
+		try {
+			const res = await http.get(`/portal/shipment/${id}/`);
+			const resp: Resp = res.data;
+
+			if (resp.error) {
+				toast.error(
+					typeof resp.data === "string"
+						? resp.data
+						: "Could not load this shipment."
+				);
+				return;
+			}
+
+			const record = extractRecord(resp.code);
+			if (!record) {
+				toast.error("Shipment record is empty.");
+				return;
+			}
+
+			setForm({
+				shipmentType: String(record.shipment_type ?? ""),
+				billOfLading: String(record.bill_of_lading ?? ""),
+				bookingNumber: String(record.booking_number ?? ""),
+				customsReference: String(record.customs_reference ?? ""),
+				shippingLine: String(record.shipping_line ?? ""),
+				vesselName: String(record.vessel_name ?? ""),
+				voyageNumber: String(record.voyage_number ?? ""),
+				originCountry: String(record.origin_country ?? ""),
+				originPort: String(record.origin_port ?? ""),
+				destinationPort: String(record.destination_port ?? ""),
+				expectedArrival: String(record.expected_arrival ?? ""),
+				consignee: String(record.consignee ?? ""),
+				consigneeEmail: String(record.consignee_email ?? ""),
+				consigneePhone: String(record.consignee_phone ?? ""),
+				cargoDescription: String(record.cargo_description ?? ""),
+				cargoCategory: String(record.cargo_category ?? ""),
+				packageType: String(record.package_type ?? ""),
+				packageCount:
+					record.package_count != null
+						? String(record.package_count)
+						: "",
+				grossWeight:
+					record.gross_weight != null ? String(record.gross_weight) : "",
+				volume: record.volume != null ? String(record.volume) : "",
+				hsCode: String(record.hs_code ?? ""),
+				dangerousGoods: record.dangerous_goods === "yes" ? "yes" : "no",
+				temperatureControlled:
+					record.temperature_controlled === "yes" ? "yes" : "no",
+				temperature: String(record.temperature ?? ""),
+				specialInstructions: String(record.special_instructions ?? ""),
+			});
+
+			if (Array.isArray(record.containers) && record.containers.length) {
+				setContainers(
+					record.containers.map((container) => ({
+						containerNo: String(container.container_no ?? ""),
+						size: String(container.size ?? "20ft"),
+						sealNo: String(container.seal_no ?? ""),
+						packageCount:
+							container.package_count != null
+								? String(container.package_count)
+								: "",
+						grossWeight:
+							container.gross_weight != null
+								? String(container.gross_weight)
+								: "",
+					}))
+				);
+			}
+		} catch (err: any) {
+			toast.error(
+				err?.response?.data?.message || "Could not load this shipment."
+			);
+		} finally {
+			setLoadingShipment(false);
+		}
+	};
+
 	useEffect(() => {
 		void fetchOptions();
 	}, []);
+
+	useEffect(() => {
+		if (routeId && routeId !== shipmentId) {
+			setShipmentId(routeId);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [routeId]);
+
+	useEffect(() => {
+		if (shipmentId) {
+			void fetchShipment(shipmentId);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [shipmentId]);
 
 	const updateField = (name: string, value: string) => {
 		setForm((current) => ({ ...current, [name]: value }));
@@ -486,34 +631,123 @@ export default function NewPortalShipmentPage() {
 	const validContainersForSubmit = () =>
 		containers.filter((container) => container.containerNo.trim());
 
-	const saveDraft = async () => {
-		setSaving(true);
-		try {
-			const draft = {
-				id: `draft-${Date.now()}`,
-				...form,
-				containers: validContainersForSubmit(),
-				documents: documents.map((document) => ({
+	const buildFormData = (status: "draft" | "pending_review") => {
+		const formData = new FormData();
+
+		const fields: Record<string, string> = {
+			shipment_type: form.shipmentType,
+			bill_of_lading: form.billOfLading.trim(),
+			booking_number: form.bookingNumber.trim(),
+			customs_reference: form.customsReference.trim(),
+			shipping_line: form.shippingLine.trim(),
+			vessel_name: form.vesselName.trim(),
+			voyage_number: form.voyageNumber.trim(),
+			origin_country: form.originCountry.trim(),
+			origin_port: form.originPort.trim(),
+			destination_port: form.destinationPort.trim(),
+			expected_arrival: form.expectedArrival,
+			consignee: form.consignee.trim(),
+			consignee_email: form.consigneeEmail.trim(),
+			consignee_phone: form.consigneePhone.trim(),
+			cargo_description: form.cargoDescription.trim(),
+			cargo_category: form.cargoCategory,
+			package_type: form.packageType,
+			package_count: form.packageCount,
+			gross_weight: form.grossWeight,
+			volume: form.volume,
+			hs_code: form.hsCode.trim(),
+			dangerous_goods: form.dangerousGoods,
+			temperature_controlled: form.temperatureControlled,
+			temperature: form.temperature.trim(),
+			special_instructions: form.specialInstructions.trim(),
+			declaration_accepted: declarationAccepted ? "1" : "0",
+			status,
+		};
+
+		Object.entries(fields).forEach(([key, value]) =>
+			formData.append(key, value)
+		);
+
+		formData.append(
+			"containers",
+			JSON.stringify(
+				validContainersForSubmit().map((container) => ({
+					containerNo: container.containerNo.trim(),
+					size: container.size,
+					sealNo: container.sealNo.trim(),
+					packageCount: container.packageCount,
+					grossWeight: container.grossWeight,
+				}))
+			)
+		);
+
+		formData.append(
+			"documents",
+			JSON.stringify(
+				documents.map((document, index) => ({
 					name: document.file.name,
 					type: document.documentKey,
 					label: document.documentLabel,
 					size: document.file.size,
-				})),
-				status: "local_draft",
-				createdAt: new Date().toISOString(),
-			};
-			const existing = JSON.parse(
-				localStorage.getItem("portal-shipment-drafts") || "[]"
+					index,
+				}))
+			)
+		);
+
+		documents.forEach((document, index) => {
+			formData.append(
+				`document_file_${index}`,
+				document.file,
+				document.file.name
 			);
-			localStorage.setItem(
-				"portal-shipment-drafts",
-				JSON.stringify([draft, ...existing])
+		});
+
+		return formData;
+	};
+
+	const persistShipment = async (
+		status: "draft" | "pending_review"
+	): Promise<string | null> => {
+		const endpoint = shipmentId
+			? `/portal/shipments/save/${shipmentId}/`
+			: "/portal/shipments/save/";
+
+		const res = await http.post(endpoint, buildFormData(status));
+		const resp: Resp = res.data;
+
+		if (resp.error) {
+			toast.error(
+				typeof resp.data === "string"
+					? resp.data
+					: "Could not save the shipment."
 			);
-			toast.success(
-				"Draft saved in this browser. Submit the declaration to upload files to the server."
+			return null;
+		}
+
+		const record = extractRecord(resp.code);
+		return record?.id ?? shipmentId ?? null;
+	};
+
+	const saveDraft = async () => {
+		setSaving(true);
+		try {
+			const nextId = await persistShipment("draft");
+			if (!nextId) return;
+
+			if (!shipmentId) {
+				setShipmentId(nextId);
+				navigate(`/portal/shipment/new?id=${nextId}`, {
+					replace: true,
+				});
+			}
+
+			toast.success("Draft saved. You can continue editing it later.");
+		} catch (error: any) {
+			toast.error(
+				error?.response?.data?.data ||
+					error?.response?.data?.message ||
+					"Unable to save the shipment draft."
 			);
-		} catch {
-			toast.error("Unable to save the shipment draft.");
 		} finally {
 			setSaving(false);
 		}
@@ -529,89 +763,13 @@ export default function NewPortalShipmentPage() {
 
 		setSubmitting(true);
 		try {
-			const formData = new FormData();
-			const fields: Record<string, string> = {
-				shipment_type: form.shipmentType,
-				bill_of_lading: form.billOfLading.trim(),
-				booking_number: form.bookingNumber.trim(),
-				customs_reference: form.customsReference.trim(),
-				shipping_line: form.shippingLine.trim(),
-				vessel_name: form.vesselName.trim(),
-				voyage_number: form.voyageNumber.trim(),
-				origin_country: form.originCountry.trim(),
-				origin_port: form.originPort.trim(),
-				destination_port: form.destinationPort.trim(),
-				expected_arrival: form.expectedArrival,
-				consignee: form.consignee.trim(),
-				consignee_email: form.consigneeEmail.trim(),
-				consignee_phone: form.consigneePhone.trim(),
-				cargo_description: form.cargoDescription.trim(),
-				cargo_category: form.cargoCategory,
-				package_type: form.packageType,
-				package_count: form.packageCount,
-				gross_weight: form.grossWeight,
-				volume: form.volume,
-				hs_code: form.hsCode.trim(),
-				dangerous_goods: form.dangerousGoods,
-				temperature_controlled: form.temperatureControlled,
-				temperature: form.temperature.trim(),
-				special_instructions: form.specialInstructions.trim(),
-				declaration_accepted: declarationAccepted ? "1" : "0",
-			};
+			const nextId = await persistShipment("pending_review");
+			if (!nextId) return;
 
-			Object.entries(fields).forEach(([key, value]) =>
-				formData.append(key, value)
-			);
-
-			formData.append(
-				"containers",
-				JSON.stringify(
-					validContainersForSubmit().map((container) => ({
-						containerNo: container.containerNo.trim(),
-						size: container.size,
-						sealNo: container.sealNo.trim(),
-						packageCount: container.packageCount,
-						grossWeight: container.grossWeight,
-					}))
-				)
-			);
-
-			formData.append(
-				"documents",
-				JSON.stringify(
-					documents.map((document, index) => ({
-						name: document.file.name,
-						type: document.documentKey,
-						label: document.documentLabel,
-						size: document.file.size,
-						index,
-					}))
-				)
-			);
-
-			documents.forEach((document, index) => {
-				formData.append(
-					`document_file_${index}`,
-					document.file,
-					document.file.name
-				);
-			});
-
-			const res = await http.post("/portal/shipments/save/", formData);
-			const resp: Resp = res.data;
-
-			if (resp.error) {
-				toast.error(
-					typeof resp.data === "string"
-						? resp.data
-						: "Could not submit the shipment."
-				);
-				return;
-			}
-
+			setShipmentId(nextId);
 			toast.success(
-				typeof resp.data === "string"
-					? resp.data
+				isEditing
+					? "Shipment updated and submitted."
 					: "Shipment submitted successfully."
 			);
 			navigate("/portal/shipments");
@@ -639,7 +797,7 @@ export default function NewPortalShipmentPage() {
 
 	return (
 		<AppShell
-			title="Submit Shipment"
+			title={isEditing ? "Edit Shipment" : "Submit Shipment"}
 			eyebrow="Stakeholder Portal · New Shipment"
 		>
 			<div className="mx-auto max-w-5xl space-y-6 pb-24">
@@ -655,12 +813,16 @@ export default function NewPortalShipmentPage() {
 
 					<Button
 						variant="outline"
-						disabled={saving}
+						disabled={saving || loadingShipment}
 						onClick={saveDraft}
 						className="gap-2 border-line bg-paper text-ink hover:bg-sand"
 					>
 						<ClipboardList className="size-4" />
-						{saving ? "Saving…" : "Save draft"}
+						{saving
+							? "Saving…"
+							: isEditing
+								? "Save changes"
+								: "Save draft"}
 					</Button>
 				</div>
 
@@ -682,12 +844,16 @@ export default function NewPortalShipmentPage() {
 						<div className="flex items-center gap-2">
 							<Ship className="size-4 text-orange" />
 							<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
-								New shipment declaration
+								{isEditing
+									? "Editing existing declaration"
+									: "New shipment declaration"}
 							</p>
 						</div>
 
 						<h1 className="mt-4 max-w-2xl font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
-							Submit shipment details for terminal validation.
+							{isEditing
+								? "Update this shipment declaration before submission."
+								: "Submit shipment details for terminal validation."}
 						</h1>
 
 						<p className="mt-4 max-w-2xl text-sm leading-6 text-sand/75 sm:text-base">
@@ -705,9 +871,20 @@ export default function NewPortalShipmentPage() {
 							<span className="inline-flex items-center gap-1.5 rounded-full border border-sand/15 bg-sand/5 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-sand/70">
 								Organisation submission
 							</span>
+							{isEditing && (
+								<span className="inline-flex items-center gap-1.5 rounded-full border border-orange/30 bg-orange/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-orange">
+									Editing · {shipmentId.slice(0, 8)}
+								</span>
+							)}
 						</div>
 					</div>
 				</motion.section>
+
+				{loadingShipment && (
+					<div className="rounded-xl bg-paper p-4 text-[12px] text-ink-soft ring-1 ring-line">
+						Loading existing shipment…
+					</div>
+				)}
 
 				<section className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
 					{steps.map((item) => {
@@ -1393,8 +1570,8 @@ export default function NewPortalShipmentPage() {
 																		event.target.value
 																	)
 																}
-																placeholder="Seal reference"
-																className="mt-1.5 h-11 border-line bg-paper text-ink"
+																placeholder="Number printed on the container door"
+																className="mt-1.5 h-11 border-line bg-paper font-mono text-ink"
 															/>
 														</label>
 
@@ -1716,6 +1893,46 @@ export default function NewPortalShipmentPage() {
 										))}
 									</div>
 
+									{validContainersForSubmit().length > 0 && (
+										<div className="border-t border-line p-5 sm:p-6">
+											<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+												Containers
+											</p>
+											<ul className="mt-3 space-y-2">
+												{validContainersForSubmit().map(
+													(container, index) => (
+														<li
+															key={`${container.containerNo}-${index}`}
+															className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-sand p-3 ring-1 ring-line"
+														>
+															<span className="font-mono text-[12px] font-semibold text-ink">
+																{container.containerNo}
+															</span>
+															<span className="font-mono text-[11px] text-ink-soft">
+																{container.size}
+															</span>
+															{container.sealNo && (
+																<span className="font-mono text-[11px] text-ink-soft">
+																	· seal {container.sealNo}
+																</span>
+															)}
+															{container.packageCount && (
+																<span className="font-mono text-[11px] text-ink-soft">
+																	· {container.packageCount} pkgs
+																</span>
+															)}
+															{container.grossWeight && (
+																<span className="font-mono text-[11px] text-ink-soft">
+																	· {container.grossWeight} kg
+																</span>
+															)}
+														</li>
+													)
+												)}
+											</ul>
+										</div>
+									)}
+
 									<div className="border-t border-line p-5 sm:p-6">
 										<label className="flex cursor-pointer items-start gap-3 rounded-xl bg-sand p-4 ring-1 ring-line">
 											<input
@@ -1791,7 +2008,9 @@ export default function NewPortalShipmentPage() {
 									>
 										{submitting
 											? "Preparing…"
-											: "Submit declaration"}
+											: isEditing
+												? "Update declaration"
+												: "Submit declaration"}
 										<CheckCircle2 className="size-4" />
 									</Button>
 								)}

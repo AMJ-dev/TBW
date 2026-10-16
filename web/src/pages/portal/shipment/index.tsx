@@ -411,7 +411,7 @@ export default function PortalShipmentsPage() {
 								Export list
 							</Button>
 							<Button
-								onClick={() => navigate("/portal/shipments/new")}
+								onClick={() => navigate("/portal/shipment/new")}
 								className="gap-2"
 							>
 								<Plus className="size-4" />

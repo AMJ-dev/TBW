@@ -61,7 +61,11 @@ export default function OtpPage() {
 		if (countdown > 0 && !canResend) {
 			const t = setTimeout(() => setCountdown((prev) => prev - 1), 1000);
 			return () => clearTimeout(t);
-		} else if (countdown === 0 && !canResend) setCanResend(true);
+		}
+		if (countdown === 0 && !canResend) {
+			setCanResend(true);
+		}
+		return undefined;
 	}, [countdown, canResend, mounted]);
 
 	useEffect(() => {

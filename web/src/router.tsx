@@ -238,7 +238,8 @@ export default function Routers() {
 						<Route path="/portal/bookings" element={<PortalBookingsPage />} />
 						<Route path="/portal/cargo" element={<CargoPage />} />
 						<Route path="/portal/shipments" element={<PortalShipmentsPage />} />
-						<Route path="/portal/shipments/new" element={<NewPortalShipmentPage />} />
+						<Route path="/portal/shipment/new" element={<NewPortalShipmentPage />} />
+						<Route path="/portal/shipment/edit/:id" element={<NewPortalShipmentPage />} />
 						<Route path="/portal/shipments/:id" element={<PortalShipmentDetailsPage />} />
 						
 						<Route path="/portal/cargo/:id" element={<CargoDetailPage />} />

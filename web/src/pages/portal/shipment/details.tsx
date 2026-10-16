@@ -75,6 +75,19 @@ type ReviewEvent = {
 	created_at: string;
 };
 
+type ManifestReview = {
+	id?: string;
+	manifest_ref?: string | null;
+	bill_of_lading?: string | null;
+	status?: string | null;
+	review_reason?: string | null;
+	review_responsible_party?: string | null;
+	notes?: string | null;
+	flagged_at?: string | null;
+	received_at?: string | null;
+	updated_at?: string | null;
+};
+
 type ShipmentRecord = {
 	id: string;
 	user_id?: string;
@@ -115,9 +128,10 @@ type ShipmentRecord = {
 	reviews?: ReviewEvent[];
 	latest_review?: ReviewEvent | null;
 	latest_review_reason?: string | null;
+	manifest?: ManifestReview | null;
 };
 
-const statusLabel = (status?: string): string => {
+const statusLabel = (status?: string | null): string => {
 	if (!status) return "Unknown";
 	return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 };
@@ -325,6 +339,12 @@ export default function PortalShipmentDetailsPage() {
 
 	const containerCount = shipment.container_count ?? containers.length;
 	const documentCount = shipment.document_count ?? documents.length;
+	const manifest = shipment.manifest ?? null;
+	const manifestStatus = String(manifest?.status ?? "").toLowerCase();
+	const manifestNeedsAction =
+		manifestStatus === "discrepancy" ||
+		Boolean(manifest?.review_reason) ||
+		Boolean(manifest?.review_responsible_party);
 
 	return (
 		<AppShell
@@ -450,6 +470,81 @@ export default function PortalShipmentDetailsPage() {
 						}
 					/>
 				</section>
+
+				{manifest && (
+					<motion.section
+						initial={{ opacity: 0, y: 8 }}
+						animate={{ opacity: 1, y: 0 }}
+						className={cn(
+							"overflow-hidden rounded-2xl border p-5 sm:p-6",
+							manifestNeedsAction
+								? "border-coral/30 bg-coral/5"
+								: "border-line bg-paper"
+						)}
+					>
+						<div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+							<div className="flex min-w-0 gap-3">
+								<div className={cn(
+									"grid size-10 shrink-0 place-items-center rounded-xl",
+									manifestNeedsAction ? "bg-coral/10 text-coral" : "bg-orange/10 text-orange-deep"
+								)}>
+									<AlertTriangle className="size-5" />
+								</div>
+								<div className="min-w-0">
+									<div className="flex flex-wrap items-center gap-2">
+										<h2 className="font-display text-base font-bold text-ink">
+											Manifest review
+										</h2>
+										<StatusBadge
+											label={statusLabel(manifest.status)}
+											tone={statusTone(manifest.status ?? "")}
+										/>
+									</div>
+									<p className="mt-1 text-sm leading-6 text-ink-soft">
+										{manifestNeedsAction
+											? "Operations has flagged an issue associated with this shipment. Review the reason and follow the requested action."
+											: "A manifest is linked to this shipment. Review its current status and any operator notes here."}
+									</p>
+									<dl className="mt-4 grid gap-3 sm:grid-cols-2">
+										<Field icon={Hash} label="Manifest reference" value={manifest.manifest_ref || "—"} mono />
+										<Field icon={Hash} label="Manifest bill of lading" value={manifest.bill_of_lading || "—"} mono />
+										<Field icon={User} label="Responsible party" value={manifest.review_responsible_party || "Not specified"} />
+										<Field icon={CalendarDays} label="Last flagged" value={formatDateTime(manifest.flagged_at)} />
+									</dl>
+								</div>
+							</div>
+							{manifestNeedsAction && (
+								<Button
+									onClick={() => navigate(`/portal/shipment/edit/${shipment.id}`)}
+									className="shrink-0 gap-2 bg-orange text-white hover:bg-orange-deep"
+								>
+									<FileCheck2 className="size-4" />
+									Resolve Issue
+								</Button>
+							)}
+						</div>
+						{manifest.review_reason && (
+							<div className="mt-4 rounded-xl border border-coral/20 bg-background p-4">
+								<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-coral">
+									Reason for flag
+								</p>
+								<p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-ink">
+									{manifest.review_reason}
+								</p>
+							</div>
+						)}
+						{manifest.notes && (
+							<div className="mt-3 rounded-xl border border-line bg-background p-4">
+								<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+									Operator notes
+								</p>
+								<p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-ink">
+									{manifest.notes}
+								</p>
+							</div>
+						)}
+					</motion.section>
+				)}
 
 				<div className="grid gap-5 lg:grid-cols-[1.4fr_1fr] lg:items-start">
 					<div className="space-y-5">
