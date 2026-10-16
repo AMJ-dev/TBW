@@ -115,7 +115,7 @@
     }
     function send_email($to, $name, $subject, $message, $reply_to="", $reply_name="", $attachment=[]){
         global $baseURL, $AppName, $sender_email, $comp_logo, $email_host, $email_port, $email_user, $email_password;  
-   
+
         $template = file_get_contents(__DIR__."/email/index.tpl");
         $template = str_replace("<!-- #{AppName} -->", $AppName, $template);
         $template = str_replace("<!-- #{comp_logo} -->", $comp_logo, $template);
@@ -159,10 +159,47 @@
                 $mail->clearCustomHeaders();
                 return $is_send;
             } catch (\Throwable $th) {
-                // throw $th;
+                throw $th;
             }
         } catch (Exception $e) {
-            // echo "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
+            echo "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
+        }
+    }
+    function update_integration_setting(string $encryptionKey): bool {
+        global $conn,$redis;
+
+        $q = $conn->prepare("
+            SELECT
+                a.adapter_key,
+                c.field_key,
+                c.encrypted_value
+            FROM integration_credentials c
+            INNER JOIN integration_adapters a ON a.id = c.integration_id
+            WHERE a.adapter_key IN ('email_provider', 'sms_provider')
+        ");
+        $q->execute();
+
+        $settings = [];
+
+        foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $encryptedValue = base64_decode((string) $row['encrypted_value'], true);
+            if ($encryptedValue === false || strlen($encryptedValue) < 29) continue;
+
+            $iv = substr($encryptedValue, 0, 12);
+            $tag = substr($encryptedValue, 12, 16);
+            $ciphertext = substr($encryptedValue, 28);
+
+            $value = openssl_decrypt($ciphertext, 'aes-256-gcm', $encryptionKey, OPENSSL_RAW_DATA, $iv, $tag);
+
+            if ($value === false) continue;
+            $settings[(string) $row['adapter_key']][(string) $row['field_key']] = $value;
+        }
+
+        try {
+            $redis->setex('trinu:integration_settings:v1', 300, json_encode($settings, JSON_THROW_ON_ERROR));
+            return true;
+        } catch (Throwable $e) {
+            return false;
         }
     }
     function generateId(){

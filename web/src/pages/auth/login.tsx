@@ -33,17 +33,17 @@ export default function LoginPage() {
 		try {
 			let res = await http.post("sign-in/",{ email, password});
 			const resp:Resp = res.data;
-			if (resp?.error){
-				toast.error(resp?.data || "Login failed. Check the credentials and try again.")
+			if (!resp?.error && resp.data){
+				toast.success(resp.data);
+				sessionStorage.setItem('remember', 'true')
+				sessionStorage.setItem('expires_in', String(resp.code?.expires_in ?? 300))
+				sessionStorage.setItem('email', String(email.trim()))
+				const isMfaEnabled = String(resp.code?.mfa_enabled) === "1" || resp.code?.mfa_enabled === true;
+				if(isMfaEnabled) sessionStorage.setItem('mfa_token', String(resp.code?.mfa_token));
+				navigate(isMfaEnabled ? "/mfa" : "/otp");
 				return
 			}
-			toast.success(resp.data);
-			sessionStorage.setItem('remember', 'true')
-			sessionStorage.setItem('expires_in', String(resp.code?.expires_in ?? 300))
-			sessionStorage.setItem('email', String(email.trim()))
-			const isMfaEnabled = String(resp.code?.mfa_enabled) === "1" || resp.code?.mfa_enabled === true;
-			if(isMfaEnabled) sessionStorage.setItem('mfa_token', String(resp.code?.mfa_token));
-			navigate(isMfaEnabled ? "/mfa" : "/otp");
+				toast.error(resp?.data || "Login failed. Check the credentials and try again.")
 		} catch (error) {
 			toast.error("Could not complete login. Try again later.")
 		}finally{

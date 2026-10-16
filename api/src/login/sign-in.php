@@ -539,12 +539,7 @@ try {
         </div>
     ";
 
-    $sent = send_email(
-        $user["email"],
-        $user["full_name"],
-        $subject,
-        $message
-    );
+    $sent = send_email($user["email"], $user["full_name"], $subject, $message);
 
     if (!$sent) {
 
@@ -554,9 +549,7 @@ try {
             WHERE id = :id
         ");
 
-        $stmt->execute([
-            ":id" => $otp_id
-        ]);
+        $stmt->execute([":id" => $otp_id]);
 
         echo json_encode([
             "error" => true,

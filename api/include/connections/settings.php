@@ -57,46 +57,21 @@
         $settings = [];
 
         foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $encryptedValue = base64_decode(
-                (string) $row['encrypted_value'],
-                true
-            );
-
-            if ($encryptedValue === false || strlen($encryptedValue) < 29) {
-                continue;
-            }
+            $encryptedValue = base64_decode((string) $row['encrypted_value'], true);
+            if ($encryptedValue === false || strlen($encryptedValue) < 29) continue;
 
             $iv = substr($encryptedValue, 0, 12);
             $tag = substr($encryptedValue, 12, 16);
             $ciphertext = substr($encryptedValue, 28);
 
-            $value = openssl_decrypt(
-                $ciphertext,
-                'aes-256-gcm',
-                $encryptionKey,
-                OPENSSL_RAW_DATA,
-                $iv,
-                $tag
-            );
-
-            if ($value === false) {
-                throw new RuntimeException(
-                    'Could not decrypt an integration credential.'
-                );
-            }
-
-            $settings[(string) $row['adapter_key']]
-                    [(string) $row['field_key']] = $value;
+            $value = openssl_decrypt($ciphertext, 'aes-256-gcm', $encryptionKey, OPENSSL_RAW_DATA, $iv, $tag);
+            if ($value === false) throw new RuntimeException('Could not decrypt an integration credential.');
+            $settings[(string) $row['adapter_key']][(string) $row['field_key']] = $value;
         }
 
         try {
-            $redis->setex(
-                $redisKey,
-                300,
-                json_encode($settings, JSON_THROW_ON_ERROR)
-            );
-        } catch (Throwable $e) {
-        }
+            $redis->setex($redisKey, 300, json_encode($settings, JSON_THROW_ON_ERROR));
+        } catch (Throwable $e) {}
     }
 
     $emailSettings = $settings['email_provider'] ?? [];
@@ -104,13 +79,12 @@
 
     $email_host = (string) ($emailSettings['email_host'] ?? '');
     $email_port = (int) ($emailSettings['email_port'] ?? 0);
-    $email_user = (string) (
-        $emailSettings['email_user']
-        ?? $emailSettings['sender_email']
-        ?? ''
-    );
+    $email_user = (string) ($emailSettings['email_user'] ?? '');
     $email_password = (string) ($emailSettings['email_password'] ?? '');
     $sender_email = (string) ($emailSettings['sender_email'] ?? '');
 
     $sms_sender = (string) ($smsSettings['sms_sender'] ?? '');
     $sms_api_token = (string) ($smsSettings['sms_api_token'] ?? '');
+    // print_r($emailSettings);
+    // exit;
+    // re_ZmQcfoL4_KdVUkQLLAU2vYCns692XmM9W

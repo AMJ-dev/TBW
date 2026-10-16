@@ -541,6 +541,13 @@ export default function AdminIntegrationsConfigurationPage() {
                                               required: true,
                                           },
                                           {
+                                              key: "email_user",
+                                              label: "Email username",
+                                              placeholder: "username",
+                                              kind: "text",
+                                              required: true,
+                                          },
+                                          {
                                               key: "email_password",
                                               label: "Password",
                                               placeholder: "SMTP password",

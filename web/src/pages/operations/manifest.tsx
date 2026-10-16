@@ -281,21 +281,22 @@ export default function OperationsManifestRoute() {
 		}
 	};
 
-	const handleFlag = async (id: string) => {
+	const handleFlag = async (id: string, reason: string, responsibleParty: "Organisation" | "Carrier" | "Operations" | "") => {
 		setActioning(true);
 		try {
-			const res = await http.post(`operations/manifests/flag/${id}/`);
+			const res = await http.post(`operations/manifests/flag/${id}/`, {reason: reason.trim(), responsible_party: responsibleParty});
 			const resp: Resp = res.data;
 			if (resp.error) {
 				toast.error(resp.data || "Could not flag the manifest.");
-				return;
+				return false;
 			}
 			toast.success("Manifest flagged for review.");
 			await fetchManifests();
+			setSelected(null);
+			return true;
 		} catch (err: any) {
-			toast.error(
-				err?.response?.data?.message || "Could not flag the manifest."
-			);
+			toast.error(err?.response?.data?.message || "Could not flag the manifest.");
+			return false;
 		} finally {
 			setActioning(false);
 		}
@@ -365,10 +366,9 @@ export default function OperationsManifestRoute() {
 						await handleValidate(selected.id);
 						setSelected(null);
 					}}
-					onFlag={async () => {
-						await handleFlag(selected.id);
-						setSelected(null);
-					}}
+					onFlag={async (reason, responsibleParty) =>
+						await handleFlag(selected.id, reason, responsibleParty)
+					}
 					onMatch={async (shipmentId, reason) => {
 						const res = await http.post(`operations/manifests/match/`, {"manifest_id": selected.id, "shipment_id": shipmentId, "reason": reason});
 						const resp: Resp = res.data;
@@ -1131,7 +1131,7 @@ function ManifestDetailDialog({
 	actioning: boolean;
 	onClose: () => void;
 	onValidate: () => Promise<void>;
-	onFlag: () => Promise<void>;
+	onFlag: (reason: string, responsibleParty: "Organisation" | "Carrier" | "Operations" | "") => Promise<boolean>;
 	onMatch: (shipmentId: string, reason: string) => Promise<boolean>;
 	onRefresh: () => Promise<void>;
 }) {
@@ -1141,6 +1141,10 @@ function ManifestDetailDialog({
 	const [matchReason, setMatchReason] = useState("");
 	const [searchingShipments, setSearchingShipments] = useState(false);
 	const [matchingShipment, setMatchingShipment] = useState(false);
+	const [flagDialogOpen, setFlagDialogOpen] = useState(false);
+	const [flagReason, setFlagReason] = useState("");
+	const [responsibleParty, setResponsibleParty] = useState<"" | "Organisation" | "Carrier" | "Operations">("");
+	const [submittingFlag, setSubmittingFlag] = useState(false);
 
 	const [inviteEmail, setInviteEmail] = useState(manifest.consigneeEmail ?? "");
 	const [inviting, setInviting] = useState(false);
@@ -1515,7 +1519,11 @@ function ManifestDetailDialog({
 						{canFlag && (
 							<Button
 								variant="outline"
-								onClick={onFlag}
+								onClick={() => {
+									setFlagReason("");
+									setResponsibleParty("");
+									setFlagDialogOpen(true);
+								}}
 								disabled={actioning}
 								className="border-line bg-paper text-coral hover:bg-coral/10"
 							>
@@ -1544,6 +1552,55 @@ function ManifestDetailDialog({
 					</div>
 				</div>
 			</div>
+			{flagDialogOpen && (
+				<div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/50 p-4 backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && !submittingFlag && setFlagDialogOpen(false)}>
+					<form
+						className="w-full max-w-lg space-y-5 rounded-2xl bg-paper p-5 shadow-2xl ring-1 ring-line sm:p-6"
+						onSubmit={async (e) => {
+							e.preventDefault();
+							if (flagReason.trim().length < 5) {
+								toast.error("Enter a reason of at least 5 characters.");
+								return;
+							}
+							setSubmittingFlag(true);
+							try {
+								const ok = await onFlag(flagReason.trim(), responsibleParty);
+								if (ok) setFlagDialogOpen(false);
+							} finally {
+								setSubmittingFlag(false);
+							}
+						}}
+					>
+						<div className="flex items-start gap-3">
+							<span className="grid size-10 shrink-0 place-items-center rounded-xl bg-coral/10 text-coral"><AlertTriangle className="size-5" /></span>
+							<div>
+								<h3 className="font-display text-lg font-bold text-ink">Flag manifest for review</h3>
+								<p className="mt-1 text-xs leading-5 text-ink-soft">Record the issue and, if known, identify who needs to act next.</p>
+							</div>
+							<Button type="button" variant="ghost" size="icon" aria-label="Close flag dialog" disabled={submittingFlag} onClick={() => setFlagDialogOpen(false)}><X className="size-4" /></Button>
+						</div>
+						<div className="rounded-lg bg-sand px-3 py-2 text-xs text-ink-soft">Manifest <span className="font-mono font-semibold text-ink">{manifest.manifestRef}</span></div>
+						<label className="block">
+							<span className={labelClass}>Reason for review <span className="text-coral">*</span></span>
+							<textarea value={flagReason} onChange={(e) => setFlagReason(e.target.value)} minLength={5} maxLength={2000} required rows={4} placeholder="Describe the discrepancy, missing information, or issue requiring follow-up…" className={textareaClass} />
+							<span className="mt-1 block text-right text-[10px] text-ink-soft">{flagReason.length}/2000</span>
+						</label>
+						<fieldset className="space-y-2">
+							<legend className={labelClass}>Who needs to act? <span className="normal-case tracking-normal">(optional)</span></legend>
+							<div className="grid gap-2 sm:grid-cols-3">
+								{(["Organisation", "Carrier", "Operations"] as const).map((party) => (
+									<button key={party} type="button" onClick={() => setResponsibleParty(responsibleParty === party ? "" : party)} className={cn("rounded-lg border px-3 py-3 text-sm font-medium transition-colors", responsibleParty === party ? "border-orange bg-orange/10 text-orange-deep ring-1 ring-orange/30" : "border-line bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink")} aria-pressed={responsibleParty === party}>{party}</button>
+								))}
+							</div>
+							{responsibleParty && <p className="text-xs text-ink-soft">Next action assigned to: <span className="font-semibold text-ink">{responsibleParty}</span></p>}
+						</fieldset>
+						<div className="flex justify-end gap-2 border-t border-line pt-4">
+							<Button type="button" variant="outline" disabled={submittingFlag} onClick={() => setFlagDialogOpen(false)} className="border-line">Cancel</Button>
+							<Button type="submit" disabled={submittingFlag || flagReason.trim().length < 5} className="bg-orange text-white hover:bg-orange-deep">{submittingFlag ? <><Loader2 className="mr-2 size-4 animate-spin" />Submitting…</> : <><AlertTriangle className="mr-2 size-4" />Confirm flag</>}</Button>
+						</div>
+					</form>
+				</div>
+			)}
 		</div>
 	);
 }
