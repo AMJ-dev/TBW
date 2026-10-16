@@ -85,6 +85,5 @@
 
     $sms_sender = (string) ($smsSettings['sms_sender'] ?? '');
     $sms_api_token = (string) ($smsSettings['sms_api_token'] ?? '');
-    // print_r($emailSettings);
-    // exit;
-    // re_ZmQcfoL4_KdVUkQLLAU2vYCns692XmM9W
+    
+    
