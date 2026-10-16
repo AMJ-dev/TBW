@@ -40,9 +40,34 @@
                 exit;
             }
         }
-        $link = $conn->prepare('INSERT INTO operation_manifest_shipment_matches (id,manifest_id,shipment_id,match_method,matched_by,confirmed_by,notes) VALUES (:id,:manifest,:shipment,:method,:actor,:actor,:notes) ON DUPLICATE KEY UPDATE match_method=VALUES(match_method), matched_by=VALUES(matched_by), confirmed_by=VALUES(confirmed_by), notes=VALUES(notes), matched_at=CURRENT_TIMESTAMP');
+        $link = $conn->prepare('
+            INSERT INTO operation_manifest_shipment_matches
+                (id, manifest_id, shipment_id, match_method, matched_by, confirmed_by, notes)
+            VALUES
+                (:id, :manifest, :shipment, :method, :matched_by, :confirmed_by, :notes)
+            ON DUPLICATE KEY UPDATE
+                match_method = VALUES(match_method),
+                matched_by = VALUES(matched_by),
+                confirmed_by = VALUES(confirmed_by),
+                notes = VALUES(notes),
+                matched_at = CURRENT_TIMESTAMP
+        ');
+
         $reason = trim((string)($_POST['reason'] ?? ''));
-        $link->execute([':id'=>generateId(),':manifest'=>$manifestId,':shipment'=>$shipmentId,':method'=>strcasecmp(trim((string)$manifest['bill_of_lading']), trim((string)$shipment['bill_of_lading']))===0 ? 'BILL_OF_LADING_CONFIRMED' : 'MANUAL_EXCEPTION',':actor'=>(string)$my_details->id,':notes'=>$reason !== '' ? $reason : null]);
+        $actorId = (string)$my_details->id;
+
+        $link->execute([
+            ':id' => generateId(),
+            ':manifest' => $manifestId,
+            ':shipment' => $shipmentId,
+            ':method' => strcasecmp(
+                trim((string)$manifest['bill_of_lading']),
+                trim((string)$shipment['bill_of_lading'])
+            ) === 0 ? 'BILL_OF_LADING_CONFIRMED' : 'MANUAL_EXCEPTION',
+            ':matched_by' => $actorId,
+            ':confirmed_by' => $actorId,
+            ':notes' => $reason !== '' ? $reason : null
+        ]);
         $up = $conn->prepare('UPDATE operation_manifests SET matched_shipment_id=? WHERE id=?');
         $up->execute([$shipmentId,$manifestId]);
         $containerMatch = $conn->prepare('UPDATE operation_manifest_containers mc INNER JOIN portal_shipment_containers sc ON UPPER(TRIM(sc.container_no))=UPPER(TRIM(mc.container_no)) AND sc.shipment_id=? SET mc.matched_shipment_id=?, mc.matched_shipment_container_id=sc.id WHERE mc.manifest_id=?');
@@ -55,5 +80,5 @@
     } catch (Throwable $e) {
         if ($conn->inTransaction()) $conn->rollBack();
         http_response_code(500);
-        echo json_encode(['error'=>true,'data'=>'Unable to link shipment to manifest.','code'=>null]);
+        echo json_encode(['error'=>true,'data'=>'Unable to link shipment to manifest.','code'=>$e->getMessage()]);
     }

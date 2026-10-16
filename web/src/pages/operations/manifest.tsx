@@ -370,6 +370,10 @@ export default function OperationsManifestRoute() {
 						await handleFlag(selected.id, reason, responsibleParty)
 					}
 					onMatch={async (shipmentId, reason) => {
+						if (selected.status !== "Pre-advice") {
+							toast.error("The shipment link is locked because this manifest has already been validated or flagged.");
+							return false;
+						}
 						const res = await http.post(`operations/manifests/match/`, {"manifest_id": selected.id, "shipment_id": shipmentId, "reason": reason});
 						const resp: Resp = res.data;
 						if (resp.error) {
@@ -1137,6 +1141,8 @@ function ManifestDetailDialog({
 }) {
 	const [shipmentQuery, setShipmentQuery] = useState(manifest.bl);
 	const [shipmentResults, setShipmentResults] = useState<any[]>([]);
+	const [matchSuggestions, setMatchSuggestions] = useState<any[]>([]);
+	const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 	const [shipmentId, setShipmentId] = useState("");
 	const [matchReason, setMatchReason] = useState("");
 	const [searchingShipments, setSearchingShipments] = useState(false);
@@ -1177,9 +1183,30 @@ function ManifestDetailDialog({
 		};
 	}, [shipmentQuery]);
 
-	const canValidate = manifest.status === "Pre-advice";
-	const canFlag =
-		manifest.status !== "Discrepancy" && manifest.status !== "Duplicate";
+	useEffect(() => {
+		let cancelled = false;
+		(async () => {
+			setLoadingSuggestions(true);
+			try {
+				const res = await http.post("operations/manifests/suggestions/", { manifest_id: manifest.id });
+				const resp: Resp = res.data;
+				if (!cancelled) setMatchSuggestions(resp.error ? [] : extractList<any>((resp.code as any)?.suggestions ?? resp.code));
+			} catch {
+				if (!cancelled) setMatchSuggestions([]);
+			} finally {
+				if (!cancelled) setLoadingSuggestions(false);
+			}
+		})();
+		return () => { cancelled = true; };
+	}, [manifest.id]);
+
+	const isShipmentLinked = Boolean(
+		(manifest.shipmentReference && manifest.shipmentReference.trim()) ||
+		(manifest.shipmentReferences && manifest.shipmentReferences.trim())
+	);
+	const canChangeLink = manifest.status === "Pre-advice";
+	const canValidate = canChangeLink && isShipmentLinked;
+	const canFlag = canChangeLink && isShipmentLinked;
 
 	const handleSendInvite = async () => {
 		if (!inviteEmail.trim()) {
@@ -1278,8 +1305,38 @@ function ManifestDetailDialog({
 						)}
 					</div>
 
+					<div className={cn(
+						"rounded-xl border p-4",
+						isShipmentLinked
+							? "border-teal/25 bg-teal/5"
+							: "border-orange/30 bg-orange/5"
+					)}>
+						<div className="flex items-start gap-3">
+							<span className={cn(
+								"grid size-9 shrink-0 place-items-center rounded-lg",
+								isShipmentLinked ? "bg-teal/10 text-teal-deep" : "bg-orange/10 text-orange-deep"
+							)}>
+								{isShipmentLinked ? <Check className="size-4" /> : <Info className="size-4" />}
+							</span>
+							<div className="min-w-0 flex-1">
+								<p className="text-sm font-semibold text-ink">
+									{isShipmentLinked ? "Shipment declaration linked" : "Step 1 of 2: Link a shipment declaration"}
+								</p>
+								<p className="mt-1 text-xs leading-5 text-ink-soft">
+									{isShipmentLinked
+										? `Linked shipment: ${manifest.shipmentReferences || manifest.shipmentReference}. You can now complete the checks and validate or flag this manifest if needed.`
+										: "You must link this manifest to the correct shipment declaration before you can validate it or flag it for review. Choose a suggested match or search for a declaration below."
+									}
+								</p>
+								{!isShipmentLinked && (
+									<p className="mt-2 text-[11px] font-medium text-orange-deep">Validation and flagging are locked until a shipment is linked.</p>
+								)}
+							</div>
+						</div>
+					</div>
+
 					<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
-						<p className="text-[12px] leading-6 text-ink-soft">{manifest.notes}</p>
+						<p className="text-[12px] leading-6 text-ink-soft">{manifest.notes || "No additional notes for this manifest."}</p>
 					</div>
 
 					<dl className="grid gap-4 sm:grid-cols-2">
@@ -1371,15 +1428,44 @@ function ManifestDetailDialog({
 						</div>
 					)}
 
-					<section className="space-y-3 rounded-xl bg-sand p-4 ring-1 ring-line">
+					{canChangeLink ? (
+<section className="space-y-3 rounded-xl bg-sand p-4 ring-1 ring-line">
 						<div>
 							<p className="text-[13px] font-semibold text-ink">
-								Shipment declaration matching
+								Step 1 · Link shipment declaration
 							</p>
 							<p className="mt-1 text-[11px] leading-5 text-ink-soft">
-								Search portal shipment declarations and link the correct
-								record. A bill-of-lading mismatch requires an explanation.
+								Select the declaration that belongs to this carrier manifest. Check the bill of lading and container numbers before confirming. A bill-of-lading mismatch requires an explanation.
 							</p>
+						</div>
+						<div className="rounded-lg border border-teal/25 bg-teal/5 p-3">
+							<div className="flex items-center justify-between gap-2">
+								<p className="text-xs font-semibold text-ink">Suggested shipment matches</p>
+								{loadingSuggestions && <Loader2 className="size-3.5 animate-spin text-ink-soft" />}
+							</div>
+							<p className="mt-1 text-[11px] leading-5 text-ink-soft">Suggestions are based on exact bill-of-lading and saved container-number matches. Nothing is linked until an operations user confirms it.</p>
+							{!loadingSuggestions && matchSuggestions.length === 0 && (
+								<p className="mt-2 text-[11px] text-ink-soft">No exact bill-of-lading or container matches found. Search manually below.</p>
+							)}
+							{matchSuggestions.length > 0 && (
+								<div className="mt-2 max-h-48 space-y-2 overflow-y-auto">
+									{matchSuggestions.map((s) => (
+										<div key={s.id} className={cn("rounded-lg border p-3", shipmentId === s.id ? "border-orange bg-orange/10" : "border-line bg-paper")}>
+											<div className="flex items-start justify-between gap-3">
+												<div className="min-w-0">
+													<p className="text-xs font-semibold text-ink">{s.shipment_reference || s.id}</p>
+													<p className="mt-1 text-[11px] text-ink-soft">BL: {s.bill_of_lading || "—"} · {s.consignee || "No consignee"}</p>
+													<p className="mt-1 text-[10px] text-ink-soft">{s.organisation_name || "No organisation"} · Score {s.match_score}%</p>
+													<p className="mt-1 text-[10px] text-teal-deep">{Array.isArray(s.match_reasons) ? s.match_reasons.join(" · ") : "Potential match — verify details"}</p>
+												</div>
+												<Button type="button" variant="outline" className={cn("shrink-0", shipmentId === s.id && "border-orange bg-orange/10 text-ink")} onClick={() => { setShipmentId(s.id); setShipmentQuery(s.shipment_reference || s.bill_of_lading || ""); }}>
+													{shipmentId === s.id ? "Selected" : "Review match"}
+												</Button>
+											</div>
+										</div>
+									))}
+								</div>
+							)}
 						</div>
 						<input
 							value={shipmentQuery}
@@ -1487,6 +1573,32 @@ function ManifestDetailDialog({
 							</Button>
 						</div>
 					</section>
+					) : (
+						<section className="rounded-xl border border-line bg-sand p-4">
+							<div className="flex items-start gap-3">
+								<span className="grid size-9 shrink-0 place-items-center rounded-lg bg-ink/5 text-ink-soft">
+									<ClipboardCheck className="size-4" />
+								</span>
+								<div className="min-w-0">
+									<p className="text-sm font-semibold text-ink">Shipment link is locked</p>
+									<p className="mt-1 text-xs leading-5 text-ink-soft">
+										{manifest.status === "Validated"
+											? "This manifest has been validated. The linked shipment cannot be changed."
+											: manifest.status === "Discrepancy"
+												? "This manifest has been flagged for review. Resolve the issue through the authorised review process before changing the shipment link."
+												: manifest.status === "Duplicate"
+													? "This manifest is marked as a duplicate. The shipment link cannot be changed until the duplicate is resolved."
+													: "This manifest has moved beyond the matching stage. The shipment link cannot be changed."}
+									</p>
+									{isShipmentLinked && (
+										<p className="mt-2 text-xs font-semibold text-ink">
+											Linked shipment: {manifest.shipmentReferences || manifest.shipmentReference}
+										</p>
+									)}
+								</div>
+							</div>
+						</section>
+					)}
 
 					<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
 						<div className="flex items-start gap-3">
@@ -1516,39 +1628,29 @@ function ManifestDetailDialog({
 						Close
 					</Button>
 					<div className="flex flex-wrap gap-2">
-						{canFlag && (
-							<Button
-								variant="outline"
-								onClick={() => {
-									setFlagReason("");
-									setResponsibleParty("");
-									setFlagDialogOpen(true);
-								}}
-								disabled={actioning}
-								className="border-line bg-paper text-coral hover:bg-coral/10"
-							>
-								{actioning ? (
-									<Loader2 className="mr-1.5 size-4 animate-spin" />
-								) : (
-									<AlertTriangle className="mr-1.5 size-4" />
-								)}
-								Flag for review
-							</Button>
-						)}
-						{canValidate && (
-							<Button
-								onClick={onValidate}
-								disabled={actioning}
-								className="bg-orange text-white hover:bg-orange-deep"
-							>
-								{actioning ? (
-									<Loader2 className="mr-1.5 size-4 animate-spin" />
-								) : (
-									<Check className="mr-1.5 size-4" />
-								)}
-								Mark as validated
-							</Button>
-						)}
+						<Button
+							variant="outline"
+							onClick={() => {
+								setFlagReason("");
+								setResponsibleParty("");
+								setFlagDialogOpen(true);
+							}}
+							disabled={!canFlag || actioning}
+							className="border-line bg-paper text-coral hover:bg-coral/10"
+							title={!isShipmentLinked ? "Link a shipment before flagging this manifest" : undefined}
+						>
+							{actioning ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <AlertTriangle className="mr-1.5 size-4" />}
+							Flag for review
+						</Button>
+						<Button
+							onClick={onValidate}
+							disabled={!canValidate || actioning}
+							className="bg-orange text-white hover:bg-orange-deep"
+							title={!isShipmentLinked ? "Link a shipment before validating this manifest" : undefined}
+						>
+							{actioning ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : <Check className="mr-1.5 size-4" />}
+							Mark as validated
+						</Button>
 					</div>
 				</div>
 			</div>

@@ -35,6 +35,16 @@ type ShipmentRecord = UnknownRecord & {
 	reference?: string;
 	reference_number?: string;
 	shipment_reference?: string;
+	manifest_id?: string | null;
+	manifest_reference?: string | null;
+	manifest_bill_of_lading?: string | null;
+	manifest_status?: string | null;
+	manifest_review_reason?: string | null;
+	manifest_review_responsible_party?: string | null;
+	manifest_flagged_at?: string | null;
+	manifest_action_status?: string;
+	manifest_requires_action?: boolean;
+	manifest_linked?: boolean;
 	created_at?: string;
 	submitted_at?: string;
 	createdAt?: string;
@@ -589,7 +599,7 @@ export default function PortalShipmentsPage() {
 					) : (
 						<>
 							<div className="overflow-x-auto">
-								<table className="w-full min-w-[1100px] text-left text-sm">
+								<table className="w-full min-w-[1250px] text-left text-sm">
 									<thead>
 										<tr className="border-b border-line bg-sand/40">
 											<th className="px-5 py-3.5 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-soft">
@@ -614,7 +624,10 @@ export default function PortalShipmentsPage() {
 												Status
 											</th>
 											<th className="px-5 py-3.5 text-right font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-soft">
-												Action
+												Manifest / next step
+							</th>
+							<th className="px-5 py-3.5 text-right font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-soft">
+								Action
 											</th>
 										</tr>
 									</thead>
@@ -771,7 +784,17 @@ export default function PortalShipmentsPage() {
 														</span>
 													</td>
 
-													<td className="px-5 py-4 text-right">
+													<td className="max-w-[280px] px-5 py-4">
+									<div className="space-y-1.5">
+										<span className={cn("inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold", statusTone(String(item.manifest_action_status ?? "No manifest linked")))}>
+											{String(item.manifest_action_status ?? (item.manifest_linked ? "Manifest linked" : "No manifest linked"))}
+										</span>
+										{item.manifest_reference && <p className="font-mono text-[10px] text-muted-foreground">Manifest: {String(item.manifest_reference)}</p>}
+										{item.manifest_requires_action && item.manifest_review_reason && <p className="max-w-[260px] whitespace-normal text-xs text-rose-700">{String(item.manifest_review_reason)}</p>}
+										{item.manifest_requires_action && <Button variant="outline" size="sm" className="mt-1 h-7 text-xs" onClick={() => navigate(`/portal/shipments/${item.id}`)}>Review shipment</Button>}
+									</div>
+								</td>
+								<td className="px-5 py-4 text-right">
 														<Button
 															variant="ghost"
 															size="sm"
