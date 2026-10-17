@@ -546,6 +546,16 @@ try {
         $documentInsert->bindValue(":file_size", $file["size"], PDO::PARAM_INT);
         $documentInsert->execute();
     }
+    $reviewStmt = $conn->prepare("
+        UPDATE operation_manifests
+        SET status = 'Review required'
+        WHERE matched_shipment_id = :shipment_id
+        AND status = 'Discrepancy'
+    ");
+
+    $reviewStmt->execute([
+        ":shipment_id" => $shipmentId
+    ]);
 
     $conn->commit();
     $transactionStarted = false;

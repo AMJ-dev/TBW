@@ -791,7 +791,7 @@ export default function PortalShipmentsPage() {
 										</span>
 										{item.manifest_reference && <p className="font-mono text-[10px] text-muted-foreground">Manifest: {String(item.manifest_reference)}</p>}
 										{item.manifest_requires_action && item.manifest_review_reason && <p className="max-w-[260px] whitespace-normal text-xs text-rose-700">{String(item.manifest_review_reason)}</p>}
-										{item.manifest_requires_action && <Button variant="outline" size="sm" className="mt-1 h-7 text-xs" onClick={() => navigate(`/portal/shipments/${item.id}`)}>Review shipment</Button>}
+										{item.manifest_requires_action && <Button variant="outline" size="sm" className="mt-1 h-7 text-xs" onClick={() => navigate(`/portal/shipment/edit/${item.id}`)}>Review shipment</Button>}
 									</div>
 								</td>
 								<td className="px-5 py-4 text-right">

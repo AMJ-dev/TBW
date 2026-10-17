@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 
 type ManifestStatus =
 	| "Pre-advice"
+	| "Review required"
 	| "Validated"
 	| "Received"
 	| "Discrepancy"
@@ -41,7 +42,7 @@ type ConsigneeType = "organisation" | "individual";
 
 type ConsigneeStatus = "linked" | "unregistered";
 
-type View = "list" | "intake";
+type View = "list" | "intake" | "detail";
 
 interface ManifestRecord {
 	id: string;
@@ -67,6 +68,7 @@ interface ManifestRecord {
 	notes: string;
 	shipmentReference?: string;
 	shipmentReferences?: string;
+	matchedShipmentId?: string | null;
 }
 
 interface RegisteredOrganisation {
@@ -102,12 +104,13 @@ interface ConsigneeValue {
 const statusFilters: (ManifestStatus | "all")[] = [
 	"all",
 	"Pre-advice",
+	"Review required",
 	"Validated",
 	"Received",
 	"Discrepancy",
 	"Duplicate",
 ];
-
+const formatStatus = (status: string) => status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 const labelClass =
 	"block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft";
 
@@ -138,6 +141,17 @@ const extractList = <T,>(payload: any): T[] => {
 	if (Array.isArray(payload?.data)) return payload.data as T[];
 	return [];
 };
+
+const pageAnimations = `
+	@keyframes slideInFromRight {
+		from { opacity: 0; transform: translateX(24px); }
+		to { opacity: 1; transform: translateX(0); }
+	}
+	@keyframes slideInFromLeft {
+		from { opacity: 0; transform: translateX(-24px); }
+		to { opacity: 1; transform: translateX(0); }
+	}
+`;
 
 export default function OperationsManifestRoute() {
 	const [manifests, setManifests] = useState<ManifestRecord[]>([]);
@@ -180,11 +194,12 @@ export default function OperationsManifestRoute() {
 					consigneeAddress: m.consignee_address ?? null,
 					agent: m.agent ?? "—",
 					source: (m.source ?? "Manual") as IntakeSource,
-					status: (m.status ?? "Pre-advice") as ManifestStatus,
+					status: (String(m.status ?? "Pre-advice").toLowerCase() === "review_required" || String(m.status ?? "").toLowerCase() === "review required" ? "Review required" : m.status ?? "Pre-advice") as ManifestStatus,
 					receivedAt: m.received_at ?? m.receivedAt ?? "—",
 					notes: m.notes ?? "",
 					shipmentReference: m.shipment_reference ?? "",
 					shipmentReferences: m.shipment_reference ?? m.shipment_bill_of_lading ?? "",
+					matchedShipmentId: m.matched_shipment_id ?? null,
 				}))
 			);
 		} catch (err: any) {
@@ -224,6 +239,16 @@ export default function OperationsManifestRoute() {
 		).length;
 		return { total, validated, received, flagged };
 	}, [manifests]);
+
+	const openManifest = (m: ManifestRecord) => {
+		setSelected(m);
+		setView("detail");
+	};
+
+	const closeManifest = () => {
+		setSelected(null);
+		setView("list");
+	};
 
 	const handleIntake = async (
 		next: ManifestRecord & { uploadToken?: string }
@@ -281,7 +306,7 @@ export default function OperationsManifestRoute() {
 		}
 	};
 
-	const handleFlag = async (id: string, reason: string, responsibleParty: "Organisation" | "Carrier" | "Operations" | "") => {
+	const handleFlag = async (id: string, reason: string, responsibleParty: "Organisation" | "Operations" | "") => {
 		setActioning(true);
 		try {
 			const res = await http.post(`operations/manifests/flag/${id}/`, {reason: reason.trim(), responsible_party: responsibleParty});
@@ -292,7 +317,6 @@ export default function OperationsManifestRoute() {
 			}
 			toast.success("Manifest flagged for review.");
 			await fetchManifests();
-			setSelected(null);
 			return true;
 		} catch (err: any) {
 			toast.error(err?.response?.data?.message || "Could not flag the manifest.");
@@ -330,8 +354,9 @@ export default function OperationsManifestRoute() {
 
 	return (
 		<AppShell title="Pre-advice & manifest intake" eyebrow="Operations · Inbound">
+			<style>{pageAnimations}</style>
 			<div className="overflow-hidden">
-				{view === "list" ? (
+				{view === "list" && (
 					<ListView
 						key="list"
 						manifests={manifests}
@@ -343,11 +368,13 @@ export default function OperationsManifestRoute() {
 						actioning={actioning}
 						onQueryChange={setQuery}
 						onStatusChange={setStatusFilter}
-						onSelect={setSelected}
+						onSelect={openManifest}
 						onNewIntake={() => setView("intake")}
 						onExport={handleExport}
 					/>
-				) : (
+				)}
+
+				{view === "intake" && (
 					<IntakeView
 						key="intake"
 						onCancel={() => setView("list")}
@@ -355,41 +382,48 @@ export default function OperationsManifestRoute() {
 						submitting={submitting}
 					/>
 				)}
-			</div>
 
-			{selected && (
-				<ManifestDetailDialog
-					manifest={selected}
-					actioning={actioning}
-					onClose={() => setSelected(null)}
-					onValidate={async () => {
-						await handleValidate(selected.id);
-						setSelected(null);
-					}}
-					onFlag={async (reason, responsibleParty) =>
-						await handleFlag(selected.id, reason, responsibleParty)
-					}
-					onMatch={async (shipmentId, reason) => {
-						if (selected.status !== "Pre-advice") {
-							toast.error("The shipment link is locked because this manifest has already been validated or flagged.");
-							return false;
+				{view === "detail" && selected && (
+					<ManifestDetailDialog
+						key={selected.id}
+						manifest={selected}
+						actioning={actioning}
+						onClose={closeManifest}
+						onValidate={async () => {
+							await handleValidate(selected.id);
+							await fetchManifests();
+							setSelected((current) => current ? { ...current, status: "Validated" } : current);
+						}}
+						onFlag={async (reason, responsibleParty) =>
+							await handleFlag(selected.id, reason, responsibleParty)
 						}
-						const res = await http.post(`operations/manifests/match/`, {"manifest_id": selected.id, "shipment_id": shipmentId, "reason": reason});
-						const resp: Resp = res.data;
-						if (resp.error) {
-							toast.error(resp.data || "Could not link shipment declaration.");
-							return false;
-						}
-						toast.success(resp.data || "Shipment declaration linked.");
-						await fetchManifests();
-						setSelected(null);
-						return true;
-					}}
-					onRefresh={async () => {
-						await fetchManifests();
-					}}
-				/>
-			)}
+						onMatch={async (shipmentId, reason) => {
+							if (selected.status !== "Pre-advice") {
+								toast.error("The shipment link can only be changed while the manifest is in Pre-advice.");
+								return false;
+							}
+							const res = await http.post(`operations/manifests/match/`, {"manifest_id": selected.id, "shipment_id": shipmentId, "reason": reason});
+							const resp: Resp = res.data;
+							if (resp.error) {
+								toast.error(resp.data || "Could not link shipment declaration.");
+								return false;
+							}
+							toast.success(resp.data || "Shipment declaration linked.");
+							await fetchManifests();
+							setSelected((current) => current ? {
+								...current,
+								matchedShipmentId: shipmentId,
+								shipmentReference: current.shipmentReference || shipmentId,
+								shipmentReferences: current.shipmentReferences || current.shipmentReference || shipmentId,
+							} : current);
+							return true;
+						}}
+						onRefresh={async () => {
+							await fetchManifests();
+						}}
+					/>
+				)}
+			</div>
 		</AppShell>
 	);
 }
@@ -428,17 +462,6 @@ function ListView({
 				animation: "slideInFromRight 260ms cubic-bezier(0.32, 0.72, 0, 1)",
 			}}
 		>
-			<style>{`
-				@keyframes slideInFromRight {
-					from { opacity: 0; transform: translateX(24px); }
-					to { opacity: 1; transform: translateX(0); }
-				}
-				@keyframes slideInFromLeft {
-					from { opacity: 0; transform: translateX(-24px); }
-					to { opacity: 1; transform: translateX(0); }
-				}
-			`}</style>
-
 			<div className="flex flex-wrap items-end justify-between gap-4">
 				<div>
 					<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">
@@ -618,7 +641,7 @@ function ListView({
 										</td>
 										<td className="px-4 py-3.5">
 											<StatusBadge
-												label={m.status}
+												label={formatStatus(m.status)}
 												tone={statusTone(m.status)}
 											/>
 										</td>
@@ -816,13 +839,6 @@ function IntakeView({
 				animation: "slideInFromLeft 260ms cubic-bezier(0.32, 0.72, 0, 1)",
 			}}
 		>
-			<style>{`
-				@keyframes slideInFromLeft {
-					from { opacity: 0; transform: translateX(-24px); }
-					to { opacity: 1; transform: translateX(0); }
-				}
-			`}</style>
-
 			<div className="flex flex-wrap items-center justify-between gap-3">
 				<Button
 					type="button"
@@ -1135,7 +1151,7 @@ function ManifestDetailDialog({
 	actioning: boolean;
 	onClose: () => void;
 	onValidate: () => Promise<void>;
-	onFlag: (reason: string, responsibleParty: "Organisation" | "Carrier" | "Operations" | "") => Promise<boolean>;
+	onFlag: (reason: string, responsibleParty: "Organisation" | "Operations" | "") => Promise<boolean>;
 	onMatch: (shipmentId: string, reason: string) => Promise<boolean>;
 	onRefresh: () => Promise<void>;
 }) {
@@ -1149,9 +1165,12 @@ function ManifestDetailDialog({
 	const [matchingShipment, setMatchingShipment] = useState(false);
 	const [flagDialogOpen, setFlagDialogOpen] = useState(false);
 	const [flagReason, setFlagReason] = useState("");
-	const [responsibleParty, setResponsibleParty] = useState<"" | "Organisation" | "Carrier" | "Operations">("");
+	const [responsibleParty, setResponsibleParty] = useState<"" | "Organisation" | "Operations">("");
 	const [submittingFlag, setSubmittingFlag] = useState(false);
 
+	const [linkedShipment, setLinkedShipment] = useState<any>(null);
+	const [loadingLinkedShipment, setLoadingLinkedShipment] = useState(false);
+	const [linkedShipmentError, setLinkedShipmentError] = useState("");
 	const [inviteEmail, setInviteEmail] = useState(manifest.consigneeEmail ?? "");
 	const [inviting, setInviting] = useState(false);
 
@@ -1205,8 +1224,36 @@ function ManifestDetailDialog({
 		(manifest.shipmentReferences && manifest.shipmentReferences.trim())
 	);
 	const canChangeLink = manifest.status === "Pre-advice";
-	const canValidate = canChangeLink && isShipmentLinked;
-	const canFlag = canChangeLink && isShipmentLinked;
+	const correctionSubmitted = manifest.status === "Review required";
+	const canValidate = isShipmentLinked && (canChangeLink || correctionSubmitted);
+	const canFlag = isShipmentLinked && (canChangeLink || correctionSubmitted);
+
+	useEffect(() => {
+		let cancelled = false;
+		if (!isShipmentLinked) {
+			setLinkedShipment(null);
+			setLinkedShipmentError("");
+			return;
+		}
+		(async () => {
+			setLoadingLinkedShipment(true);
+			setLinkedShipmentError("");
+			try {
+				if (!manifest.matchedShipmentId) {
+					throw new Error("The manifest is linked by reference, but the linked shipment ID was not returned. Include matched_shipment_id in the operations/manifests list response.");
+				}
+				const res = await http.get(`operations/shipments/review/details/${manifest.matchedShipmentId}/`);
+				const resp: Resp = res.data;
+				if (resp.error) throw new Error(String(resp.data || "Could not load linked shipment details."));
+				if (!cancelled) setLinkedShipment((resp.code as any)?.shipment ?? resp.code ?? null);
+			} catch (err: any) {
+				if (!cancelled) setLinkedShipmentError(err?.response?.data?.data || err?.message || "Could not load linked shipment details.");
+			} finally {
+				if (!cancelled) setLoadingLinkedShipment(false);
+			}
+		})();
+		return () => { cancelled = true; };
+	}, [manifest.id, manifest.matchedShipmentId, manifest.shipmentReference, manifest.shipmentReferences, isShipmentLinked]);
 
 	const handleSendInvite = async () => {
 		if (!inviteEmail.trim()) {
@@ -1257,10 +1304,24 @@ function ManifestDetailDialog({
 
 	return (
 		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 py-10 backdrop-blur-sm"
-			onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+			className="space-y-5 pb-24"
+			style={{
+				animation: "slideInFromRight 260ms cubic-bezier(0.32, 0.72, 0, 1)",
+			}}
 		>
-			<div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-paper shadow-2xl ring-1 ring-line">
+			<div className="flex flex-wrap items-center justify-between gap-3">
+				<Button
+					variant="ghost"
+					onClick={onClose}
+					disabled={actioning}
+					className="-ml-3 gap-2 text-ink-soft hover:text-ink"
+				>
+					<ArrowLeft className="size-4" />
+					Back to manifests
+				</Button>
+			</div>
+
+			<div className="rounded-2xl bg-paper shadow-sm ring-1 ring-line">
 				<div className="flex items-start justify-between border-b border-line p-5 sm:p-6">
 					<div className="min-w-0">
 						<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-deep">
@@ -1278,18 +1339,23 @@ function ManifestDetailDialog({
 						size="icon"
 						onClick={onClose}
 						disabled={actioning}
-						aria-label="Close dialog"
+						aria-label="Close manifest details"
 					>
 						<X />
 					</Button>
 				</div>
 
-				<div className="max-h-[70vh] space-y-4 overflow-y-auto p-5 sm:p-6">
+				<div className="space-y-4 p-5 sm:p-6">
 					<div className="flex flex-wrap items-center gap-2">
 						<StatusBadge
 							label={manifest.status}
 							tone={statusTone(manifest.status)}
 						/>
+						{correctionSubmitted && (
+							<span className="rounded bg-teal/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-teal-deep ring-1 ring-teal/25">
+								Organisation resubmitted · Review required
+							</span>
+						)}
 						<span className="rounded bg-sand px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-soft">
 							{manifest.source}
 						</span>
@@ -1334,6 +1400,40 @@ function ManifestDetailDialog({
 							</div>
 						</div>
 					</div>
+
+					{isShipmentLinked && (
+						<section className="space-y-4 rounded-xl border border-teal/25 bg-paper p-4 sm:p-5">
+							<div className="flex flex-wrap items-start justify-between gap-3">
+								<div>
+									<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-teal-deep">Linked declaration</p>
+									<h4 className="mt-1 text-base font-bold text-ink">{linkedShipment?.shipment_reference || manifest.shipmentReferences || manifest.shipmentReference}</h4>
+									<p className="mt-1 text-xs text-ink-soft">Review declaration fields, container seals and uploaded documents before validating or flagging.</p>
+								</div>
+								{loadingLinkedShipment && <Loader2 className="size-4 animate-spin text-teal-deep" />}
+							</div>
+							{linkedShipmentError ? (
+								<div className="rounded-lg border border-coral/20 bg-coral/5 p-3 text-xs text-coral">{linkedShipmentError} Ensure the operations linked-shipment details endpoint is configured.</div>
+							) : loadingLinkedShipment && !linkedShipment ? (
+								<p className="text-xs text-ink-soft">Loading shipment declaration, containers and documents…</p>
+							) : linkedShipment ? (
+								<>
+									<dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+										{[["Organisation", linkedShipment.organisation_name || linkedShipment.organisation?.name], ["Shipment status", formatStatus(linkedShipment.status)], ["Bill of lading", linkedShipment.bill_of_lading || linkedShipment.bl], ["Booking reference", linkedShipment.booking_reference], ["Vessel / voyage", [linkedShipment.vessel_name || linkedShipment.vessel, linkedShipment.voyage_number || linkedShipment.voyage].filter(Boolean).join(" / ")], ["Shipping line", linkedShipment.shipping_line], ["Origin", linkedShipment.origin_port || linkedShipment.origin], ["Destination", linkedShipment.destination_port || linkedShipment.destination], ["Expected arrival", linkedShipment.expected_arrival || linkedShipment.eta], ["Consignee", linkedShipment.consignee_name || linkedShipment.consignee], ["Consignee email", linkedShipment.consignee_email], ["Consignee phone", linkedShipment.consignee_phone], ["Cargo description", linkedShipment.cargo_description], ["Packages", linkedShipment.package_count ?? linkedShipment.packages], ["Gross weight", linkedShipment.gross_weight], ["Volume", linkedShipment.volume], ["HS code", linkedShipment.hs_code], ["Customs reference", linkedShipment.customs_reference]].filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== "").map(([label, value]) => (
+											<div key={String(label)} className="rounded-lg bg-sand/70 p-3"><dt className="text-[10px] uppercase tracking-wide text-ink-soft">{label}</dt><dd className="mt-1 break-words text-xs font-medium text-ink">{String(value)}</dd></div>
+										))}
+									</dl>
+									<div>
+										<h5 className="mb-2 text-xs font-bold text-ink">Containers and seal numbers</h5>
+										{(linkedShipment.containers || []).length ? <div className="overflow-x-auto rounded-lg border border-line"><table className="w-full text-left text-xs"><thead className="bg-sand text-ink-soft"><tr><th className="p-2.5">Container</th><th className="p-2.5">Size</th><th className="p-2.5">Seal no.</th><th className="p-2.5">Packages</th><th className="p-2.5">Gross weight</th></tr></thead><tbody>{linkedShipment.containers.map((c: any, i: number) => <tr key={c.id || c.container_no || i} className="border-t border-line"><td className="p-2.5 font-mono">{c.container_no || "—"}</td><td className="p-2.5">{c.size || c.container_size || "—"}</td><td className="p-2.5">{c.seal_no || "Not provided"}</td><td className="p-2.5">{c.package_count ?? "—"}</td><td className="p-2.5">{c.gross_weight ?? "—"}</td></tr>)}</tbody></table></div> : <p className="rounded-lg bg-sand p-3 text-xs text-ink-soft">No container rows were returned for this declaration.</p>}
+									</div>
+									<div>
+										<h5 className="mb-2 text-xs font-bold text-ink">Uploaded documents</h5>
+										{(linkedShipment.documents || []).length ? <div className="grid gap-2 sm:grid-cols-2">{linkedShipment.documents.map((doc: any, i: number) => <div key={doc.id || doc.file_path || i} className="flex items-start gap-3 rounded-lg border border-line p-3"><FileText className="mt-0.5 size-4 shrink-0 text-orange"/><div className="min-w-0 flex-1"><p className="break-words text-xs font-semibold text-ink">{doc.original_name || doc.document_type || `Document ${i + 1}`}</p><p className="mt-1 text-[10px] text-ink-soft">{doc.document_type || "Document"}{doc.file_size ? ` · ${Math.round(Number(doc.file_size) / 1024)} KB` : ""}{doc.uploaded_at ? ` · ${doc.uploaded_at}` : ""}</p>{(doc.url || doc.file_url || doc.file_path) && <a href={doc.url || doc.file_url || doc.file_path} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-semibold text-teal-deep underline">Open document</a>}</div></div>)}</div> : <p className="rounded-lg bg-sand p-3 text-xs text-ink-soft">No documents were returned for this declaration.</p>}
+									</div>
+								</>
+							) : null}
+						</section>
+					)}
 
 					<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
 						<p className="text-[12px] leading-6 text-ink-soft">{manifest.notes || "No additional notes for this manifest."}</p>
@@ -1429,7 +1529,7 @@ function ManifestDetailDialog({
 					)}
 
 					{canChangeLink ? (
-<section className="space-y-3 rounded-xl bg-sand p-4 ring-1 ring-line">
+					<section className="space-y-3 rounded-xl bg-sand p-4 ring-1 ring-line">
 						<div>
 							<p className="text-[13px] font-semibold text-ink">
 								Step 1 · Link shipment declaration
@@ -1689,8 +1789,8 @@ function ManifestDetailDialog({
 						</label>
 						<fieldset className="space-y-2">
 							<legend className={labelClass}>Who needs to act? <span className="normal-case tracking-normal">(optional)</span></legend>
-							<div className="grid gap-2 sm:grid-cols-3">
-								{(["Organisation", "Carrier", "Operations"] as const).map((party) => (
+							<div className="grid gap-2 sm:grid-cols-2">
+								{(["Organisation", "Operations"] as const).map((party) => (
 									<button key={party} type="button" onClick={() => setResponsibleParty(responsibleParty === party ? "" : party)} className={cn("rounded-lg border px-3 py-3 text-sm font-medium transition-colors", responsibleParty === party ? "border-orange bg-orange/10 text-orange-deep ring-1 ring-orange/30" : "border-line bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink")} aria-pressed={responsibleParty === party}>{party}</button>
 								))}
 							</div>

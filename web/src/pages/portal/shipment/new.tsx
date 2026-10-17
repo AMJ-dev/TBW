@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { http, type Resp } from "@/lib/httpClient";
+import { resolveSrc } from "@/lib/functions";
 
 type OptionRow = {
 	id: string;
@@ -94,11 +95,35 @@ type ContainerItem = {
 	grossWeight: string;
 };
 
-type ShipmentDocument = {
+type ShipmentDocument =
+	| {
+			kind: "existing";
+			id: string;
+			documentKey: string;
+			documentLabel: string;
+			originalName: string;
+			fileSize?: number | null;
+			filePath?: string;
+			keep: boolean;
+	  }
+	| {
+			kind: "new";
+			id: string;
+			file: File;
+			documentKey: string;
+			documentLabel: string;
+	  };
+
+type ExistingDocument = {
 	id: string;
-	file: File;
-	documentKey: string;
-	documentLabel: string;
+	document_type: string;
+	original_name: string;
+	stored_name?: string;
+	file_path?: string;
+	mime_type?: string | null;
+	file_size?: number | null;
+	uploaded_at?: string;
+	document_label?: string | null;
 };
 
 interface ExistingShipment {
@@ -137,6 +162,7 @@ interface ExistingShipment {
 		package_count?: number | string;
 		gross_weight?: number | string;
 	}>;
+	documents?: ExistingDocument[];
 }
 
 const inputClass =
@@ -163,6 +189,32 @@ const extractRecord = (raw: any): ExistingShipment | null => {
 	if (!raw || typeof raw !== "object") return null;
 	if (raw.shipment && typeof raw.shipment === "object") return raw.shipment;
 	return raw as ExistingShipment;
+};
+
+const normaliseKey = (s: string) =>
+	s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+
+const matchRequirementKey = (
+	docType: string,
+	docLabel: string | null | undefined,
+	requirements: DocumentRequirement[]
+): { key: string; label: string } => {
+	const candidates = [docLabel, docType].filter(Boolean) as string[];
+	for (const c of candidates) {
+		const norm = normaliseKey(c);
+		const hit = requirements.find(
+			(r) =>
+				normaliseKey(r.documentKey) === norm ||
+				normaliseKey(r.label) === norm ||
+				normaliseKey(r.documentKey).includes(norm) ||
+				norm.includes(normaliseKey(r.documentKey))
+		);
+		if (hit) return { key: hit.documentKey, label: hit.label };
+	}
+	return {
+		key: normaliseKey(docLabel || docType || "document"),
+		label: docLabel || docType || "Document",
+	};
 };
 
 export default function NewPortalShipmentPage() {
@@ -271,17 +323,20 @@ export default function NewPortalShipmentPage() {
 						(item) => item.label === current.packageType
 					)?.label ?? loaded.packagingTypes[0]?.label ?? "",
 			}));
+
+			return loaded;
 		} catch (err: any) {
 			setOptionsError(
 				err?.response?.data?.message ||
 					"Could not load shipment configuration."
 			);
+			return null;
 		} finally {
 			setLoadingOptions(false);
 		}
 	};
 
-	const fetchShipment = async (id: string) => {
+	const fetchShipment = async (id: string, loadedOptions?: ConfigOptions) => {
 		setLoadingShipment(true);
 		try {
 			const res = await http.get(`/portal/shipment/${id}/`);
@@ -313,7 +368,7 @@ export default function NewPortalShipmentPage() {
 				originCountry: String(record.origin_country ?? ""),
 				originPort: String(record.origin_port ?? ""),
 				destinationPort: String(record.destination_port ?? ""),
-				expectedArrival: String(record.expected_arrival ?? ""),
+				expectedArrival: String(record.expected_arrival ?? "").slice(0, 10),
 				consignee: String(record.consignee ?? ""),
 				consigneeEmail: String(record.consignee_email ?? ""),
 				consigneePhone: String(record.consignee_phone ?? ""),
@@ -352,6 +407,29 @@ export default function NewPortalShipmentPage() {
 					}))
 				);
 			}
+
+			if (Array.isArray(record.documents) && record.documents.length) {
+				const reqs = (loadedOptions ?? options).supportingDocuments;
+				setDocuments(
+					record.documents.map<ShipmentDocument>((doc:any) => {
+						const match = matchRequirementKey(
+							doc.document_type,
+							doc.document_label,
+							reqs
+						);
+						return {
+							kind: "existing",
+							id: doc.id,
+							documentKey: match.key,
+							documentLabel: match.label,
+							originalName: doc.original_name,
+							fileSize: doc.file_size ?? null,
+							filePath: doc.file_path,
+							keep: true,
+						};
+					})
+				);
+			}
 		} catch (err: any) {
 			toast.error(
 				err?.response?.data?.message || "Could not load this shipment."
@@ -362,7 +440,19 @@ export default function NewPortalShipmentPage() {
 	};
 
 	useEffect(() => {
-		void fetchOptions();
+		let cancelled = false;
+		const boot = async () => {
+			const loaded = await fetchOptions();
+			if (cancelled) return;
+			if (shipmentId) {
+				await fetchShipment(shipmentId, loaded ?? undefined);
+			}
+		};
+		void boot();
+		return () => {
+			cancelled = true;
+		};
+		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	useEffect(() => {
@@ -371,13 +461,6 @@ export default function NewPortalShipmentPage() {
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [routeId]);
-
-	useEffect(() => {
-		if (shipmentId) {
-			void fetchShipment(shipmentId);
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [shipmentId]);
 
 	const updateField = (name: string, value: string) => {
 		setForm((current) => ({ ...current, [name]: value }));
@@ -433,7 +516,9 @@ export default function NewPortalShipmentPage() {
 
 		setDocuments((current) => {
 			const existingForDoc = current.filter(
-				(item) => item.documentKey === requirement.documentKey
+				(item) =>
+					item.documentKey === requirement.documentKey &&
+					(item.kind === "new" || item.keep)
 			);
 
 			if (!requirement.allowMultiple && existingForDoc.length > 0) {
@@ -450,6 +535,7 @@ export default function NewPortalShipmentPage() {
 			return [
 				...current,
 				...toAdd.map((file) => ({
+					kind: "new" as const,
 					id: `${requirement.documentKey}-${file.name}-${file.size}-${file.lastModified}-${Math.random()}`,
 					file,
 					documentKey: requirement.documentKey,
@@ -461,12 +547,20 @@ export default function NewPortalShipmentPage() {
 
 	const removeDocument = (id: string) => {
 		setDocuments((current) =>
-			current.filter((document) => document.id !== id)
+			current.flatMap((document) => {
+				if (document.id !== id) return [document];
+				if (document.kind === "new") return [];
+				return [{ ...document, keep: false }];
+			})
 		);
 	};
 
 	const documentsForRequirement = (documentKey: string) =>
-		documents.filter((doc) => doc.documentKey === documentKey);
+		documents.filter(
+			(doc) =>
+				doc.documentKey === documentKey &&
+				(doc.kind === "new" || doc.keep)
+		);
 
 	const missingRequiredDocuments = () => {
 		return options.supportingDocuments
@@ -681,10 +775,22 @@ export default function NewPortalShipmentPage() {
 			)
 		);
 
+		const newDocuments = documents.filter(
+			(d): d is Extract<ShipmentDocument, { kind: "new" }> =>
+				d.kind === "new"
+		);
+
+		const keptExistingIds = documents
+			.filter(
+				(d): d is Extract<ShipmentDocument, { kind: "existing" }> =>
+					d.kind === "existing" && d.keep
+			)
+			.map((d) => d.id);
+
 		formData.append(
 			"documents",
 			JSON.stringify(
-				documents.map((document, index) => ({
+				newDocuments.map((document, index) => ({
 					name: document.file.name,
 					type: document.documentKey,
 					label: document.documentLabel,
@@ -694,13 +800,18 @@ export default function NewPortalShipmentPage() {
 			)
 		);
 
-		documents.forEach((document, index) => {
+		newDocuments.forEach((document, index) => {
 			formData.append(
 				`document_file_${index}`,
 				document.file,
 				document.file.name
 			);
 		});
+
+		formData.append(
+			"existing_document_ids",
+			JSON.stringify(keptExistingIds)
+		);
 
 		return formData;
 	};
@@ -709,7 +820,7 @@ export default function NewPortalShipmentPage() {
 		status: "draft" | "pending_review"
 	): Promise<string | null> => {
 		const endpoint = shipmentId
-			? `/portal/shipments/save/${shipmentId}/`
+			? `/portal/shipments/update/${shipmentId}/`
 			: "/portal/shipments/save/";
 
 		const res = await http.post(endpoint, buildFormData(status));
@@ -1123,12 +1234,7 @@ export default function NewPortalShipmentPage() {
 										Port of loading
 										<Input
 											value={form.originPort}
-											onChange={(event) =>
-												updateField(
-													"originPort",
-													event.target.value
-												)
-											}
+											onChange={(event) => updateField("originPort", event.target.value)}
 											placeholder="Origin port"
 											className="mt-1.5 h-11 border-line bg-sand text-ink"
 										/>
@@ -1138,12 +1244,7 @@ export default function NewPortalShipmentPage() {
 										Destination port
 										<Input
 											value={form.destinationPort}
-											onChange={(event) =>
-												updateField(
-													"destinationPort",
-													event.target.value
-												)
-											}
+											onChange={(event) => updateField("destinationPort", event.target.value)}
 											placeholder="Destination port"
 											className="mt-1.5 h-11 border-line bg-sand text-ink"
 										/>
@@ -1154,12 +1255,7 @@ export default function NewPortalShipmentPage() {
 										<Input
 											type="date"
 											value={form.expectedArrival}
-											onChange={(event) =>
-												updateField(
-													"expectedArrival",
-													event.target.value
-												)
-											}
+											onChange={(event) => updateField("expectedArrival", event.target.value)}
 											className="mt-1.5 h-11 border-line bg-sand font-mono text-ink"
 										/>
 									</label>
@@ -1749,41 +1845,81 @@ export default function NewPortalShipmentPage() {
 
 															{attached.length > 0 && (
 																<div className="mt-3 space-y-2">
-																	{attached.map((document) => (
-																		<div
-																			key={document.id}
-																			className="flex items-center gap-3 rounded-lg bg-paper p-2.5 ring-1 ring-line"
-																		>
-																			<div className="grid size-9 shrink-0 place-items-center rounded-md bg-orange/10 text-orange-deep">
-																				<FileText className="size-3.5" />
-																			</div>
-																			<div className="min-w-0 flex-1">
-																				<p className="truncate text-[12px] font-semibold text-ink">
-																					{document.file.name}
-																				</p>
-																				<p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">
-																					{document.documentLabel} ·{" "}
-																					{(
+																	{attached.map((document) => {
+																		const name =
+																			document.kind === "new"
+																				? document.file.name
+																				: document.originalName;
+																		const sizeLabel =
+																			document.kind === "new"
+																				? `${(
 																						document.file
 																							.size / 1024
-																					).toFixed(1)}{" "}
-																					KB
-																				</p>
-																			</div>
-																			<button
-																				type="button"
-																				onClick={() =>
-																					removeDocument(
-																						document.id
-																					)
-																				}
-																				aria-label="Remove document"
-																				className="grid size-8 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
+																				  ).toFixed(1)} KB`
+																				: document.fileSize != null
+																					? `${(
+																							document.fileSize /
+																							1024
+																					  ).toFixed(1)} KB`
+																					: "—";
+																		const isExisting =
+																			document.kind ===
+																			"existing";
+																		const href =
+																			isExisting &&
+																			document.filePath
+																				? resolveSrc(
+																						document.filePath
+																				  )
+																				: undefined;
+
+																		return (
+																			<div
+																				key={document.id}
+																				className="flex items-center gap-3 rounded-lg bg-paper p-2.5 ring-1 ring-line"
 																			>
-																				<X className="size-3.5" />
-																			</button>
-																		</div>
-																	))}
+																				<div className="grid size-9 shrink-0 place-items-center rounded-md bg-orange/10 text-orange-deep">
+																					<FileText className="size-3.5" />
+																				</div>
+																				<div className="min-w-0 flex-1">
+																					<p className="truncate text-[12px] font-semibold text-ink">
+																						{name}
+																					</p>
+																					<p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">
+																						{
+																							document.documentLabel
+																						}{" "}
+																						· {sizeLabel}
+																						{isExisting &&
+																							" · already uploaded"}
+																					</p>
+																				</div>
+																				{href && (
+																					<a
+																						href={href}
+																						target="_blank"
+																						rel="noopener noreferrer"
+																						className="grid size-8 shrink-0 place-items-center rounded-md text-orange-deep hover:bg-orange/10"
+																						aria-label={`Open ${name}`}
+																					>
+																						<FileText className="size-3.5" />
+																					</a>
+																				)}
+																				<button
+																					type="button"
+																					onClick={() =>
+																						removeDocument(
+																							document.id
+																						)
+																					}
+																					aria-label="Remove document"
+																					className="grid size-8 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
+																				>
+																					<X className="size-3.5" />
+																				</button>
+																			</div>
+																		);
+																	})}
 																</div>
 															)}
 														</div>
@@ -1876,7 +2012,12 @@ export default function NewPortalShipmentPage() {
 											},
 											{
 												label: "Documents attached",
-												value: String(documents.length),
+												value: String(
+													documents.filter(
+														(d) =>
+															d.kind === "new" || d.keep
+													).length
+												),
 											},
 										].map((item) => (
 											<div

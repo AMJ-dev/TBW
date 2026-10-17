@@ -135,7 +135,15 @@ const statusLabel = (status?: string | null): string => {
 	if (!status) return "Unknown";
 	return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 };
-
+const toDatetimeLocal = (value?: string | null): string => {
+	if (!value) return "";
+	const date = new Date(String(value).replace(" ", "T"));
+	if (Number.isNaN(date.getTime())) return "";
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+		date.getDate()
+	)}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
 const formatDate = (value?: string | null): string => {
 	if (!value) return "—";
 	const date = new Date(String(value).replace(" ", "T"));
@@ -341,10 +349,11 @@ export default function PortalShipmentDetailsPage() {
 	const documentCount = shipment.document_count ?? documents.length;
 	const manifest = shipment.manifest ?? null;
 	const manifestStatus = String(manifest?.status ?? "").toLowerCase();
-	const manifestNeedsAction =
-		manifestStatus === "discrepancy" ||
-		Boolean(manifest?.review_reason) ||
-		Boolean(manifest?.review_responsible_party);
+	const manifestNeedsAction = Boolean(manifest?.flagged_at) && String(manifest?.review_responsible_party ?? "").toLowerCase() === "organisation";
+	// const manifestNeedsAction =
+	// 	manifestStatus === "discrepancy" ||
+	// 	Boolean(manifest?.review_reason) ||
+	// 	Boolean(manifest?.review_responsible_party);
 
 	return (
 		<AppShell
