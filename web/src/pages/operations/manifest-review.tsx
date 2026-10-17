@@ -2,12 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   AlertTriangle,
+  ArrowLeft,
   CheckCircle2,
+  ChevronRight,
   FileText,
   RefreshCw,
   Search,
   Send,
   ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, StatusBadge, statusTone } from "@/components/auth-shell";
@@ -27,11 +30,6 @@ type Manifest = {
   containers: number;
   packages: number;
   gross_weight: string | null;
-  consignee: string;
-  agent: string | null;
-  consignee_email: string | null;
-  consignee_phone: string | null;
-  consignee_address: string | null;
   notes: string | null;
   status: string;
   review_reason: string | null;
@@ -50,11 +48,6 @@ type Draft = {
   containers: string;
   packages: string;
   gross_weight: string;
-  consignee: string;
-  agent: string;
-  consignee_email: string;
-  consignee_phone: string;
-  consignee_address: string;
   notes: string;
 };
 
@@ -68,11 +61,6 @@ const emptyDraft: Draft = {
   containers: "0",
   packages: "0",
   gross_weight: "",
-  consignee: "",
-  agent: "",
-  consignee_email: "",
-  consignee_phone: "",
-  consignee_address: "",
   notes: "",
 };
 
@@ -86,11 +74,6 @@ const toDraft = (manifest: Manifest): Draft => ({
   containers: String(manifest.containers ?? 0),
   packages: String(manifest.packages ?? 0),
   gross_weight: manifest.gross_weight ?? "",
-  consignee: manifest.consignee ?? "",
-  agent: manifest.agent ?? "",
-  consignee_email: manifest.consignee_email ?? "",
-  consignee_phone: manifest.consignee_phone ?? "",
-  consignee_address: manifest.consignee_address ?? "",
   notes: manifest.notes ?? "",
 });
 
@@ -117,17 +100,24 @@ const fieldGroups: {
       { name: "gross_weight", label: "Gross weight" },
     ],
   },
-  {
-    title: "Consignee and agent",
-    fields: [
-      { name: "consignee", label: "Consignee", required: true },
-      { name: "agent", label: "Licensed agent" },
-      { name: "consignee_email", label: "Consignee email" },
-      { name: "consignee_phone", label: "Consignee phone" },
-      { name: "consignee_address", label: "Consignee address" },
-    ],
-  },
 ];
+
+const pageAnimations = `
+  @keyframes slideInFromRight {
+    from { opacity: 0; transform: translateX(24px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes slideInFromLeft {
+    from { opacity: 0; transform: translateX(-24px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+`;
+
+type View = "list" | "detail";
 
 export default function ManifestSupervisorReviewPage() {
   const [manifests, setManifests] = useState<Manifest[]>([]);
@@ -137,6 +127,7 @@ export default function ManifestSupervisorReviewPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [view, setView] = useState<View>("list");
 
   const selected = useMemo(
     () => manifests.find((manifest) => manifest.id === selectedId) ?? null,
@@ -185,7 +176,7 @@ export default function ManifestSupervisorReviewPage() {
 
   useEffect(() => {
     void fetchManifests();
-  }, []);
+  }, [fetchManifests]);
 
   const filteredManifests = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -197,17 +188,30 @@ export default function ManifestSupervisorReviewPage() {
         manifest.manifest_ref,
         manifest.bill_of_lading,
         manifest.vessel,
-        manifest.consignee,
       ]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query)),
     );
   }, [manifests, search]);
 
-  const selectManifest = (manifest: Manifest) => {
+  const pendingCount = useMemo(
+    () =>
+      manifests.filter((m) => {
+        const s = (m.review_status ?? "pending").toLowerCase();
+        return s === "pending" || s === "flagged" || s === "under review";
+      }).length,
+    [manifests],
+  );
+
+  const openManifest = (manifest: Manifest) => {
     setSelectedId(manifest.id);
     setDraft(toDraft(manifest));
     setCorrectionReason(manifest.correction_reason ?? "");
+    setView("detail");
+  };
+
+  const closeManifest = () => {
+    setView("list");
   };
 
   const updateField = (name: keyof Draft, value: string) => {
@@ -225,12 +229,8 @@ export default function ManifestSupervisorReviewPage() {
       return;
     }
 
-    if (
-      !draft.manifest_ref.trim() ||
-      !draft.bill_of_lading.trim() ||
-      !draft.consignee.trim()
-    ) {
-      toast.error("Manifest reference, bill of lading and consignee are required.");
+    if (!draft.manifest_ref.trim() || !draft.bill_of_lading.trim()) {
+      toast.error("Manifest reference and bill of lading are required.");
       return;
     }
 
@@ -271,6 +271,7 @@ export default function ManifestSupervisorReviewPage() {
       );
 
       await fetchManifests();
+      setView("list");
     } catch (error: any) {
       toast.error(
         error?.response?.data?.data ||
@@ -284,281 +285,488 @@ export default function ManifestSupervisorReviewPage() {
 
   return (
     <AppShell title="Manifest Review" eyebrow="Operations">
-      <div className="mx-auto w-full max-w-[1600px] space-y-6 p-4 sm:p-6 lg:p-8">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center"
-        >
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
-              <ShieldCheck className="h-4 w-4" />
-              Operations / Supervisor review
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              Manifest review
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Verify flagged manifest details, document corrections, and approve
-              or return the record to Operations.
-            </p>
-          </div>
+      <style>{pageAnimations}</style>
+      <div className="relative mx-auto w-full max-w-[1400px] space-y-6 p-4 sm:p-6 lg:p-8">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-72 bg-gradient-to-b from-orange/5 via-transparent to-transparent"
+        />
 
-          <Button
-            variant="outline"
-            onClick={() => void fetchManifests(selectedId)}
-            disabled={loading || saving}
+        {view === "list" && (
+          <div
+            className="space-y-6"
+            style={{
+              animation: "slideInFromRight 260ms cubic-bezier(0.32, 0.72, 0, 1)",
+            }}
           >
-            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} />
-            Refresh queue
-          </Button>
-        </motion.div>
-
-        <div className="grid gap-5 xl:grid-cols-[340px_minmax(0,1fr)]">
-          <section className="overflow-hidden rounded-2xl border bg-card">
-            <div className="border-b p-4">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold">Review queue</h2>
-                <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium">
-                  {manifests.length}
-                </span>
-              </div>
-
-              <div className="relative mt-4">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search manifests..."
-                  className="pl-9"
-                />
-              </div>
-            </div>
-
-            <div className="max-h-[720px] space-y-2 overflow-y-auto p-3">
-              {loading ? (
-                <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Loading review queue...
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end"
+            >
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-2 rounded-full border border-orange/20 bg-orange/5 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-orange-deep">
+                  <ShieldCheck className="h-3 w-3" />
+                  Supervisor review
                 </div>
-              ) : filteredManifests.length === 0 ? (
-                <div className="px-4 py-12 text-center">
-                  <CheckCircle2 className="mx-auto h-8 w-8 text-muted-foreground" />
-                  <p className="mt-3 font-medium">No manifests found</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    There are no matching Operations reviews.
-                  </p>
-                </div>
-              ) : (
-                filteredManifests.map((manifest) => (
-                  <button
-                    key={manifest.id}
-                    type="button"
-                    onClick={() => selectManifest(manifest)}
-                    className={cn(
-                      "w-full rounded-xl border p-4 text-left transition-colors",
-                      selectedId === manifest.id
-                        ? "border-primary bg-primary/5"
-                        : "border-transparent bg-muted/40 hover:border-border hover:bg-muted",
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold">
-                          {manifest.manifest_ref}
-                        </p>
-                        <p className="mt-1 truncate text-sm text-muted-foreground">
-                          {manifest.bill_of_lading}
-                        </p>
-                      </div>
-                      <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    </div>
-                    <p className="mt-3 truncate text-sm">
-                      {manifest.consignee}
-                    </p>
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <StatusBadge
-                        label={manifest.review_status ?? "Pending"}
-                        tone={statusTone(manifest.review_status ?? "Pending")}
-                      />
-                      <span className="text-xs text-muted-foreground">
-                        {manifest.flagged_at ?? "Flagged"}
-                      </span>
-                    </div>
-                  </button>
-                ))
-              )}
-            </div>
-          </section>
 
-          <section className="min-w-0 space-y-5">
-            {!selected ? (
-              <div className="flex min-h-80 flex-col items-center justify-center rounded-2xl border border-dashed p-8 text-center">
-                <FileText className="h-10 w-10 text-muted-foreground" />
-                <h2 className="mt-4 font-semibold">Select a manifest</h2>
-                <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-                  Choose a record from the queue to inspect and correct its details.
+                <h1 className="mt-4 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+                  Manifest review
+                </h1>
+
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+                  Verify flagged manifest details, document corrections, and
+                  approve or return the record to Operations.
                 </p>
               </div>
-            ) : (
-              <>
-                <div className="rounded-2xl border bg-card p-5 sm:p-6">
-                  <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        Selected manifest
-                      </p>
-                      <h2 className="mt-1 break-words text-xl font-semibold">
-                        {selected.manifest_ref}
-                      </h2>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Bill of lading: {selected.bill_of_lading}
-                      </p>
-                    </div>
-                    <StatusBadge
-                      label={selected.status || "Unknown"}
-                      tone={statusTone(selected.status || "Unknown")}
-                    />
-                  </div>
 
-                  <div className="mt-5 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-                      <div>
-                        <p className="font-medium">Reason flagged for review</p>
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
-                          {selected.review_reason || "No reason was supplied."}
-                        </p>
-                      </div>
-                    </div>
+              <Button
+                variant="outline"
+                onClick={() => void fetchManifests(selectedId)}
+                disabled={loading || saving}
+                className="self-start border-line bg-paper text-ink shadow-sm hover:bg-sand"
+              >
+                <RefreshCw
+                  className={cn("mr-2 h-4 w-4", loading && "animate-spin")}
+                />
+                Refresh queue
+              </Button>
+            </motion.div>
+
+            <div className="grid gap-4 sm:grid-cols-3">
+              <StatTile
+                label="In queue"
+                value={String(manifests.length)}
+                detail="Flagged for supervisor review"
+                icon={FileText}
+                tone="info"
+              />
+              <StatTile
+                label="Awaiting decision"
+                value={String(pendingCount)}
+                detail="Pending action from you"
+                icon={AlertTriangle}
+                tone="warning"
+              />
+              <StatTile
+                label="Reviewed today"
+                value={String(
+                  manifests.filter((m) => {
+                    const s = (m.review_status ?? "").toLowerCase();
+                    return s === "approved" || s === "returned";
+                  }).length,
+                )}
+                detail="Approved or returned"
+                icon={CheckCircle2}
+                tone="success"
+              />
+            </div>
+
+            <section className="overflow-hidden rounded-2xl border border-line bg-paper shadow-sm ring-1 ring-black/[0.02]">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-gradient-to-r from-paper to-sand/30 px-5 py-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="grid size-8 place-items-center rounded-lg bg-orange/10 text-orange-deep">
+                    <Sparkles className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <h2 className="text-[13px] font-semibold text-ink">
+                      Review queue
+                    </h2>
+                    <p className="text-[11px] text-ink-soft">
+                      {filteredManifests.length} of {manifests.length} records
+                    </p>
                   </div>
                 </div>
 
-                <div className="rounded-2xl border bg-card p-5 sm:p-6">
-                  <div className="mb-5">
-                    <h2 className="text-lg font-semibold">Manifest details</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Edit incorrect information before approving. Required fields
-                      are marked.
+                <div className="relative w-full sm:w-[320px]">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-soft" />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search by ref, BL or vessel…"
+                    className="h-10 border-line bg-sand pl-9 text-sm text-ink placeholder:text-ink-soft/70 focus:ring-2 focus:ring-orange/30"
+                  />
+                </div>
+              </div>
+
+              <div className="divide-y divide-line">
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center gap-3 py-16">
+                    <RefreshCw className="h-5 w-5 animate-spin text-orange" />
+                    <p className="text-sm text-ink-soft">Loading review queue…</p>
+                  </div>
+                ) : filteredManifests.length === 0 ? (
+                  <div className="px-4 py-16 text-center">
+                    <div className="mx-auto grid size-12 place-items-center rounded-xl bg-teal/10 text-teal-deep">
+                      <CheckCircle2 className="h-6 w-6" />
+                    </div>
+                    <p className="mt-4 text-sm font-semibold text-ink">
+                      Nothing to review
+                    </p>
+                    <p className="mt-1 text-xs text-ink-soft">
+                      There are no matching Operations reviews right now.
+                    </p>
+                  </div>
+                ) : (
+                  filteredManifests.map((manifest) => (
+                    <button
+                      key={manifest.id}
+                      type="button"
+                      onClick={() => openManifest(manifest)}
+                      className="group flex w-full items-start gap-4 px-5 py-4 text-left transition-colors hover:bg-sand/60 focus:outline-none focus-visible:bg-sand/80"
+                    >
+                      <span className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl bg-orange/10 text-orange-deep ring-1 ring-orange/15 transition group-hover:bg-orange group-hover:text-white">
+                        <FileText className="h-4 w-4" />
+                      </span>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                          <p className="truncate font-mono text-[13px] font-semibold text-ink">
+                            {manifest.manifest_ref}
+                          </p>
+                          <StatusBadge
+                            label={manifest.review_status ?? "Pending"}
+                            tone={statusTone(manifest.review_status ?? "Pending")}
+                          />
+                        </div>
+
+                        <p className="mt-1 truncate font-mono text-[11px] uppercase tracking-[0.08em] text-ink-soft">
+                          BL · {manifest.bill_of_lading}
+                        </p>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-ink-soft">
+                          {manifest.vessel && (
+                            <span className="truncate">
+                              <span className="font-mono uppercase tracking-[0.08em] text-ink-soft/70">
+                                Vessel
+                              </span>{" "}
+                              {manifest.vessel}
+                            </span>
+                          )}
+                          {manifest.shipping_line && (
+                            <span className="truncate">
+                              <span className="font-mono uppercase tracking-[0.08em] text-ink-soft/70">
+                                Line
+                              </span>{" "}
+                              {manifest.shipping_line}
+                            </span>
+                          )}
+                          {manifest.flagged_at && (
+                            <span className="truncate">
+                              <span className="font-mono uppercase tracking-[0.08em] text-ink-soft/70">
+                                Flagged
+                              </span>{" "}
+                              {manifest.flagged_at}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-ink-soft transition-transform group-hover:translate-x-0.5 group-hover:text-orange-deep" />
+                    </button>
+                  ))
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {view === "detail" && selected && (
+          <div
+            key={selected.id}
+            className="space-y-5"
+            style={{
+              animation: "slideInFromRight 260ms cubic-bezier(0.32, 0.72, 0, 1)",
+            }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Button
+                variant="ghost"
+                onClick={closeManifest}
+                disabled={saving}
+                className="-ml-3 gap-2 text-ink-soft hover:bg-sand hover:text-ink"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to review queue
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => void fetchManifests(selectedId)}
+                disabled={loading || saving}
+                className="border-line bg-paper text-ink shadow-sm hover:bg-sand"
+              >
+                <RefreshCw
+                  className={cn("mr-2 h-4 w-4", loading && "animate-spin")}
+                />
+                Refresh
+              </Button>
+            </div>
+
+            <div className="relative overflow-hidden rounded-2xl border border-line bg-slate text-sand shadow-lg ring-1 ring-black/5">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-orange/20 blur-3xl"
+              />
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute -left-24 bottom-0 size-56 rounded-full bg-carmine/15 blur-3xl"
+              />
+
+              <div className="relative p-5 sm:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
+                      Selected manifest
+                    </p>
+
+                    <h2 className="mt-2 break-words font-display text-2xl font-bold tracking-tight text-sand sm:text-3xl">
+                      {selected.manifest_ref}
+                    </h2>
+
+                    <p className="mt-2 font-mono text-[11px] uppercase tracking-[0.1em] text-sand/60">
+                      BL · {selected.bill_of_lading}
                     </p>
                   </div>
 
-                  <div className="space-y-7">
-                    {fieldGroups.map((group) => (
-                      <div key={group.title}>
-                        <h3 className="mb-4 text-sm font-semibold">
-                          {group.title}
-                        </h3>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          {group.fields.map((field) => (
-                            <label
-                              key={field.name}
-                              className={cn(
-                                "block space-y-2",
-                                field.name === "consignee_address" && "sm:col-span-2",
-                              )}
-                            >
-                              <span className="text-sm font-medium">
-                                {field.label}
-                                {field.required && (
-                                  <span className="ml-1 text-destructive">*</span>
-                                )}
-                              </span>
-                              <Input
-                                value={draft[field.name]}
-                                onChange={(event) =>
-                                  updateField(field.name, event.target.value)
-                                }
-                                required={field.required}
-                                type={
-                                  field.name === "consignee_email"
-                                    ? "email"
-                                    : "text"
-                                }
-                                inputMode={
-                                  field.name === "containers" ||
-                                  field.name === "packages"
-                                    ? "numeric"
-                                    : undefined
-                                }
-                                disabled={saving}
-                              />
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+                  <StatusBadge
+                    label={selected.status || "Unknown"}
+                    tone={statusTone(selected.status || "Unknown")}
+                  />
+                </div>
 
-                    <div>
-                      <label className="mb-2 block text-sm font-medium">
-                        Internal notes
-                      </label>
-                      <textarea
-                        value={draft.notes}
-                        onChange={(event) =>
-                          updateField("notes", event.target.value)
-                        }
-                        disabled={saving}
-                        rows={3}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        placeholder="Additional manifest notes..."
-                      />
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <HeroStat
+                    label="Vessel"
+                    value={selected.vessel || "—"}
+                  />
+                  <HeroStat
+                    label="Shipping line"
+                    value={selected.shipping_line || "—"}
+                  />
+                  <HeroStat
+                    label="Flagged"
+                    value={selected.flagged_at || "—"}
+                    mono
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-amber/30 bg-amber/5 p-5 ring-1 ring-amber/20 sm:p-6">
+              <div className="flex items-start gap-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-amber/15 text-orange-deep">
+                  <AlertTriangle className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange-deep">
+                    Reason flagged for review
+                  </p>
+                  <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-ink">
+                    {selected.review_reason || "No reason was supplied."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-line bg-paper shadow-sm ring-1 ring-black/[0.02]">
+              <div className="border-b border-line bg-gradient-to-r from-paper to-sand/30 p-5 sm:p-6">
+                <h2 className="text-base font-semibold text-ink">
+                  Manifest details
+                </h2>
+                <p className="mt-1 text-[12px] text-ink-soft">
+                  Edit incorrect information before approving. Required fields
+                  are marked.
+                </p>
+              </div>
+
+              <div className="space-y-7 p-5 sm:p-6">
+                {fieldGroups.map((group) => (
+                  <div key={group.title}>
+                    <div className="mb-4 flex items-center gap-2">
+                      <span className="h-px flex-1 bg-line" />
+                      <h3 className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+                        {group.title}
+                      </h3>
+                      <span className="h-px flex-1 bg-line" />
                     </div>
 
-                    <div className="rounded-xl border p-4">
-                      <label className="mb-2 block text-sm font-semibold">
-                        Correction / decision reason
-                        <span className="ml-1 text-destructive">*</span>
-                      </label>
-                      <textarea
-                        value={correctionReason}
-                        onChange={(event) =>
-                          setCorrectionReason(event.target.value)
-                        }
-                        disabled={saving}
-                        required
-                        minLength={5}
-                        maxLength={2000}
-                        rows={4}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        placeholder="Explain what was corrected and why, or what Operations must do next..."
-                      />
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {correctionReason.length}/2000 characters. This reason is
-                        saved by the server with the decision.
-                      </p>
-                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {group.fields.map((field) => (
+                        <label key={field.name} className="block space-y-2">
+                          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+                            {field.label}
+                            {field.required && (
+                              <span className="ml-1 text-coral">*</span>
+                            )}
+                          </span>
 
-                    <div className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => void submitDecision("return")}
-                        disabled={saving}
-                      >
-                        <Send className="mr-2 h-4 w-4" />
-                        Return to Operations
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => void submitDecision("approve")}
-                        disabled={saving}
-                      >
-                        {saving ? (
-                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                        )}
-                        {saving ? "Processing..." : "Approve Manifest"}
-                      </Button>
+                          <Input
+                            value={draft[field.name]}
+                            onChange={(event) =>
+                              updateField(field.name, event.target.value)
+                            }
+                            required={field.required}
+                            inputMode={
+                              field.name === "containers" ||
+                              field.name === "packages"
+                                ? "numeric"
+                                : undefined
+                            }
+                            disabled={saving}
+                            className="h-11 border-line bg-sand font-medium text-ink placeholder:text-ink-soft/60 focus:ring-2 focus:ring-orange/30"
+                          />
+                        </label>
+                      ))}
                     </div>
                   </div>
+                ))}
+
+                <div>
+                  <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+                    Internal notes
+                  </label>
+
+                  <textarea
+                    value={draft.notes}
+                    onChange={(event) =>
+                      updateField("notes", event.target.value)
+                    }
+                    disabled={saving}
+                    rows={3}
+                    className="w-full resize-y rounded-md border border-line bg-sand px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-soft/60 focus:ring-2 focus:ring-orange/30"
+                    placeholder="Additional manifest notes…"
+                  />
                 </div>
-              </>
-            )}
-          </section>
-        </div>
+
+                <div className="rounded-xl border border-line bg-sand/40 p-4 sm:p-5">
+                  <label className="mb-2 block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+                    Correction / decision reason
+                    <span className="ml-1 text-coral">*</span>
+                  </label>
+
+                  <textarea
+                    value={correctionReason}
+                    onChange={(event) =>
+                      setCorrectionReason(event.target.value)
+                    }
+                    disabled={saving}
+                    required
+                    minLength={5}
+                    maxLength={2000}
+                    rows={4}
+                    className="w-full resize-y rounded-md border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-soft/60 focus:ring-2 focus:ring-orange/30"
+                    placeholder="Explain what was corrected and why, or what Operations must do next…"
+                  />
+
+                  <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-soft">
+                    {correctionReason.length}/2000 · saved with the decision
+                  </p>
+                </div>
+
+                <div className="flex flex-col-reverse gap-3 border-t border-line pt-5 sm:flex-row sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void submitDecision("return")}
+                    disabled={saving}
+                    className="border-line bg-paper text-ink hover:bg-sand"
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    Return to Operations
+                  </Button>
+
+                  <Button
+                    type="button"
+                    onClick={() => void submitDecision("approve")}
+                    disabled={saving}
+                    className="bg-orange text-white shadow-sm hover:bg-orange-deep"
+                  >
+                    {saving ? (
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                    )}
+
+                    {saving ? "Processing…" : "Approve Manifest"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  detail,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  icon: typeof FileText;
+  tone: "info" | "warning" | "success";
+}) {
+  const toneClass =
+    tone === "success"
+      ? "bg-teal/10 text-teal-deep ring-teal/20"
+      : tone === "warning"
+        ? "bg-amber/15 text-orange-deep ring-amber/25"
+        : "bg-orange/10 text-orange-deep ring-orange/20";
+
+  return (
+    <div className="group relative overflow-hidden rounded-2xl border border-line bg-paper p-5 shadow-sm ring-1 ring-black/[0.02] transition hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+            {label}
+          </p>
+          <p className="mt-2 font-display text-2xl font-bold tracking-tight text-ink">
+            {value}
+          </p>
+          <p className="mt-1 text-[11px] text-ink-soft">{detail}</p>
+        </div>
+        <span
+          className={cn(
+            "grid size-10 shrink-0 place-items-center rounded-xl ring-1",
+            toneClass,
+          )}
+        >
+          <Icon className="h-5 w-5" />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function HeroStat({
+  label,
+  value,
+  mono,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="rounded-xl border border-sand/10 bg-sand/[0.04] p-3 backdrop-blur-sm">
+      <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-sand/50">
+        {label}
+      </p>
+      <p
+        className={cn(
+          "mt-1.5 truncate text-[13px] font-semibold text-sand",
+          mono && "font-mono",
+        )}
+      >
+        {value}
+      </p>
+    </div>
   );
 }
