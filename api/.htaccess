@@ -152,3 +152,9 @@ RewriteRule ^driver/unassign/$ src/drivers/unassign.php [NC]
 RewriteRule ^drivers/assignments/$ src/drivers/assignments.php [NC]
 RewriteRule ^driver/([0-9a-zA-Z-]+)/$ src/drivers/get.php?id=$1 [NC]
 RewriteRule ^driver/update/([0-9a-zA-Z-]+)/$ src/drivers/update.php?id=$1 [NC]
+
+
+RewriteRule ^appointments/$ src/appointments/all.php [NC]
+RewriteRule ^appointments/add/$ src/appointments/add.php [NC]
+
+

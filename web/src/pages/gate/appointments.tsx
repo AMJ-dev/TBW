@@ -1,204 +1,381 @@
-import { useMemo, useState } from "react";
-import { toast } from "sonner";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
 	Calendar,
 	CheckCircle2,
 	Clock,
 	Download,
 	Filter,
+	LoaderCircle,
 	Plus,
+	RefreshCw,
 	Search,
 	Truck,
-	X,
 } from "lucide-react";
-import { AppShell, StatusBadge, statusTone, Metric } from "@/components/auth-shell";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import {
+	AppShell,
+	StatusBadge,
+	statusTone,
+	Metric,
+} from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { http, type Resp } from "@/lib/httpClient";
+
+type AppointmentStatus =
+	| "Confirmed"
+	| "Arrived"
+	| "In Terminal"
+	| "Completed"
+	| "Missed"
+	| "Cancelled";
 
 interface AppointmentRecord {
 	id: string;
+	appointmentDate: string;
 	slotTime: string;
 	truckNo: string;
 	driverName: string;
 	driverPhone: string;
-	containerNo: string;
+	containerNos: string[];
 	cargoRef: string;
-	status: "Confirmed" | "Arrived" | "In Terminal" | "Completed" | "Missed";
+	status: AppointmentStatus;
 	lane: string;
 }
 
-const initialAppointments: AppointmentRecord[] = [
-	{
-		id: "apt-1",
-		slotTime: "10:00 – 11:00",
-		truckNo: "KJA-882-XD",
-		driverName: "Babatunde Alao",
-		driverPhone: "+234 803 112 3456",
-		containerNo: "TRIU1234564",
-		cargoRef: "TRN-IMP-002481",
-		status: "Arrived",
-		lane: "Gate Lane 01",
-	},
-	{
-		id: "apt-2",
-		slotTime: "10:30 – 11:30",
-		truckNo: "LSR-441-YY",
-		driverName: "Emeka Okoro",
-		driverPhone: "+234 802 987 6543",
-		containerNo: "MSCU9876540",
-		cargoRef: "TRN-IMP-002482",
-		status: "Confirmed",
-		lane: "Gate Lane 02",
-	},
-	{
-		id: "apt-3",
-		slotTime: "11:00 – 12:00",
-		truckNo: "ABJ-220-ZZ",
-		driverName: "Suleiman Bello",
-		driverPhone: "+234 814 332 1199",
-		containerNo: "CMAU5544335",
-		cargoRef: "TRN-IMP-002483",
-		status: "Confirmed",
-		lane: "Gate Lane 01",
-	},
-	{
-		id: "apt-4",
-		slotTime: "08:30 – 09:30",
-		truckNo: "KTN-773-AA",
-		driverName: "Yakubu Garba",
-		driverPhone: "+234 805 441 2288",
-		containerNo: "HLCU1122338",
-		cargoRef: "TRN-IMP-002484",
-		status: "Completed",
-		lane: "Gate Lane 02",
-	},
-	{
-		id: "apt-5",
-		slotTime: "09:00 – 10:00",
-		truckNo: "EKY-904-BB",
-		driverName: "Femi Daniel",
-		driverPhone: "+234 816 778 9900",
-		containerNo: "ONEU9988774",
-		cargoRef: "TRN-IMP-002485",
-		status: "Missed",
-		lane: "Gate Lane 01",
-	},
-];
+interface ApiAppointment {
+	id?: string | number;
+	appointment_id?: string | number;
+	appointment_date?: string;
+	date?: string;
+	slot_time?: string;
+	slotTime?: string;
+	vehicle_plate?: string;
+	truck_no?: string;
+	plate?: string;
+	driver_name?: string;
+	driverName?: string;
+	driver_phone?: string;
+	driverPhone?: string;
+	container_nos?: string[] | string;
+	container_no?: string;
+	containerNos?: string[];
+	cargo_ref?: string;
+	cargo_reference?: string;
+	status?: string;
+	lane?: string;
+	assigned_lane?: string;
+}
+
+function extractList<T>(response: Resp): T[] {
+	const payload = response.code ?? response.data;
+
+	if (Array.isArray(payload)) {
+		return payload as T[];
+	}
+
+	if (payload && typeof payload === "object") {
+		const record = payload as Record<string, unknown>;
+
+		for (const key of ["appointments", "results", "items", "data"]) {
+			if (Array.isArray(record[key])) {
+				return record[key] as T[];
+			}
+		}
+	}
+
+	return [];
+}
+
+function normalizeStatus(value?: string): AppointmentStatus {
+	const status = (value ?? "").trim().toLowerCase().replace(/_/g, " ");
+
+	const statuses: Record<string, AppointmentStatus> = {
+		confirmed: "Confirmed",
+		arrived: "Arrived",
+		"in terminal": "In Terminal",
+		completed: "Completed",
+		missed: "Missed",
+		cancelled: "Cancelled",
+		canceled: "Cancelled",
+	};
+
+	return statuses[status] ?? "Confirmed";
+}
+
+function normalizeAppointment(item: ApiAppointment): AppointmentRecord {
+	const rawContainers =
+		item.container_nos ?? item.containerNos ?? item.container_no ?? [];
+
+	const containerNos = Array.isArray(rawContainers)
+		? rawContainers.map(String).filter(Boolean)
+		: String(rawContainers)
+				.split(",")
+				.map((value) => value.trim())
+				.filter(Boolean);
+
+	return {
+		id: String(item.id ?? item.appointment_id ?? ""),
+		appointmentDate: String(item.appointment_date ?? item.date ?? ""),
+		slotTime: String(item.slot_time ?? item.slotTime ?? ""),
+		truckNo: String(
+			item.vehicle_plate ?? item.truck_no ?? item.plate ?? "",
+		),
+		driverName: String(item.driver_name ?? item.driverName ?? ""),
+		driverPhone: String(item.driver_phone ?? item.driverPhone ?? ""),
+		containerNos,
+		cargoRef: String(
+			item.cargo_ref ?? item.cargo_reference ?? "",
+		),
+		status: normalizeStatus(item.status),
+		lane: String(item.assigned_lane ?? item.lane ?? ""),
+	};
+}
+
+function getErrorMessage(resp: Resp, fallback: string): string {
+	return typeof resp.data === "string" && resp.data
+		? resp.data
+		: fallback;
+}
+
+function formatDate(date: string): string {
+	if (!date) return "—";
+
+	const parsed = new Date(`${date.slice(0, 10)}T00:00:00`);
+
+	if (Number.isNaN(parsed.getTime())) return date;
+
+	return parsed.toLocaleDateString(undefined, {
+		day: "2-digit",
+		month: "short",
+		year: "numeric",
+	});
+}
+
+function escapeCsv(value: string): string {
+	return `"${value.replace(/"/g, '""')}"`;
+}
 
 export default function GateAppointmentsRoute() {
-	const [appointments, setAppointments] = useState<AppointmentRecord[]>(initialAppointments);
+	const navigate = useNavigate();
+
+	const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [statusFilter, setStatusFilter] = useState("ALL");
-	const [isModalOpen, setIsModalOpen] = useState(false);
+	const [loading, setLoading] = useState(true);
+	const [refreshing, setRefreshing] = useState(false);
+	const [checkingIn, setCheckingIn] = useState<string | null>(null);
 
-	const [truckNo, setTruckNo] = useState("");
-	const [driverName, setDriverName] = useState("");
-	const [driverPhone, setDriverPhone] = useState("");
-	const [containerNo, setContainerNo] = useState("");
-	const [slotTime, setSlotTime] = useState("12:00 – 13:00");
+	const loadAppointments = useCallback(async (refresh = false) => {
+		if (refresh) {
+			setRefreshing(true);
+		} else {
+			setLoading(true);
+		}
+
+		try {
+			const res = await http.get("appointments/");
+			const resp: Resp = res.data;
+
+			if (resp.error) {
+				toast.error(
+					getErrorMessage(resp, "Could not load appointments."),
+				);
+				return;
+			}
+
+			const records = extractList<ApiAppointment>(resp)
+				.map(normalizeAppointment)
+				.filter((item) => item.id);
+
+			setAppointments(records);
+		} catch {
+			toast.error("Could not load appointments. Please try again.");
+		} finally {
+			setLoading(false);
+			setRefreshing(false);
+		}
+	}, []);
+
+	useEffect(() => {
+		void loadAppointments();
+	}, [loadAppointments]);
+
+	const today = new Date();
+	const todayString = [
+		today.getFullYear(),
+		String(today.getMonth() + 1).padStart(2, "0"),
+		String(today.getDate()).padStart(2, "0"),
+	].join("-");
+
+	const todaysAppointments = useMemo(
+		() =>
+			appointments.filter(
+				(item) => item.appointmentDate.slice(0, 10) === todayString,
+			),
+		[appointments, todayString],
+	);
+
+	const confirmedToday = todaysAppointments.filter(
+		(item) => item.status === "Confirmed",
+	).length;
+
+	const arrivedToday = todaysAppointments.filter(
+		(item) =>
+			item.status === "Arrived" || item.status === "In Terminal",
+	).length;
 
 	const filteredAppointments = useMemo(() => {
+		const query = searchQuery.trim().toLowerCase();
+
 		return appointments.filter((item) => {
-			const matchQuery =
-				item.truckNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				item.driverName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				item.containerNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				item.cargoRef.toLowerCase().includes(searchQuery.toLowerCase());
+			const searchable = [
+				item.truckNo,
+				item.driverName,
+				item.driverPhone,
+				item.cargoRef,
+				...item.containerNos,
+			]
+				.join(" ")
+				.toLowerCase();
 
-			const matchStatus =
-				statusFilter === "ALL" ? true : item.status.toUpperCase() === statusFilter.toUpperCase();
+			const matchesQuery = searchable.includes(query);
+			const matchesStatus =
+				statusFilter === "ALL" || item.status === statusFilter;
 
-			return matchQuery && matchStatus;
+			return matchesQuery && matchesStatus;
 		});
 	}, [appointments, searchQuery, statusFilter]);
 
-	const handleCreateAppointment = (e: React.FormEvent) => {
-		e.preventDefault();
-		if (!truckNo || !driverName || !containerNo) {
-			toast.error("Please fill in truck, driver, and container information.");
+	const handleExport = () => {
+		if (filteredAppointments.length === 0) {
+			toast.info("There are no appointments to export.");
 			return;
 		}
 
-		const newApt: AppointmentRecord = {
-			id: `apt-${appointments.length + 1}`,
-			slotTime,
-			truckNo: truckNo.toUpperCase(),
-			driverName,
-			driverPhone: driverPhone || "—",
-			containerNo: containerNo.toUpperCase(),
-			cargoRef: `TRN-IMP-00${2486 + appointments.length}`,
-			status: "Confirmed",
-			lane: "Gate Lane 01",
-		};
+		const rows = [
+			[
+				"Appointment ID",
+				"Appointment Date",
+				"Slot",
+				"Truck Plate",
+				"Driver",
+				"Driver Phone",
+				"Containers",
+				"Cargo Reference",
+				"Status",
+				"Assigned Lane",
+			],
+			...filteredAppointments.map((item) => [
+				item.id,
+				item.appointmentDate,
+				item.slotTime,
+				item.truckNo,
+				item.driverName,
+				item.driverPhone,
+				item.containerNos.join(", "),
+				item.cargoRef,
+				item.status,
+				item.lane,
+			]),
+		];
 
-		setAppointments([newApt, ...appointments]);
-		setIsModalOpen(false);
-		setTruckNo("");
-		setDriverName("");
-		setDriverPhone("");
-		setContainerNo("");
-		toast.success(`Appointment confirmed locally for truck ${truckNo}.`);
+		const csv = rows
+			.map((row) => row.map((value) => escapeCsv(String(value))).join(","))
+			.join("\r\n");
+
+		const blob = new Blob(["\uFEFF", csv], {
+			type: "text/csv;charset=utf-8;",
+		});
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement("a");
+
+		link.href = url;
+		link.download = `gate-appointments-${todayString}.csv`;
+		document.body.appendChild(link);
+		link.click();
+		link.remove();
+		URL.revokeObjectURL(url);
 	};
 
 	return (
-		<AppShell title="Truck Appointments" eyebrow="Gate Coordination · Fleet Scheduling">
+		<AppShell
+			title="Truck Appointments"
+			eyebrow="Gate Coordination · Fleet Scheduling"
+		>
 			<div className="flex flex-wrap items-end justify-between gap-4">
 				<div>
 					<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">
 						Terminal access · Traffic coordination
 					</p>
+
 					<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
 						Truck appointments & gate scheduling
 					</h2>
+
 					<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-						Coordinate hauler arrival slots around cargo readiness to prevent terminal road
-						congestion.
+						Manage truck bookings, review arrival schedules, and record
+						confirmed appointments at the terminal gate.
 					</p>
 				</div>
-				<div className="flex gap-2">
+
+				<div className="flex flex-wrap gap-2">
 					<Button
 						variant="outline"
 						className="border-line bg-paper text-ink"
-						onClick={() => toast.success("Daily gate manifest exported locally.")}
+						onClick={handleExport}
+						disabled={loading || filteredAppointments.length === 0}
 					>
-						<Download className="size-4" /> Export Schedule
+						<Download className="size-4" />
+						Export Schedule
 					</Button>
+
+					<Button
+						variant="outline"
+						className="border-line bg-paper text-ink"
+						onClick={() => void loadAppointments(true)}
+						disabled={loading || refreshing}
+					>
+						<RefreshCw
+							className={`size-4 ${refreshing ? "animate-spin" : ""}`}
+						/>
+						Refresh
+					</Button>
+
 					<Button
 						className="bg-orange text-white hover:bg-orange-deep"
-						onClick={() => setIsModalOpen(true)}
+						onClick={() => navigate("/gate/appointments/book")}
 					>
-						<Plus className="size-4" /> Book Appointment
+						<Plus className="size-4" />
+						Book Appointment
 					</Button>
 				</div>
 			</div>
 
-			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
 				<Metric
-					label="Today's Slots"
-					value="48"
-					detail="12 remaining available"
-					tone="success"
+					label="Today's Appointments"
+					value={loading ? "—" : String(todaysAppointments.length)}
+					detail="Bookings scheduled for today"
+					tone="info"
 					icon={Calendar}
 				/>
+
 				<Metric
 					label="Expected Today"
-					value={String(appointments.length)}
-					detail="Across 2 gate lanes"
-					tone="info"
+					value={loading ? "—" : String(confirmedToday)}
+					detail="Confirmed appointments"
+					tone="success"
 					icon={Truck}
 				/>
+
 				<Metric
-					label="Avg Turnaround"
-					value="42 min"
-					detail="6 min faster vs last week"
-					tone="success"
-					icon={Clock}
-				/>
-				<Metric
-					label="Admittance Rate"
-					value="95.8%"
-					detail="Readiness checks passed at gate"
-					tone="success"
+					label="Arrived Today"
+					value={loading ? "—" : String(arrivedToday)}
+					detail="Arrived or currently in terminal"
+					tone="info"
 					icon={CheckCircle2}
 				/>
 			</div>
@@ -207,197 +384,142 @@ export default function GateAppointmentsRoute() {
 				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
 					<div className="relative min-w-[260px] flex-1">
 						<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
+
 						<Input
 							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							placeholder="Search by truck plate, driver name, container, or cargo ref..."
+							onChange={(event) => setSearchQuery(event.target.value)}
+							placeholder="Search plate, driver, phone, container, or cargo reference..."
 							className="h-10 border-line bg-sand pl-9 text-sm text-ink"
 						/>
 					</div>
 
-					<div className="flex items-center gap-2">
+					<div className="flex flex-wrap items-center gap-2">
 						<span className="flex items-center gap-1 text-xs text-ink-soft">
-							<Filter className="size-3.5" /> Status:
+							<Filter className="size-3.5" />
+							Status:
 						</span>
-						{["ALL", "Confirmed", "Arrived", "Completed", "Missed"].map((s) => (
+
+						{[
+							"ALL",
+							"Confirmed",
+							"Arrived",
+							"In Terminal",
+							"Completed",
+							"Missed",
+							"Cancelled",
+						].map((status) => (
 							<button
-								key={s}
-								onClick={() => setStatusFilter(s)}
+								key={status}
+								type="button"
+								onClick={() => setStatusFilter(status)}
 								className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-									statusFilter === s
+									statusFilter === status
 										? "bg-ink text-sand"
 										: "bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink"
 								}`}
 							>
-								{s}
+								{status === "ALL" ? "All" : status}
 							</button>
 						))}
 					</div>
 				</div>
 
 				<div className="overflow-x-auto">
-					<table className="w-full min-w-[850px] text-left text-sm">
+					<table className="w-full min-w-[1050px] text-left text-sm">
 						<thead>
 							<tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+								<th className="px-4 py-3 font-medium">Appointment</th>
 								<th className="px-4 py-3 font-medium">Slot Window</th>
 								<th className="px-4 py-3 font-medium">Truck Plate</th>
 								<th className="px-4 py-3 font-medium">Driver / Phone</th>
 								<th className="px-4 py-3 font-medium">Container No.</th>
 								<th className="px-4 py-3 font-medium">Assigned Lane</th>
 								<th className="px-4 py-3 font-medium">Status</th>
-								<th className="px-4 py-3 font-medium text-right">Action</th>
 							</tr>
 						</thead>
+
 						<tbody className="divide-y divide-line">
-							{filteredAppointments.map((apt) => (
-								<tr key={apt.id} className="transition-colors hover:bg-sand/60">
-									<td className="px-4 py-3.5 font-mono text-xs font-semibold text-orange-deep">
-										{apt.slotTime}
-									</td>
-									<td className="px-4 py-3.5 font-mono text-xs font-bold text-ink">
-										{apt.truckNo}
-									</td>
-									<td className="px-4 py-3.5">
-										<p className="font-semibold text-ink">{apt.driverName}</p>
-										<p className="font-mono text-[10px] text-ink-soft">
-											{apt.driverPhone}
+							{loading ? (
+								<tr>
+									<td colSpan={8} className="px-4 py-12 text-center">
+										<LoaderCircle className="mx-auto mb-3 size-5 animate-spin text-orange" />
+										<p className="text-sm text-ink-soft">
+											Loading appointments...
 										</p>
 									</td>
-									<td className="px-4 py-3.5 font-mono text-xs text-ink">{apt.containerNo}</td>
-									<td className="px-4 py-3.5 text-xs text-ink-soft">{apt.lane}</td>
-									<td className="px-4 py-3.5">
-										<StatusBadge label={apt.status} tone={statusTone(apt.status)} />
-									</td>
-									<td className="px-4 py-3.5 text-right">
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() =>
-												toast.success(`Gate check-in recorded for truck ${apt.truckNo}.`)
-											}
-											className="text-xs font-semibold text-orange-deep hover:bg-orange/10"
-										>
-											Check-In
-										</Button>
+								</tr>
+							) : filteredAppointments.length === 0 ? (
+								<tr>
+									<td
+										colSpan={8}
+										className="px-4 py-12 text-center text-sm text-ink-soft"
+									>
+										<Search className="mx-auto mb-3 size-5 opacity-50" />
+										No appointments match your search or status filter.
 									</td>
 								</tr>
-							))}
+							) : (
+								filteredAppointments.map((appointment) => (
+									<tr
+										key={appointment.id}
+										className="transition-colors hover:bg-sand/60"
+									>
+										<td className="px-4 py-3.5 text-xs text-ink">
+											{formatDate(appointment.appointmentDate)}
+											<p className="mt-1 font-mono text-[10px] text-ink-soft">
+												{appointment.id}
+											</p>
+										</td>
+
+										<td className="px-4 py-3.5 font-mono text-xs font-semibold text-orange-deep">
+											{appointment.slotTime || "—"}
+										</td>
+
+										<td className="px-4 py-3.5 font-mono text-xs font-bold text-ink">
+											{appointment.truckNo || "—"}
+										</td>
+
+										<td className="px-4 py-3.5">
+											<p className="font-semibold text-ink">
+												{appointment.driverName || "—"}
+											</p>
+											<p className="font-mono text-[10px] text-ink-soft">
+												{appointment.driverPhone || "—"}
+											</p>
+										</td>
+
+										<td className="px-4 py-3.5 font-mono text-xs text-ink">
+											{appointment.containerNos.length
+												? appointment.containerNos.join(", ")
+												: "—"}
+										</td>
+
+										<td className="px-4 py-3.5 text-xs text-ink-soft">
+											{appointment.lane || "—"}
+										</td>
+
+										<td className="px-4 py-3.5">
+											<StatusBadge
+												label={appointment.status}
+												tone={statusTone(appointment.status)}
+											/>
+										</td>
+									</tr>
+								))
+							)}
 						</tbody>
 					</table>
 				</div>
 
-				<div className="flex items-center justify-between border-t border-line px-4 py-3 font-mono text-[10px] text-ink-soft">
+				<div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-3 font-mono text-[10px] text-ink-soft">
 					<span>
-						Showing {filteredAppointments.length} of {appointments.length} gate appointments
+						Showing {filteredAppointments.length} of {appointments.length} appointments
 					</span>
-					<span>Turnaround measured gate-in to gate-out</span>
+					<span>
+						{loading ? "Loading from server" : "Live API data"}
+					</span>
 				</div>
 			</section>
-
-			{isModalOpen && (
-				<div
-					className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4 backdrop-blur-sm"
-					onMouseDown={(e) => e.target === e.currentTarget && setIsModalOpen(false)}
-				>
-					<div className="w-full max-w-lg rounded-xl bg-paper p-6 shadow-2xl ring-1 ring-line">
-						<div className="flex items-center justify-between border-b border-line pb-4">
-							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-deep">
-									Gate booking
-								</p>
-								<h3 className="mt-1 font-display text-xl font-bold text-ink">
-									Book Truck Entry Slot
-								</h3>
-							</div>
-							<Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
-								<X />
-							</Button>
-						</div>
-
-						<form onSubmit={handleCreateAppointment} className="mt-5 space-y-4">
-							<div className="grid grid-cols-2 gap-3">
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Truck Registration Plate
-									</label>
-									<Input
-										required
-										placeholder="e.g. KJA-882-XD"
-										value={truckNo}
-										onChange={(e) => setTruckNo(e.target.value)}
-										className="mt-1.5 border-line bg-sand font-mono text-ink"
-									/>
-								</div>
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Time Window
-									</label>
-									<select
-										value={slotTime}
-										onChange={(e) => setSlotTime(e.target.value)}
-										className="mt-1.5 h-10 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none"
-									>
-										<option>10:00 – 11:00</option>
-										<option>11:00 – 12:00</option>
-										<option>12:00 – 13:00</option>
-										<option>13:00 – 14:00</option>
-										<option>14:00 – 15:00</option>
-										<option>15:00 – 16:00</option>
-									</select>
-								</div>
-							</div>
-
-							<div className="grid grid-cols-2 gap-3">
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Driver Full Name
-									</label>
-									<Input
-										required
-										placeholder="e.g. Babatunde Alao"
-										value={driverName}
-										onChange={(e) => setDriverName(e.target.value)}
-										className="mt-1.5 border-line bg-sand text-ink"
-									/>
-								</div>
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Driver Phone Number
-									</label>
-									<Input
-										placeholder="e.g. +234 803 112 3456"
-										value={driverPhone}
-										onChange={(e) => setDriverPhone(e.target.value)}
-										className="mt-1.5 border-line bg-sand text-ink"
-									/>
-								</div>
-							</div>
-
-							<div>
-								<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-									Container Number to Load / Offload
-								</label>
-								<Input
-									required
-									placeholder="e.g. TRIU1234564"
-									value={containerNo}
-									onChange={(e) => setContainerNo(e.target.value)}
-									className="mt-1.5 border-line bg-sand font-mono text-ink"
-								/>
-							</div>
-
-							<div className="flex justify-end gap-2 border-t border-line pt-4">
-								<Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-									Cancel
-								</Button>
-								<Button type="submit" className="bg-orange text-white hover:bg-orange-deep">
-									Confirm Booking
-								</Button>
-							</div>
-						</form>
-					</div>
-				</div>
-			)}
 		</AppShell>
 	);
 }

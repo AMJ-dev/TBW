@@ -52,7 +52,13 @@ const vehicleKinds: VehicleKind[] = [
 	"Box",
 	"Tanker",
 ];
-
+const vehicleKindDescriptions: Record<VehicleKind, string> = {
+	Flatbed: "An open truck or trailer for steel, machinery, timber, and oversized cargo.",
+	Container: "A truck or trailer designed to carry shipping containers, such as 20-foot or 40-foot containers.",
+	Reefer: "A refrigerated vehicle for frozen food, fresh produce, and other temperature-sensitive cargo.",
+	Box: "A truck with an enclosed cargo compartment for cartons, electronics, furniture, and packaged goods.",
+	Tanker: "A vehicle with a tank for transporting liquids or other permitted bulk materials. Special cargo requirements may apply.",
+};
 const emptyForm: VehicleForm = {
 	plate: "",
 	kind: "Container",
@@ -362,13 +368,11 @@ export default function GateVehicleFormPage() {
 
 							<label className="block">
 								<span className={labelClass}>Vehicle type</span>
+
 								<select
 									value={form.kind}
 									onChange={(event) =>
-										updateField(
-											"kind",
-											event.target.value as VehicleKind,
-										)
+										updateField("kind", event.target.value as VehicleKind)
 									}
 									disabled={submitting}
 									className="mt-2 h-11 w-full rounded-md border border-line bg-sand px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-orange/30 disabled:opacity-60"
@@ -379,6 +383,10 @@ export default function GateVehicleFormPage() {
 										</option>
 									))}
 								</select>
+
+								<p className="mt-2 text-xs leading-5 text-ink-soft">
+									{vehicleKindDescriptions[form.kind]}
+								</p>
 							</label>
 						</div>
 
