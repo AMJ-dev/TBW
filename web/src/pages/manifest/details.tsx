@@ -473,7 +473,7 @@ export default function OperationsManifestDetailsPage() {
 						<Button
 							variant="outline"
 							className="border-line bg-paper text-ink hover:bg-sand"
-							onClick={() => navigate("/operations/manifests")}
+							onClick={() => navigate("/operations/manifest")}
 						>
 							Back to manifests
 						</Button>
@@ -496,7 +496,7 @@ export default function OperationsManifestDetailsPage() {
 				<div className="flex flex-wrap items-center justify-between gap-3">
 					<Button
 						variant="ghost"
-						onClick={() => navigate("/operations/manifests")}
+						onClick={() => navigate("/operations/manifest")}
 						disabled={actioning}
 						className="-ml-3 gap-2 text-ink-soft hover:text-ink"
 					>
@@ -521,7 +521,7 @@ export default function OperationsManifestDetailsPage() {
 						<Button
 							variant="ghost"
 							size="icon"
-							onClick={() => navigate("/operations/manifests")}
+							onClick={() => navigate("/operations/manifest")}
 							disabled={actioning}
 							aria-label="Close manifest details"
 						>
@@ -1160,53 +1160,48 @@ export default function OperationsManifestDetailsPage() {
 					<div className="flex flex-wrap items-center justify-between gap-2 border-t border-line p-5 sm:p-6">
 						<Button
 							variant="ghost"
-							onClick={() => navigate("/operations/manifests")}
+							onClick={() => navigate("/operations/manifest")}
 							disabled={actioning}
 							className="text-ink-soft"
 						>
 							Close
 						</Button>
 						<div className="flex flex-wrap gap-2">
-							<Button
-								variant="outline"
-								onClick={() => {
-									setFlagReason("");
-									setResponsibleParty("");
-									setFlagDialogOpen(true);
-								}}
-								disabled={!canFlag || actioning}
-								className="border-line bg-paper text-coral hover:bg-coral/10"
-								title={
-									!isShipmentLinked
-										? "Link a shipment before flagging this manifest"
-										: undefined
-								}
-							>
-								{actioning ? (
-									<Loader2 className="mr-1.5 size-4 animate-spin" />
-								) : (
-									<AlertTriangle className="mr-1.5 size-4" />
-								)}
-								Flag for review
-							</Button>
-							<Button
-								onClick={handleValidate}
-								disabled={!canValidate || actioning}
-								className="bg-orange text-white hover:bg-orange-deep"
-								title={
-									!isShipmentLinked
-										? "Link a shipment before validating this manifest"
-										: undefined
-								}
-							>
-								{actioning ? (
-									<Loader2 className="mr-1.5 size-4 animate-spin" />
-								) : (
-									<Check className="mr-1.5 size-4" />
-								)}
-								Mark as validated
-							</Button>
-						</div>
+                            {canFlag && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setFlagReason("");
+                                        setResponsibleParty("");
+                                        setFlagDialogOpen(true);
+                                    }}
+                                    disabled={actioning}
+                                    className="border-line bg-paper text-coral hover:bg-coral/10"
+                                >
+                                    {actioning ? (
+                                        <Loader2 className="mr-1.5 size-4 animate-spin" />
+                                    ) : (
+                                        <AlertTriangle className="mr-1.5 size-4" />
+                                    )}
+                                    Flag for review
+                                </Button>
+                            )}
+
+                            {canValidate && (
+                                <Button
+                                    onClick={handleValidate}
+                                    disabled={actioning}
+                                    className="bg-orange text-white hover:bg-orange-deep"
+                                >
+                                    {actioning ? (
+                                        <Loader2 className="mr-1.5 size-4 animate-spin" />
+                                    ) : (
+                                        <Check className="mr-1.5 size-4" />
+                                    )}
+                                    Mark as validated
+                                </Button>
+                            )}
+                        </div>
 					</div>
 				</div>
 

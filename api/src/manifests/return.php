@@ -84,10 +84,13 @@ try {
     $update = $conn->prepare("
         UPDATE operation_manifests
         SET
+            status = 'Discrepancy',
+            review_responsible_party = 'Operations',
             review_status = 'Returned',
             correction_reason = :reason,
             reviewed_by = :reviewed_by,
-            reviewed_at = CURRENT_TIMESTAMP
+            reviewed_at = CURRENT_TIMESTAMP,
+            flagged_at = CURRENT_TIMESTAMP
         WHERE id = :id
     ");
 
@@ -101,10 +104,15 @@ try {
 
     echo json_encode([
         "error" => false,
-        "data" => "Manifest returned to Operations with instructions.",
-        "code" => null
+        "data" => "Manifest returned to Operations with correction instructions.",
+        "code" => [
+            "id" => $id,
+            "status" => "Discrepancy",
+            "review_responsible_party" => "Operations",
+            "review_status" => "Returned"
+        ]
     ]);
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     if ($conn->inTransaction()) {
         $conn->rollBack();
     }

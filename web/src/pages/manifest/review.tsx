@@ -219,12 +219,17 @@ export default function ManifestSupervisorReviewPage() {
     }
 
     const body = new FormData();
-    body.append("id", selected.id);
-    body.append("correction_reason", correctionReason.trim());
+    if(action === "validate"){
+      body.append("id", selected.id);
+      body.append("correction_reason", correctionReason.trim());
 
-    Object.entries(draft).forEach(([key, value]) => {
-      body.append(key, value);
-    });
+      Object.entries(draft).forEach(([key, value]) => {
+        body.append(key, value);
+      });
+    }else{
+      body.append("responsible_party", "Organisation");
+      body.append("reason", correctionReason.trim());
+    }
 
     setSaving(true);
 
@@ -232,7 +237,7 @@ export default function ManifestSupervisorReviewPage() {
       const endpoint =
         action === "validate"
           ? `operations/manifests/validate/${selected.id}/`
-          : "operations/manifests/return/";
+          : `operations/manifests/flag/${selected.id}/`;
 
       const res = await http.post(endpoint, body);
       const resp: Resp = res.data;

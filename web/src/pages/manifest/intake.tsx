@@ -364,7 +364,7 @@ export default function OperationsManifestIntakePage() {
 				return;
 			}
 			toast.success("Manifest added.");
-			navigate("/operations/manifests");
+			navigate("/operations/manifest");
 		} catch (err: any) {
 			toast.error(
 				err?.response?.data?.message || "Could not add the manifest."
@@ -393,7 +393,7 @@ export default function OperationsManifestIntakePage() {
 					<Button
 						type="button"
 						variant="ghost"
-						onClick={() => navigate("/operations/manifests")}
+						onClick={() => navigate("/operations/manifest")}
 						disabled={submitting || uploading}
 						className="-ml-3 gap-2 text-ink-soft hover:text-ink"
 					>
@@ -802,7 +802,7 @@ export default function OperationsManifestIntakePage() {
 							<Button
 								type="button"
 								variant="outline"
-								onClick={() => navigate("/operations/manifests")}
+								onClick={() => navigate("/operations/manifest")}
 								disabled={submitting || uploading}
 								className="border-sand/25 bg-transparent text-sand hover:bg-sand/10"
 							>
