@@ -135,13 +135,18 @@ RewriteRule ^vehicles/add/$ src/vehicles/add.php [NC]
 RewriteRule ^vehicles/reject/$ src/vehicles/reject.php [NC]
 RewriteRule ^vehicles/suspend/$ src/vehicles/suspend.php [NC]
 RewriteRule ^vehicles/approve/$ src/vehicles/approve.php [NC]
-RewriteRule ^vehicles/addeleted/$ src/vehicles/delete.php [NC]
+RewriteRule ^vehicles/deleted/$ src/vehicles/delete.php [NC]
 RewriteRule ^vehicles/activate/$ src/vehicles/activate.php [NC]
 RewriteRule ^vehicles/([0-9a-zA-Z-]+)/$ src/vehicles/get.php?id=$1 [NC]
 RewriteRule ^vehicles/update/([0-9a-zA-Z-]+)/$ src/vehicles/update.php?id=$1 [NC]
 
-# http.post("vehicles/delete/", { id, reason })
-# http.post("vehicles/suspend/", { id, reason })
-# http.post("vehicles/reject/", { id, reason })
-# http.post("vehicles/approve/", { id })
-# http.post("vehicles/activate/", { id })
+
+RewriteRule ^drivers/$ src/drivers/all.php [NC]
+RewriteRule ^driver/add/$ src/drivers/add.php [NC]
+RewriteRule ^driver/deleted/$ src/drivers/delete.php [NC]
+RewriteRule ^driver/approve/$ src/drivers/approve.php [NC]
+RewriteRule ^driver/suspend/$ src/drivers/suspend.php [NC]
+RewriteRule ^driver/activate/$ src/drivers/activate.php [NC]
+# activate.php
+RewriteRule ^driver/([0-9a-zA-Z-]+)/$ src/drivers/get.php?id=$1 [NC]
+RewriteRule ^driver/update/([0-9a-zA-Z-]+)/$ src/drivers/update.php?id=$1 [NC]
