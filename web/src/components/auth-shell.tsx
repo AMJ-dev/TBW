@@ -5,14 +5,16 @@ import { toast } from "sonner";
 import {
     Activity, AlertTriangle, ArrowRight, BarChart3, Bell, Boxes,
     ChevronLeft, ChevronRight, Check, ClipboardCheck, Clock3, Command,
-    Container, FileCheck2, FileText, FileSpreadsheet, Grid2X2,
-    ListChecks, HelpCircle, LayoutDashboard, LogOut, Menu,
+    FileCheck2, FileText, FileSpreadsheet, Grid2X2,
+    HelpCircle, LayoutDashboard, LogOut, Menu,
     PackageCheck, Package, QrCode, Search, Settings, ShieldCheck,
     Truck, User, UsersRound, Warehouse, X,
     CarFront,
     CreditCard,
     ReceiptText,
     CalendarDays,
+    UserRoundCheck,
+    Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -192,6 +194,8 @@ const sections = [
             { label: "Gate-in", to: "/gate/in", icon: Truck, access: ["system"] },
             { label: "Gate-out", to: "/gate/out", icon: Truck, access: ["system"] },
             { label: "Vehicle Registry", to: "/gate/vehicles", icon: CarFront, access: ["system"] },
+            {label: "Driver Registry",to: "/gate/drivers",icon: Users,access: ["system"]},
+            {label: "Driver Assignments",to: "/gate/drivers/assignments",icon: UserRoundCheck,access: ["system"]},
         ],
     },
     {
@@ -285,7 +289,7 @@ function PendingPanel() {
 export function AppShell({ children, title, eyebrow }: { children: ReactNode; title: string; eyebrow?: string }) {
     const { pathname } = useLocation();
     const navigate = useNavigate();
-    const { privileges, permissions, role, my_details } = useContext(UserContext);
+    const { role, my_details } = useContext(UserContext);
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
@@ -299,8 +303,20 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
             .some((value) => value.toLowerCase().includes(searchQuery.trim().toLowerCase()))
     );
 
-    const isActive = (to: string, exact = false) =>
-        exact ? pathname === to : pathname === to || pathname.startsWith(to + "/");
+    const normalisePath = (path: string) => {
+        const normalised = path.replace(/\/+/g, "/").replace(/\/$/, "");
+        return normalised || "/";
+    };
+
+    const isActive = (to: string, exact = false) => {
+        const currentPath = normalisePath(pathname);
+        const targetPath = normalisePath(to);
+
+        return exact
+            ? currentPath === targetPath
+            : currentPath === targetPath ||
+                currentPath.startsWith(`${targetPath}/`);
+    };
 
     const handleLogout = async () => {
         if (loggingOut) return;
@@ -388,7 +404,23 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                                         </p>
                                         {visibleItems.map((item) => {
                                             const { label, to, icon: Icon } = item;
-                                            const active = isActive(to, "exact" in item && item.exact);
+                                            const exact = "exact" in item && item.exact === true;
+
+                                            const active =
+                                                isActive(to, exact) &&
+                                                !visibleItems.some((other) => {
+                                                    if (other.to === to) return false;
+
+                                                    const otherExact =
+                                                        "exact" in other && other.exact === true;
+
+                                                    return (
+                                                        isActive(other.to, otherExact) &&
+                                                        normalisePath(other.to).startsWith(
+                                                            `${normalisePath(to)}/`
+                                                        )
+                                                    );
+                                                });
                                             return (
                                                 <Link
                                                     key={to}

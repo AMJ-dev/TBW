@@ -77,7 +77,11 @@ const GateDashboardPage = lazy(() => import("@/pages/gate/dashboard"));
 const GateAppointmentsPage = lazy(() => import("@/pages/gate/appointments"));
 const GatePassesPage = lazy(() => import("@/pages/gate/passes"));
 const GateVehiclesPage = lazy(() => import("@/pages/gate/vehicles"));
+const GateVehicleFormPage = lazy(() => import("@/pages/gate/vehicle-form"));
 const GateConsolePage = lazy(() => import("@/pages/gate/console"));
+const GateDriversPage = lazy(() => import("@/pages/gate/drivers"));
+const GateDriverFormPage = lazy(() => import("@/pages/gate/driver-form"));
+const GateDriverAssignmentsPage = lazy(() => import("@/pages/gate/driver-assignments"));
 
 const OperationsDashboardPage = lazy(() => import("@/pages/operations/dashboard"));
 const OperationsExaminationPage = lazy(() => import("@/pages/operations/examination"));
@@ -217,7 +221,13 @@ export default function Routers() {
 						<Route path="/gate/in" element={<GateConsolePage />} />
 						<Route path="/gate/out" element={<GateConsolePage />} />
 						<Route path="/gate/vehicles" element={<GateVehiclesPage />} />
-
+						<Route path="/gate/vehicle/add" element={<GateVehicleFormPage />} />
+						<Route path="/gate/vehicle/edit/:id" element={<GateVehicleFormPage />} />
+						<Route path="/gate/drivers" element={<GateDriversPage />} />
+						<Route path="/gate/driver/add" element={<GateDriverFormPage />} />
+						<Route path="/gate/driver/edit/:id" element={<GateDriverFormPage />} />
+						<Route path="/gate/drivers/assignments" element={<GateDriverAssignmentsPage />} />
+						
 						<Route path="/operations" element={<OperationsDashboardPage />} />
 						<Route path="/operations/dashboard" element={<OperationsDashboardPage />} />
 						<Route path="/operations/examination" element={<OperationsExaminationPage />} />
