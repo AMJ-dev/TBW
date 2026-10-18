@@ -712,43 +712,35 @@ function VehicleDetail({
 					Actions
 				</p>
 
-				{isPending && (
-					<div className="mt-3 flex flex-wrap gap-2">
-						<Button
-							disabled={actioning}
-							onClick={() => void onApprove()}
-							className="bg-orange text-white hover:bg-orange-deep"
-						>
-							{actioning ? (
-								<Loader2 className="mr-1.5 size-4 animate-spin" />
-							) : (
-								<Check className="mr-1.5 size-4" />
-							)}
-							Approve
-						</Button>
-						<Button
-							disabled={actioning}
-							onClick={() => void onActivate()}
-							variant="outline"
-							className="border-line bg-paper text-ink hover:bg-sand"
-						>
-							<Check className="mr-1.5 size-4" />
-							Activate
-						</Button>
-						<Button
-							disabled={actioning}
-							onClick={() => setRejectOpen(true)}
-							variant="outline"
-							className="border-coral/30 bg-coral/5 text-coral hover:bg-coral/10"
-						>
-							<XCircle className="mr-1.5 size-4" />
-							Reject
-						</Button>
-					</div>
-				)}
+				<div className="mt-3 flex flex-wrap gap-2">
+					{isPending && (
+						<>
+							<Button
+								disabled={actioning}
+								onClick={() => void onApprove()}
+								className="bg-orange text-white hover:bg-orange-deep"
+							>
+								{actioning ? (
+									<Loader2 className="mr-1.5 size-4 animate-spin" />
+								) : (
+									<Check className="mr-1.5 size-4" />
+								)}
+								Approve
+							</Button>
 
-				{isActive && (
-					<div className="mt-3 flex flex-wrap gap-2">
+							<Button
+								disabled={actioning}
+								onClick={() => setRejectOpen(true)}
+								variant="outline"
+								className="border-coral/30 bg-coral/5 text-coral hover:bg-coral/10"
+							>
+								<XCircle className="mr-1.5 size-4" />
+								Reject
+							</Button>
+						</>
+					)}
+
+					{isActive && (
 						<Button
 							disabled={actioning}
 							onClick={() => setSuspendOpen(true)}
@@ -758,21 +750,23 @@ function VehicleDetail({
 							<AlertTriangle className="mr-1.5 size-4" />
 							Suspend
 						</Button>
-					</div>
-				)}
+					)}
 
-				{isSuspended && (
-					<div className="mt-3 flex flex-wrap gap-2">
+					{isSuspended && (
 						<Button
 							disabled={actioning}
 							onClick={() => void onActivate()}
 							className="bg-orange text-white hover:bg-orange-deep"
 						>
-							<Check className="mr-1.5 size-4" />
+							{actioning ? (
+								<Loader2 className="mr-1.5 size-4 animate-spin" />
+							) : (
+								<Check className="mr-1.5 size-4" />
+							)}
 							Activate
 						</Button>
-					</div>
-				)}
+					)}
+				</div>
 
 				<div className="mt-5 border-t border-line pt-4">
 					<Button
@@ -782,9 +776,54 @@ function VehicleDetail({
 						className="text-coral hover:bg-coral/10"
 					>
 						<XCircle className="mr-1.5 size-4" />
-						Remove from registry
+						Delete vehicle
 					</Button>
 				</div>
+
+				{suspendOpen && (
+					<ConfirmDialog
+						title="Suspend vehicle"
+						description="Suspending this vehicle blocks gate entry. Provide a reason for the audit trail."
+						confirmLabel="Suspend vehicle"
+						tone="danger"
+						requireReason
+						onClose={() => setSuspendOpen(false)}
+						onConfirm={async (reason) => {
+							const ok = await onSuspend(reason ?? "");
+							if (ok) setSuspendOpen(false);
+						}}
+					/>
+				)}
+
+				{rejectOpen && (
+					<ConfirmDialog
+						title="Reject vehicle"
+						description="Rejecting this vehicle prevents it from being approved. Provide a reason for the audit trail."
+						confirmLabel="Reject vehicle"
+						tone="danger"
+						requireReason
+						onClose={() => setRejectOpen(false)}
+						onConfirm={async (reason) => {
+							const ok = await onReject(reason ?? "");
+							if (ok) setRejectOpen(false);
+						}}
+					/>
+				)}
+
+				{deleteOpen && (
+					<ConfirmDialog
+						title="Delete vehicle"
+						description="This removes the vehicle from the registry. Provide a reason for the audit trail."
+						confirmLabel="Delete vehicle"
+						tone="danger"
+						requireReason
+						onClose={() => setDeleteOpen(false)}
+						onConfirm={async (reason) => {
+							await onDelete(reason ?? "");
+							setDeleteOpen(false);
+						}}
+					/>
+				)}
 			</div>
 
 			{suspendOpen && (
