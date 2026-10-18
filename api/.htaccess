@@ -132,21 +132,23 @@ RewriteRule ^operations/manifests/onboarding-request/$ src/manifests/onboarding-
 
 RewriteRule ^vehicles/$ src/vehicles/all.php [NC]
 RewriteRule ^vehicles/add/$ src/vehicles/add.php [NC]
+RewriteRule ^vehicles/search/$ src/vehicles/search.php [NC]
 RewriteRule ^vehicles/reject/$ src/vehicles/reject.php [NC]
+RewriteRule ^vehicles/deleted/$ src/vehicles/delete.php [NC]
 RewriteRule ^vehicles/suspend/$ src/vehicles/suspend.php [NC]
 RewriteRule ^vehicles/approve/$ src/vehicles/approve.php [NC]
-RewriteRule ^vehicles/deleted/$ src/vehicles/delete.php [NC]
 RewriteRule ^vehicles/activate/$ src/vehicles/activate.php [NC]
 RewriteRule ^vehicles/([0-9a-zA-Z-]+)/$ src/vehicles/get.php?id=$1 [NC]
 RewriteRule ^vehicles/update/([0-9a-zA-Z-]+)/$ src/vehicles/update.php?id=$1 [NC]
 
-
 RewriteRule ^drivers/$ src/drivers/all.php [NC]
 RewriteRule ^driver/add/$ src/drivers/add.php [NC]
+RewriteRule ^driver/assign/$ src/drivers/assign.php [NC]
 RewriteRule ^driver/deleted/$ src/drivers/delete.php [NC]
 RewriteRule ^driver/approve/$ src/drivers/approve.php [NC]
 RewriteRule ^driver/suspend/$ src/drivers/suspend.php [NC]
 RewriteRule ^driver/activate/$ src/drivers/activate.php [NC]
-# activate.php
+RewriteRule ^driver/unassign/$ src/drivers/unassign.php [NC]
+RewriteRule ^drivers/assignments/$ src/drivers/assignments.php [NC]
 RewriteRule ^driver/([0-9a-zA-Z-]+)/$ src/drivers/get.php?id=$1 [NC]
 RewriteRule ^driver/update/([0-9a-zA-Z-]+)/$ src/drivers/update.php?id=$1 [NC]
