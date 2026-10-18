@@ -13,6 +13,7 @@ import {
 	Search,
 	ShieldCheck,
 	Truck,
+	User,
 	UserCheck,
 	X,
 	XCircle,
@@ -32,6 +33,25 @@ type VehicleStatus =
 	| "Rejected"
 	| "Inactive";
 
+type DriverStatus =
+	| "Approved"
+	| "Pending review"
+	| "Suspended"
+	| "Expired documents"
+	| "Rejected"
+	| "Inactive";
+
+interface Driver {
+	id: string;
+	name: string;
+	phone: string;
+	licenceNumber: string;
+	licenceClass: string;
+	licenceExpiry: string;
+	transporter: string;
+	status: DriverStatus;
+}
+
 interface Vehicle {
 	id: string;
 	plate: string;
@@ -47,6 +67,7 @@ interface Vehicle {
 	status: VehicleStatus;
 	lastVisit: string;
 	notes: string;
+	drivers: Driver[];
 }
 
 const statusFilters: (VehicleStatus | "all")[] = [
@@ -105,6 +126,17 @@ const normalizeStatus = (raw: unknown): VehicleStatus => {
 	}
 };
 
+const normalizeDriver = (raw: any): Driver => ({
+	id: String(raw?.id ?? ""),
+	name: String(raw?.name ?? raw?.full_name ?? "—"),
+	phone: String(raw?.phone ?? "—"),
+	licenceNumber: String(raw?.licence_number ?? raw?.licenceNumber ?? "—"),
+	licenceClass: String(raw?.licence_class ?? raw?.licenceClass ?? "—"),
+	licenceExpiry: String(raw?.licence_expiry ?? raw?.licenceExpiry ?? "—"),
+	transporter: String(raw?.transporter ?? "—"),
+	status: normalizeStatus(raw?.status),
+});
+
 const normalizeVehicle = (raw: any): Vehicle => ({
 	id: String(raw?.id ?? ""),
 	plate: String(raw?.plate ?? raw?.plate_number ?? "—"),
@@ -124,6 +156,9 @@ const normalizeVehicle = (raw: any): Vehicle => ({
 	status: normalizeStatus(raw?.status),
 	lastVisit: String(raw?.last_visit ?? raw?.lastVisit ?? "—"),
 	notes: String(raw?.notes ?? ""),
+	drivers: Array.isArray(raw?.drivers)
+		? raw.drivers.map(normalizeDriver)
+		: [],
 });
 
 export default function GateVehiclesRoute() {
@@ -154,8 +189,7 @@ export default function GateVehiclesRoute() {
 				return;
 			}
 			const list = extractList<any>(resp.code ?? resp.data);
-			const normalized = list.map(normalizeVehicle);
-			setVehicles(normalized);
+			setVehicles(list.map(normalizeVehicle));
 			if (preferredId) setSelectedId(preferredId);
 		} catch (err: any) {
 			const message =
@@ -175,12 +209,20 @@ export default function GateVehiclesRoute() {
 	}, [fetchVehicles]);
 
 	const filteredVehicles = useMemo(() => {
+		const q = query.trim().toLowerCase();
 		return vehicles.filter((v) => {
 			const matchQuery =
-				v.plate.toLowerCase().includes(query.toLowerCase()) ||
-				v.owner.toLowerCase().includes(query.toLowerCase()) ||
-				v.transporter.toLowerCase().includes(query.toLowerCase()) ||
-				v.make.toLowerCase().includes(query.toLowerCase());
+				!q ||
+				v.plate.toLowerCase().includes(q) ||
+				v.owner.toLowerCase().includes(q) ||
+				v.transporter.toLowerCase().includes(q) ||
+				v.make.toLowerCase().includes(q) ||
+				v.drivers.some(
+					(d) =>
+						d.name.toLowerCase().includes(q) ||
+						d.phone.toLowerCase().includes(q) ||
+						d.licenceNumber.toLowerCase().includes(q)
+				);
 			const matchStatus = statusFilter === "all" || v.status === statusFilter;
 			return matchQuery && matchStatus;
 		});
@@ -191,7 +233,8 @@ export default function GateVehiclesRoute() {
 		const approved = vehicles.filter((v) => v.status === "Approved").length;
 		const pending = vehicles.filter((v) => v.status === "Pending review").length;
 		const expired = vehicles.filter((v) => v.status === "Expired documents").length;
-		return { total, approved, pending, expired };
+		const withDriver = vehicles.filter((v) => v.drivers.length > 0).length;
+		return { total, approved, pending, expired, withDriver };
 	}, [vehicles]);
 
 	const selected = useMemo(
@@ -301,8 +344,8 @@ export default function GateVehiclesRoute() {
 								</h2>
 								<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
 									Every truck visiting the terminal is registered with plate,
-									insurance, and roadworthiness details. Expired documents
-									block entry until renewed.
+									insurance, and roadworthiness details. The assigned driver
+									is shown per vehicle.
 								</p>
 							</div>
 							<div className="flex flex-wrap gap-2">
@@ -346,18 +389,18 @@ export default function GateVehiclesRoute() {
 								icon={Truck}
 							/>
 							<Metric
-								label="Approved"
-								value={String(stats.approved)}
-								detail="Cleared for gate entry"
+								label="With driver"
+								value={String(stats.withDriver)}
+								detail="Have an assigned driver"
 								tone="success"
-								icon={Check}
+								icon={UserCheck}
 							/>
 							<Metric
 								label="Pending review"
 								value={String(stats.pending)}
 								detail="Awaiting verification"
 								tone="warning"
-								icon={UserCheck}
+								icon={AlertTriangle}
 							/>
 							<Metric
 								label="Expired documents"
@@ -375,7 +418,7 @@ export default function GateVehiclesRoute() {
 									<Input
 										value={query}
 										onChange={(e) => setQuery(e.target.value)}
-										placeholder="Search by plate, owner, transporter, or make..."
+										placeholder="Search by plate, owner, transporter, make, or driver…"
 										className="h-10 border-line bg-sand pl-9 text-sm text-ink"
 									/>
 								</div>
@@ -432,7 +475,7 @@ export default function GateVehiclesRoute() {
 								</div>
 							) : (
 								<div className="overflow-x-auto">
-									<table className="w-full min-w-[1000px] text-left text-sm">
+									<table className="w-full min-w-[1100px] text-left text-sm">
 										<thead>
 											<tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 												<th className="px-4 py-3 font-medium">Plate</th>
@@ -440,10 +483,10 @@ export default function GateVehiclesRoute() {
 												<th className="px-4 py-3 font-medium">
 													Owner / transporter
 												</th>
-												<th className="px-4 py-3 font-medium">Insurance</th>
 												<th className="px-4 py-3 font-medium">
-													Roadworthiness
+													Assigned driver
 												</th>
+												<th className="px-4 py-3 font-medium">Insurance</th>
 												<th className="px-4 py-3 font-medium">Status</th>
 												<th className="px-4 py-3 font-medium text-right">
 													Action
@@ -476,14 +519,37 @@ export default function GateVehiclesRoute() {
 														</p>
 													</td>
 													<td className="px-4 py-3.5">
-														<p className="font-mono text-[11px] text-ink">
-															{v.insuranceExpiry}
-														</p>
+														{v.drivers.length > 0 ? (
+															<ul className="space-y-1.5">
+																{v.drivers.map((d) => (
+																	<li
+																		key={d.id}
+																		className="flex items-start gap-2"
+																	>
+																		<span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-teal/10 text-teal-deep ring-1 ring-teal/20">
+																			<User className="size-3" />
+																		</span>
+																		<span className="min-w-0">
+																			<span className="block truncate text-[12px] font-semibold text-ink">
+																				{d.name}
+																			</span>
+																			<span className="block truncate font-mono text-[10px] text-ink-soft">
+																				{d.phone} ·{" "}
+																				{d.licenceNumber}
+																			</span>
+																		</span>
+																	</li>
+																))}
+															</ul>
+														) : (
+															<span className="inline-flex items-center gap-1 rounded-md bg-coral/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-coral ring-1 ring-coral/20">
+																<AlertTriangle className="size-3" />
+																No driver
+															</span>
+														)}
 													</td>
-													<td className="px-4 py-3.5">
-														<p className="font-mono text-[11px] text-ink">
-															{v.roadworthinessExpiry}
-														</p>
+													<td className="px-4 py-3.5 font-mono text-[11px] text-ink">
+														{v.insuranceExpiry}
 													</td>
 													<td className="px-4 py-3.5">
 														<StatusBadge
@@ -527,19 +593,19 @@ export default function GateVehiclesRoute() {
 										</p>
 									</div>
 									<h3 className="mt-3 font-display text-xl font-bold text-ink">
-										Only registered vehicles reach the gate
+										Only registered vehicles and drivers reach the gate
 									</h3>
 									<p className="mt-2 max-w-xl text-[13px] leading-6 text-ink-soft">
-										Gate officers verify the plate against the registry
-										and check document expiry. Expired or suspended records
-										block entry at the gate console. Every check is logged
-										to the gate audit trail.
+										Gate officers verify the plate against the registry,
+										confirm the assigned driver, and check document expiry.
+										Expired or suspended records block entry at the gate
+										console. Every check is logged to the gate audit trail.
 									</p>
 								</div>
 
 								<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
 									<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Documents checked at gate
+										Checked at gate
 									</p>
 									<ul className="mt-3 space-y-2 text-[12px] leading-5 text-ink-soft">
 										<li className="flex items-start gap-2">
@@ -549,6 +615,14 @@ export default function GateVehiclesRoute() {
 										<li className="flex items-start gap-2">
 											<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
 											Roadworthiness certificate (not expired)
+										</li>
+										<li className="flex items-start gap-2">
+											<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
+											Assigned driver matches the appointment
+										</li>
+										<li className="flex items-start gap-2">
+											<span className="mt-1.5 size-1 shrink-0 rounded-full bg-orange" />
+											Driver licence (Class G, not expired)
 										</li>
 									</ul>
 								</div>
@@ -613,6 +687,7 @@ function VehicleDetail({
 	onReject: (reason: string) => Promise<boolean>;
 	onDelete: (reason: string) => Promise<void>;
 }) {
+	const navigate = useNavigate();
 	const [suspendOpen, setSuspendOpen] = useState(false);
 	const [rejectOpen, setRejectOpen] = useState(false);
 	const [deleteOpen, setDeleteOpen] = useState(false);
@@ -676,6 +751,69 @@ function VehicleDetail({
 				</div>
 			</div>
 
+			<div className="rounded-2xl bg-paper p-5 ring-1 ring-line sm:p-6">
+				<div className="flex items-center justify-between gap-3">
+					<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+						Assigned drivers
+					</p>
+					<span className="rounded-full bg-sand px-2 py-0.5 font-mono text-[10px] text-ink-soft">
+						{vehicle.drivers.length}
+					</span>
+				</div>
+
+				{vehicle.drivers.length === 0 ? (
+					<div className="mt-3 rounded-xl border border-dashed border-line bg-sand/40 p-4 text-center">
+						<User className="mx-auto size-6 text-ink-soft" />
+						<p className="mt-2 text-[12px] font-semibold text-ink">
+							No driver assigned
+						</p>
+						<p className="mt-1 text-[11px] text-ink-soft">
+							Assign a driver from the driver assignments page.
+						</p>
+						<Button
+							onClick={() => navigate("/gate/drivers/assignments")}
+							variant="outline"
+							className="mt-3 border-line bg-paper text-ink hover:bg-sand"
+						>
+							Open assignments
+						</Button>
+					</div>
+				) : (
+					<ul className="mt-3 space-y-2">
+						{vehicle.drivers.map((d) => (
+							<li
+								key={d.id}
+								className="flex items-start gap-3 rounded-lg border border-line bg-sand p-3"
+							>
+								<span className="grid size-9 shrink-0 place-items-center rounded-lg bg-paper text-orange-deep ring-1 ring-line">
+									<User className="size-4" />
+								</span>
+								<div className="min-w-0 flex-1">
+									<div className="flex flex-wrap items-center gap-2">
+										<p className="text-[13px] font-semibold text-ink">
+											{d.name}
+										</p>
+										<StatusBadge
+											label={d.status}
+											tone={statusTone(d.status)}
+										/>
+									</div>
+									<p className="mt-0.5 font-mono text-[11px] text-ink-soft">
+										{d.phone} · {d.licenceNumber}
+									</p>
+									<p className="mt-0.5 text-[11px] text-ink-soft">
+										{d.licenceClass} · Expires {d.licenceExpiry}
+									</p>
+									<p className="mt-0.5 text-[11px] text-ink-soft">
+										Transporter: {d.transporter}
+									</p>
+								</div>
+							</li>
+						))}
+					</ul>
+				)}
+			</div>
+
 			<div className="grid gap-4 sm:grid-cols-2">
 				<div className="rounded-2xl bg-paper p-5 ring-1 ring-line">
 					<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
@@ -727,7 +865,6 @@ function VehicleDetail({
 								)}
 								Approve
 							</Button>
-
 							<Button
 								disabled={actioning}
 								onClick={() => setRejectOpen(true)}
@@ -825,51 +962,6 @@ function VehicleDetail({
 					/>
 				)}
 			</div>
-
-			{suspendOpen && (
-				<ConfirmDialog
-					title="Suspend vehicle"
-					description="Suspending this vehicle blocks gate entry immediately. Provide a reason for the audit trail."
-					confirmLabel="Suspend vehicle"
-					tone="danger"
-					requireReason
-					onClose={() => setSuspendOpen(false)}
-					onConfirm={async (reason) => {
-						const ok = await onSuspend(reason ?? "");
-						if (ok) setSuspendOpen(false);
-					}}
-				/>
-			)}
-
-			{rejectOpen && (
-				<ConfirmDialog
-					title="Reject vehicle"
-					description="Rejecting this vehicle prevents it from being approved. Provide a reason for the audit trail."
-					confirmLabel="Reject vehicle"
-					tone="danger"
-					requireReason
-					onClose={() => setRejectOpen(false)}
-					onConfirm={async (reason) => {
-						const ok = await onReject(reason ?? "");
-						if (ok) setRejectOpen(false);
-					}}
-				/>
-			)}
-
-			{deleteOpen && (
-				<ConfirmDialog
-					title="Remove vehicle"
-					description="The vehicle will no longer be able to enter the terminal. Historical records remain on the audit trail."
-					confirmLabel="Remove vehicle"
-					tone="danger"
-					requireReason
-					onClose={() => setDeleteOpen(false)}
-					onConfirm={async (reason) => {
-						await onDelete(reason ?? "");
-						setDeleteOpen(false);
-					}}
-				/>
-			)}
 		</div>
 	);
 }

@@ -13,6 +13,7 @@ import {
 	Search,
 	ShieldCheck,
 	Trash2,
+	Truck,
 	User,
 	UserCheck,
 	X,
@@ -33,6 +34,18 @@ type DriverStatus =
 	| "Rejected"
 	| "Inactive";
 
+interface AssignedVehicle {
+	id: string;
+	plate: string;
+	kind: string;
+	make: string;
+	model: string;
+	year: string;
+	capacity: string;
+	transporter: string;
+	status: string;
+}
+
 interface Driver {
 	id: string;
 	name: string;
@@ -40,11 +53,11 @@ interface Driver {
 	licenceNumber: string;
 	licenceClass: string;
 	licenceExpiry: string;
-	assignedVehicle: string;
 	transporter: string;
 	status: DriverStatus;
 	lastVisit: string;
 	notes: string;
+	vehicles: AssignedVehicle[];
 }
 
 const statusFilters: (DriverStatus | "all")[] = [
@@ -103,26 +116,42 @@ const normalizeStatus = (raw: unknown): DriverStatus => {
 	}
 };
 
-const normalizeDriver = (raw: any): Driver => ({
-	id: String(raw?.id ?? ""),
-	name: String(raw?.name ?? raw?.full_name ?? "—"),
-	phone: String(raw?.phone ?? "—"),
-	licenceNumber: String(raw?.licence_number ?? raw?.licenceNumber ?? "—"),
-	licenceClass: String(raw?.licence_class ?? raw?.licenceClass ?? "—"),
-	licenceExpiry: String(
-		raw?.licence_expiry ?? raw?.licenceExpiry ?? "—"
-	),
-	assignedVehicle: String(
-		raw?.assigned_vehicle ??
-			raw?.assigned_vehicle_plate ??
-			raw?.assignedVehicle ??
-			"—"
-	),
-	transporter: String(raw?.transporter ?? "—"),
-	status: normalizeStatus(raw?.status),
-	lastVisit: String(raw?.last_visit ?? raw?.lastVisit ?? "—"),
-	notes: String(raw?.notes ?? ""),
-});
+const normalizeDriver = (raw: any): Driver => {
+	const assignedVehicle: AssignedVehicle | null =
+		raw?.vehicle_id || raw?.vehicle_plate
+			? {
+					id: String(raw?.vehicle_id ?? ""),
+					plate: String(raw?.vehicle_plate ?? "—"),
+					kind: String(raw?.vehicle_kind ?? "—"),
+					make: String(raw?.vehicle_make ?? "—"),
+					model: String(raw?.vehicle_model ?? "—"),
+					year: String(raw?.vehicle_year ?? "—"),
+					capacity: String(raw?.vehicle_capacity ?? "—"),
+					transporter: String(raw?.vehicle_transporter ?? "—"),
+					status: String(raw?.vehicle_status ?? "—"),
+			  }
+			: null;
+
+	return {
+		id: String(raw?.id ?? ""),
+		name: String(raw?.name ?? raw?.full_name ?? "—"),
+		phone: String(raw?.phone ?? "—"),
+		licenceNumber: String(
+			raw?.licence_number ?? raw?.licenceNumber ?? "—"
+		),
+		licenceClass: String(
+			raw?.licence_class ?? raw?.licenceClass ?? "—"
+		),
+		licenceExpiry: String(
+			raw?.licence_expiry ?? raw?.licenceExpiry ?? "—"
+		),
+		transporter: String(raw?.transporter ?? "—"),
+		status: normalizeStatus(raw?.status),
+		lastVisit: String(raw?.last_visit ?? raw?.lastVisit ?? "—"),
+		notes: String(raw?.notes ?? ""),
+		vehicles: assignedVehicle ? [assignedVehicle] : [],
+	};
+};
 
 export default function GateDriversPage() {
 	const navigate = useNavigate();
@@ -172,13 +201,21 @@ export default function GateDriversPage() {
 	}, [fetchDrivers]);
 
 	const filtered = useMemo(() => {
+		const q = query.trim().toLowerCase();
 		return drivers.filter((d) => {
 			const matchQuery =
-				d.name.toLowerCase().includes(query.toLowerCase()) ||
-				d.phone.includes(query) ||
-				d.licenceNumber.toLowerCase().includes(query.toLowerCase()) ||
-				d.transporter.toLowerCase().includes(query.toLowerCase()) ||
-				d.assignedVehicle.toLowerCase().includes(query.toLowerCase());
+				!q ||
+				d.name.toLowerCase().includes(q) ||
+				d.phone.includes(q) ||
+				d.licenceNumber.toLowerCase().includes(q) ||
+				d.transporter.toLowerCase().includes(q) ||
+				d.vehicles.some(
+					(v) =>
+						v.plate.toLowerCase().includes(q) ||
+						v.make.toLowerCase().includes(q) ||
+						v.model.toLowerCase().includes(q) ||
+						v.transporter.toLowerCase().includes(q)
+				);
 			const matchStatus = statusFilter === "all" || d.status === statusFilter;
 			return matchQuery && matchStatus;
 		});
@@ -189,7 +226,8 @@ export default function GateDriversPage() {
 		const approved = drivers.filter((d) => d.status === "Approved").length;
 		const pending = drivers.filter((d) => d.status === "Pending review").length;
 		const expired = drivers.filter((d) => d.status === "Expired documents").length;
-		return { total, approved, pending, expired };
+		const assigned = drivers.filter((d) => d.vehicles.length > 0).length;
+		return { total, approved, pending, expired, assigned };
 	}, [drivers]);
 
 	const selected = useMemo(
@@ -350,11 +388,11 @@ export default function GateDriversPage() {
 								icon={User}
 							/>
 							<Metric
-								label="Approved"
-								value={String(stats.approved)}
-								detail="Cleared for gate entry"
+								label="With vehicle"
+								value={String(stats.assigned)}
+								detail="Assigned to a vehicle"
 								tone="success"
-								icon={Check}
+								icon={Truck}
 							/>
 							<Metric
 								label="Pending review"
@@ -477,8 +515,35 @@ export default function GateDriversPage() {
 															Expires {d.licenceExpiry}
 														</p>
 													</td>
-													<td className="px-4 py-3.5 font-mono text-[11px] text-ink">
-														{d.assignedVehicle}
+													<td className="px-4 py-3.5">
+														{d.vehicles.length === 0 ? (
+															<span className="inline-flex items-center gap-1 rounded-md bg-coral/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-coral ring-1 ring-coral/20">
+																<AlertTriangle className="size-3" />
+																No vehicle
+															</span>
+														) : (
+															<ul className="space-y-1.5">
+																{d.vehicles.map((v) => (
+																	<li
+																		key={v.id}
+																		className="flex items-start gap-2"
+																	>
+																		<span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-md bg-teal/10 text-teal-deep ring-1 ring-teal/20">
+																			<Truck className="size-3" />
+																		</span>
+																		<span className="min-w-0">
+																			<span className="block truncate font-mono text-[12px] font-semibold text-ink">
+																				{v.plate}
+																			</span>
+																			<span className="block truncate text-[10px] text-ink-soft">
+																				{v.kind} · {v.make}{" "}
+																				{v.model}
+																			</span>
+																		</span>
+																	</li>
+																))}
+															</ul>
+														)}
 													</td>
 													<td className="px-4 py-3.5 text-[11px] text-ink-soft">
 														{d.transporter}
@@ -630,6 +695,7 @@ function DriverDetail({
 	onReject: (reason: string) => Promise<boolean>;
 	onDelete: (reason: string) => Promise<void>;
 }) {
+	const navigate = useNavigate();
 	const [suspendOpen, setSuspendOpen] = useState(false);
 	const [rejectOpen, setRejectOpen] = useState(false);
 	const [deleteOpen, setDeleteOpen] = useState(false);
@@ -652,7 +718,7 @@ function DriverDetail({
 					disabled={actioning}
 					className="-ml-3 gap-2 text-ink-soft hover:text-ink"
 				>
-					<ArrowLeftIcon />
+					<ArrowLeft className="size-4" />
 					Back to drivers
 				</Button>
 				<Button
@@ -688,8 +754,8 @@ function DriverDetail({
 				<div className="grid gap-3 p-5 sm:grid-cols-3 sm:p-6">
 					<InfoStat label="Transporter" value={driver.transporter} />
 					<InfoStat
-						label="Assigned vehicle"
-						value={driver.assignedVehicle}
+						label="Vehicles assigned"
+						value={String(driver.vehicles.length)}
 						mono
 					/>
 					<InfoStat label="Last visit" value={driver.lastVisit} mono />
@@ -709,6 +775,68 @@ function DriverDetail({
 				<p className="mt-2 font-mono text-[11px] text-ink-soft">
 					Expires {driver.licenceExpiry}
 				</p>
+			</div>
+
+			<div className="rounded-2xl bg-paper p-5 ring-1 ring-line sm:p-6">
+				<div className="flex items-center justify-between gap-3">
+					<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+						Assigned vehicles
+					</p>
+					<span className="rounded-full bg-sand px-2 py-0.5 font-mono text-[10px] text-ink-soft">
+						{driver.vehicles.length}
+					</span>
+				</div>
+
+				{driver.vehicles.length === 0 ? (
+					<div className="mt-3 rounded-xl border border-dashed border-line bg-sand/40 p-4 text-center">
+						<Truck className="mx-auto size-6 text-ink-soft" />
+						<p className="mt-2 text-[12px] font-semibold text-ink">
+							No vehicle assigned
+						</p>
+						<p className="mt-1 text-[11px] text-ink-soft">
+							Assign a vehicle from the driver assignments page.
+						</p>
+						<Button
+							onClick={() => navigate("/gate/drivers/assignments")}
+							variant="outline"
+							className="mt-3 border-line bg-paper text-ink hover:bg-sand"
+						>
+							Open assignments
+						</Button>
+					</div>
+				) : (
+					<ul className="mt-3 space-y-2">
+						{driver.vehicles.map((v) => (
+							<li
+								key={v.id}
+								className="flex items-start gap-3 rounded-lg border border-line bg-sand p-3"
+							>
+								<span className="grid size-9 shrink-0 place-items-center rounded-lg bg-paper text-orange-deep ring-1 ring-line">
+									<Truck className="size-4" />
+								</span>
+								<div className="min-w-0 flex-1">
+									<div className="flex flex-wrap items-center gap-2">
+										<p className="font-mono text-[13px] font-semibold text-ink">
+											{v.plate}
+										</p>
+										{v.status && v.status !== "—" && (
+											<StatusBadge
+												label={v.status}
+												tone={statusTone(v.status)}
+											/>
+										)}
+									</div>
+									<p className="mt-0.5 text-[11px] text-ink-soft">
+										{v.kind} · {v.make} {v.model} · {v.year}
+									</p>
+									<p className="mt-0.5 font-mono text-[11px] text-ink-soft">
+										{v.capacity} · {v.transporter}
+									</p>
+								</div>
+							</li>
+						))}
+					</ul>
+				)}
 			</div>
 
 			<div className="rounded-2xl bg-paper p-5 ring-1 ring-line sm:p-6">
@@ -836,10 +964,6 @@ function DriverDetail({
 			)}
 		</div>
 	);
-}
-
-function ArrowLeftIcon() {
-	return <ArrowLeft className="size-4" />;
 }
 
 function InfoStat({
