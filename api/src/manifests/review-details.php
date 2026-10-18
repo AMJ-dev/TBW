@@ -2,22 +2,6 @@
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
     try {
-        $permission = $conn->prepare("
-            SELECT 1
-            FROM role_permissions rp
-            INNER JOIN permissions p ON p.id = rp.permission_id
-            WHERE rp.role_id = :role_id
-            AND p.permission_key = 'operations.manage'
-            LIMIT 1
-        ");
-        $permission->execute([":role_id" => $roleId]);
-
-        if (!$permission->fetchColumn()) {
-            http_response_code(403);
-            echo json_encode(["error" => true, "data" => "You do not have permission to review manifests.", "code" => null]);
-            exit;
-        }
-
         $stmt = $conn->prepare("
             SELECT
                 id,
