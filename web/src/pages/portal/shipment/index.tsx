@@ -785,16 +785,16 @@ export default function PortalShipmentsPage() {
 													</td>
 
 													<td className="max-w-[280px] px-5 py-4">
-									<div className="space-y-1.5">
-										<span className={cn("inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold", statusTone(String(item.manifest_action_status ?? "No manifest linked")))}>
-											{String(item.manifest_action_status ?? (item.manifest_linked ? "Manifest linked" : "No manifest linked"))}
-										</span>
-										{item.manifest_reference && <p className="font-mono text-[10px] text-muted-foreground">Manifest: {String(item.manifest_reference)}</p>}
-										{item.manifest_requires_action && item.manifest_review_reason && <p className="max-w-[260px] whitespace-normal text-xs text-rose-700">{String(item.manifest_review_reason)}</p>}
-										{item.manifest_requires_action && <Button variant="outline" size="sm" className="mt-1 h-7 text-xs" onClick={() => navigate(`/portal/shipment/edit/${item.id}`)}>Review shipment</Button>}
-									</div>
-								</td>
-								<td className="px-5 py-4 text-right">
+														<div className="space-y-1.5">
+															<span className={cn("inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold", statusTone(String(item.manifest_action_status ?? "No manifest linked")))}>
+																{String(item.manifest_action_status ?? (item.manifest_linked ? "Manifest linked" : "No manifest linked"))}
+															</span>
+															{item.manifest_reference && <p className="font-mono text-[10px] text-muted-foreground">Manifest: {String(item.manifest_reference)}</p>}
+															{item.manifest_requires_action && item.manifest_review_reason && <p className="max-w-[260px] whitespace-normal text-xs text-rose-700">{String(item.manifest_review_reason)}</p>}
+															{item.manifest_requires_action && <Button variant="outline" size="sm" className="mt-1 h-7 text-xs" onClick={() => navigate(`/portal/shipment/edit/${item.id}`)}>Review shipment</Button>}
+														</div>
+													</td>
+													<td className="px-5 py-4 text-right">
 														<Button
 															variant="ghost"
 															size="sm"

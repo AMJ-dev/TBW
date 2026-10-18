@@ -82,10 +82,12 @@ type ManifestReview = {
 	status?: string | null;
 	review_reason?: string | null;
 	review_responsible_party?: string | null;
-	notes?: string | null;
 	flagged_at?: string | null;
 	received_at?: string | null;
 	updated_at?: string | null;
+	requires_action?: boolean;
+	manifest_requires_action?: boolean;
+	notes?: string | null;
 };
 
 type ShipmentRecord = {
@@ -348,12 +350,9 @@ export default function PortalShipmentDetailsPage() {
 	const containerCount = shipment.container_count ?? containers.length;
 	const documentCount = shipment.document_count ?? documents.length;
 	const manifest = shipment.manifest ?? null;
-	const manifestStatus = String(manifest?.status ?? "").toLowerCase();
-	const manifestNeedsAction = Boolean(manifest?.flagged_at) && String(manifest?.review_responsible_party ?? "").toLowerCase() === "organisation";
-	// const manifestNeedsAction =
-	// 	manifestStatus === "discrepancy" ||
-	// 	Boolean(manifest?.review_reason) ||
-	// 	Boolean(manifest?.review_responsible_party);
+
+	const manifestNeedsAction = manifest?.manifest_requires_action === true || manifest?.requires_action === true;
+
 
 	return (
 		<AppShell

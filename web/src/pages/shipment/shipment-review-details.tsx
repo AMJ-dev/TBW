@@ -135,6 +135,40 @@ type PermittedAction = {
   reason: string | null;
 };
 
+type ShipmentManifest = {
+  id: string;
+  manifest_ref: string | null;
+  bill_of_lading: string | null;
+  vessel: string | null;
+  shipping_line: string | null;
+  origin_port: string | null;
+  eta: string | null;
+  containers: any[];
+  packages: number | null;
+  gross_weight: string | number | null;
+  consignee: string | null;
+  consignee_type: string | null;
+  agent: string | null;
+  source: string | null;
+  status: string | null;
+  notes: string | null;
+  review_reason: string | null;
+  review_responsible_party: string | null;
+  flagged_at: string | null;
+  validated_at: string | null;
+  received_at: string | null;
+  updated_at: string | null;
+  consignee_email: string | null;
+  consignee_phone: string | null;
+  consignee_address: string | null;
+  consignee_status: string | null;
+  review_status: string | null;
+  correction_reason: string | null;
+  reviewed_at: string | null;
+  matches: any[];
+  events: any[];
+};
+
 type Shipment = {
   id: string;
   shipment_reference: string | null;
@@ -177,6 +211,7 @@ type Shipment = {
   inventory: InventorySummary | null;
   activity: ActivityEvent[];
   permitted_actions: PermittedAction[];
+  manifests: ShipmentManifest[];
 };
 
 type CargoState = {
@@ -408,6 +443,7 @@ const normaliseShipment = (raw: any): Shipment => ({
   permitted_actions: Array.isArray(raw?.permitted_actions)
     ? raw.permitted_actions.map(normaliseAction)
     : [],
+  manifests: Array.isArray(raw?.manifests) ? raw.manifests : [],
 });
 
 const normaliseState = (raw: any): CargoState => ({
@@ -951,10 +987,6 @@ export default function OperationsShipmentReviewPage() {
   const [config, setConfig] = useState<CurrentConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [actionNote, setActionNote] = useState("");
-  const [holdReason, setHoldReason] = useState("");
-  const [authorityReference, setAuthorityReference] = useState("");
   const [showHistory, setShowHistory] = useState(true);
   const [showActivity, setShowActivity] = useState(true);
 
@@ -1002,6 +1034,7 @@ export default function OperationsShipmentReviewPage() {
         setShipment(
           normaliseShipment({
             ...payload,
+            manifests: shipmentResp.code?.manifests ?? payload.manifests ?? [],
             reviews,
             latest_review_reason: latestReviewReason,
           })
@@ -1030,115 +1063,10 @@ export default function OperationsShipmentReviewPage() {
     return map;
   }, [config]);
 
-  const permittedActions = shipment?.permitted_actions ?? [];
   const reviews = shipment?.reviews ?? [];
   const activity = shipment?.activity ?? [];
   const finance = shipment?.finance ?? null;
   const inventory = shipment?.inventory ?? null;
-
-  const requiresFinancial = permittedActions.some(
-    (a) => a.requires_financial_clearance
-  );
-  const requiresAuthority = permittedActions.some(
-    (a) => a.requires_authority_reference
-  );
-  const requiresHold = permittedActions.some((a) => a.requires_hold_clear);
-
-  const financialCleared = finance?.payment_cleared === true;
-
-  const canSubmitTransition =
-    (!requiresAuthority || authorityReference.trim() !== "") &&
-    (!requiresFinancial || financialCleared);
-
-  const handleReview = async (
-    decision: "approve" | "reject" | "return"
-  ) => {
-    if (!shipment || !id || submitting) return;
-
-    if (decision !== "approve" && actionNote.trim().length < 5) {
-      toast.error("Enter a clear reason of at least 5 characters.");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const body = new FormData();
-      body.set("id", id);
-      body.set("action", decision);
-      body.set("note", actionNote.trim());
-
-      const response = await http.post(
-        "/operator/shipment/transition/",
-        body,
-        {
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        }
-      );
-      const resp: Resp = response.data;
-      if (resp.error) {
-        toast.error(resp.data || "Could not review declaration.");
-        return;
-      }
-
-      toast.success(resp.data || "Declaration review saved.");
-      setActionNote("");
-      await fetchAll(true);
-    } catch (err: any) {
-      toast.error(
-        err?.response?.data?.data ||
-          err?.response?.data?.message ||
-          "Could not review declaration."
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleTransition = async (toCode: string) => {
-    if (!shipment || !id || submitting) return;
-    if (!canSubmitTransition) {
-      toast.error("Provide the required references before proceeding.");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const body = new FormData();
-      body.set("id", id);
-      body.set("to_status", toCode);
-      body.set("note", actionNote.trim());
-      if (holdReason.trim()) body.set("hold_reason", holdReason.trim());
-      if (authorityReference.trim())
-        body.set("authority_reference", authorityReference.trim());
-
-      const response = await http.post(
-        "/operator/shipment/transition/",
-        body,
-        {
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        }
-      );
-      const resp: Resp = response.data;
-      if (resp.error) {
-        toast.error(resp.data || "Could not update shipment.");
-        return;
-      }
-
-      toast.success(resp.data || "Shipment updated.");
-      setActionNote("");
-      setHoldReason("");
-      setAuthorityReference("");
-      await fetchAll(true);
-    } catch (err: any) {
-      toast.error(
-        err?.response?.data?.data ||
-          err?.response?.data?.message ||
-          "Could not update shipment."
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -1178,9 +1106,6 @@ export default function OperationsShipmentReviewPage() {
 
   const reference =
     shipment.shipment_reference ?? `${shipment.id.slice(0, 8)}…`;
-  const declarationIsReviewable =
-    shipment.status === "pending_review" ||
-    shipment.status === "CHANGES_REQUESTED";
   const currentState = stateLookup.get(shipment.status);
   const routeLine = `${shipment.origin_port || shipment.origin_country || "—"} → ${
     shipment.destination_port || "—"
@@ -1221,7 +1146,7 @@ export default function OperationsShipmentReviewPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                disabled={refreshing || submitting}
+                disabled={refreshing}
                 onClick={() => void fetchAll(true)}
                 className="ml-auto h-8 text-ink-soft hover:bg-sand hover:text-ink"
               >
@@ -1297,82 +1222,6 @@ export default function OperationsShipmentReviewPage() {
           status={shipment.status}
           customerLabel={currentState?.customer_label}
         />
-
-        {declarationIsReviewable && (
-          <motion.section
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.25 }}
-            className="overflow-hidden rounded-2xl border border-orange/30 bg-gradient-to-br from-orange/[0.07] via-orange/[0.03] to-paper shadow-[0_1px_0_0_rgba(0,0,0,0.02),0_8px_24px_-12px_rgba(255,102,0,0.25)]"
-          >
-            <div className="flex items-start gap-4 border-b border-orange/20 p-5 sm:p-6">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-orange text-white shadow-sm">
-                <ShieldAlert className="size-5" />
-              </span>
-              <div className="min-w-0">
-                <h2 className="font-display text-base font-bold tracking-tight text-ink">
-                  Declaration decision required
-                </h2>
-                <p className="mt-1 text-sm leading-6 text-ink-soft">
-                  Approving moves this declaration to{" "}
-                  <strong className="font-semibold text-orange-deep">
-                    EXPECTED
-                  </strong>
-                  . Rejection and correction requests require a reason and are
-                  retained in the review history.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-5 p-5 sm:p-6">
-              <label className="block">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-                    Review note / reason
-                  </span>
-                  <span className="font-mono text-[10px] text-ink-soft">
-                    {actionNote.length}/500
-                  </span>
-                </div>
-                <textarea
-                  value={actionNote}
-                  onChange={(event) => setActionNote(event.target.value)}
-                  rows={4}
-                  maxLength={500}
-                  placeholder="Explain why it is being rejected or what the applicant must correct..."
-                  className="mt-2 w-full resize-y rounded-xl border border-line bg-paper px-3.5 py-3 text-sm text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-orange focus:ring-2 focus:ring-orange/15"
-                />
-              </label>
-
-              <div className="flex flex-col gap-2 border-t border-orange/15 pt-5 sm:flex-row sm:flex-wrap">
-                <Button
-                  disabled={submitting}
-                  onClick={() => void handleReview("approve")}
-                  className="bg-teal-deep text-white shadow-sm hover:bg-teal-deep/90 disabled:opacity-60"
-                >
-                  <CheckCircle2 className="mr-2 size-4" />
-                  {submitting ? "Saving…" : "Approve declaration"}
-                </Button>
-                <Button
-                  disabled={submitting || actionNote.trim().length < 5}
-                  variant="outline"
-                  onClick={() => void handleReview("return")}
-                  className="border-orange/30 bg-paper text-orange-deep hover:bg-orange/10 disabled:opacity-60"
-                >
-                  <FileCheck2 className="mr-2 size-4" /> Return for correction
-                </Button>
-                <Button
-                  disabled={submitting || actionNote.trim().length < 5}
-                  variant="destructive"
-                  onClick={() => void handleReview("reject")}
-                  className="disabled:opacity-60"
-                >
-                  <XCircle className="mr-2 size-4" /> Reject declaration
-                </Button>
-              </div>
-            </div>
-          </motion.section>
-        )}
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_400px]">
           <div className="space-y-5">
@@ -1573,6 +1422,103 @@ export default function OperationsShipmentReviewPage() {
                     </li>
                   ))}
                 </ul>
+              )}
+            </Block>
+
+            <Block title="Manifest details" icon={<FileCheck2 className="size-4" />}>
+              {shipment.manifests.length === 0 ? (
+                <p className="text-sm leading-6 text-ink-soft">
+                  No manifest has been linked to this shipment yet.
+                </p>
+              ) : (
+                <div className="space-y-5">
+                  {shipment.manifests.map((manifest) => (
+                    <div key={manifest.id} className="rounded-xl border border-line p-4 sm:p-5">
+                      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-4">
+                        <div>
+                          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">Manifest reference</p>
+                          <h3 className="mt-1 text-base font-bold text-ink">{manifest.manifest_ref || "—"}</h3>
+                          <p className="mt-1 font-mono text-[11px] text-ink-soft">{manifest.id}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {manifest.status && <StatusPill status={manifest.status} />}
+                          {manifest.review_status && <DecisionPill decision={manifest.review_status.toUpperCase()} />}
+                        </div>
+                      </div>
+                      <div className="grid gap-x-5 gap-y-4 py-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <Field label="Manifest bill of lading" value={manifest.bill_of_lading} />
+                        <Field label="Manifest vessel" value={manifest.vessel} />
+                        <Field label="Shipping line" value={manifest.shipping_line} />
+                        <Field label="Origin port" value={manifest.origin_port} />
+                        <Field label="Manifest ETA" value={manifest.eta} />
+                        <Field label="Source" value={manifest.source} />
+                        <Field label="Consignee" value={manifest.consignee} />
+                        <Field label="Consignee type" value={manifest.consignee_type} />
+                        <Field label="Consignee status" value={manifest.consignee_status} />
+                        <Field label="Consignee email" value={manifest.consignee_email} />
+                        <Field label="Consignee phone" value={manifest.consignee_phone} />
+                        <Field label="Consignee address" value={manifest.consignee_address} />
+                        <Field label="Agent" value={manifest.agent} />
+                        <Field label="Packages" value={manifest.packages} />
+                        <Field label="Gross weight" value={manifest.gross_weight} />
+                        <Field label="Flagged at" value={formatDateTime(manifest.flagged_at)} />
+                        <Field label="Validated at" value={formatDateTime(manifest.validated_at)} />
+                        <Field label="Received at" value={formatDateTime(manifest.received_at)} />
+                        <Field label="Last updated" value={formatDateTime(manifest.updated_at)} />
+                        <Field label="Reviewed at" value={formatDateTime(manifest.reviewed_at)} />
+                        <Field label="Review responsible party" value={manifest.review_responsible_party} />
+                      </div>
+                      {(manifest.review_reason || manifest.correction_reason || manifest.notes) && (
+                        <div className="space-y-3 border-t border-line pt-4">
+                          {manifest.review_reason && <div><p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">Review reason</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-ink">{manifest.review_reason}</p></div>}
+                          {manifest.correction_reason && <div><p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">Correction reason</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-ink">{manifest.correction_reason}</p></div>}
+                          {manifest.notes && <div><p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">Manifest notes</p><p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-ink-soft">{manifest.notes}</p></div>}
+                        </div>
+                      )}
+                      {manifest.matches?.length > 0 && (
+                        <div className="mt-4 border-t border-line pt-4">
+                          <h4 className="text-sm font-semibold text-ink">Shipment matching</h4>
+                          <div className="mt-3 space-y-2">
+                            {manifest.matches.map((match: any) => (
+                              <div key={match.id} className="rounded-lg bg-sand/50 p-3 text-sm">
+                                <p className="font-medium text-ink">{humanise(String(match.match_method || "Manual match"))}</p>
+                                <p className="mt-1 text-xs text-ink-soft">Matched by {match.matched_by_name || match.matched_by || "—"} · Confirmed by {match.confirmed_by_name || match.confirmed_by || "—"}</p>
+                                <p className="mt-1 text-xs text-ink-soft">{formatDateTime(match.matched_at)}</p>
+                                {match.notes && <p className="mt-2 text-sm text-ink-soft">{match.notes}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {manifest.containers?.length > 0 && (
+                        <div className="mt-4 border-t border-line pt-4">
+                          <h4 className="text-sm font-semibold text-ink">Manifest containers</h4>
+                          <div className="mt-3 overflow-x-auto">
+                            <table className="w-full min-w-[520px] text-left text-sm">
+                              <thead><tr className="border-b border-line text-xs text-ink-soft"><th className="px-2 py-2 font-medium">Container</th><th className="px-2 py-2 font-medium">Size</th><th className="px-2 py-2 font-medium">Seal</th><th className="px-2 py-2 font-medium">Packages</th><th className="px-2 py-2 font-medium">Weight</th></tr></thead>
+                              <tbody>{manifest.containers.map((container: any, index: number) => <tr key={container.id || index} className="border-b border-line/70"><td className="px-2 py-2 font-mono">{container.container_no || container.container_number || "—"}</td><td className="px-2 py-2">{container.size || container.container_size || "—"}</td><td className="px-2 py-2 font-mono">{container.seal_no || container.seal_number || "—"}</td><td className="px-2 py-2">{container.package_count ?? container.packages ?? "—"}</td><td className="px-2 py-2">{container.gross_weight ?? "—"}</td></tr>)}</tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                      {manifest.events?.length > 0 && (
+                        <div className="mt-4 border-t border-line pt-4">
+                          <h4 className="text-sm font-semibold text-ink">Manifest history</h4>
+                          <ol className="mt-3 space-y-3 border-l border-line pl-4">
+                            {manifest.events.map((event: any) => (
+                              <li key={event.id} className="relative">
+                                <span className="absolute -left-[21px] top-1.5 size-2 rounded-full bg-orange" />
+                                <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-semibold text-ink">{humanise(String(event.action || "Event"))}</p><span className="font-mono text-[10px] text-ink-soft">{formatDateTime(event.created_at)}</span></div>
+                                <p className="mt-1 text-xs text-ink-soft">{event.actor_name || "Operator"}{event.from_status || event.to_status ? ` · ${event.from_status || "—"} → ${event.to_status || "—"}` : ""}</p>
+                                {event.details && <p className="mt-1 whitespace-pre-wrap text-sm leading-5 text-ink-soft">{String(event.details).startsWith("{") ? (() => { try { const parsed = JSON.parse(event.details); return [parsed.reason, parsed.responsible_party && `Responsible: ${parsed.responsible_party}`].filter(Boolean).join(" · ") || event.details; } catch { return event.details; } })() : event.details}</p>}
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </Block>
 
@@ -1988,136 +1934,6 @@ export default function OperationsShipmentReviewPage() {
           </aside>
         </div>
 
-        {!declarationIsReviewable &&
-          shipment.status !== "REJECTED" &&
-          permittedActions.length > 0 && (
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25 }}
-              className="overflow-hidden rounded-2xl border border-line bg-paper shadow-[0_1px_0_0_rgba(0,0,0,0.02),0_1px_3px_0_rgba(0,0,0,0.04)]"
-            >
-              <header className="flex items-center gap-3 border-b border-line bg-sand/40 px-5 py-4 sm:px-6">
-                <span className="grid size-8 place-items-center rounded-lg bg-teal/10 text-teal-deep ring-1 ring-teal/20">
-                  <CheckCircle2 className="size-4" />
-                </span>
-                <div>
-                  <h2 className="font-display text-sm font-bold tracking-tight text-ink">
-                    Permitted actions
-                  </h2>
-                  <p className="mt-0.5 text-[11px] text-ink-soft">
-                    Only actions your role can perform on this shipment at its
-                    current status
-                  </p>
-                </div>
-              </header>
-
-              <div className="space-y-5 p-5 sm:p-6">
-                <label className="block">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-                      Operational note
-                    </span>
-                    <span className="font-mono text-[10px] text-ink-soft">
-                      {actionNote.length}/500
-                    </span>
-                  </div>
-                  <textarea
-                    value={actionNote}
-                    onChange={(e) => setActionNote(e.target.value)}
-                    rows={3}
-                    maxLength={500}
-                    className="mt-2 w-full rounded-xl border border-line bg-background px-3.5 py-3 text-sm text-ink outline-none transition placeholder:text-ink-soft/60 focus:border-orange focus:ring-2 focus:ring-orange/15"
-                    placeholder="Add an optional note for this status change"
-                  />
-                </label>
-
-                {requiresAuthority && (
-                  <label className="block">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-                      Authority reference
-                    </span>
-                    <input
-                      value={authorityReference}
-                      onChange={(e) => setAuthorityReference(e.target.value)}
-                      className="mt-2 w-full rounded-xl border border-line bg-background px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-orange focus:ring-2 focus:ring-orange/15"
-                    />
-                  </label>
-                )}
-
-                {requiresHold && (
-                  <label className="block">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-                      Hold reason (if applicable)
-                    </span>
-                    <input
-                      value={holdReason}
-                      onChange={(e) => setHoldReason(e.target.value)}
-                      className="mt-2 w-full rounded-xl border border-line bg-background px-3.5 py-2.5 text-sm text-ink outline-none transition focus:border-orange focus:ring-2 focus:ring-orange/15"
-                    />
-                  </label>
-                )}
-
-                {requiresFinancial && !financialCleared && (
-                  <div className="rounded-xl border border-orange/30 bg-orange/5 p-4">
-                    <div className="flex items-start gap-3">
-                      <Banknote className="mt-0.5 size-4 shrink-0 text-orange-deep" />
-                      <div>
-                        <p className="text-[13px] font-semibold text-ink">
-                          Finance clearance required
-                        </p>
-                        <p className="mt-1 text-[12px] leading-5 text-ink-soft">
-                          This action requires payment to be cleared by the
-                          finance department against the invoice. No reference
-                          field is accepted here — the terminal verifies
-                          clearance from live payment records.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-2 border-t border-line pt-5">
-                  {permittedActions.map((action) => (
-                    <Button
-                      key={`${action.action}-${action.to_status}`}
-                      disabled={submitting || !canSubmitTransition}
-                      onClick={() => void handleTransition(action.to_status)}
-                      className={cn(primaryBtn, "disabled:opacity-60")}
-                    >
-                      {action.label}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            </motion.section>
-          )}
-
-        {!declarationIsReviewable &&
-          shipment.status !== "REJECTED" &&
-          permittedActions.length === 0 && (
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25 }}
-              className="rounded-2xl border border-line bg-paper p-5 shadow-[0_1px_0_0_rgba(0,0,0,0.02),0_1px_3px_0_rgba(0,0,0,0.04)] sm:p-6"
-            >
-              <div className="flex items-start gap-3">
-                <ShieldCheck className="mt-0.5 size-5 shrink-0 text-ink-soft" />
-                <div>
-                  <h2 className="font-display text-sm font-bold tracking-tight text-ink">
-                    No actions available
-                  </h2>
-                  <p className="mt-1 text-sm leading-6 text-ink-soft">
-                    Either your role does not have permission to progress this
-                    shipment from its current status, or the required records
-                    (documents, payment clearance, hold release) are not yet in
-                    place.
-                  </p>
-                </div>
-              </div>
-            </motion.section>
-          )}
       </div>
     </AppShell>
   );

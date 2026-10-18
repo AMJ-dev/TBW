@@ -2,11 +2,13 @@
 
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
+header("Content-Type: application/json; charset=utf-8");
+
 if ($_SERVER["REQUEST_METHOD"] !== "GET") {
     http_response_code(405);
     echo json_encode([
         "error" => true,
-        "data" => "Method not allowed",
+        "data" => "Method not allowed.",
         "code" => null
     ]);
     exit;
@@ -46,9 +48,10 @@ try {
           AND p.permission_key = :permission_key
         LIMIT 1
     ");
-    $permStmt->bindValue(":role_id", $systemRoleId);
-    $permStmt->bindValue(":permission_key", "operations.view");
-    $permStmt->execute();
+    $permStmt->execute([
+        ":role_id" => $systemRoleId,
+        ":permission_key" => "operations.view"
+    ]);
 
     if (!$permStmt->fetchColumn()) {
         http_response_code(403);
@@ -60,7 +63,7 @@ try {
         exit;
     }
 
-    $shipmentId = trim($_GET["id"] ?? "");
+    $shipmentId = trim((string) ($_GET["id"] ?? ""));
 
     if ($shipmentId === "") {
         http_response_code(400);
@@ -78,7 +81,10 @@ try {
             ps.shipment_reference,
             ps.user_id,
             ps.organisation_id,
-            o.organisation_name AS organisation_name,
+            COALESCE(
+                NULLIF(o.trading_name, ''),
+                o.organisation_name
+            ) AS organisation_name,
             ps.shipment_type,
             ps.bill_of_lading,
             ps.booking_number,
@@ -112,8 +118,7 @@ try {
         WHERE ps.id = :id
         LIMIT 1
     ");
-    $stmt->bindValue(":id", $shipmentId);
-    $stmt->execute();
+    $stmt->execute([":id" => $shipmentId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$row) {
@@ -132,39 +137,48 @@ try {
         WHERE shipment_id = :shipment_id
         ORDER BY created_at ASC
     ");
-    $containerStmt->bindValue(":shipment_id", $shipmentId);
-    $containerStmt->execute();
-    $containerRows = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
+    $containerStmt->execute([":shipment_id" => $shipmentId]);
 
     $containers = [];
-    foreach ($containerRows as $c) {
+
+    foreach ($containerStmt->fetchAll(PDO::FETCH_ASSOC) as $c) {
         $containers[] = [
             "id" => (string) $c["id"],
             "container_no" => (string) $c["container_no"],
             "size" => $c["size"],
             "seal_no" => $c["seal_no"],
-            "package_count" => $c["package_count"] !== null ? (float) $c["package_count"] : null,
-            "gross_weight" => $c["gross_weight"] !== null ? (float) $c["gross_weight"] : null
+            "package_count" => $c["package_count"] !== null
+                ? (float) $c["package_count"]
+                : null,
+            "gross_weight" => $c["gross_weight"] !== null
+                ? (float) $c["gross_weight"]
+                : null
         ];
     }
 
     $documentStmt = $conn->prepare("
-        SELECT id, document_type, original_name, file_path, mime_type, file_size, uploaded_at
+        SELECT
+            id,
+            document_type,
+            original_name,
+            file_path,
+            mime_type,
+            file_size,
+            uploaded_at
         FROM portal_shipment_documents
         WHERE shipment_id = :shipment_id
         ORDER BY uploaded_at ASC
     ");
-    $documentStmt->bindValue(":shipment_id", $shipmentId);
-    $documentStmt->execute();
-    $documentRows = $documentStmt->fetchAll(PDO::FETCH_ASSOC);
+    $documentStmt->execute([":shipment_id" => $shipmentId]);
 
     $documents = [];
-    foreach ($documentRows as $d) {
+
+    foreach ($documentStmt->fetchAll(PDO::FETCH_ASSOC) as $d) {
         $documents[] = [
             "id" => (string) $d["id"],
             "document_type" => (string) $d["document_type"],
             "original_name" => (string) $d["original_name"],
-            "file_path" => (string) $d["file_path"],
+            "file_path" => $d["file_path"],
             "mime_type" => $d["mime_type"],
             "file_size" => (int) $d["file_size"],
             "uploaded_at" => (string) $d["uploaded_at"]
@@ -193,9 +207,15 @@ try {
         "cargo_description" => $row["cargo_description"],
         "cargo_category" => (string) $row["cargo_category"],
         "package_type" => (string) $row["package_type"],
-        "package_count" => $row["package_count"] !== null ? (float) $row["package_count"] : null,
-        "gross_weight" => $row["gross_weight"] !== null ? (float) $row["gross_weight"] : null,
-        "volume" => $row["volume"] !== null ? (float) $row["volume"] : null,
+        "package_count" => $row["package_count"] !== null
+            ? (float) $row["package_count"]
+            : null,
+        "gross_weight" => $row["gross_weight"] !== null
+            ? (float) $row["gross_weight"]
+            : null,
+        "volume" => $row["volume"] !== null
+            ? (float) $row["volume"]
+            : null,
         "hs_code" => $row["hs_code"],
         "dangerous_goods" => (string) $row["dangerous_goods"],
         "temperature_controlled" => (string) $row["temperature_controlled"],
@@ -208,7 +228,119 @@ try {
         "containers" => $containers,
         "documents" => $documents
     ];
- $reviewStmt = $conn->prepare("
+
+    $manifestStmt = $conn->prepare("
+        SELECT DISTINCT om.*
+        FROM operation_manifests om
+        LEFT JOIN operation_manifest_shipment_matches osm
+            ON osm.manifest_id = om.id
+        WHERE om.matched_shipment_id = :direct_shipment_id
+           OR osm.shipment_id = :matched_shipment_id
+        ORDER BY om.updated_at DESC
+    ");
+    $manifestStmt->execute([
+        ":direct_shipment_id" => $shipmentId,
+        ":matched_shipment_id" => $shipmentId
+    ]);
+
+    $manifestRows = $manifestStmt->fetchAll(PDO::FETCH_ASSOC);
+    $manifests = [];
+    $manifestIds = [];
+
+    foreach ($manifestRows as $manifestRow) {
+        $manifestId = (string) $manifestRow["id"];
+        $manifestIds[] = $manifestId;
+
+        $manifest = $manifestRow;
+        $manifest["id"] = $manifestId;
+        $manifest["matched_shipment_id"] =
+            $manifestRow["matched_shipment_id"] ?? null;
+
+        $manifest["containers"] = [];
+        $manifest["matches"] = [];
+        $manifest["events"] = [];
+
+        $manifests[$manifestId] = $manifest;
+    }
+
+    $manifestMatches = [];
+    $manifestContainers = [];
+    $manifestEvents = [];
+
+    if ($manifestIds) {
+        $placeholders = implode(
+            ", ",
+            array_fill(0, count($manifestIds), "?")
+        );
+
+        $matchStmt = $conn->prepare("
+            SELECT
+                osm.*,
+                u.full_name AS matched_by_name,
+                confirmer.full_name AS confirmed_by_name
+            FROM operation_manifest_shipment_matches osm
+            LEFT JOIN users u ON u.id = osm.matched_by
+            LEFT JOIN users confirmer ON confirmer.id = osm.confirmed_by
+            WHERE osm.manifest_id IN ($placeholders)
+            ORDER BY osm.matched_at DESC
+        ");
+        $matchStmt->execute($manifestIds);
+        $manifestMatches = $matchStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($manifestMatches as $match) {
+            $manifestId = (string) $match["manifest_id"];
+
+            if (isset($manifests[$manifestId])) {
+                $manifests[$manifestId]["matches"][] = $match;
+            }
+        }
+
+        $manifestContainerStmt = $conn->prepare("
+            SELECT *
+            FROM operation_manifest_containers
+            WHERE manifest_id IN ($placeholders)
+            ORDER BY manifest_id ASC, container_no ASC
+        ");
+        $manifestContainerStmt->execute($manifestIds);
+        $manifestContainers = $manifestContainerStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($manifestContainers as $container) {
+            $manifestId = (string) $container["manifest_id"];
+
+            if (isset($manifests[$manifestId])) {
+                $manifests[$manifestId]["containers"][] = $container;
+            }
+        }
+
+        $eventStmt = $conn->prepare("
+            SELECT
+                e.id,
+                e.manifest_id,
+                e.actor_id,
+                u.full_name AS actor_name,
+                e.action,
+                e.from_status,
+                e.to_status,
+                e.details,
+                e.created_at
+            FROM operation_manifest_events e
+            LEFT JOIN users u ON u.id = e.actor_id
+            WHERE e.manifest_id IN ($placeholders)
+            ORDER BY e.created_at DESC
+        ");
+        $eventStmt->execute($manifestIds);
+        $manifestEvents = $eventStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($manifestEvents as $event) {
+            $manifestId = (string) $event["manifest_id"];
+
+            if (isset($manifests[$manifestId])) {
+                $manifests[$manifestId]["events"][] = $event;
+            }
+        }
+    }
+
+    $reviewStmt = $conn->prepare("
         SELECT
             sdr.id,
             sdr.shipment_id,
@@ -227,14 +359,11 @@ try {
         WHERE sdr.shipment_id = :shipment_id
         ORDER BY sdr.created_at DESC
     ");
-
-    $reviewStmt->bindValue(":shipment_id", $shipmentId);
-    $reviewStmt->execute();
-    $reviewRows = $reviewStmt->fetchAll(PDO::FETCH_ASSOC);
+    $reviewStmt->execute([":shipment_id" => $shipmentId]);
 
     $reviews = [];
 
-    foreach ($reviewRows as $review) {
+    foreach ($reviewStmt->fetchAll(PDO::FETCH_ASSOC) as $review) {
         $reviews[] = [
             "id" => (string) $review["id"],
             "shipment_id" => (string) $review["shipment_id"],
@@ -247,23 +376,63 @@ try {
                 "pics" => $review["reviewer_pics"]
             ],
             "decision" => (string) $review["decision"],
-            "from_status" => (string) $review["from_status"],
-            "to_status" => (string) $review["to_status"],
+            "from_status" => $review["from_status"],
+            "to_status" => $review["to_status"],
             "reason" => $review["reason"],
             "created_at" => (string) $review["created_at"]
         ];
     }
 
+    $logs = [];
+
+    foreach ($reviews as $review) {
+        $logs[] = [
+            "id" => $review["id"],
+            "type" => "declaration_review",
+            "title" => "Declaration " . str_replace("_", " ", $review["decision"]),
+            "actor_id" => $review["reviewer_id"],
+            "actor_name" => $review["reviewer"]["full_name"],
+            "from_status" => $review["from_status"],
+            "to_status" => $review["to_status"],
+            "details" => $review["reason"],
+            "created_at" => $review["created_at"]
+        ];
+    }
+
+    foreach ($manifestEvents as $event) {
+        $logs[] = [
+            "id" => (string) $event["id"],
+            "type" => "manifest",
+            "manifest_id" => (string) $event["manifest_id"],
+            "title" => (string) $event["action"],
+            "actor_id" => $event["actor_id"],
+            "actor_name" => $event["actor_name"],
+            "from_status" => $event["from_status"],
+            "to_status" => $event["to_status"],
+            "details" => $event["details"],
+            "created_at" => (string) $event["created_at"]
+        ];
+    }
+
+    usort($logs, function ($a, $b) {
+        return strcmp($b["created_at"], $a["created_at"]);
+    });
+
     $latestReview = $reviews[0] ?? null;
-    
+
     echo json_encode([
         "error" => false,
         "data" => "Shipment loaded.",
         "code" => [
             "shipment" => $shipment,
+            "manifests" => array_values($manifests),
+            "manifest_matches" => $manifestMatches,
+            "manifest_containers" => $manifestContainers,
+            "manifest_events" => $manifestEvents,
             "reviews" => $reviews,
             "latest_review" => $latestReview,
-            "latest_review_reason" => $latestReview["reason"] ?? null
+            "latest_review_reason" => $latestReview["reason"] ?? null,
+            "logs" => $logs
         ]
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
@@ -272,6 +441,6 @@ try {
     echo json_encode([
         "error" => true,
         "data" => "Could not load shipment.",
-        "code" => null
+        "code" => $e->getMessage()
     ]);
 }
