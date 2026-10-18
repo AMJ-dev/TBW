@@ -129,3 +129,19 @@ RewriteRule ^operations/manifests/details/([0-9a-zA-Z-]+)/$ src/manifests/detail
 RewriteRule ^operations/manifests/review/validate/([0-9a-zA-Z-]+)/$ src/manifests/validate.php?id=$1 [NC]
 RewriteRule ^operations/manifests/review/details/([0-9a-zA-Z-]+)/$ src/manifests/review-details.php?id=$1 [NC]
 RewriteRule ^operations/manifests/onboarding-request/$ src/manifests/onboarding-request.php [NC]
+
+RewriteRule ^vehicles/$ src/vehicles/all.php [NC]
+RewriteRule ^vehicles/add/$ src/vehicles/add.php [NC]
+RewriteRule ^vehicles/reject/$ src/vehicles/reject.php [NC]
+RewriteRule ^vehicles/suspend/$ src/vehicles/suspend.php [NC]
+RewriteRule ^vehicles/approve/$ src/vehicles/approve.php [NC]
+RewriteRule ^vehicles/addeleted/$ src/vehicles/delete.php [NC]
+RewriteRule ^vehicles/activate/$ src/vehicles/activate.php [NC]
+RewriteRule ^vehicles/([0-9a-zA-Z-]+)/$ src/vehicles/get.php?id=$1 [NC]
+RewriteRule ^vehicles/update/([0-9a-zA-Z-]+)/$ src/vehicles/update.php?id=$1 [NC]
+
+# http.post("vehicles/delete/", { id, reason })
+# http.post("vehicles/suspend/", { id, reason })
+# http.post("vehicles/reject/", { id, reason })
+# http.post("vehicles/approve/", { id })
+# http.post("vehicles/activate/", { id })

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
 	AlertTriangle,
@@ -18,6 +18,7 @@ import { AppShell, Metric, StatusBadge, statusTone } from "@/components/auth-she
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { http, type Resp } from "@/lib/httpClient";
 
 type DriverStatus =
 	| "Approved"
