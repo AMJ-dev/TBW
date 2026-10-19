@@ -289,7 +289,6 @@ function GateConsole({ direction }: { direction: GateDirection }) {
   const [decision, setDecision] = useState<GateDecision | null>(null);
   const [decisionReason, setDecisionReason] = useState("");
   const [overrideReason, setOverrideReason] = useState("");
-  const [supervisorApprovalRef, setSupervisorApprovalRef] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -401,7 +400,6 @@ function GateConsole({ direction }: { direction: GateDirection }) {
     setDecision(null);
     setDecisionReason("");
     setOverrideReason("");
-    setSupervisorApprovalRef("");
     setLookupError(null);
   };
 
@@ -445,8 +443,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
       setDecision(null);
       setDecisionReason("");
       setOverrideReason("");
-      setSupervisorApprovalRef("");
-    } catch (error: unknown) {
+      } catch (error: unknown) {
       const message =
         error instanceof Error
           ? error.message
@@ -479,11 +476,6 @@ function GateConsole({ direction }: { direction: GateDirection }) {
       return;
     }
 
-    if (overrideNeeded && !supervisorApprovalRef.trim()) {
-      toast.error("Enter the supervisor approval reference.");
-      return;
-    }
-
     submitLock.current = true;
     setSubmitting(true);
 
@@ -496,7 +488,6 @@ function GateConsole({ direction }: { direction: GateDirection }) {
         decision,
         reason: decisionReason.trim(),
         override_reason: overrideReason.trim(),
-        supervisor_approval_ref: supervisorApprovalRef.trim(),
       });
 
       const resp: Resp = response.data;
@@ -517,8 +508,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
       setDecision(null);
       setDecisionReason("");
       setOverrideReason("");
-      setSupervisorApprovalRef("");
-
+  
       await loadQueue(true);
     } catch (error: unknown) {
       const message =
@@ -875,12 +865,12 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                       <ShieldAlert className="mt-0.5 size-4 shrink-0 text-orange-deep" />
                       <div>
                         <p className="text-sm font-semibold text-ink">
-                          Supervisor approval required
+                          Override review required
                         </p>
                         <p className="mt-1 text-xs leading-5 text-ink-soft">
-                          A reason alone is not approval. The server must
-                          verify the supervisor's authority and approval
-                          reference before accepting an override.
+                          Provide a clear reason for this exception. The server
+                          must validate the movement and enforce all mandatory
+                          safety, financial and release requirements.
                         </p>
                       </div>
                     </div>
@@ -901,20 +891,6 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                       />
                     </label>
 
-                    <label className="block">
-                      <span className="text-xs font-semibold text-ink">
-                        Supervisor approval reference
-                      </span>
-                      <Input
-                        value={supervisorApprovalRef}
-                        onChange={(event) =>
-                          setSupervisorApprovalRef(event.target.value)
-                        }
-                        maxLength={100}
-                        className="mt-2 border-line bg-paper text-ink"
-                        placeholder="Enter approved reference"
-                      />
-                    </label>
                   </div>
                 )}
 
@@ -942,8 +918,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                     (decision === "REJECT" && decisionReason.trim().length < 5) ||
                     (decision === "ADMIT" &&
                       active.readiness !== "Ready" &&
-                      (overrideReason.trim().length < 5 ||
-                        !supervisorApprovalRef.trim()))
+                      overrideReason.trim().length < 5)
                   }
                   onClick={() => void submitDecision()}
                 >
@@ -1094,8 +1069,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                         setDecision(null);
                         setDecisionReason("");
                         setOverrideReason("");
-                        setSupervisorApprovalRef("");
-                      }}
+                                          }}
                     >
                       Review
                       <ArrowRight className="ml-2 size-4" />
