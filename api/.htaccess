@@ -160,4 +160,9 @@ RewriteRule ^gate-passes/view/([0-9a-zA-Z-]+)/$ src/gate-passes/view.php?id=$1 [
 RewriteRule ^appointments/$ src/appointments/all.php [NC]
 RewriteRule ^appointments/add/$ src/appointments/add.php [NC]
 
+RewriteRule ^gate/in/queue/$ src/gate/in.php [NC]
+RewriteRule ^gate/out/queue/$ src/gate/out.php [NC]
+RewriteRule ^gate/passes/verify/$ src/gate/verify.php [NC]
+RewriteRule ^gate/decision/$ src/gate/decision.php [NC]
+
 

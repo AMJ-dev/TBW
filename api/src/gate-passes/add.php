@@ -246,7 +246,7 @@ try {
             type,
             valid_until,
             status,
-            created_by
+            issued_by
         ) VALUES (?, ?, ?, ?, ?, ?, 'Active', ?)
     ");
 
@@ -306,6 +306,6 @@ try {
     echo json_encode([
         "error" => true,
         "data" => "Could not issue gate pass.",
-        "code" => null
+        "code" => $e->getMessage()
     ]);
 }

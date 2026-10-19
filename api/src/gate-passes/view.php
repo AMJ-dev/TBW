@@ -37,7 +37,7 @@ try {
             gp.issued_at,
             gp.valid_until,
             gp.status,
-            gp.created_at,
+            gp.issued_at,
             v.plate AS vehicle_plate,
             d.name AS driver_name,
             d.phone AS driver_phone

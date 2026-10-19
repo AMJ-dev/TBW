@@ -24,7 +24,7 @@
                 gp.issued_at,
                 gp.valid_until,
                 gp.status,
-                gp.created_at,
+                gp.issued_at,
                 v.plate AS vehicle_plate,
                 d.name AS driver_name,
                 d.phone AS driver_phone
@@ -35,7 +35,7 @@
             INNER JOIN gate_drivers d
                 ON gp.driver_id COLLATE utf8mb4_unicode_ci =
                 d.id COLLATE utf8mb4_unicode_ci
-            ORDER BY gp.created_at DESC
+            ORDER BY gp.issued_at DESC
         ";
 
         $stmt = $conn->prepare($sql);
