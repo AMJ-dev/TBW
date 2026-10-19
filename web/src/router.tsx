@@ -76,6 +76,8 @@ const GatePage = lazy(() => import("@/pages/gate"));
 const GateDashboardPage = lazy(() => import("@/pages/gate/dashboard"));
 const GateAppointmentsPage = lazy(() => import("@/pages/gate/appointments"));
 const GatePassesPage = lazy(() => import("@/pages/gate/passes"));
+const GatePassFormPage = lazy(() => import("@/pages/gate/pass-form"));
+const GatePassDetailsPage = lazy(() => import("@/pages/gate/pass-details"));
 const GateVehiclesPage = lazy(() => import("@/pages/gate/vehicles"));
 const GateVehicleFormPage = lazy(() => import("@/pages/gate/vehicle-form"));
 const GateConsolePage = lazy(() => import("@/pages/gate/console"));
@@ -229,7 +231,8 @@ export default function Routers() {
 						<Route path="/gate/driver/edit/:id" element={<GateDriverFormPage />} />
 						<Route path="/gate/drivers/assignments" element={<GateDriverAssignmentsPage />} />
 						<Route path="/gate/appointments/book" element={<GateBookAppointmentsPage />} />
-						{/* gate/appointments/book */}
+						<Route path="/gate/passes/new" element={<GatePassFormPage />} />
+						<Route path="/gate/passes/:id" element={<GatePassDetailsPage />} />
 						
 						<Route path="/operations" element={<OperationsDashboardPage />} />
 						<Route path="/operations/dashboard" element={<OperationsDashboardPage />} />

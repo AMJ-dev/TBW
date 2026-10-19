@@ -1,429 +1,523 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { motion } from "framer-motion";
 import {
-	CheckCircle2,
-	Download,
-	Filter,
-	Plus,
-	QrCode,
-	Search,
-	ShieldAlert,
-	ShieldCheck,
-	X,
+  CheckCircle2,
+  Download,
+  Eye,
+  Filter,
+  LoaderCircle,
+  Plus,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  ShieldCheck,
+  Ticket,
+  AlertTriangle,
 } from "lucide-react";
 import { AppShell, StatusBadge, statusTone, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { http, type Resp } from "@/lib/httpClient";
 
-interface GatePass {
-	id: string;
-	passCode: string;
-	truckNo: string;
-	driver: string;
-	type: "Terminal Entry" | "Gate-Out Clearance" | "Collection";
-	issuedAt: string;
-	validUntil: string;
-	status: "Active" | "Redeemed" | "Revoked" | "Expired";
-	container: string;
+type GatePass = {
+  id: string;
+  passCode: string;
+  vehicleId: string;
+  truckNo: string;
+  driver: string;
+  driverPhone: string;
+  type: string;
+  issuedAt: string;
+  validUntil: string;
+  status: string;
+  containerNos: string[];
+};
+
+function extractList<T>(resp: Resp): T[] {
+  const value = resp.code ?? resp.data;
+
+  if (Array.isArray(value)) return value as T[];
+
+  if (value && typeof value === "object") {
+    const data = value as Record<string, unknown>;
+
+    for (const key of ["passes", "gate_passes", "results", "items", "data"]) {
+      if (Array.isArray(data[key])) return data[key] as T[];
+    }
+  }
+
+  return [];
 }
 
-const initialPasses: GatePass[] = [
-	{
-		id: "pas-1",
-		passCode: "GP-2026-09281",
-		truckNo: "KJA-882-XD",
-		driver: "Babatunde Alao",
-		type: "Terminal Entry",
-		issuedAt: "09 Sep · 09:15",
-		validUntil: "09 Sep · 17:00",
-		status: "Active",
-		container: "TRIU1234564",
-	},
-	{
-		id: "pas-2",
-		passCode: "GP-2026-09282",
-		truckNo: "LSR-441-YY",
-		driver: "Emeka Okoro",
-		type: "Gate-Out Clearance",
-		issuedAt: "09 Sep · 10:00",
-		validUntil: "09 Sep · 18:00",
-		status: "Active",
-		container: "MSCU9876540",
-	},
-	{
-		id: "pas-3",
-		passCode: "GP-2026-09283",
-		truckNo: "KTN-773-AA",
-		driver: "Yakubu Garba",
-		type: "Gate-Out Clearance",
-		issuedAt: "08 Sep · 14:20",
-		validUntil: "08 Sep · 20:00",
-		status: "Redeemed",
-		container: "HLCU1122338",
-	},
-	{
-		id: "pas-4",
-		passCode: "GP-2026-09284",
-		truckNo: "EKY-904-BB",
-		driver: "Femi Daniel",
-		type: "Terminal Entry",
-		issuedAt: "07 Sep · 08:30",
-		validUntil: "07 Sep · 16:00",
-		status: "Expired",
-		container: "ONEU9988774",
-	},
-];
+function normalizePass(item: Record<string, unknown>): GatePass {
+  type ContainerItem = {
+    container_no?: string | number | null;
+    containerNo?: string | number | null;
+  };
+
+  const rawContainers: unknown =
+    item["container_nos"] ?? item["containerNos"] ?? item["containers"] ?? [];
+
+  let containerNos: string[] = [];
+
+  if (Array.isArray(rawContainers)) {
+    containerNos = rawContainers
+      .map((container: unknown): string => {
+        if (typeof container === "string" || typeof container === "number") {
+          return String(container).trim();
+        }
+
+        if (typeof container === "object" && container !== null) {
+          const value = container as ContainerItem;
+          return String(value.container_no ?? value.containerNo ?? "").trim();
+        }
+
+        return "";
+      })
+      .filter((value: string) => value !== "");
+  } else if (typeof rawContainers === "string") {
+    containerNos = rawContainers
+      .split(",")
+      .map((value: string) => value.trim())
+      .filter((value: string) => value !== "");
+  }
+
+  const getString = (...values: unknown[]): string => {
+    const value = values.find(
+      (entry) => entry !== undefined && entry !== null,
+    );
+
+    return value === undefined ? "" : String(value);
+  };
+
+  return {
+    id: getString(item["id"]),
+    passCode: getString(item["pass_code"], item["passCode"]),
+    vehicleId: getString(item["vehicle_id"], item["vehicleId"]),
+    truckNo: getString(
+      item["vehicle_plate"],
+      item["plate"],
+      item["truckNo"],
+    ),
+    driver: getString(item["driver_name"], item["driver"]),
+    driverPhone: getString(item["driver_phone"], item["driverPhone"]),
+    type: getString(item["type"], item["pass_type"]) || "Terminal Entry",
+    issuedAt: getString(
+      item["issued_at"],
+      item["created_at"],
+      item["issuedAt"],
+    ),
+    validUntil: getString(item["valid_until"], item["validUntil"]),
+    status: getString(item["status"]) || "Unknown",
+    containerNos,
+  };
+}
+
+function formatDate(value: string) {
+  if (!value) return "—";
+
+  const date = new Date(value.replace(" ", "T"));
+
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(undefined, {
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+}
 
 export default function GatePassesRoute() {
-	const [passes, setPasses] = useState<GatePass[]>(initialPasses);
-	const [searchQuery, setSearchQuery] = useState("");
-	const [statusFilter, setStatusFilter] = useState("ALL");
-	const [isModalOpen, setIsModalOpen] = useState(false);
-	const [selectedPass, setSelectedPass] = useState<GatePass | null>(null);
+  const navigate = useNavigate();
+  const [passes, setPasses] = useState<GatePass[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
-	const [truckNo, setTruckNo] = useState("");
-	const [driver, setDriver] = useState("");
-	const [container, setContainer] = useState("");
-	const [type, setType] = useState<GatePass["type"]>("Terminal Entry");
+  // Retry parameters
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 1000;
 
-	const filteredPasses = useMemo(() => {
-		return passes.filter((p) => {
-			const matchQuery =
-				p.passCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				p.truckNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				p.driver.toLowerCase().includes(searchQuery.toLowerCase()) ||
-				p.container.toLowerCase().includes(searchQuery.toLowerCase());
+  const fetchPassesWithRetry = useCallback(async (attempt = 1): Promise<void> => {
+    try {
+      const response = await http.get("gate-passes/");
+      const resp: Resp = response.data;
 
-			const matchStatus =
-				statusFilter === "ALL" ? true : p.status.toUpperCase() === statusFilter.toUpperCase();
+      if (resp.error) {
+        throw new Error(String(resp.data || "Could not load gate passes."));
+      }
 
-			return matchQuery && matchStatus;
-		});
-	}, [passes, searchQuery, statusFilter]);
+      setPasses(
+        extractList<Record<string, unknown>>(resp).map(normalizePass),
+      );
+      setError(null);
+    } catch (err: any) {
+      if (attempt < MAX_RETRIES) {
+        // Wait before retrying (exponential backoff: 1s, 2s, etc.)
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS * attempt));
+        return fetchPassesWithRetry(attempt + 1);
+      }
+      
+      // Max retries reached
+      const errorMessage = err?.message || "Could not load gate passes after multiple attempts.";
+      setError(errorMessage);
+      setPasses([]);
+      toast.error(errorMessage);
+    }
+  }, []);
 
-	const handleIssuePass = (e: React.FormEvent) => {
-		e.preventDefault();
-		if (!truckNo || !driver || !container) {
-			toast.error("Please fill in truck, driver, and container.");
-			return;
-		}
+  const loadPasses = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    await fetchPassesWithRetry(1);
+    
+    setLoading(false);
+  }, [fetchPassesWithRetry]);
 
-		const nextCode = `GP-2026-09${285 + passes.length}`;
-		const newPass: GatePass = {
-			id: `pas-${passes.length + 1}`,
-			passCode: nextCode,
-			truckNo: truckNo.toUpperCase(),
-			driver,
-			type,
-			issuedAt: "Just now",
-			validUntil: "Today · 20:00",
-			status: "Active",
-			container: container.toUpperCase(),
-		};
+  useEffect(() => {
+    void loadPasses();
+  }, [loadPasses]);
 
-		setPasses([newPass, ...passes]);
-		setIsModalOpen(false);
-		setTruckNo("");
-		setDriver("");
-		setContainer("");
-		toast.success(`Gate pass ${nextCode} issued locally.`);
-	};
+  const filteredPasses = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
 
-	return (
-		<AppShell title="Gate Passes" eyebrow="Gate Control · Security Credentials">
-			<div className="flex flex-wrap items-end justify-between gap-4">
-				<div>
-					<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">
-						Security control · Gate pass records
-					</p>
-					<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
-						Gate passes & clearances
-					</h2>
-					<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-						Issue and track gate passes linked to truck plates, driver details, and cargo
-						reference.
-					</p>
-				</div>
-				<div className="flex gap-2">
-					<Button
-						variant="outline"
-						className="border-line bg-paper text-ink"
-						onClick={() => toast.success("Pass log exported locally.")}
-					>
-						<Download className="size-4" /> Export Log
-					</Button>
-					<Button
-						className="bg-orange text-white hover:bg-orange-deep"
-						onClick={() => setIsModalOpen(true)}
-					>
-						<Plus className="size-4" /> Issue Gate Pass
-					</Button>
-				</div>
-			</div>
+    return passes.filter((pass) => {
+      const matchesQuery =
+        !query ||
+        [
+          pass.passCode,
+          pass.truckNo,
+          pass.driver,
+          pass.driverPhone,
+          ...pass.containerNos,
+        ].some((value) => value.toLowerCase().includes(query));
 
-			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-				<Metric
-					label="Active Passes"
-					value={String(passes.filter((p) => p.status === "Active").length)}
-					detail="Currently valid in terminal"
-					tone="success"
-					icon={ShieldCheck}
-				/>
-				<Metric
-					label="Redeemed Today"
-					value="38"
-					detail="Gate-out exits recorded"
-					tone="info"
-					icon={CheckCircle2}
-				/>
-				<Metric
-					label="Expired / Overdue"
-					value="1"
-					detail="Pass window elapsed"
-					tone="warning"
-					icon={ShieldAlert}
-				/>
-				<Metric
-					label="Admittance Checks"
-					value="98.4%"
-					detail="Pass and plate recorded at gate"
-					tone="success"
-					icon={CheckCircle2}
-				/>
-			</div>
+      const matchesStatus =
+        statusFilter === "ALL" ||
+        pass.status.toLowerCase() === statusFilter.toLowerCase();
 
-			<section className="rounded-xl bg-paper ring-1 ring-line">
-				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
-					<div className="relative min-w-[260px] flex-1">
-						<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
-						<Input
-							value={searchQuery}
-							onChange={(e) => setSearchQuery(e.target.value)}
-							placeholder="Search by pass code, plate, driver, or container..."
-							className="h-10 border-line bg-sand pl-9 text-sm text-ink"
-						/>
-					</div>
+      return matchesQuery && matchesStatus;
+    });
+  }, [passes, searchQuery, statusFilter]);
 
-					<div className="flex items-center gap-2">
-						<span className="flex items-center gap-1 text-xs text-ink-soft">
-							<Filter className="size-3.5" /> Status:
-						</span>
-						{["ALL", "Active", "Redeemed", "Expired"].map((s) => (
-							<button
-								key={s}
-								onClick={() => setStatusFilter(s)}
-								className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-									statusFilter === s
-										? "bg-ink text-sand"
-										: "bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink"
-								}`}
-							>
-								{s}
-							</button>
-						))}
-					</div>
-				</div>
+  const activeCount = passes.filter(
+    (pass) => pass.status.toLowerCase() === "active",
+  ).length;
 
-				<div className="overflow-x-auto">
-					<table className="w-full min-w-[850px] text-left text-sm">
-						<thead>
-							<tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-								<th className="px-4 py-3 font-medium">Pass Code</th>
-								<th className="px-4 py-3 font-medium">Truck Plate</th>
-								<th className="px-4 py-3 font-medium">Driver</th>
-								<th className="px-4 py-3 font-medium">Container No.</th>
-								<th className="px-4 py-3 font-medium">Type</th>
-								<th className="px-4 py-3 font-medium">Validity</th>
-								<th className="px-4 py-3 font-medium">Status</th>
-								<th className="px-4 py-3 font-medium text-right">Action</th>
-							</tr>
-						</thead>
-						<tbody className="divide-y divide-line">
-							{filteredPasses.map((p) => (
-								<tr key={p.id} className="transition-colors hover:bg-sand/60">
-									<td className="px-4 py-3.5 font-mono text-xs font-semibold text-orange-deep">
-										{p.passCode}
-									</td>
-									<td className="px-4 py-3.5 font-mono text-xs font-bold text-ink">
-										{p.truckNo}
-									</td>
-									<td className="px-4 py-3.5 text-xs text-ink">{p.driver}</td>
-									<td className="px-4 py-3.5 font-mono text-xs text-ink-soft">
-										{p.container}
-									</td>
-									<td className="px-4 py-3.5 text-xs text-ink">{p.type}</td>
-									<td className="px-4 py-3.5 text-xs text-ink-soft">{p.validUntil}</td>
-									<td className="px-4 py-3.5">
-										<StatusBadge label={p.status} tone={statusTone(p.status)} />
-									</td>
-									<td className="px-4 py-3.5 text-right">
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => setSelectedPass(p)}
-											className="text-xs font-semibold text-orange-deep hover:bg-orange/10"
-										>
-											<QrCode className="mr-1 size-3.5" /> View QR
-										</Button>
-									</td>
-								</tr>
-							))}
-						</tbody>
-					</table>
-				</div>
+  const redeemedCount = passes.filter(
+    (pass) => pass.status.toLowerCase() === "redeemed",
+  ).length;
 
-				<div className="flex items-center justify-between border-t border-line px-4 py-3 font-mono text-[10px] text-ink-soft">
-					<span>
-						Showing {filteredPasses.length} of {passes.length} digital passes
-					</span>
-					<span>QR scanner compatible</span>
-				</div>
-			</section>
+  const expiredCount = passes.filter(
+    (pass) => pass.status.toLowerCase() === "expired",
+  ).length;
 
-			{isModalOpen && (
-				<div
-					className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4 backdrop-blur-sm"
-					onMouseDown={(e) => e.target === e.currentTarget && setIsModalOpen(false)}
-				>
-					<div className="w-full max-w-lg rounded-xl bg-paper p-6 shadow-2xl ring-1 ring-line">
-						<div className="flex items-center justify-between border-b border-line pb-4">
-							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-deep">
-									Gate pass
-								</p>
-								<h3 className="mt-1 font-display text-xl font-bold text-ink">
-									Issue Gate Pass
-								</h3>
-							</div>
-							<Button variant="ghost" size="icon" onClick={() => setIsModalOpen(false)}>
-								<X />
-							</Button>
-						</div>
+  const exportCsv = () => {
+    const rows = [
+      [
+        "Pass Code",
+        "Truck Plate",
+        "Driver",
+        "Driver Phone",
+        "Containers",
+        "Type",
+        "Issued At",
+        "Valid Until",
+        "Status",
+      ],
+      ...filteredPasses.map((pass) => [
+        pass.passCode,
+        pass.truckNo,
+        pass.driver,
+        pass.driverPhone,
+        pass.containerNos.join("; "),
+        pass.type,
+        pass.issuedAt,
+        pass.validUntil,
+        pass.status,
+      ]),
+    ];
 
-						<form onSubmit={handleIssuePass} className="mt-5 space-y-4">
-							<div className="grid grid-cols-2 gap-3">
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Truck Plate Number
-									</label>
-									<Input
-										required
-										placeholder="e.g. KJA-882-XD"
-										value={truckNo}
-										onChange={(e) => setTruckNo(e.target.value)}
-										className="mt-1.5 border-line bg-sand font-mono text-ink"
-									/>
-								</div>
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Pass Type
-									</label>
-									<select
-										value={type}
-										onChange={(e) => setType(e.target.value as GatePass["type"])}
-										className="mt-1.5 h-10 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none"
-									>
-										<option>Terminal Entry</option>
-										<option>Gate-Out Clearance</option>
-										<option>Collection</option>
-									</select>
-								</div>
-							</div>
+    const csv = rows
+      .map((row) =>
+        row
+          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+          .join(","),
+      )
+      .join("\r\n");
 
-							<div className="grid grid-cols-2 gap-3">
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Driver Full Name
-									</label>
-									<Input
-										required
-										placeholder="e.g. Babatunde Alao"
-										value={driver}
-										onChange={(e) => setDriver(e.target.value)}
-										className="mt-1.5 border-line bg-sand text-ink"
-									/>
-								</div>
-								<div>
-									<label className="block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-										Container Number
-									</label>
-									<Input
-										required
-										placeholder="e.g. TRIU1234564"
-										value={container}
-										onChange={(e) => setContainer(e.target.value)}
-										className="mt-1.5 border-line bg-sand font-mono text-ink"
-									/>
-								</div>
-							</div>
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv;charset=utf-8;" }),
+    );
 
-							<div className="flex justify-end gap-2 border-t border-line pt-4">
-								<Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-									Cancel
-								</Button>
-								<Button type="submit" className="bg-orange text-white hover:bg-orange-deep">
-									Issue Pass
-								</Button>
-							</div>
-						</form>
-					</div>
-				</div>
-			)}
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "gate-passes.csv";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
-			{selectedPass && (
-				<div
-					className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 px-4 backdrop-blur-sm"
-					onMouseDown={(e) => e.target === e.currentTarget && setSelectedPass(null)}
-				>
-					<div className="w-full max-w-sm rounded-xl bg-paper p-6 text-center shadow-2xl ring-1 ring-line">
-						<div className="flex items-center justify-between border-b border-line pb-3 text-left">
-							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange-deep">
-									Gate pass
-								</p>
-								<h3 className="font-display text-lg font-bold text-ink">
-									{selectedPass.passCode}
-								</h3>
-							</div>
-							<Button variant="ghost" size="icon" onClick={() => setSelectedPass(null)}>
-								<X />
-							</Button>
-						</div>
+  return (
+    <AppShell title="Gate Passes" eyebrow="Gate Control · Security Credentials">
+      <motion.div
+        initial={{ opacity: 0, x: 24 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.24, ease: "easeOut" }}
+        className="space-y-6"
+      >
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">
+              Security control · Gate pass records
+            </p>
+            <h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+              Gate passes & clearances
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+              Manage passes linked to approved vehicles, assigned drivers and
+              shipment containers.
+            </p>
+          </div>
 
-						<div className="my-5 grid place-items-center rounded-xl bg-sand p-6 ring-1 ring-line">
-							<QrCode className="size-36 text-ink" />
-							<p className="mt-3 font-mono text-xs font-bold text-ink">
-								{selectedPass.truckNo}
-							</p>
-							<p className="text-xs text-ink-soft">{selectedPass.driver}</p>
-						</div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              className="border-line bg-paper text-ink"
+              onClick={exportCsv}
+              disabled={loading || filteredPasses.length === 0}
+            >
+              <Download className="size-4" />
+              Export CSV
+            </Button>
 
-						<div className="space-y-1 text-xs text-ink-soft">
-							<p>
-								Type:{" "}
-								<span className="font-semibold text-ink">{selectedPass.type}</span>
-							</p>
-							<p>
-								Container:{" "}
-								<span className="font-mono text-ink">{selectedPass.container}</span>
-							</p>
-							<p>
-								Valid until: <span className="text-ink">{selectedPass.validUntil}</span>
-							</p>
-						</div>
+            <Button
+              variant="outline"
+              className="border-line bg-paper text-ink"
+              onClick={() => void loadPasses()}
+              disabled={loading}
+            >
+              {loading ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : (
+                <RefreshCw className="size-4" />
+              )}
+              Refresh
+            </Button>
 
-						<Button
-							className="mt-5 w-full bg-orange text-white hover:bg-orange-deep"
-							onClick={() => {
-								toast.success(`Gate slip for ${selectedPass.passCode} prepared for print.`);
-								setSelectedPass(null);
-							}}
-						>
-							Prepare Physical Gate Slip
-						</Button>
-					</div>
-				</div>
-			)}
-		</AppShell>
-	);
+            <Button
+              className="bg-orange text-white hover:bg-orange-deep"
+              onClick={() => navigate("/gate/passes/new")}
+            >
+              <Plus className="size-4" />
+              Issue Gate Pass
+            </Button>
+          </div>
+        </div>
+
+        {/* Global Error Banner with Retry */}
+        {error && !loading && (
+          <div className="rounded-xl border border-carmine/25 bg-carmine/5 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 size-5 shrink-0 text-carmine" />
+                <div>
+                  <p className="text-sm font-semibold text-ink">
+                    Failed to synchronise gate passes
+                  </p>
+                  <p className="mt-1 text-xs text-ink-soft">{error}</p>
+                </div>
+              </div>
+              <Button
+                onClick={() => void loadPasses()}
+                className="bg-carmine text-white hover:bg-carmine/90"
+              >
+                <RefreshCw className="mr-2 size-4" />
+                Retry Connection
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Metric
+            label="Active Passes"
+            value={String(activeCount)}
+            detail="Based on loaded records"
+            tone="success"
+            icon={ShieldCheck}
+          />
+          <Metric
+            label="Redeemed"
+            value={String(redeemedCount)}
+            detail="Passes already used"
+            tone="info"
+            icon={CheckCircle2}
+          />
+          <Metric
+            label="Expired"
+            value={String(expiredCount)}
+            detail="Passes no longer valid"
+            tone="warning"
+            icon={ShieldAlert}
+          />
+          <Metric
+            label="Total Passes"
+            value={String(passes.length)}
+            detail="Records returned by the API"
+            tone="info"
+            icon={Ticket}
+          />
+        </div>
+
+        <section className="overflow-hidden rounded-xl bg-paper ring-1 ring-line">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
+            <div className="relative min-w-[240px] flex-1">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search pass, plate, driver or container..."
+                className="h-10 border-line bg-sand pl-9 text-sm text-ink"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Filter className="size-4 text-ink-soft" />
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value)}
+                className="h-10 rounded-md border border-line bg-sand px-3 text-sm text-ink"
+              >
+                <option value="ALL">All statuses</option>
+                <option value="Active">Active</option>
+                <option value="Redeemed">Redeemed</option>
+                <option value="Revoked">Revoked</option>
+                <option value="Expired">Expired</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1000px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+                  <th className="px-4 py-3 font-medium">Pass Code</th>
+                  <th className="px-4 py-3 font-medium">Truck Plate</th>
+                  <th className="px-4 py-3 font-medium">Driver</th>
+                  <th className="px-4 py-3 font-medium">Containers</th>
+                  <th className="px-4 py-3 font-medium">Type</th>
+                  <th className="px-4 py-3 font-medium">Valid Until</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Action</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-line">
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-14 text-center text-ink-soft">
+                      <LoaderCircle className="mx-auto mb-2 size-5 animate-spin" />
+                      Loading gate passes...
+                    </td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-14 text-center">
+                      <AlertTriangle className="mx-auto mb-2 size-6 text-carmine" />
+                      <p className="font-medium text-ink">Data unavailable</p>
+                      <p className="mt-1 mb-4 text-xs text-ink-soft">
+                        Please check your connection or retry.
+                      </p>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => void loadPasses()}
+                        className="border-line bg-paper text-ink"
+                      >
+                        <RefreshCw className="mr-2 size-4" /> Try Again
+                      </Button>
+                    </td>
+                  </tr>
+                ) : filteredPasses.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-14 text-center">
+                      <Ticket className="mx-auto mb-2 size-6 text-ink-soft" />
+                      <p className="font-medium text-ink">No gate passes found</p>
+                      <p className="mt-1 text-xs text-ink-soft">
+                        Try another search or issue a new pass.
+                      </p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPasses.map((pass) => (
+                    <tr key={pass.id} className="transition-colors hover:bg-sand/50">
+                      <td className="px-4 py-3.5 font-mono text-xs font-semibold text-orange-deep">
+                        {pass.passCode || "—"}
+                      </td>
+                      <td className="px-4 py-3.5 font-mono text-xs font-bold text-ink">
+                        {pass.truckNo || "—"}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <p className="text-xs font-medium text-ink">
+                          {pass.driver || "—"}
+                        </p>
+                        <p className="mt-1 text-xs text-ink-soft">
+                          {pass.driverPhone}
+                        </p>
+                      </td>
+                      <td className="max-w-[240px] px-4 py-3.5">
+                        {pass.containerNos.length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {pass.containerNos.map((container) => (
+                              <span
+                                key={container}
+                                className="rounded bg-sand px-2 py-1 font-mono text-[10px] text-ink"
+                              >
+                                {container}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-ink-soft">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3.5 text-xs text-ink">
+                        {pass.type}
+                      </td>
+                      <td className="px-4 py-3.5 text-xs text-ink-soft">
+                        {formatDate(pass.validUntil)}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <StatusBadge
+                          label={pass.status}
+                          tone={statusTone(pass.status)}
+                        />
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="border-line bg-paper text-ink"
+                          onClick={() => navigate(`/gate/passes/${pass.id}`)}
+                        >
+                          <Eye className="mr-2 size-4" />
+                          View
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="border-t border-line px-4 py-3 text-xs text-ink-soft">
+            Showing {filteredPasses.length} of {passes.length} loaded records
+          </div>
+        </section>
+      </motion.div>
+    </AppShell>
+  );
 }
