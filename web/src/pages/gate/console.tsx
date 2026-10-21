@@ -7,7 +7,8 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   AlertTriangle,
   ArrowRight,
@@ -15,6 +16,8 @@ import {
   Clock3,
   Container,
   LoaderCircle,
+  ChevronRight,
+  Home,
   RefreshCw,
   ScanLine,
   Search,
@@ -53,6 +56,10 @@ interface QueuedTruck {
   consignment: string;
   purpose: string;
   readiness: Readiness;
+  statusLabel: string;
+  passStatus: string;
+  latestDecision: string;
+  used: boolean;
   notes: string;
   checks: {
     vehicle: boolean;
@@ -160,14 +167,27 @@ function normalizeTruck(item: Record<string, unknown>): QueuedTruck {
     item["container_nos"] ?? item["containerNos"] ?? item["containers"],
   );
 
-  const readinessValue: string = getString(item, "readiness", "cargo_readiness");
-  const normalizedReadiness = readinessValue.trim().toLowerCase();
+  const readinessValue = getString(item, "readiness", "cargo_readiness").trim().toLowerCase();
   const readiness: Readiness =
-    normalizedReadiness === "ready"
+    readinessValue === "ready"
       ? "Ready"
-      : normalizedReadiness === "not ready"
+      : readinessValue === "not ready"
         ? "Not ready"
         : "Needs verification";
+
+  const passStatus = getString(item, "pass_status", "passStatus");
+  const latestDecision = getString(item, "latest_decision", "latest_gate_in_decision").toUpperCase();
+  const used = getBoolean(item, "used");
+  const statusLabel = getString(item, "status_label", "statusLabel") || (() => {
+    const normalizedStatus = passStatus.trim().toLowerCase();
+    if (normalizedStatus === "redeemed") return "Redeemed";
+    if (normalizedStatus === "revoked") return "Revoked";
+    if (getBoolean(item, "pass_expired", "passExpired")) return "Expired";
+    if (used) return "Used";
+    if (latestDecision === "REJECT") return "Rejected";
+    if (latestDecision === "REFER") return "Referred";
+    return normalizedStatus ? normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1) : "Unknown";
+  })();
 
   const rawHolds: string[] = getStringArray(
     item["holds"] ?? item["hold_reasons"],
@@ -200,6 +220,10 @@ function normalizeTruck(item: Record<string, unknown>): QueuedTruck {
     ),
     purpose: getString(item, "purpose", "type") || "Terminal movement",
     readiness,
+    statusLabel,
+    passStatus,
+    latestDecision,
+    used,
     notes: getString(item, "readiness_notes", "notes"),
     checks: {
       vehicle: getBoolean(rawChecks, "vehicle", "vehicle_eligible"),
@@ -375,7 +399,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
 
       const matchesFilter =
         filter === "ALL" ||
-        truck.readiness.toLowerCase() === filter.toLowerCase();
+        truck.statusLabel.toLowerCase() === filter.toLowerCase();
 
       return matchesQuery && matchesFilter;
     });
@@ -548,8 +572,29 @@ function GateConsole({ direction }: { direction: GateDirection }) {
           : "Gate Control · Outbound"
       }
     >
-      <div className="space-y-6">
-        <header className="flex flex-wrap items-end justify-between gap-4">
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+        className="space-y-6"
+      >
+        <nav aria-label="Breadcrumb" className="flex items-center gap-2 text-xs text-ink-soft">
+          <Link to="/" className="inline-flex items-center gap-1.5 rounded-md transition-colors hover:text-orange-deep">
+            <Home className="size-3.5" />
+            Home
+          </Link>
+          <ChevronRight className="size-3.5 opacity-50" />
+          <span className="text-ink-soft">Operations</span>
+          <ChevronRight className="size-3.5 opacity-50" />
+          <span className="font-medium text-ink">{isGateIn ? "Gate In" : "Gate Out"}</span>
+        </nav>
+
+        <motion.header
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05, duration: 0.35 }}
+          className="flex flex-wrap items-end justify-between gap-4"
+        >
           <div>
             <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">
               Gate control · {isGateIn ? "Inbound" : "Outbound"}
@@ -581,9 +626,9 @@ function GateConsole({ direction }: { direction: GateDirection }) {
               Refresh queue
             </Button>
           </div>
-        </header>
+        </motion.header>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <motion.div variants={{ hidden: {}, show: { transition: { staggerChildren: 0.07 } } }} initial="hidden" animate="show" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <GateStat
             label="Queue"
             value={String(queue.length)}
@@ -612,9 +657,9 @@ function GateConsole({ direction }: { direction: GateDirection }) {
             icon={ShieldAlert}
             tone="critical"
           />
-        </div>
+        </motion.div>
 
-        <section className="rounded-xl bg-paper p-5 ring-1 ring-line sm:p-6">
+        <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12, duration: 0.4 }} whileHover={{ y: -1 }} className="rounded-2xl bg-paper p-5 shadow-sm ring-1 ring-line/80 sm:p-6">
           <div className="flex items-center gap-3">
             <div className="grid size-10 place-items-center rounded-lg bg-orange/10 text-orange-deep">
               <ScanLine className="size-5" />
@@ -659,10 +704,11 @@ function GateConsole({ direction }: { direction: GateDirection }) {
               <p>{lookupError}</p>
             </div>
           )}
-        </section>
+        </motion.section>
 
+        <AnimatePresence mode="wait">
         {active ? (
-          <section className="rounded-xl bg-paper ring-1 ring-line">
+          <motion.section key="review" initial={{ opacity: 0, y: 16, scale: 0.99 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }} className="rounded-2xl bg-paper shadow-sm ring-1 ring-line">
             <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-ink-soft">
@@ -728,20 +774,20 @@ function GateConsole({ direction }: { direction: GateDirection }) {
 
                 <div className="rounded-lg bg-sand p-4">
                   <p className="text-sm font-semibold text-ink">
-                    Server readiness
+                    Gate pass status
                   </p>
                   <div className="mt-2">
                     <StatusBadge
-                      label={active.readiness}
-                      tone={statusTone(active.readiness)}
+                      label={active.statusLabel}
+                      tone={statusTone(active.statusLabel)}
                     />
                   </div>
-                  {active.notes && (
+                  {!active.used && active.passStatus.toLowerCase() !== "redeemed" && active.notes && (
                     <p className="mt-2 text-sm text-ink-soft">
                       {active.notes}
                     </p>
                   )}
-                  {active.holds.length > 0 && (
+                  {!active.used && active.passStatus.toLowerCase() !== "redeemed" && active.holds.length > 0 && (
                     <div className="mt-3 space-y-1">
                       <p className="text-xs font-semibold text-red-700">
                         Recorded holds
@@ -802,6 +848,15 @@ function GateConsole({ direction }: { direction: GateDirection }) {
               </div>
 
               <div className="space-y-4">
+                {active.used || active.passStatus.toLowerCase() === "redeemed" ? (
+                  <div className="rounded-xl border border-line bg-sand p-4">
+                    <p className="font-semibold text-ink">Gate pass already used</p>
+                    <p className="mt-1 text-sm text-ink-soft">
+                      This pass has already been redeemed. No further gate-in decision is available.
+                    </p>
+                  </div>
+                ) : (
+                  <>
                 <div>
                   <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-ink-soft">
                     Gate decision
@@ -934,6 +989,8 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                       : "Select a decision"}
                 </Button>
 
+                </>
+                )}
                 <Button
                   variant="outline"
                   className="w-full border-line bg-paper text-ink"
@@ -944,9 +1001,9 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                 </Button>
               </div>
             </div>
-          </section>
+          </motion.section>
         ) : (
-          <section className="overflow-hidden rounded-xl bg-paper ring-1 ring-line">
+          <motion.section key="queue" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }} className="overflow-hidden rounded-2xl bg-paper shadow-sm ring-1 ring-line">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
               <div>
                 <h3 className="font-semibold text-ink">
@@ -962,10 +1019,14 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                 onChange={(event) => setFilter(event.target.value)}
                 className="h-9 rounded-md border border-line bg-sand px-3 text-sm text-ink"
               >
-                <option value="ALL">All readiness</option>
-                <option value="Ready">Ready</option>
-                <option value="Needs verification">Needs verification</option>
-                <option value="Not ready">Not ready</option>
+                <option value="ALL">All pass statuses</option>
+                <option value="Active">Active</option>
+                <option value="Redeemed">Redeemed</option>
+                <option value="Used">Used</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Referred">Referred</option>
+                <option value="Revoked">Revoked</option>
+                <option value="Expired">Expired</option>
               </select>
             </div>
 
@@ -1020,9 +1081,13 @@ function GateConsole({ direction }: { direction: GateDirection }) {
             ) : (
               <ul className="divide-y divide-line">
                 {filteredQueue.map((truck) => (
-                  <li
+                  <motion.li
                     key={truck.id}
-                    className="flex flex-wrap items-center gap-4 p-4 transition-colors hover:bg-sand/40 sm:px-5"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.22 }}
+                    whileHover={{ backgroundColor: "rgba(245, 158, 11, 0.045)" }}
+                    className="flex flex-wrap items-center gap-4 p-4 transition-colors sm:px-5"
                   >
                     <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-orange/10 text-orange-deep">
                       <Truck className="size-5" />
@@ -1034,8 +1099,8 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                           {truck.plate || "Plate unavailable"}
                         </p>
                         <StatusBadge
-                          label={truck.readiness}
-                          tone={statusTone(truck.readiness)}
+                          label={truck.statusLabel}
+                          tone={statusTone(truck.statusLabel)}
                         />
                       </div>
                       <p className="mt-1 text-xs text-ink-soft">
@@ -1074,13 +1139,14 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                       Review
                       <ArrowRight className="ml-2 size-4" />
                     </Button>
-                  </li>
+                  </motion.li>
                 ))}
               </ul>
             )}
-          </section>
+          </motion.section>
         )}
-      </div>
+        </AnimatePresence>
+      </motion.div>
     </AppShell>
   );
 }
@@ -1179,7 +1245,7 @@ function GateStat({
   };
 
   return (
-    <div className="rounded-xl bg-paper p-4 ring-1 ring-line">
+    <motion.div variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }} transition={{ duration: 0.3 }} whileHover={{ y: -3, boxShadow: "0 12px 28px rgba(15, 23, 42, 0.06)" }} className="rounded-2xl bg-paper p-4 shadow-sm ring-1 ring-line/80">
       <div className="flex items-center justify-between gap-2">
         <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
           {label}
@@ -1190,6 +1256,6 @@ function GateStat({
         {value}
       </p>
       <p className="mt-1 text-[11px] text-ink-soft">{detail}</p>
-    </div>
+    </motion.div>
   );
 }

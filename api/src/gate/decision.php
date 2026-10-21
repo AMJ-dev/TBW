@@ -1,69 +1,63 @@
 
 <?php
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
-
 header("Content-Type: application/json; charset=utf-8");
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     http_response_code(405);
-    echo json_encode([
-        "error" => true,
-        "data" => "Method not allowed.",
-        "code" => null
-    ]);
+    echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
     exit;
 }
 
-$recordId = trim((string)($_POST["record_id"] ?? ""));
-$appointmentId = trim((string)($_POST["appointment_id"] ?? ""));
-$passId = trim((string)($_POST["gate_pass_id"] ?? ""));
-$passCode = trim((string)($_POST["pass_code"] ?? ""));
-$direction = strtolower(trim((string)($_POST["direction"] ?? "")));
-$decision = strtoupper(trim((string)($_POST["decision"] ?? "")));
-$reason = trim((string)($_POST["reason"] ?? ""));
-$overrideReason = trim((string)($_POST["override_reason"] ?? ""));
+$passId = trim((string) ($_POST["gate_pass_id"] ?? ""));
+$passCode = trim((string) ($_POST["pass_code"] ?? ""));
+$appointmentId = trim((string) ($_POST["appointment_id"] ?? ""));
+$recordId = trim((string) ($_POST["record_id"] ?? ""));
+$direction = strtolower(trim((string) ($_POST["direction"] ?? "")));
+$decision = strtoupper(trim((string) ($_POST["decision"] ?? "")));
+$reason = trim((string) ($_POST["reason"] ?? ""));
+$overrideReason = trim((string) ($_POST["override_reason"] ?? ""));
 
-if ($passId === "" && $passCode === "" && $recordId === "" && $appointmentId === "") {
+if (!in_array($direction, ["in", "out"], true) ||
+    !in_array($decision, ["ADMIT", "REFER", "REJECT"], true)) {
     http_response_code(422);
-    echo json_encode([
-        "error" => true,
-        "data" => "A gate pass, pass code, appointment or movement record ID is required.",
-        "code" => null
-    ]);
+    echo json_encode(["error" => true, "data" => "Invalid direction or decision.", "code" => null]);
     exit;
 }
 
-if (
-    !in_array($direction, ["in", "out"], true) ||
-    !in_array($decision, ["ADMIT", "REFER", "REJECT"], true)
-) {
+if ($passId === "" && $passCode === "" && $appointmentId === "" && $recordId === "") {
     http_response_code(422);
-    echo json_encode([
-        "error" => true,
-        "data" => "Provide a valid direction and decision.",
-        "code" => null
-    ]);
+    echo json_encode(["error" => true, "data" => "A gate pass or appointment ID is required.", "code" => null]);
     exit;
 }
 
 if (in_array($decision, ["REFER", "REJECT"], true) && strlen($reason) < 5) {
     http_response_code(422);
-    echo json_encode([
-        "error" => true,
-        "data" => "Provide a reason of at least 5 characters for REFER or REJECT.",
-        "code" => null
-    ]);
+    echo json_encode(["error" => true, "data" => "Provide a reason of at least 5 characters.", "code" => null]);
     exit;
 }
 
 try {
     $conn->beginTransaction();
 
+    if ($passId !== "") {
+        $identitySql = "p.id = ?";
+        $identityValue = $passId;
+    } elseif ($passCode !== "") {
+        $identitySql = "p.pass_code = ?";
+        $identityValue = $passCode;
+    } elseif ($appointmentId !== "") {
+        $identitySql = "a.id = ?";
+        $identityValue = $appointmentId;
+    } else {
+        $identitySql = "a.id = ?";
+        $identityValue = $recordId;
+    }
+
     $sql = "
         SELECT
             a.id AS appointment_id,
             a.appointment_date,
-            a.slot_time,
             a.status AS appointment_status,
             a.vehicle_id,
             a.driver_id,
@@ -73,7 +67,6 @@ try {
             v.insurance_expiry,
             v.roadworthiness_expiry,
             d.name AS driver_name,
-            d.phone AS driver_phone,
             d.status AS driver_status,
             d.licence_expiry,
             p.id AS gate_pass_id,
@@ -81,89 +74,53 @@ try {
             p.type AS pass_type,
             p.status AS pass_status,
             p.valid_until,
-            p.issued_at,
             (
-                SELECT GROUP_CONCAT(
-                    UPPER(TRIM(pc.container_no))
-                    ORDER BY UPPER(TRIM(pc.container_no))
-                    SEPARATOR ','
-                )
+                SELECT GROUP_CONCAT(UPPER(TRIM(pc.container_no)) ORDER BY UPPER(TRIM(pc.container_no)) SEPARATOR ',')
                 FROM gate_pass_containers pc
                 WHERE pc.gate_pass_id = p.id
             ) AS pass_containers,
             (
-                SELECT GROUP_CONCAT(
-                    UPPER(TRIM(ac.container_no))
-                    ORDER BY UPPER(TRIM(ac.container_no))
-                    SEPARATOR ','
-                )
+                SELECT GROUP_CONCAT(UPPER(TRIM(ac.container_no)) ORDER BY UPPER(TRIM(ac.container_no)) SEPARATOR ',')
                 FROM gate_appointment_containers ac
                 WHERE ac.appointment_id = a.id
             ) AS appointment_containers
         FROM gate_passes p
-        INNER JOIN gate_appointments a
-            ON a.id = p.appointment_id
-        INNER JOIN gate_vehicles v
-            ON v.id = p.vehicle_id
-        INNER JOIN gate_drivers d
-            ON d.id = p.driver_id
-        WHERE
-            (? <> '' AND p.id = ?)
-            OR (? <> '' AND p.pass_code = ?)
-            OR (? <> '' AND a.id = ?)
-            OR (? <> '' AND a.id = ?)
+        INNER JOIN gate_appointments a ON a.id = p.appointment_id
+        INNER JOIN gate_vehicles v ON v.id = p.vehicle_id
+        INNER JOIN gate_drivers d ON d.id = p.driver_id
+        WHERE $identitySql
         LIMIT 1
         FOR UPDATE
     ";
 
     $stmt = $conn->prepare($sql);
-    $stmt->execute([
-        $passId,
-        $passId,
-        $passCode,
-        $passCode,
-        $appointmentId,
-        $appointmentId,
-        $recordId,
-        $recordId
-    ]);
-
+    $stmt->execute([$identityValue]);
     $record = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$record) {
         $conn->rollBack();
         http_response_code(404);
-        echo json_encode([
-            "error" => true,
-            "data" => "No matching appointment and gate pass were found.",
-            "code" => null
-        ]);
+        echo json_encode(["error" => true, "data" => "Gate pass or appointment not found.", "code" => null]);
         exit;
     }
 
-    if ($passId !== "" && $record["gate_pass_id"] !== $passId) {
-        throw new InvalidArgumentException("The supplied gate pass does not match the appointment.");
-    }
-
-    if ($passCode !== "" && $record["pass_code"] !== $passCode) {
-        throw new InvalidArgumentException("The supplied pass code does not match the appointment.");
-    }
-
-    if ($appointmentId !== "" && $record["appointment_id"] !== $appointmentId) {
-        throw new InvalidArgumentException("The supplied appointment does not match the gate pass.");
-    }
-
-    if ($recordId !== "" && $record["appointment_id"] !== $recordId) {
-        throw new InvalidArgumentException("The supplied record ID does not match the appointment.");
+    if (($passId !== "" && $record["gate_pass_id"] !== $passId) ||
+        ($passCode !== "" && $record["pass_code"] !== $passCode) ||
+        ($appointmentId !== "" && $record["appointment_id"] !== $appointmentId)) {
+        $conn->rollBack();
+        http_response_code(422);
+        echo json_encode(["error" => true, "data" => "Supplied identifiers do not match the gate pass.", "code" => null]);
+        exit;
     }
 
     $today = date("Y-m-d");
     $now = time();
 
-    $vehicleStatus = strtolower(trim((string)$record["vehicle_status"]));
-    $driverStatus = strtolower(trim((string)$record["driver_status"]));
-    $passStatus = strtolower(trim((string)$record["pass_status"]));
-    $appointmentStatus = strtolower(trim((string)$record["appointment_status"]));
+    $vehicleStatus = strtolower(trim((string) $record["vehicle_status"]));
+    $driverStatus = strtolower(trim((string) $record["driver_status"]));
+    $passStatus = strtolower(trim((string) $record["pass_status"]));
+    $appointmentStatus = strtolower(trim((string) $record["appointment_status"]));
+    $passType = trim((string) $record["pass_type"]);
 
     $vehicleEligible =
         $vehicleStatus === "approved" &&
@@ -178,132 +135,13 @@ try {
         $record["licence_expiry"] >= $today;
 
     $passExpiry = !empty($record["valid_until"])
-        ? strtotime((string)$record["valid_until"])
+        ? strtotime((string) $record["valid_until"])
         : false;
 
     $passEligible =
         $passStatus === "active" &&
         $passExpiry !== false &&
         $passExpiry > $now;
-
-    $appointmentDate = (string)$record["appointment_date"];
-
-    $appointmentEligible =
-        $appointmentDate === $today &&
-        (
-            $direction === "in"
-                ? in_array($appointmentStatus, ["confirmed", "arrived"], true)
-                : $appointmentStatus === "in terminal"
-        );
-
-    $passContainers = !empty($record["pass_containers"])
-        ? array_values(array_unique(array_filter(array_map(
-            "trim",
-            explode(",", strtoupper((string)$record["pass_containers"]))
-        ))))
-        : [];
-
-    $appointmentContainers = !empty($record["appointment_containers"])
-        ? array_values(array_unique(array_filter(array_map(
-            "trim",
-            explode(",", strtoupper((string)$record["appointment_containers"]))
-        ))))
-        : [];
-
-    sort($passContainers);
-    sort($appointmentContainers);
-
-    $containerListsMatch =
-        count($appointmentContainers) > 0 &&
-        count($passContainers) > 0 &&
-        $passContainers === $appointmentContainers;
-
-    $cargoChecks = [];
-    $cargoEligible = $containerListsMatch;
-
-    if (!$containerListsMatch) {
-        $cargoChecks[] = "Gate pass containers do not exactly match appointment containers";
-    } else {
-        $placeholders = implode(",", array_fill(0, count($appointmentContainers), "?"));
-
-        $cargoSql = "
-            SELECT
-                UPPER(TRIM(pc.container_no)) AS container_no,
-                UPPER(TRIM(pc.status)) AS container_status,
-                LOWER(TRIM(ps.status)) AS shipment_status,
-                pc.gate_in_at,
-                pc.received_at
-            FROM portal_shipment_containers pc
-            INNER JOIN portal_shipments ps
-                ON ps.id = pc.shipment_id
-            WHERE UPPER(TRIM(pc.container_no)) IN ($placeholders)
-            FOR UPDATE
-        ";
-
-        $cargoStmt = $conn->prepare($cargoSql);
-        $cargoStmt->execute($appointmentContainers);
-        $cargoRows = $cargoStmt->fetchAll(PDO::FETCH_ASSOC);
-
-        $cargoByNumber = [];
-
-        foreach ($cargoRows as $cargoRow) {
-            $cargoByNumber[$cargoRow["container_no"]][] = $cargoRow;
-        }
-
-        foreach ($appointmentContainers as $containerNo) {
-            if (!isset($cargoByNumber[$containerNo])) {
-                $cargoEligible = false;
-                $cargoChecks[] = "Container " . $containerNo . " is not registered against a shipment";
-                continue;
-            }
-
-            if (count($cargoByNumber[$containerNo]) !== 1) {
-                $cargoEligible = false;
-                $cargoChecks[] = "Container " . $containerNo . " matches multiple shipment records";
-                continue;
-            }
-
-            $cargo = $cargoByNumber[$containerNo][0];
-
-            $eligibleContainerStatuses = [
-                "EXPECTED",
-                "IN_TRANSIT_TO_TERMINAL",
-                "ARRIVED_AT_GATE"
-            ];
-
-            $eligibleShipmentStatuses = [
-                "expected",
-                "in_transit_to_terminal",
-                "arrived_at_gate"
-            ];
-
-            if (!in_array($cargo["container_status"], $eligibleContainerStatuses, true)) {
-                $cargoEligible = false;
-                $cargoChecks[] = "Container " . $containerNo . " has an ineligible status: " . $cargo["container_status"];
-            }
-
-            if (!in_array($cargo["shipment_status"], $eligibleShipmentStatuses, true)) {
-                $cargoEligible = false;
-                $cargoChecks[] = "Shipment for container " . $containerNo . " is not eligible for gate-in";
-            }
-
-            if (
-                $cargo["container_status"] === "ARRIVED_AT_GATE" &&
-                !empty($cargo["gate_in_at"])
-            ) {
-                $cargoEligible = false;
-                $cargoChecks[] = "Container " . $containerNo . " already has a gate-in timestamp";
-            }
-
-            if (
-                $cargo["container_status"] === "RECEIVED" ||
-                !empty($cargo["received_at"])
-            ) {
-                $cargoEligible = false;
-                $cargoChecks[] = "Container " . $containerNo . " has already been received";
-            }
-        }
-    }
 
     $assignmentStmt = $conn->prepare("
         SELECT id
@@ -314,53 +152,59 @@ try {
         LIMIT 1
         FOR UPDATE
     ");
-    $assignmentStmt->execute([
-        $record["vehicle_id"],
-        $record["driver_id"]
-    ]);
+    $assignmentStmt->execute([$record["vehicle_id"], $record["driver_id"]]);
+    $assignmentEligible = (bool) $assignmentStmt->fetch(PDO::FETCH_ASSOC);
 
-    $assignmentEligible = (bool)$assignmentStmt->fetch(PDO::FETCH_ASSOC);
+    $passContainers = !empty($record["pass_containers"])
+        ? array_values(array_unique(explode(",", (string) $record["pass_containers"])))
+        : [];
+
+    $appointmentContainers = !empty($record["appointment_containers"])
+        ? array_values(array_unique(explode(",", (string) $record["appointment_containers"])))
+        : [];
+
+    sort($passContainers);
+    sort($appointmentContainers);
+
+    $cargoEligible =
+        count($passContainers) > 0 &&
+        $passContainers === $appointmentContainers;
+
+    $appointmentEligible =
+        $record["appointment_date"] === $today &&
+        (
+            $direction === "in"
+                ? in_array($appointmentStatus, ["confirmed", "arrived"], true)
+                : $appointmentStatus === "in terminal"
+        );
 
     $holds = [];
 
     if (!$vehicleEligible) {
         $holds[] = "Vehicle approval or required documents are invalid or expired";
     }
-
     if (!$driverEligible) {
-        $holds[] = "Driver approval or driving licence is invalid or expired";
+        $holds[] = "Driver approval or licence is invalid or expired";
     }
-
     if (!$assignmentEligible) {
         $holds[] = "Driver is not currently assigned to this vehicle";
     }
-
     if (!$passEligible) {
         $holds[] = "Gate pass is expired, revoked, redeemed or otherwise inactive";
     }
-
     if (!$appointmentEligible) {
         $holds[] = "Appointment date or status does not permit this movement";
     }
-
-    if (!$containerListsMatch) {
-        $holds[] = "Gate pass containers do not match the appointment containers";
-    }
-
-    foreach ($cargoChecks as $cargoCheck) {
-        $holds[] = $cargoCheck;
+    if (!$cargoEligible) {
+        $holds[] = "Pass containers do not match appointment containers";
     }
 
     if ($direction === "in") {
-        if (!in_array($record["pass_type"], ["Terminal Entry", "Collection"], true)) {
+        if (!in_array($passType, ["Terminal Entry", "Collection"], true)) {
             $holds[] = "Pass type does not permit gate-in";
         }
 
-        if (!in_array($appointmentStatus, ["confirmed", "arrived"], true)) {
-            $holds[] = "Appointment status does not permit gate-in";
-        }
-
-        $duplicateStmt = $conn->prepare("
+        $duplicate = $conn->prepare("
             SELECT id
             FROM gate_movement_records
             WHERE appointment_id = ?
@@ -369,24 +213,20 @@ try {
             LIMIT 1
             FOR UPDATE
         ");
-        $duplicateStmt->execute([$record["appointment_id"]]);
+        $duplicate->execute([$record["appointment_id"]]);
 
-        if ($duplicateStmt->fetch(PDO::FETCH_ASSOC)) {
-            $holds[] = "Appointment has already been admitted";
+        if ($duplicate->fetch(PDO::FETCH_ASSOC)) {
+            $holds[] = "Appointment already has a successful gate-in movement";
         }
     } else {
-        if ($record["pass_type"] !== "Gate-Out Clearance") {
-            $holds[] = "A Gate-Out Clearance pass is required for gate-out";
+        if ($passType !== "Gate-Out Clearance") {
+            $holds[] = "A Gate-Out Clearance pass is required";
         }
 
-        if ($appointmentStatus !== "in terminal") {
-            $holds[] = "Appointment is not currently in the terminal";
-        }
+        $holds[] = "Financial clearance must be verified by the server";
+        $holds[] = "Release authorisation must be verified by the server";
 
-        $holds[] = "Financial clearance has not been verified against authoritative finance records";
-        $holds[] = "Release authorisation has not been verified against authoritative release records";
-
-        $duplicateStmt = $conn->prepare("
+        $duplicate = $conn->prepare("
             SELECT id
             FROM gate_movement_records
             WHERE appointment_id = ?
@@ -395,10 +235,10 @@ try {
             LIMIT 1
             FOR UPDATE
         ");
-        $duplicateStmt->execute([$record["appointment_id"]]);
+        $duplicate->execute([$record["appointment_id"]]);
 
-        if ($duplicateStmt->fetch(PDO::FETCH_ASSOC)) {
-            $holds[] = "Appointment has already been cleared for gate-out";
+        if ($duplicate->fetch(PDO::FETCH_ASSOC)) {
+            $holds[] = "Appointment already has a successful gate-out movement";
         }
     }
 
@@ -406,26 +246,14 @@ try {
 
     $checks = [
         "vehicle" => $vehicleEligible,
-        "driver" => $driverEligible && $assignmentEligible,
+        "driver" => $driverEligible,
+        "assignment" => $assignmentEligible,
         "appointment" => $appointmentEligible,
         "cargo" => $cargoEligible,
-        "financial" => false,
-        "release" => false
+        "pass" => $passEligible,
+        "financial" => null,
+        "release" => null
     ];
-
-    if ($decision === "ADMIT" && count($holds) > 0) {
-        $conn->rollBack();
-        http_response_code(422);
-        echo json_encode([
-            "error" => true,
-            "data" => "Admission blocked. Resolve the outstanding checks first.",
-            "code" => [
-                "holds" => $holds,
-                "checks" => $checks
-            ]
-        ]);
-        exit;
-    }
 
     if ($decision === "ADMIT" && $direction === "out") {
         $conn->rollBack();
@@ -433,24 +261,18 @@ try {
         echo json_encode([
             "error" => true,
             "data" => "Gate-out is blocked until financial clearance and release authorisation are verified by the server.",
-            "code" => [
-                "holds" => $holds,
-                "checks" => $checks
-            ]
+            "code" => ["holds" => $holds, "checks" => $checks]
         ]);
         exit;
     }
 
-    if ($decision === "ADMIT" && $direction === "in" && $overrideReason !== "") {
+    if ($decision === "ADMIT" && count($holds) > 0) {
         $conn->rollBack();
         http_response_code(422);
         echo json_encode([
             "error" => true,
-            "data" => "An override cannot bypass failed vehicle, driver, pass, appointment or cargo eligibility checks.",
-            "code" => [
-                "holds" => $holds,
-                "checks" => $checks
-            ]
+            "data" => "Admission blocked. Resolve the outstanding checks first.",
+            "code" => ["holds" => $holds, "checks" => $checks]
         ]);
         exit;
     }
@@ -460,17 +282,8 @@ try {
 
     $insert = $conn->prepare("
         INSERT INTO gate_movement_records (
-            id,
-            appointment_id,
-            gate_pass_id,
-            vehicle_id,
-            driver_id,
-            direction,
-            decision,
-            reason,
-            override_reason,
-            operator_id,
-            movement_at
+            id, appointment_id, gate_pass_id, vehicle_id, driver_id,
+            direction, decision, reason, override_reason, operator_id, movement_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     ");
 
@@ -497,7 +310,7 @@ try {
         $updateAppointment->execute([$record["appointment_id"]]);
 
         if ($updateAppointment->rowCount() !== 1) {
-            throw new RuntimeException("Appointment status changed before admission could be completed.");
+            throw new RuntimeException("Appointment status changed before admission.");
         }
 
         $updatePass = $conn->prepare("
@@ -512,40 +325,12 @@ try {
         if ($updatePass->rowCount() !== 1) {
             throw new RuntimeException("Gate pass is no longer active.");
         }
-
-        $containerUpdate = $conn->prepare("
-            UPDATE portal_shipment_containers
-            SET status = 'ARRIVED_AT_GATE',
-                gate_in_at = NOW()
-            WHERE UPPER(TRIM(container_no)) = ?
-              AND UPPER(TRIM(status)) IN (
-                  'EXPECTED',
-                  'IN_TRANSIT_TO_TERMINAL'
-              )
-              AND gate_in_at IS NULL
-              AND received_at IS NULL
-        ");
-
-        foreach ($appointmentContainers as $containerNo) {
-            $containerUpdate->execute([$containerNo]);
-
-            if ($containerUpdate->rowCount() !== 1) {
-                throw new RuntimeException(
-                    "Container " . $containerNo . " could not be updated to ARRIVED_AT_GATE. The admission was rolled back."
-                );
-            }
-        }
     }
 
     $audit = $conn->prepare("
         INSERT INTO gate_movement_audit (
-            id,
-            movement_id,
-            appointment_id,
-            gate_pass_id,
-            operator_id,
-            event_type,
-            event_data
+            id, movement_id, appointment_id, gate_pass_id,
+            operator_id, event_type, event_data
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
     ");
 
@@ -562,10 +347,8 @@ try {
             "direction" => $direction,
             "decision" => $decision,
             "reason" => $reason,
-            "override_reason" => $overrideReason,
             "holds" => $holds,
-            "checks" => $checks,
-            "containers" => $appointmentContainers
+            "checks" => $checks
         ], JSON_UNESCAPED_SLASHES)
     ]);
 
@@ -576,7 +359,6 @@ try {
         "data" => "Gate decision recorded successfully.",
         "code" => [
             "id" => $movementId,
-            "record_id" => $record["appointment_id"],
             "appointment_id" => $record["appointment_id"],
             "gate_pass_id" => $record["gate_pass_id"],
             "pass_code" => $record["pass_code"],
@@ -585,27 +367,17 @@ try {
             "reason" => $reason,
             "recorded_at" => date("Y-m-d H:i:s")
         ]
-    ]);
-} catch (InvalidArgumentException $e) {
-    if ($conn->inTransaction()) {
-        $conn->rollBack();
-    }
-
-    http_response_code(422);
-    echo json_encode([
-        "error" => true,
-        "data" => $e->getMessage(),
-        "code" => null
-    ]);
+    ], JSON_UNESCAPED_SLASHES);
 } catch (Throwable $e) {
     if ($conn->inTransaction()) {
         $conn->rollBack();
     }
 
+    error_log("Gate decision error: " . $e->getMessage());
     http_response_code(500);
     echo json_encode([
         "error" => true,
         "data" => "Could not record gate decision.",
-        "code" => $e->getMessage()
+        "code" => null
     ]);
 }
