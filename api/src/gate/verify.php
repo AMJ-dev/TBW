@@ -119,7 +119,6 @@
         $pass = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$pass) {
-            http_response_code(404);
             echo json_encode([
                 "error" => true,
                 "data" => "No matching gate pass found.",

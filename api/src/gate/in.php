@@ -53,26 +53,44 @@ try {
                 WHERE ac.appointment_id = a.id
             ) AS container_nos,
 
-            (
-                SELECT COUNT(*)
+            EXISTS (
+                SELECT 1
+                FROM gate_driver_vehicle_assignments dva
+                WHERE dva.driver_id = a.driver_id
+                  AND dva.vehicle_id = a.vehicle_id
+                  AND dva.unassigned_at IS NULL
+            ) AS assignment_eligible,
+
+            EXISTS (
+                SELECT 1
                 FROM gate_movement_records gm
                 WHERE gm.appointment_id = a.id
                   AND gm.direction = 'in'
                   AND gm.decision = 'ADMIT'
-            ) AS admitted_count
+            ) AS already_admitted
 
         FROM gate_appointments a
-        LEFT JOIN gate_vehicles v ON v.id = a.vehicle_id
-        LEFT JOIN gate_drivers d ON d.id = a.driver_id
-        LEFT JOIN gate_passes p ON p.id = (
-            SELECT gp.id
-            FROM gate_passes gp
-            WHERE gp.appointment_id = a.id
-            ORDER BY gp.issued_at DESC
-            LIMIT 1
-        )
 
-        WHERE a.appointment_date >= CURDATE()
+        INNER JOIN gate_vehicles v
+            ON v.id = a.vehicle_id
+
+        INNER JOIN gate_drivers d
+            ON d.id = a.driver_id
+
+        INNER JOIN gate_passes p
+            ON p.id = (
+                SELECT gp.id
+                FROM gate_passes gp
+                WHERE gp.appointment_id = a.id
+                ORDER BY gp.issued_at DESC
+                LIMIT 1
+            )
+
+        WHERE a.appointment_date = CURDATE()
+          AND a.status IN ('Confirmed', 'Arrived')
+          AND p.type IN ('Terminal Entry', 'Collection')
+          AND p.status = 'Active'
+          AND p.valid_until > NOW()
 
         ORDER BY
             a.appointment_date ASC,
@@ -86,26 +104,35 @@ try {
 
     $today = date("Y-m-d");
     $now = time();
+    $result = [];
 
-    foreach ($rows as &$row) {
-        $row["container_nos"] = !empty($row["container_nos"])
-            ? explode(",", $row["container_nos"])
+    $eligibleContainerStatuses = [
+        "EXPECTED",
+        "IN_TRANSIT_TO_TERMINAL"
+    ];
+
+    $eligibleShipmentStatuses = [
+        "expected",
+        "in_transit_to_terminal",
+        "arrived_at_gate"
+    ];
+
+    foreach ($rows as $row) {
+        $containers = !empty($row["container_nos"])
+            ? array_values(array_unique(array_filter(
+                array_map("trim", explode(",", $row["container_nos"]))
+            )))
             : [];
-
-        $row["admitted_count"] = (int) $row["admitted_count"];
 
         $appointmentStatus = strtolower(
             trim((string) $row["appointment_status"])
         );
 
-        $appointmentEligible = in_array(
-            $appointmentStatus,
-            ["confirmed", "arrived"],
-            true
-        );
+        $appointmentEligible =
+            in_array($appointmentStatus, ["confirmed", "arrived"], true) &&
+            $row["appointment_date"] === $today;
 
         $vehicleEligible =
-            !empty($row["vehicle_id"]) &&
             $row["vehicle_status"] === "Approved" &&
             !empty($row["insurance_expiry"]) &&
             $row["insurance_expiry"] >= $today &&
@@ -113,7 +140,6 @@ try {
             $row["roadworthiness_expiry"] >= $today;
 
         $driverEligible =
-            !empty($row["driver_id"]) &&
             $row["driver_status"] === "Approved" &&
             !empty($row["licence_expiry"]) &&
             $row["licence_expiry"] >= $today;
@@ -123,74 +149,181 @@ try {
             : false;
 
         $passEligible =
-            !empty($row["gate_pass_id"]) &&
             $row["pass_status"] === "Active" &&
             $passExpiry !== false &&
-            $passExpiry >= $now &&
+            $passExpiry > $now &&
             in_array(
                 $row["pass_type"],
                 ["Terminal Entry", "Collection"],
                 true
             );
 
-        $alreadyAdmitted = $row["admitted_count"] > 0;
+        $assignmentEligible = (bool) $row["assignment_eligible"];
+        $alreadyAdmitted = (bool) $row["already_admitted"];
 
-        $row["checks"] = [
+        $cargoEligible = false;
+        $cargoHolds = [];
+
+        if (count($containers) > 0) {
+            $cargoSql = "
+                SELECT
+                    ac.container_no,
+                    pc.id AS portal_container_id,
+                    pc.status AS container_status,
+                    pc.gate_in_at,
+                    pc.received_at,
+                    ps.status AS shipment_status
+                FROM gate_appointment_containers ac
+                LEFT JOIN portal_shipment_containers pc
+                    ON UPPER(TRIM(pc.container_no)) =
+                       UPPER(TRIM(ac.container_no))
+                LEFT JOIN portal_shipments ps
+                    ON ps.id = pc.shipment_id
+                WHERE ac.appointment_id = :appointment_id
+                ORDER BY ac.container_no
+            ";
+
+            $cargoStmt = $conn->prepare($cargoSql);
+            $cargoStmt->execute([
+                ":appointment_id" => $row["appointment_id"]
+            ]);
+
+            $cargoRows = $cargoStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $cargoByNumber = [];
+
+            foreach ($cargoRows as $cargoRow) {
+                $key = strtoupper(trim((string) $cargoRow["container_no"]));
+
+                if (!isset($cargoByNumber[$key])) {
+                    $cargoByNumber[$key] = [];
+                }
+
+                $cargoByNumber[$key][] = $cargoRow;
+            }
+
+            $cargoEligible = true;
+
+            foreach ($containers as $containerNo) {
+                $key = strtoupper(trim($containerNo));
+                $matches = $cargoByNumber[$key] ?? [];
+
+                if (count($matches) !== 1) {
+                    $cargoEligible = false;
+                    $cargoHolds[] = count($matches) === 0
+                        ? "Container {$containerNo} is not linked to a shipment"
+                        : "Container {$containerNo} matches multiple shipment records";
+                    continue;
+                }
+
+                $cargo = $matches[0];
+
+                $containerStatus = strtoupper(
+                    trim((string) $cargo["container_status"])
+                );
+
+                $shipmentStatus = strtolower(
+                    trim((string) $cargo["shipment_status"])
+                );
+
+                if (
+                    !in_array(
+                        $containerStatus,
+                        $eligibleContainerStatuses,
+                        true
+                    ) ||
+                    !in_array(
+                        $shipmentStatus,
+                        $eligibleShipmentStatuses,
+                        true
+                    ) ||
+                    !empty($cargo["gate_in_at"]) ||
+                    !empty($cargo["received_at"])
+                ) {
+                    $cargoEligible = false;
+                    $cargoHolds[] = "Container {$containerNo} is not eligible for gate-in";
+                }
+            }
+        } else {
+            $cargoHolds[] = "No containers are linked to this appointment";
+        }
+
+        $checks = [
             "vehicle" => $vehicleEligible,
             "driver" => $driverEligible,
+            "assignment" => $assignmentEligible,
             "appointment" => $appointmentEligible,
-            "cargo" => false,
-            "financial" => false,
-            "release" => false,
+            "cargo" => $cargoEligible,
+            "financial" => null,
+            "release" => null,
             "pass" => $passEligible
         ];
 
-        $row["holds"] = [];
+        $holds = [];
 
         if (!$appointmentEligible) {
-            $row["holds"][] = "Appointment status: " .
-                $row["appointment_status"];
+            $holds[] = "Appointment date or status does not permit gate-in";
         }
 
         if (!$vehicleEligible) {
-            $row["holds"][] = "Vehicle approval or documents are invalid";
+            $holds[] = "Vehicle approval or required documents are invalid or expired";
         }
 
         if (!$driverEligible) {
-            $row["holds"][] = "Driver approval or licence is invalid";
+            $holds[] = "Driver approval or licence is invalid or expired";
+        }
+
+        if (!$assignmentEligible) {
+            $holds[] = "Driver is not currently assigned to this vehicle";
         }
 
         if (!$passEligible) {
-            $row["holds"][] = "Valid active gate pass required";
+            $holds[] = "Gate pass is expired, inactive or invalid for gate-in";
+        }
+
+        if (!$cargoEligible) {
+            $holds = array_merge($holds, $cargoHolds);
         }
 
         if ($alreadyAdmitted) {
-            $row["holds"][] = "Vehicle has already been admitted";
+            $holds[] = "Appointment has already been admitted";
         }
 
-        $row["holds"][] = "Cargo readiness must be verified";
-
-        $row["readiness"] = "Needs verification";
-        $row["readiness_notes"] = "Review the verification checks and holds.";
-
-        $row["purpose"] = $row["pass_type"] ?: "Terminal movement";
-        $row["consignment"] = "";
-        $row["already_admitted"] = $alreadyAdmitted;
-
-        $row["can_admit"] =
-            $appointmentEligible &&
+        $canAdmit =
             $vehicleEligible &&
             $driverEligible &&
+            $assignmentEligible &&
+            $appointmentEligible &&
             $passEligible &&
-            !$alreadyAdmitted;
+            $cargoEligible &&
+            !$alreadyAdmitted &&
+            count($holds) === 0;
+
+        $row["container_nos"] = $containers;
+        $row["assignment_eligible"] = $assignmentEligible;
+        $row["already_admitted"] = $alreadyAdmitted;
+        $row["checks"] = $checks;
+        $row["holds"] = $holds;
+        $row["readiness"] = $canAdmit
+            ? "Ready"
+            : "Needs verification";
+        $row["readiness_notes"] = $canAdmit
+            ? "All required gate-in checks passed."
+            : implode("; ", $holds);
+        $row["purpose"] = $row["pass_type"] ?: "Terminal movement";
+        $row["consignment"] = "";
+        $row["can_admit"] = $canAdmit;
+
+        // if ($canAdmit) {
+        //     $result[] = $row;
+        // }
     }
-    unset($row);
 
     echo json_encode([
         "error" => false,
         "data" => "Gate-in queue loaded successfully.",
-        "code" => $rows,
-        "count" => count($rows)
+        "code" => $result,
+        "count" => count($result)
     ]);
 } catch (Throwable $e) {
     error_log("Gate-in queue error: " . $e->getMessage());
@@ -199,6 +332,6 @@ try {
     echo json_encode([
         "error" => true,
         "data" => "Could not load gate-in queue.",
-        "code" => $e->getMessage()
+        "code" => null
     ]);
 }

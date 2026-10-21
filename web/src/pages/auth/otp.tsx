@@ -336,8 +336,8 @@ export default function OtpPage() {
 							<button
 								type="button"
 								className={cn(
-									"font-semibold text-orange",
-									sending && "cursor-not-allowed opacity-60"
+									"font-semibold text-orange cursor-pointer",
+									"disabled:cursor-not-allowed disabled:opacity-60",
 								)}
 								disabled={sending}
 								onClick={handleResend}
