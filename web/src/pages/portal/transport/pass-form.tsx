@@ -260,9 +260,9 @@ export default function GatePassFormPage() {
       toast.success(String(resp.data || "Gate pass issued successfully."));
       
       if (passId) {
-        navigate(`/gate/passes/${passId}`, { replace: true });
+        navigate(`/portal/passes/${passId}`, { replace: true });
       } else {
-        navigate("/gate/passes", { replace: true });
+        navigate("/portal/passes", { replace: true });
       }
     } catch {
       toast.error("Could not issue gate pass. Please try again.");
@@ -282,7 +282,7 @@ export default function GatePassFormPage() {
       >
         <button
           type="button"
-          onClick={() => navigate("/gate/passes")}
+          onClick={() => navigate("/portal/passes")}
           className="cursor-pointer inline-flex items-center gap-2 text-sm text-ink-soft transition-colors hover:text-ink"
         >
           <ArrowLeft className="size-4" />
@@ -526,7 +526,7 @@ export default function GatePassFormPage() {
               type="button"
               variant="outline"
               className="border-line"
-              onClick={() => navigate("/gate/passes")}
+              onClick={() => navigate("/portal/passes")}
               disabled={submitting}
             >
               Cancel

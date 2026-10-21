@@ -248,7 +248,7 @@ export default function GateVehicleFormPage() {
 					: "Vehicle registered successfully.",
 			);
 
-			navigate("/gate/vehicles");
+			navigate("/portal/vehicles");
 		} catch (error: any) {
 			toast.error(
 				getErrorMessage(
@@ -296,7 +296,7 @@ export default function GateVehicleFormPage() {
 						<Button
 							type="button"
 							variant="outline"
-							onClick={() => navigate("/gate/vehicles")}
+							onClick={() => navigate("/portal/vehicles")}
 						>
 							Back to registry
 						</Button>
@@ -316,7 +316,7 @@ export default function GateVehicleFormPage() {
 					<Button
 						type="button"
 						variant="ghost"
-						onClick={() => navigate("/gate/vehicles")}
+						onClick={() => navigate("/portal/vehicles")}
 						disabled={submitting}
 						className="-ml-3 gap-2 text-ink-soft hover:text-ink"
 					>
@@ -521,7 +521,7 @@ export default function GateVehicleFormPage() {
 							<Button
 								type="button"
 								variant="outline"
-								onClick={() => navigate("/gate/vehicles")}
+								onClick={() => navigate("/portal/vehicles")}
 								disabled={submitting}
 								className="border-sand/25 bg-transparent text-sand hover:bg-sand/10"
 							>

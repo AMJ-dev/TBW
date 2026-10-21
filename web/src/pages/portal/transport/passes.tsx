@@ -309,7 +309,7 @@ export default function GatePassesRoute() {
 
             <Button
               className="bg-orange text-white hover:bg-orange-deep"
-              onClick={() => navigate("/gate/passes/new")}
+              onClick={() => navigate("/portal/passes/new")}
             >
               <Plus className="size-4" />
               Issue Gate Pass
@@ -500,7 +500,7 @@ export default function GatePassesRoute() {
                           variant="outline"
                           size="sm"
                           className="border-line bg-paper text-ink"
-                          onClick={() => navigate(`/gate/passes/${pass.id}`)}
+                          onClick={() => navigate(`/portal/passes/${pass.id}`)}
                         >
                           <Eye className="mr-2 size-4" />
                           View

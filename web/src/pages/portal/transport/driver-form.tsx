@@ -136,7 +136,7 @@ export default function GateDriverFormPage() {
 						? "Driver updated."
 						: "Driver registered."
 			);
-			navigate("/gate/drivers");
+			navigate("/portal/drivers");
 		} catch (err: any) {
 			toast.error(
 				err?.response?.data?.message ||
@@ -160,7 +160,7 @@ export default function GateDriverFormPage() {
 					<Button
 						type="button"
 						variant="ghost"
-						onClick={() => navigate("/gate/drivers")}
+						onClick={() => navigate("/portal/drivers")}
 						disabled={submitting}
 						className="-ml-3 gap-2 text-ink-soft hover:text-ink"
 					>
@@ -318,7 +318,7 @@ export default function GateDriverFormPage() {
 							<Button
 								type="button"
 								variant="outline"
-								onClick={() => navigate("/gate/drivers")}
+								onClick={() => navigate("/portal/drivers")}
 								disabled={submitting}
 								className="border-sand/25 bg-transparent text-sand hover:bg-sand/10"
 							>

@@ -119,7 +119,7 @@ export default function GatePassDetailsPage() {
           <Button
             variant="outline"
             className="border-line bg-paper text-ink hover:bg-sand"
-            onClick={() => navigate("/gate/passes")}
+            onClick={() => navigate("/portal/passes")}
           >
             <ArrowLeft className="mr-2 size-4" />
             Back to Passes

@@ -335,14 +335,14 @@ export default function GateDriverAssignmentsPage() {
 							<Button
 								variant="outline"
 								className="border-line bg-paper text-ink hover:bg-sand"
-								onClick={() => navigate("/gate/drivers")}
+								onClick={() => navigate("/portal/drivers")}
 							>
 								<ArrowLeft className="mr-1.5 size-4" /> Drivers
 							</Button>
 							<Button
 								variant="outline"
 								className="border-line bg-paper text-ink hover:bg-sand"
-								onClick={() => navigate("/gate/vehicles")}
+								onClick={() => navigate("/portal/vehicles")}
 							>
 								<Truck className="mr-1.5 size-4" /> Vehicles
 							</Button>

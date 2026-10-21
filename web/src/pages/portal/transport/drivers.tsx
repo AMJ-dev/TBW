@@ -316,7 +316,7 @@ export default function GateDriversPage() {
 	};
 
 	const openEdit = (id: string) => {
-		navigate(`/gate/driver/edit/${id}`);
+		navigate(`/portal/driver/edit/${id}`);
 	};
 
 	return (
@@ -371,7 +371,7 @@ export default function GateDriversPage() {
 								</Button>
 								<Button
 									className="bg-orange text-white hover:bg-orange-deep"
-									onClick={() => navigate("/gate/driver/add")}
+									onClick={() => navigate("/portal/driver/add")}
 								>
 									<Plus className="mr-1.5 size-4" />
 									Add driver
@@ -797,7 +797,7 @@ function DriverDetail({
 							Assign a vehicle from the driver assignments page.
 						</p>
 						<Button
-							onClick={() => navigate("/gate/drivers/assignments")}
+							onClick={() => navigate("/portal/drivers/assignments")}
 							variant="outline"
 							className="mt-3 border-line bg-paper text-ink hover:bg-sand"
 						>

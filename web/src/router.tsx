@@ -74,17 +74,19 @@ const FinanceReconciliationPage = lazy(() => import("@/pages/finance/reconciliat
 
 const GatePage = lazy(() => import("@/pages/gate"));
 const GateDashboardPage = lazy(() => import("@/pages/gate/dashboard"));
-const GateAppointmentsPage = lazy(() => import("@/pages/gate/appointments"));
-const GatePassesPage = lazy(() => import("@/pages/gate/passes"));
-const GatePassFormPage = lazy(() => import("@/pages/gate/pass-form"));
-const GatePassDetailsPage = lazy(() => import("@/pages/gate/pass-details"));
-const GateVehiclesPage = lazy(() => import("@/pages/gate/vehicles"));
-const GateVehicleFormPage = lazy(() => import("@/pages/gate/vehicle-form"));
 const GateConsolePage = lazy(() => import("@/pages/gate/console"));
-const GateDriversPage = lazy(() => import("@/pages/gate/drivers"));
-const GateDriverFormPage = lazy(() => import("@/pages/gate/driver-form"));
-const GateDriverAssignmentsPage = lazy(() => import("@/pages/gate/driver-assignments"));
-const GateBookAppointmentsPage = lazy(() => import("@/pages/gate/book-appointments"));
+
+const TransportAppointmentsPage = lazy(() => import("@/pages/portal/transport/appointments"));
+const TransportPassesPage = lazy(() => import("@/pages/portal/transport/passes"));
+const TransportPassFormPage = lazy(() => import("@/pages/portal/transport/pass-form"));
+const TransportPassDetailsPage = lazy(() => import("@/pages/portal/transport/pass-details"));
+const TransportVehiclesPage = lazy(() => import("@/pages/portal/transport/vehicles"));
+const TransportVehicleFormPage = lazy(() => import("@/pages/portal/transport/vehicle-form"));
+const TransportDriversPage = lazy(() => import("@/pages/portal/transport/drivers"));
+const TransportDriverFormPage = lazy(() => import("@/pages/portal/transport/driver-form"));
+const TransportDriverAssignmentsPage = lazy(() => import("@/pages/portal/transport/driver-assignments"));
+const TransportBookAppointmentsPage = lazy(() => import("@/pages/portal/transport/book-appointments"));
+const TransportVehicleDetailsPage = lazy(() => import("@/pages/portal/transport/vehicle-details"));
 
 const OperationsDashboardPage = lazy(() => import("@/pages/operations/dashboard"));
 const OperationsExaminationPage = lazy(() => import("@/pages/operations/examination"));
@@ -219,20 +221,8 @@ export default function Routers() {
 
 						<Route path="/gate" element={<GatePage />} />
 						<Route path="/gate/dashboard" element={<GateDashboardPage />} />
-						<Route path="/gate/appointments" element={<GateAppointmentsPage />} />
-						<Route path="/gate/passes" element={<GatePassesPage />} />
 						<Route path="/gate/in" element={<GateConsolePage />} />
 						<Route path="/gate/out" element={<GateConsolePage />} />
-						<Route path="/gate/vehicles" element={<GateVehiclesPage />} />
-						<Route path="/gate/vehicle/add" element={<GateVehicleFormPage />} />
-						<Route path="/gate/vehicle/edit/:id" element={<GateVehicleFormPage />} />
-						<Route path="/gate/drivers" element={<GateDriversPage />} />
-						<Route path="/gate/driver/add" element={<GateDriverFormPage />} />
-						<Route path="/gate/driver/edit/:id" element={<GateDriverFormPage />} />
-						<Route path="/gate/drivers/assignments" element={<GateDriverAssignmentsPage />} />
-						<Route path="/gate/appointments/book" element={<GateBookAppointmentsPage />} />
-						<Route path="/gate/passes/new" element={<GatePassFormPage />} />
-						<Route path="/gate/passes/:id" element={<GatePassDetailsPage />} />
 						
 						<Route path="/operations" element={<OperationsDashboardPage />} />
 						<Route path="/operations/dashboard" element={<OperationsDashboardPage />} />
@@ -263,6 +253,20 @@ export default function Routers() {
 						<Route path="/portal/shipment/new" element={<NewPortalShipmentPage />} />
 						<Route path="/portal/shipment/edit/:id" element={<NewPortalShipmentPage />} />
 						<Route path="/portal/shipments/:id" element={<PortalShipmentDetailsPage />} />
+						
+						<Route path="/portal/appointments" element={<TransportAppointmentsPage />} />
+						<Route path="/portal/vehicles" element={<TransportVehiclesPage />} />
+						<Route path="/portal/vehicle/add" element={<TransportVehicleFormPage />} />
+						<Route path="/portal/vehicle/edit/:id" element={<TransportVehicleFormPage />} />
+						<Route path="/portal/drivers" element={<TransportDriversPage />} />
+						<Route path="/portal/driver/add" element={<TransportDriverFormPage />} />
+						<Route path="/portal/driver/edit/:id" element={<TransportDriverFormPage />} />
+						<Route path="/portal/drivers/assignments" element={<TransportDriverAssignmentsPage />} />
+						<Route path="/portal/appointments/book" element={<TransportBookAppointmentsPage />} />
+						<Route path="/portal/vehicle/details/:id" element={<TransportVehicleDetailsPage />} />
+						<Route path="/portal/passes" element={<TransportPassesPage />} />
+						<Route path="/portal/passes/new" element={<TransportPassFormPage />} />
+						<Route path="/portal/passes/:id" element={<TransportPassDetailsPage />} />
 						
 						<Route path="/portal/cargo/:id" element={<CargoDetailPage />} />
 						<Route path="/portal/containers/:id" element={<ContainerDetailPage />} />

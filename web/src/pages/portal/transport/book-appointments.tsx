@@ -269,7 +269,7 @@ export default function GateBookAppointmentsPage() {
 			}
 
 			toast.success("Appointment booked successfully.");
-			navigate("/gate/appointments");
+			navigate("/portal/appointments");
 		} catch (error) {
 			toast.error(
 				error instanceof Error
@@ -290,7 +290,7 @@ export default function GateBookAppointmentsPage() {
 				<Button
 					type="button"
 					variant="ghost"
-					onClick={() => navigate("/gate/appointments")}
+					onClick={() => navigate("/portal/appointments")}
 					className="-ml-3 gap-2 text-ink-soft hover:text-ink"
 				>
 					<ArrowLeft className="size-4" />
@@ -661,7 +661,7 @@ export default function GateBookAppointmentsPage() {
 						<Button
 							type="button"
 							variant="outline"
-							onClick={() => navigate("/gate/appointments")}
+							onClick={() => navigate("/portal/appointments")}
 							disabled={submitting}
 						>
 							Cancel

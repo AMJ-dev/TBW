@@ -346,7 +346,7 @@ export default function GateAppointmentsRoute() {
 
 					<Button
 						className="bg-orange text-white hover:bg-orange-deep"
-						onClick={() => navigate("/gate/appointments/book")}
+						onClick={() => navigate("/portal/appointments/book")}
 					>
 						<Plus className="size-4" />
 						Book Appointment
