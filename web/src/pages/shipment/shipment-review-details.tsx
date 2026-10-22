@@ -1273,7 +1273,7 @@ export default function OperationsShipmentReviewPage() {
                 <Field label="Package type" value={shipment.package_type} />
                 <Field label="Package count" value={shipment.package_count} />
                 <Field
-                  label="Gross weight"
+                  label="Gross weight (KG)"
                   value={
                     shipment.gross_weight == null
                       ? null
@@ -1332,7 +1332,7 @@ export default function OperationsShipmentReviewPage() {
                           Packages
                         </th>
                         <th className="px-4 py-3 font-medium text-right">
-                          Gross weight
+                          Gross weight (KG)
                         </th>
                       </tr>
                     </thead>

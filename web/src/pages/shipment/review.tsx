@@ -617,7 +617,7 @@ export default function OperationsReviewPage() {
 																				value={shipment.manifest_packages}
 																			/>
 																			<DetailItem
-																				label="Gross weight"
+																				label="Gross weight (KG)"
 																				value={shipment.manifest_gross_weight}
 																			/>
 																			<DetailItem

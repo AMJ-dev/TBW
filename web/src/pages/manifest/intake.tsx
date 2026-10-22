@@ -749,8 +749,8 @@ export default function OperationsManifestIntakePage() {
 						</div>
 						<div className="sm:col-span-2">
 							<Field
-								label="Gross weight"
-								placeholder="72,860 kg"
+								label="Gross weight (KG)"
+								placeholder="72860"
 								value={grossWeight}
 								onChange={setGrossWeight}
 								mono

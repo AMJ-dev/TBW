@@ -682,7 +682,7 @@ export default function OperationsManifestDetailsPage() {
 													"Packages",
 													linkedShipment.package_count ?? linkedShipment.packages,
 												],
-												["Gross weight", linkedShipment.gross_weight],
+												["Gross weight (KG)", linkedShipment.gross_weight],
 												["Volume", linkedShipment.volume],
 												["HS code", linkedShipment.hs_code],
 												["Customs reference", linkedShipment.customs_reference],
@@ -836,7 +836,7 @@ export default function OperationsManifestDetailsPage() {
 									["ETA at terminal", manifest.eta, true],
 									["Containers", String(manifest.containers), true],
 									["Packages", String(manifest.packages), true],
-									["Gross weight", manifest.grossWeight, true],
+									["Gross weight (KG)", manifest.grossWeight, true],
 									["Consignee", manifest.consignee, false],
 									["Licensed agent", manifest.agent, false],
 								] as const

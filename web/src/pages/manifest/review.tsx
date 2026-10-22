@@ -97,7 +97,7 @@ const fieldGroups: {
 			{ name: "eta", label: "Expected arrival" },
 			{ name: "containers", label: "Number of containers", required: true },
 			{ name: "packages", label: "Number of packages", required: true },
-			{ name: "gross_weight", label: "Gross weight" },
+			{ name: "gross_weight", label: "Gross weight (KG)" },
 		],
 	},
 ];
