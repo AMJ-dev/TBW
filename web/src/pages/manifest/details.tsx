@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 
 type ManifestStatus =
 	| "Pre-advice"
+	| "Unmatched"
 	| "Review required"
 	| "Validated"
 	| "Received"
@@ -233,10 +234,11 @@ export default function OperationsManifestDetailsPage() {
 	}, [manifest?.id]);
 
 	const isShipmentLinked = Boolean(
+		manifest?.matchedShipmentId ||
 		(manifest?.shipmentReference && manifest.shipmentReference.trim()) ||
-			(manifest?.shipmentReferences && manifest.shipmentReferences.trim())
+		(manifest?.shipmentReferences && manifest.shipmentReferences.trim())
 	);
-	const canChangeLink = manifest?.status === "Pre-advice";
+	const canChangeLink = manifest?.status === "Pre-advice" || manifest?.status === "Unmatched";
 	const correctionSubmitted = manifest?.status === "Review required";
 	const canValidate = isShipmentLinked && (canChangeLink || correctionSubmitted);
 	const canFlag = isShipmentLinked && (canChangeLink || correctionSubmitted);
@@ -337,9 +339,9 @@ export default function OperationsManifestDetailsPage() {
 
 	const handleMatch = async (selectedShipmentId: string, reason: string) => {
 		if (!manifest) return false;
-		if (manifest.status !== "Pre-advice") {
+		if (manifest.status !== "Pre-advice" && manifest.status !== "Unmatched") {
 			toast.error(
-				"The shipment link can only be changed while the manifest is in Pre-advice."
+				"The shipment link can only be changed while the manifest is unmatched or in Pre-advice."
 			);
 			return false;
 		}
@@ -582,7 +584,7 @@ export default function OperationsManifestDetailsPage() {
 									<p className="text-sm font-semibold text-ink">
 										{isShipmentLinked
 											? "Shipment declaration linked"
-											: "Step 1 of 2: Link a shipment declaration"}
+											: "No shipment declaration linked yet"}
 									</p>
 									<p className="mt-1 text-xs leading-5 text-ink-soft">
 										{isShipmentLinked
@@ -590,7 +592,7 @@ export default function OperationsManifestDetailsPage() {
 													manifest.shipmentReferences ||
 													manifest.shipmentReference
 											  }. You can now complete the checks and validate or flag this manifest if needed.`
-											: "You must link this manifest to the correct shipment declaration before you can validate it or flag it for review. Choose a suggested match or search for a declaration below."}
+											: "This carrier manifest has been saved, but no organisation shipment declaration is linked to it yet. The organisation may not have submitted its declaration, or the records may not have been matched. Keep this manifest and link the declaration when it becomes available."}
 									</p>
 									{!isShipmentLinked && (
 										<p className="mt-2 text-[11px] font-medium text-orange-deep">

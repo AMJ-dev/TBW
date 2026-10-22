@@ -240,6 +240,106 @@ try {
     $conn->beginTransaction();
     $transactionStarted = true;
 
+    $billOfLading = trim((string) ($_POST["bill_of_lading"] ?? ""));
+    $normaliseReference = static function ($value): string {
+        return strtoupper((string) preg_replace('/[^A-Z0-9]/i', '', trim((string) $value)));
+    };
+
+    $matchedManifest = null;
+    $existingShipment = null;
+
+    if ($billOfLading !== "") {
+        $normalisedBillOfLading = $normaliseReference($billOfLading);
+
+        $shipmentDuplicateQuery = $conn->prepare("
+            SELECT id, shipment_reference, status, organisation_id
+            FROM portal_shipments
+            WHERE REGEXP_REPLACE(UPPER(TRIM(bill_of_lading)), '[^A-Z0-9]', '') = :bill_of_lading
+            ORDER BY created_at ASC
+            LIMIT 1
+            FOR UPDATE
+        ");
+        $shipmentDuplicateQuery->execute([":bill_of_lading" => $normalisedBillOfLading]);
+        $existingShipment = $shipmentDuplicateQuery->fetch(PDO::FETCH_ASSOC) ?: null;
+
+        if ($existingShipment) {
+            echo json_encode([
+                "error" => true,
+                "data" => "A shipment declaration with this bill of lading already exists. No duplicate shipment was created.",
+                "code" => [
+                    "duplicate" => true,
+                    "duplicate_source" => "portal_shipment",
+                    "shipment_id" => $existingShipment["id"],
+                    "shipment_reference" => $existingShipment["shipment_reference"],
+                    "shipment_status" => $existingShipment["status"],
+                    "manifest_id" => null,
+                    "manifest_reference" => null,
+                    "bill_of_lading" => $billOfLading
+                ]
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            $conn->rollBack();
+            $transactionStarted = false;
+            exit;
+        }
+
+        $manifestQuery = $conn->prepare("
+            SELECT
+                m.id AS manifest_id,
+                m.manifest_ref,
+                m.bill_of_lading,
+                m.status AS manifest_status,
+                m.matched_shipment_id,
+                mc.container_no,
+                mc.matched_shipment_id AS container_shipment_id,
+                COALESCE(mc.matched_shipment_id, m.matched_shipment_id) AS linked_shipment_id,
+                ps.shipment_reference,
+                ps.status AS shipment_status
+            FROM operation_manifests m
+            LEFT JOIN operation_manifest_containers mc
+                ON mc.manifest_id = m.id
+            LEFT JOIN portal_shipments ps
+                ON ps.id = COALESCE(mc.matched_shipment_id, m.matched_shipment_id)
+            WHERE REGEXP_REPLACE(UPPER(TRIM(m.bill_of_lading)), '[^A-Z0-9]', '') = :bill_of_lading
+            ORDER BY
+                CASE WHEN COALESCE(mc.matched_shipment_id, m.matched_shipment_id) IS NOT NULL
+                          AND COALESCE(mc.matched_shipment_id, m.matched_shipment_id) <> '' THEN 0 ELSE 1 END,
+                m.received_at ASC
+            FOR UPDATE
+        ");
+        $manifestQuery->execute([":bill_of_lading" => $normalisedBillOfLading]);
+        $manifestMatches = $manifestQuery->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($manifestMatches as $manifestMatch) {
+            $linkedShipmentId = trim((string) ($manifestMatch["linked_shipment_id"] ?? ""));
+
+            if ($linkedShipmentId !== "") {
+                echo json_encode([
+                    "error" => true,
+                    "data" => "This bill of lading is already recorded in the manifest and linked to a shipment declaration. No duplicate shipment was created.",
+                    "code" => [
+                        "duplicate" => true,
+                        "duplicate_source" => "linked_manifest",
+                        "manifest_id" => $manifestMatch["manifest_id"],
+                        "manifest_reference" => $manifestMatch["manifest_ref"],
+                        "bill_of_lading" => $manifestMatch["bill_of_lading"],
+                        "container_no" => $manifestMatch["container_no"] ?: null,
+                        "manifest_status" => $manifestMatch["manifest_status"],
+                        "shipment_id" => $linkedShipmentId,
+                        "shipment_reference" => $manifestMatch["shipment_reference"] ?: null,
+                        "shipment_status" => $manifestMatch["shipment_status"] ?: null
+                    ]
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                $conn->rollBack();
+                $transactionStarted = false;
+                exit;
+            }
+
+            if ($matchedManifest === null) {
+                $matchedManifest = $manifestMatch;
+            }
+        }
+    }
+
     $q = $conn->prepare("
         INSERT INTO portal_shipments (
             id, shipment_reference, user_id, organisation_id, shipment_type, bill_of_lading, booking_number,
@@ -378,6 +478,37 @@ try {
         $containerInsert->execute();
     }
 
+    if ($matchedManifest !== null) {
+        $linkManifest = $conn->prepare("
+            UPDATE operation_manifests
+            SET matched_shipment_id = :shipment_id, status=:status, organisation_id=:organisation_id
+            WHERE id = :manifest_id
+              AND (matched_shipment_id IS NULL OR matched_shipment_id = '')
+        ");
+        $linkManifest->execute([
+            ":shipment_id" => $shipmentId,
+            ":manifest_id" => $matchedManifest["manifest_id"],
+            ":status" => "Pre-advice",
+            ":organisation_id" => $my_details->organisation_id??null
+        ]);
+
+        $linkManifestContainers = $conn->prepare("
+            UPDATE operation_manifest_containers mc
+            INNER JOIN portal_shipment_containers pc
+                ON pc.shipment_id = :shipment_id
+               AND REGEXP_REPLACE(UPPER(TRIM(pc.container_no)), '[^A-Z0-9]', '') = REGEXP_REPLACE(UPPER(TRIM(mc.container_no)), '[^A-Z0-9]', '')
+            SET mc.matched_shipment_id = :matched_shipment_id,
+                mc.matched_shipment_container_id = pc.id
+            WHERE mc.manifest_id = :manifest_id
+              AND (mc.matched_shipment_id IS NULL OR mc.matched_shipment_id = '')
+        ");
+        $linkManifestContainers->execute([
+            ":shipment_id" => $shipmentId,
+            ":matched_shipment_id" => $shipmentId,
+            ":manifest_id" => $matchedManifest["manifest_id"]
+        ]);
+    }
+
     $documentInsert = $conn->prepare("
         INSERT INTO portal_shipment_documents (
             id, shipment_id, document_type, original_name,
@@ -482,7 +613,10 @@ try {
         "code" => [
             "shipment_id" => $shipmentId,
             "shipment_reference" => $shipmentReference,
-            "status" => $status
+            "status" => $status,
+            "manifest_linked" => $matchedManifest !== null,
+            "manifest_id" => $matchedManifest["manifest_id"] ?? null,
+            "manifest_reference" => $matchedManifest["manifest_ref"] ?? null
         ]
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 

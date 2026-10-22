@@ -32,13 +32,51 @@
         exit;
     }
 
+    if (!in_array($type, ["organisation", "individual"], true)) {
+        echo json_encode(["error" => true, "data" => "Invalid consignee type.", "code" => null]);
+        exit;
+    }
+
+    if ($type === "organisation" && $orgId === "" && $email === "" && $phone === "") {
+        echo json_encode(["error" => true, "data" => "For an unregistered organisation, provide an email address or phone number for onboarding follow-up.", "code" => null]);
+        exit;
+    }
+
+    if ($email !== "" && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        echo json_encode(["error" => true, "data" => "Enter a valid consignee email address.", "code" => null]);
+        exit;
+    }
+
+    if (!in_array($source, ["EDI", "CSV", "XLSX", "Manual"], true)) {
+        echo json_encode(["error" => true, "data" => "Invalid intake source.", "code" => null]);
+        exit;
+    }
+
+    if ($source !== "Manual" && $uploadToken === "") {
+        echo json_encode(["error" => true, "data" => "Upload the manifest file before submitting.", "code" => null]);
+        exit;
+    }
+
+    if ($containers === false || $packages === false) {
+        echo json_encode(["error" => true, "data" => "Containers and packages must be nonnegative integers.", "code" => null]);
+        exit;
+    }
+
     try {
+        $normalise = static function ($value): string {
+            return strtoupper((string) preg_replace('/[^A-Z0-9]/i', '', trim((string) $value)));
+        };
+
+        $conn->beginTransaction();
+
         $find = $conn->prepare("
-            SELECT id, manifest_ref, bill_of_lading
+            SELECT id, manifest_ref, bill_of_lading, status, matched_shipment_id
             FROM operation_manifests
             WHERE manifest_ref = :ref OR bill_of_lading = :bl
             LIMIT 1
+            FOR UPDATE
         ");
+
         $find->execute([
             ":ref" => $ref,
             ":bl" => $bl
@@ -47,8 +85,11 @@
         $existingManifest = $find->fetch(PDO::FETCH_ASSOC);
 
         if ($existingManifest) {
+            $conn->rollBack();
 
-            $message = strcasecmp(trim((string) $existingManifest["manifest_ref"]), $ref) === 0
+            $sameReference = $normalise($existingManifest["manifest_ref"] ?? "") === $normalise($ref);
+
+            $message = $sameReference
                 ? "This manifest reference already exists."
                 : "This Bill of Lading already exists.";
 
@@ -59,60 +100,51 @@
                     "duplicate" => true,
                     "manifest_id" => $existingManifest["id"],
                     "manifest_ref" => $existingManifest["manifest_ref"],
-                    "bill_of_lading" => $existingManifest["bill_of_lading"]
+                    "bill_of_lading" => $existingManifest["bill_of_lading"],
+                    "status" => $existingManifest["status"],
+                    "matched_shipment_id" => $existingManifest["matched_shipment_id"]
                 ]
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
 
-        if ($matchedShipmentId === "") {
-            throw new InvalidArgumentException("Select and confirm the matching shipment declaration before submitting the manifest.");
-        }
-
-        if (!in_array($type, ["organisation", "individual"], true)) {
-            throw new InvalidArgumentException("Invalid consignee type.");
-        }
-
-        if ($type === "organisation" && $orgId === "" && $email === "" && $phone === "") {
-            throw new InvalidArgumentException("For an unregistered organisation, provide an email address or phone number for onboarding follow-up.");
-        }
-
-        if ($email !== "" && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new InvalidArgumentException("Enter a valid consignee email address.");
-        }
-
-        if (!in_array($source, ["EDI", "CSV", "XLSX", "Manual"], true)) {
-            throw new InvalidArgumentException("Invalid intake source.");
-        }
-
-        if ($source !== "Manual" && $uploadToken === "") {
-            throw new InvalidArgumentException("Upload the manifest file before submitting.");
-        }
-
-        if ($containers === false || $packages === false) {
-            throw new InvalidArgumentException("Containers and packages must be nonnegative integers.");
-        }
-
-        $conn->beginTransaction();
-
         if ($orgId !== "") {
-            $checkOrg = $conn->prepare("SELECT id FROM organisations WHERE id = ? AND organisation_type <> 'agent' LIMIT 1");
+            $checkOrg = $conn->prepare("
+                SELECT id
+                FROM organisations
+                WHERE id = ? AND organisation_type <> 'agent'
+                LIMIT 1
+            ");
             $checkOrg->execute([$orgId]);
 
             if (!$checkOrg->fetchColumn()) {
                 throw new InvalidArgumentException("Selected consignee organisation was not found.");
             }
         }
+
         $agentId = trim((string) ($_POST["agentId"] ?? $_POST["agent_organisation_id"] ?? ""));
+
         if ($agentId !== "") {
-            $agentCheck = $conn->prepare("SELECT id FROM organisations WHERE id = ? AND organisation_type = 'agent' LIMIT 1");
+            $agentCheck = $conn->prepare("
+                SELECT id
+                FROM organisations
+                WHERE id = ? AND organisation_type = 'agent'
+                LIMIT 1
+            ");
             $agentCheck->execute([$agentId]);
+
             if (!$agentCheck->fetchColumn()) {
-                $agentId = "";
+                throw new InvalidArgumentException("Selected licensed agent was not found.");
             }
         }
+
         if ($source !== "Manual") {
-            $uploadQuery = $conn->prepare("SELECT id, source, consumed_at FROM operation_manifest_uploads WHERE upload_token = ? AND uploaded_by = ? FOR UPDATE");
+            $uploadQuery = $conn->prepare("
+                SELECT id, source, consumed_at
+                FROM operation_manifest_uploads
+                WHERE upload_token = ? AND uploaded_by = ?
+                FOR UPDATE
+            ");
             $uploadQuery->execute([$uploadToken, (string) $my_details->id]);
             $uploadRow = $uploadQuery->fetch(PDO::FETCH_ASSOC);
 
@@ -121,39 +153,28 @@
             }
         }
 
-        $shipmentQuery = $conn->prepare("
-            SELECT id, organisation_id, bill_of_lading, shipment_reference, consignee, status
-            FROM portal_shipments
-            WHERE id = :id
-            LIMIT 1
-            FOR UPDATE
-        ");
-        $shipmentQuery->execute([":id" => $matchedShipmentId]);
-        $shipment = $shipmentQuery->fetch(PDO::FETCH_ASSOC);
+        $shipment = null;
 
-        if (!$shipment) {
-            throw new InvalidArgumentException("The selected shipment declaration could not be found. Search again and select a valid shipment.");
-        }
+        if ($matchedShipmentId !== "") {
+            $shipmentQuery = $conn->prepare("
+                SELECT id, organisation_id, bill_of_lading, shipment_reference, consignee, status
+                FROM portal_shipments
+                WHERE id = :id
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $shipmentQuery->execute([":id" => $matchedShipmentId]);
+            $shipment = $shipmentQuery->fetch(PDO::FETCH_ASSOC);
 
-        $normalise = static function ($value): string {
-            return strtoupper((string) preg_replace('/[^A-Z0-9]/i', '', trim((string) $value)));
-        };
+            if (!$shipment) {
+                throw new InvalidArgumentException("The selected shipment declaration could not be found. Search again and select a valid shipment.");
+            }
 
-        if (
-            $normalise($shipment["bill_of_lading"] ?? "") === "" ||
-            $normalise($shipment["bill_of_lading"]) !== $normalise($bl)
-        ) {
-            throw new InvalidArgumentException("The manifest bill of lading does not match the selected shipment declaration.");
-        }
-
-        $agentId = trim((string) ($_POST["agentId"] ?? $_POST["agent_organisation_id"] ?? ""));
-
-        if ($agentId !== "") {
-            $agentCheck = $conn->prepare("SELECT id FROM organisations WHERE id = ? AND organisation_type = 'agent' LIMIT 1");
-            $agentCheck->execute([$agentId]);
-
-            if (!$agentCheck->fetchColumn()) {
-                $agentId = "";
+            if (
+                $normalise($shipment["bill_of_lading"] ?? "") === "" ||
+                $normalise($shipment["bill_of_lading"]) !== $normalise($bl)
+            ) {
+                throw new InvalidArgumentException("The manifest bill of lading does not match the selected shipment declaration.");
             }
         }
 
@@ -163,8 +184,13 @@
             $notes = trim($notes . "\nConsignee not yet in TRÏNŪ; onboarding and verification follow-up required.");
         }
 
+        if ($shipment === null) {
+            $notes = trim($notes . "\nNo matching shipment declaration was found during manifest intake. Match this manifest when the organisation submits its declaration.");
+        }
+
         $id = generateId();
         $organisationId = $shipment["organisation_id"] ?? null;
+        $status = $shipment !== null ? "Pre-advice" : "Unmatched";
 
         $stmt = $conn->prepare("
             INSERT INTO operation_manifests
@@ -209,27 +235,36 @@
             ":agent" => substr(trim((string) ($_POST["agent"] ?? "")), 0, 255),
             ":agent_id" => $agentId !== "" ? $agentId : null,
             ":source" => $source,
-            ":status" => "Pre-advice",
+            ":status" => $status,
             ":notes" => $notes,
             ":actor" => (string) $my_details->id,
-            ":matched_shipment_id" => $matchedShipmentId
+            ":matched_shipment_id" => $shipment !== null ? $matchedShipmentId : null
         ]);
 
-        $match = $conn->prepare("
-            INSERT INTO operation_manifest_shipment_matches
-            (id, manifest_id, shipment_id, match_method, matched_by, confirmed_by, notes)
-            VALUES (:id, :manifest_id, :shipment_id, :match_method, :matched_by, :confirmed_by, :notes)
-        ");
+        if ($shipment !== null) {
+            $match = $conn->prepare("
+                INSERT INTO operation_manifest_shipment_matches
+                (
+                    id, manifest_id, shipment_id, match_method,
+                    matched_by, confirmed_by, notes
+                )
+                VALUES
+                (
+                    :id, :manifest_id, :shipment_id, :match_method,
+                    :matched_by, :confirmed_by, :notes
+                )
+            ");
 
-        $match->execute([
-            ":id" => generateId(),
-            ":manifest_id" => $id,
-            ":shipment_id" => $matchedShipmentId,
-            ":match_method" => "BILL_OF_LADING_CONFIRMED",
-            ":matched_by" => (string) $my_details->id,
-            ":confirmed_by" => (string) $my_details->id,
-            ":notes" => "Shipment linked during manifest intake. Shipment reference: " . (string) ($shipment["shipment_reference"] ?? "")
-        ]);
+            $match->execute([
+                ":id" => generateId(),
+                ":manifest_id" => $id,
+                ":shipment_id" => $matchedShipmentId,
+                ":match_method" => "BILL_OF_LADING_CONFIRMED",
+                ":matched_by" => (string) $my_details->id,
+                ":confirmed_by" => (string) $my_details->id,
+                ":notes" => "Shipment linked during manifest intake. Shipment reference: " . (string) ($shipment["shipment_reference"] ?? "")
+            ]);
+        }
 
         if ($source !== "Manual") {
             $consume = $conn->prepare("
@@ -246,31 +281,42 @@
 
         $event = $conn->prepare("
             INSERT INTO operation_manifest_events
-            (id, manifest_id, actor_id, action, from_status, to_status, details)
-            VALUES (:event_id, :id, :actor, :action, NULL, :status, :details)
+            (
+                id, manifest_id, actor_id, action,
+                from_status, to_status, details
+            )
+            VALUES
+            (
+                :event_id, :id, :actor, :action,
+                NULL, :status, :details
+            )
         ");
 
         $event->execute([
             ":event_id" => generateId(),
             ":id" => $id,
             ":actor" => (string) $my_details->id,
-            ":action" => "CREATED_AND_LINKED",
-            ":status" => "Pre-advice",
-            ":details" => trim($notes . "\nLinked shipment: " . (string) ($shipment["shipment_reference"] ?? $matchedShipmentId))
+            ":action" => $shipment !== null ? "CREATED_AND_LINKED" : "CREATED_UNMATCHED",
+            ":status" => $status,
+            ":details" => $shipment !== null
+                ? trim($notes . "\nLinked shipment: " . (string) ($shipment["shipment_reference"] ?? $matchedShipmentId))
+                : trim($notes . "\nAwaiting an organisation shipment declaration.")
         ]);
 
         $conn->commit();
 
         echo json_encode([
             "error" => false,
-            "data" => "Manifest created and linked to the existing shipment declaration.",
+            "data" => $shipment !== null
+                ? "Manifest created and linked to the existing shipment declaration."
+                : "Manifest saved successfully. No matching shipment declaration was found; it can be matched when the organisation submits its declaration.",
             "code" => [
                 "id" => $id,
-                "status" => "Pre-advice",
+                "status" => $status,
                 "duplicate" => false,
                 "duplicate_of" => null,
                 "consignee_status" => $consigneeStatus,
-                "matched_shipment_id" => $matchedShipmentId,
+                "matched_shipment_id" => $shipment !== null ? $matchedShipmentId : null,
                 "shipment_reference" => $shipment["shipment_reference"] ?? null,
                 "shipment_status" => $shipment["status"] ?? null
             ]
@@ -279,11 +325,20 @@
         if ($conn->inTransaction()) {
             $conn->rollBack();
         }
-        echo json_encode(["error" => true, "data" => $e->getMessage(), "code" => null], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        echo json_encode([
+            "error" => true,
+            "data" => $e->getMessage(),
+            "code" => null
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     } catch (Throwable $e) {
         if ($conn->inTransaction()) {
             $conn->rollBack();
         }
 
-        echo json_encode(["error" => true, "data" => "Unable to create manifest.", "code" => $e->getMessage()], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        echo json_encode([
+            "error" => true,
+            "data" => "Unable to create manifest.",
+            "code" => $e->getMessage()
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }

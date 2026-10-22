@@ -293,13 +293,6 @@ export default function OperationsManifestIntakePage() {
 			return;
 		}
 
-		if (!matchedShipment?.id) {
-			toast.error(
-				"Search for and confirm the matching shipment declaration before adding this manifest."
-			);
-			return;
-		}
-
 		const consigneeName =
 			consignee.type === "organisation"
 				? consignee.organisationName.trim()
@@ -352,8 +345,8 @@ export default function OperationsManifestIntakePage() {
 			formData.append("agentId", consignee.agentId ?? "");
 			formData.append("agent", consignee.agentName);
 			formData.append("source", source);
-			formData.append("status", "Pre-advice");
-			formData.append("matched_shipment_id", String(matchedShipment.id));
+			formData.append("status", matchedShipment?.id ? "Pre-advice" : "Unmatched");
+			formData.append("matched_shipment_id", matchedShipment?.id ? String(matchedShipment.id) : "");
 			formData.append("containerNumbers", containerNumbers);
 			if (uploadToken) formData.append("uploadToken", uploadToken);
 
@@ -363,7 +356,11 @@ export default function OperationsManifestIntakePage() {
 				toast.error(resp.data || "Could not add the manifest.");
 				return;
 			}
-			toast.success("Manifest added.");
+			toast.success(
+				matchedShipment?.id
+					? "Manifest added and linked to the shipment."
+					: "Manifest saved. It can be matched when the organisation submits its declaration."
+			);
 			navigate("/operations/manifest");
 		} catch (err: any) {
 			console.log(err);
@@ -583,7 +580,7 @@ export default function OperationsManifestIntakePage() {
 												? "Searching existing shipment declarations…"
 												: bl.trim().length < 2
 													? "Enter at least two characters of the bill of lading to search existing declarations."
-													: "Select the correct declaration below. The manifest cannot be added until a match is confirmed."}
+													: "Select a matching declaration if one exists. If no declaration exists yet, you can still save this manifest as unmatched."}
 									</p>
 									{matchedShipment && (
 										<div className="mt-3 rounded-lg border border-teal/25 bg-teal/5 p-3">
@@ -684,8 +681,7 @@ export default function OperationsManifestIntakePage() {
 											))
 										) : (
 											<p className="rounded-lg border border-dashed border-line p-3 text-xs text-ink-soft">
-												No matching declarations found. Try the full B/L
-												number or correct the entered value.
+												No matching declarations found. You can still save this manifest as unmatched and link it when the organisation submits its declaration.
 											</p>
 										)}
 									</div>

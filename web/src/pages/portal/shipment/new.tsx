@@ -816,9 +816,7 @@ export default function NewPortalShipmentPage() {
 		return formData;
 	};
 
-	const persistShipment = async (
-		status: "draft" | "pending_review"
-	): Promise<string | null> => {
+	const persistShipment = async (status: "draft" | "pending_review"): Promise<string | null> => {
 		const endpoint = shipmentId
 			? `/portal/shipments/update/${shipmentId}/`
 			: "/portal/shipments/save/";
@@ -836,6 +834,8 @@ export default function NewPortalShipmentPage() {
 		}
 
 		const record = extractRecord(resp.code);
+		toast.success(resp.data || "Shipment saved successfully.");
+		navigate("/portal/shipments");
 		return record?.id ?? shipmentId ?? null;
 	};
 
