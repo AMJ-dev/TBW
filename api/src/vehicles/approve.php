@@ -1,34 +1,30 @@
 <?php
-require_once dirname(__DIR__, 2) . "/include/verify-user.php";
+    require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
-$id = trim($_POST["id"] ?? "");
+    $id = trim($_POST["id"] ?? "");
 
-if ($id === "") {
-    http_response_code(400);
-    echo json_encode([
-        "error" => true,
-        "data" => "Vehicle ID is required.",
-        "code" => null
-    ]);
-    exit;
-}
+    if ($id === "") {
+        http_response_code(400);
+        echo json_encode([
+            "error" => true,
+            "data" => "Vehicle ID is required.",
+            "code" => null
+        ]);
+        exit;
+    }
 
-try {
-    $stmt = $conn->prepare("
-        UPDATE gate_vehicles
-        SET status = 'Approved'
-        WHERE id = ? AND status = 'Pending review'
-    ");
-    $stmt->execute([$id]);
+    $organisation_id = $my_details->organisation_id ?? null;
 
-    if ($stmt->rowCount() === 0) {
+    try {
+        $conn->beginTransaction();
+
         $check = $conn->prepare("
-            SELECT status
+            SELECT `status`
             FROM gate_vehicles
-            WHERE id = ?
+            WHERE id = :id AND organisation_id=:organisation_id
             LIMIT 1
         ");
-        $check->execute([$id]);
+        $check->execute([":id" => $id, ":organisation_id" => $organisation_id]);
         $vehicle = $check->fetch(PDO::FETCH_ASSOC);
 
         if (!$vehicle) {
@@ -40,26 +36,40 @@ try {
             ]);
             exit;
         }
+        if ($vehicle["status"] !== "Pending review") {
+            http_response_code(409);
+            echo json_encode([
+                "error" => true,
+                "data" => "Only vehicles pending review can be approved.",
+                "code" => ["status" => $vehicle["status"]]
+            ]);
+            exit;
+        }
 
-        http_response_code(409);
+        $stmt = $conn->prepare("UPDATE gate_vehicles SET `status` = 'Approved' WHERE id = :id");
+        if ($stmt->execute([":id" => $id])) {
+            echo json_encode([
+                "error" => false,
+                "data" => "Vehicle approved successfully.",
+                "code" => ["id" => $id, "status" => "Approved"]
+            ]);
+            $conn->commit();
+        } else {
+            $conn->rollBack();
+            http_response_code(409);
+            echo json_encode([
+                "error" => true,
+                "data" => "Could not approve vehicle.",
+                "code" => ["status" => $vehicle["status"]]
+            ]);
+            exit;
+        }
+
+    } catch (PDOException $e) {
+        http_response_code(500);
         echo json_encode([
             "error" => true,
-            "data" => "Only vehicles pending review can be approved.",
-            "code" => ["status" => $vehicle["status"]]
+            "data" => "Could not approve vehicle.",
+            "code" => $e->getMessage(),
         ]);
-        exit;
     }
-
-    echo json_encode([
-        "error" => false,
-        "data" => "Vehicle approved successfully.",
-        "code" => ["id" => $id, "status" => "Approved"]
-    ]);
-} catch (PDOException $e) {
-    http_response_code(500);
-    echo json_encode([
-        "error" => true,
-        "data" => "Could not approve vehicle.",
-        "code" => null
-    ]);
-}

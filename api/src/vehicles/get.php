@@ -14,13 +14,14 @@
     }
 
     try {
+        $organisation_id = $my_details->organisation_id ?? null;
         $stmt = $conn->prepare("
             SELECT *
             FROM gate_vehicles
-            WHERE id = ?
+            WHERE id = :id AND organisation_id=:organisation_id
             LIMIT 1
         ");
-        $stmt->execute([$id]);
+        $stmt->execute([":id" => $id, ":organisation_id" => $organisation_id]);
         $vehicle = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$vehicle) {

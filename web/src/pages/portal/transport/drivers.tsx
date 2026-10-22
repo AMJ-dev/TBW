@@ -796,13 +796,17 @@ function DriverDetail({
 						<p className="mt-1 text-[11px] text-ink-soft">
 							Assign a vehicle from the driver assignments page.
 						</p>
-						<Button
-							onClick={() => navigate("/portal/drivers/assignments")}
-							variant="outline"
-							className="mt-3 border-line bg-paper text-ink hover:bg-sand"
-						>
-							Open assignments
-						</Button>
+						{
+							driver.status == "Approved" && (
+								<Button
+									onClick={() => navigate("/portal/drivers/assignments")}
+									variant="outline"
+									className="mt-3 border-line bg-paper text-ink hover:bg-sand"
+								>
+									Open assignments
+								</Button>
+							)
+						}
 					</div>
 				) : (
 					<ul className="mt-3 space-y-2">
@@ -830,7 +834,7 @@ function DriverDetail({
 										{v.kind} · {v.make} {v.model} · {v.year}
 									</p>
 									<p className="mt-0.5 font-mono text-[11px] text-ink-soft">
-										{v.capacity} · {v.transporter}
+										{v.capacity} · {v.transporter} {driver.status}
 									</p>
 								</div>
 							</li>

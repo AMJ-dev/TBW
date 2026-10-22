@@ -1,7 +1,7 @@
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
-    $organisationId = $my_details->organisation_id ?? null;
+    $organisation_id = $my_details->organisation_id ?? null;
 
     $id = trim($_POST["id"] ?? "");
     $reason = trim($_POST["reason"] ?? "");
@@ -14,8 +14,10 @@
     try {
         $conn->beginTransaction();
 
-        $stmt = $conn->prepare("SELECT id, status FROM gate_drivers WHERE id = ? FOR UPDATE");
-        $stmt->execute([$id]);
+        $stmt = $conn->prepare("SELECT id, `status` FROM gate_drivers WHERE id = :id AND organisation_id=:organisation_id
+            LIMIT 1
+            FOR UPDATE");
+        $stmt->execute([":id" => $id, ":organisation_id" => $organisation_id]);
         $driver = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$driver) {
@@ -29,18 +31,18 @@
         $stmt = $conn->prepare("
             INSERT INTO gate_driver_action_logs
             (id, driver_id, action, reason, previous_status, new_status, actor_id)
-            VALUES (?, ?, 'deleted', ?, ?, 'Deleted', ?)
+            VALUES (:id, :driver_id, 'deleted', :reason, :previous_status, 'Deleted', :actor_id)
         ");
         $stmt->execute([
-            generateId(),
-            $id,
-            $reason,
-            $driver["status"],
-            $actor
+            ":id" => generateId(),
+            ":driver_id" => $id,
+            ":reason" => $reason,
+            ":previous_status" => $driver["status"],
+            ":actor_id" => $actor
         ]);
 
-        $stmt = $conn->prepare("DELETE FROM gate_drivers WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $conn->prepare("DELETE FROM gate_drivers WHERE id = :id AND organisation_id=:organisation_id LIMIT 1");
+        $stmt->execute([":id" => $id, ":organisation_id" => $organisation_id]);
 
         $conn->commit();
 

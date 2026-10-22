@@ -755,7 +755,7 @@ function AssignPicker({
 		const timer = window.setTimeout(async () => {
 			setSearching(true);
 			try {
-				const res = await http.post("vehicles/search/", { q });
+				const res = await http.post("vehicles/search/", { q, include_assigned: true });
 				const resp: Resp = res.data;
 				if (cancelled) return;
 				if (resp.error) {

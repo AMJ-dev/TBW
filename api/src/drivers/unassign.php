@@ -71,6 +71,7 @@
             ":id" => generateId(),
             ":driver_id" => $driver_id,
             ":vehicle_id" => $assignment["vehicle_id"],
+            ":action" => "unassigned",
             ":actor_id" => $actor_id,
             ":details" => json_encode(["assignment_id" => $assignment["id"]])
         ]);
@@ -88,5 +89,5 @@
         }
 
         http_response_code(500);
-        echo json_encode(["error" => true, "data" => "Could not unassign vehicle.", "code" => null]);
+        echo json_encode(["error" => true, "data" => "Could not unassign vehicle.", "code" => $e->getMessage()]);
     }

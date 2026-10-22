@@ -16,11 +16,14 @@
 
     try {
         $conn->beginTransaction();
+
         $organisation_id = $my_details->organisation_id ?? null;
+        $actorId = isset($my_details->id) ? $my_details->id : null;
+
         $stmt = $conn->prepare("
             SELECT id
             FROM gate_vehicles
-            WHERE id = :id && organisation_id = :organisation_id
+            WHERE id = :id AND organisation_id = :organisation_id
             LIMIT 1
             FOR UPDATE
         ");
@@ -41,30 +44,24 @@
             exit;
         }
 
-        $actorId = isset($my_details->id) ? $my_details->id : null;
 
         $log = $conn->prepare("
             INSERT INTO gate_vehicle_action_logs (
                 id,
                 vehicle_id,
-                organisation_id,
                 action,
                 reason,
                 actor_id
-            ) VALUES (:id, :vehicle_id, :organisation_id, 'deleted', :reason, :actor_id)
+            ) VALUES (:id, :vehicle_id, 'deleted', :reason, :actor_id)
         ");
         $log->execute([
             ":id" => generateId(),
             ":vehicle_id" => $id,
-            ":organisation_id" => $organisation_id,
             ":reason" => $reason,
             ":actor_id" => $actorId
         ]);
 
-        $delete = $conn->prepare("
-            DELETE FROM gate_vehicles
-            WHERE id = :id && organisation_id = :organisation_id
-        ");
+        $delete = $conn->prepare("DELETE FROM gate_vehicles WHERE id = :id AND organisation_id = :organisation_id");
         $delete->execute([
             ":id" => $id,
             ":organisation_id" => $organisation_id
@@ -86,6 +83,6 @@
         echo json_encode([
             "error" => true,
             "data" => "Could not remove vehicle.",
-            "code" => null
+            "code" => $e->getMessage()
         ]);
     }

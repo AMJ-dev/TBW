@@ -1,7 +1,7 @@
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
-    $organisationId = $my_details->organisation_id ?? null;
+    $organisation_id = $my_details->organisation_id ?? null;
 
     $id = trim($_GET["id"] ?? $_POST["id"] ?? "");
     $name = trim($_POST["name"] ?? "");
@@ -40,13 +40,8 @@
 
         $conn->beginTransaction();
 
-        $stmt = $conn->prepare("
-            SELECT id, status
-            FROM gate_drivers
-            WHERE id = ?
-            FOR UPDATE
-        ");
-        $stmt->execute([$id]);
+        $stmt = $conn->prepare("SELECT id, status FROM gate_drivers WHERE id = :id AND organisation_id=:organisation_id LIMIT 1 FOR UPDATE");
+        $stmt->execute([":id" => $id, ":organisation_id" => $organisation_id]);
         $driver = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$driver) {
@@ -59,15 +54,8 @@
             exit;
         }
 
-        $stmt = $conn->prepare("
-            SELECT id, status
-            FROM gate_drivers
-            WHERE licence_number = ?
-            AND id <> ?
-            LIMIT 1
-            FOR UPDATE
-        ");
-        $stmt->execute([$licence_number, $id]);
+        $stmt = $conn->prepare("SELECT id, status FROM gate_drivers WHERE licence_number = :licence_number AND organisation_id=:organisation_id AND id <> :id LIMIT 1 FOR UPDATE");
+        $stmt->execute([":licence_number" => $licence_number, ":organisation_id" => $organisation_id, ":id" => $id]);
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($existing) {
@@ -76,41 +64,37 @@
             $stmt = $conn->prepare("
                 UPDATE gate_drivers
                 SET
-                    name = ?,
-                    phone = ?,
-                    licence_class = ?,
-                    licence_expiry = ?,
-                    assigned_vehicle = ?,
-                    transporter = ?,
-                    notes = ?,
-                    updated_by = ?
-                WHERE id = ?
+                    name = :name,
+                    phone = :phone,
+                    licence_class = :licence_class,
+                    licence_expiry = :licence_expiry,
+                    assigned_vehicle = :assigned_vehicle,
+                    transporter = :transporter,
+                    notes = :notes,
+                    updated_by = :actor
+                WHERE id = :existing_id
             ");
 
             $stmt->execute([
-                $name,
-                $phone,
-                $licence_class ?: null,
-                $licence_expiry ?: null,
-                $assigned_vehicle ?: null,
-                $transporter ?: null,
-                $notes ?: null,
-                $actor,
-                $existing_id
+                ":name" => $name,
+                ":phone" => $phone,
+                ":licence_class" => $licence_class ?: null,
+                ":licence_expiry" => $licence_expiry ?: null,
+                ":assigned_vehicle" => $assigned_vehicle ?: null,
+                ":transporter" => $transporter ?: null,
+                ":notes" => $notes ?: null,
+                ":actor" => $actor,
+                ":existing_id" => $existing_id
             ]);
 
-            $stmt = $conn->prepare("
-                INSERT INTO gate_driver_action_logs (
-                    id, driver_id, action, previous_status, new_status, actor_id
-                ) VALUES (?, ?, 'updated_existing_licence', ?, ?, ?)
-            ");
+            $stmt = $conn->prepare("INSERT INTO gate_driver_action_logs (id, driver_id, action, previous_status, new_status, actor_id) VALUES (:id, :driver_id, 'updated_existing_licence', :previous_status, :new_status, :actor_id)");
 
             $stmt->execute([
-                generateId(),
-                $existing_id,
-                $existing["status"],
-                $existing["status"],
-                $actor
+                ":id" => generateId(),
+                ":driver_id" => $existing_id,
+                ":previous_status" => $existing["status"],
+                ":new_status" => $existing["status"],
+                ":actor_id" => $actor
             ]);
 
             $conn->commit();
@@ -129,43 +113,39 @@
         $stmt = $conn->prepare("
             UPDATE gate_drivers
             SET
-                name = ?,
-                phone = ?,
-                licence_number = ?,
-                licence_class = ?,
-                licence_expiry = ?,
-                assigned_vehicle = ?,
-                transporter = ?,
-                notes = ?,
-                updated_by = ?
-            WHERE id = ?
+                name = :name,
+                phone = :phone,
+                licence_number = :licence_number,
+                licence_class = :licence_class,
+                licence_expiry = :licence_expiry,
+                assigned_vehicle = :assigned_vehicle,
+                transporter = :transporter,
+                notes = :notes,
+                updated_by = :actor
+            WHERE id = :id
         ");
 
         $stmt->execute([
-            $name,
-            $phone,
-            $licence_number,
-            $licence_class ?: null,
-            $licence_expiry ?: null,
-            $assigned_vehicle ?: null,
-            $transporter ?: null,
-            $notes ?: null,
-            $actor,
-            $id
+            ":name" => $name,
+            ":phone" => $phone,
+            ":licence_number" => $licence_number,
+            ":licence_class" => $licence_class ?: null,
+            ":licence_expiry" => $licence_expiry ?: null,
+            ":assigned_vehicle" => $assigned_vehicle ?: null,
+            ":transporter" => $transporter ?: null,
+            ":notes" => $notes ?: null,
+            ":actor" => $actor,
+            ":id" => $id
         ]);
 
-        $stmt = $conn->prepare("
-            INSERT INTO gate_driver_action_logs (
-                id, driver_id, action, previous_status, new_status, actor_id
-            ) VALUES (?, ?, 'updated', ?, ?, ?)
-        ");
+        $stmt = $conn->prepare("INSERT INTO gate_driver_action_logs (id, driver_id, action, previous_status, new_status, actor_id) VALUES (:id, :driver_id, 'updated', :previous_status, :new_status, :actor_id)");
 
         $stmt->execute([
-            generateId(),
-            $id,
-            $driver["status"],
-            $driver["status"],
-            $actor
+            ":id" => generateId(),
+            ":driver_id" => $id,
+            ":previous_status" => $driver["status"],
+            ":new_status" => $driver["status"],
+            ":actor_id" => $actor
         ]);
 
         $conn->commit();

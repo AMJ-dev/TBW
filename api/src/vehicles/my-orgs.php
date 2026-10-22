@@ -5,9 +5,9 @@
     header("Content-Type: application/json; charset=utf-8");
 
     try {
-        $organisationId = $my_details->organisation_id ?? null;
+        $organisation_id = $my_details->organisation_id ?? null;
 
-        if (!$organisationId) {
+        if (!$organisation_id) {
             http_response_code(403);
             echo json_encode([
                 "error" => true,
@@ -65,11 +65,11 @@
                 AND dva.unassigned_at IS NULL
             LEFT JOIN gate_drivers d
                 ON d.id = dva.driver_id
-            WHERE v.organisation_id = ?
+            WHERE v.organisation_id = :organisation_id
             ORDER BY v.created_at DESC
         ");
 
-        $stmt->execute([$organisationId]);
+        $stmt->execute([":organisation_id" => $organisation_id]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $vehicles = [];

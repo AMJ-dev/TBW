@@ -13,9 +13,10 @@ if ($id === "" || mb_strlen($reason) < 5) {
 
 try {
     $conn->beginTransaction();
+    $organisation_id = $my_details->organisation_id ?? null;
 
-    $stmt = $conn->prepare("SELECT id, status FROM gate_drivers WHERE id = ? FOR UPDATE");
-    $stmt->execute([$id]);
+    $stmt = $conn->prepare("SELECT id, `status` FROM gate_drivers WHERE id = :id AND organisation_id=:organisation_id LIMIT 1 FOR UPDATE");
+    $stmt->execute([":id" => $id, ":organisation_id" => $organisation_id]);
     $driver = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$driver) {
@@ -34,17 +35,17 @@ try {
 
     $stmt = $conn->prepare("
         UPDATE gate_drivers
-        SET status = 'Suspended', updated_by = ?
-        WHERE id = ?
+        SET status = 'Suspended', updated_by = :actor
+        WHERE id = :id AND organisation_id=:organisation_id LIMIT 1
     ");
-    $stmt->execute([$actor, $id]);
+    $stmt->execute([":actor" => $actor, ":id" => $id, ":organisation_id" => $organisation_id]);
 
     $stmt = $conn->prepare("
         INSERT INTO gate_driver_action_logs
         (id, driver_id, action, reason, previous_status, new_status, actor_id)
-        VALUES (?, ?, 'suspended', ?, 'Approved', 'Suspended', ?)
+        VALUES (:id, :driver_id, 'suspended', :reason, 'Approved', 'Suspended', :actor_id)
     ");
-    $stmt->execute([generateId(), $id, $reason, $actor]);
+    $stmt->execute([":id" => generateId(), ":driver_id" => $id, ":reason" => $reason, ":actor_id" => $actor]);
 
     $conn->commit();
 

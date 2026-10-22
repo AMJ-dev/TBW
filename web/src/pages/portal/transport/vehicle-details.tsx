@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
 	AlertTriangle,
 	ArrowLeft,
@@ -136,10 +136,6 @@ const normalizeVehicle = (raw: any): Vehicle => ({
 export default function GateVehicleDetailsPage() {
 	const { id } = useParams<{ id: string }>();
 	const navigate = useNavigate();
-	const location = useLocation();
-
-	// Check if the URL implies read-only mode based on your exact requirement
-	const isReadOnly = location.pathname.includes("/details/");
 
 	const [vehicle, setVehicle] = useState<Vehicle | null>(null);
 	const [loading, setLoading] = useState(true);
@@ -332,18 +328,15 @@ export default function GateVehicleDetailsPage() {
 						Back to registry
 					</Button>
 
-					{/* Hide Edit button in read-only details view if desired, but usually viewing allows edit */}
-					{!isReadOnly && (
-						<Button
-							variant="outline"
-							onClick={() => navigate(`/portal/vehicle/edit/${vehicle.id}`)}
-							disabled={actioning}
-							className="border-line bg-paper text-ink hover:bg-sand"
-						>
-							<Pencil className="mr-1.5 size-4" />
-							Edit
-						</Button>
-					)}
+					<Button
+						variant="outline"
+						onClick={() => navigate(`/portal/vehicle/edit/${vehicle.id}`)}
+						disabled={actioning}
+						className="border-line bg-paper text-ink hover:bg-sand"
+					>
+						<Pencil className="mr-1.5 size-4" />
+						Edit
+					</Button>
 				</div>
 
 				<div className="rounded-2xl bg-paper ring-1 ring-line">
@@ -460,59 +453,17 @@ export default function GateVehicleDetailsPage() {
 					</p>
 				</div>
 
-				{/* 
-					Only render actions if NOT in the read-only `/details/` route.
-					This is the requirement.
-				*/}
-				{!isReadOnly && (
-					<div className="rounded-2xl bg-paper p-5 ring-1 ring-line sm:p-6">
-						<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
-							Actions
-						</p>
+				<div className="rounded-2xl bg-paper p-5 ring-1 ring-line sm:p-6">
+					<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+						Actions
+					</p>
 
-						<div className="mt-3 flex flex-wrap gap-2">
-							{isPending && (
-								<>
-									<Button
-										disabled={actioning}
-										onClick={() => void handleApprove()}
-										className="bg-orange text-white hover:bg-orange-deep"
-									>
-										{actioning ? (
-											<Loader2 className="mr-1.5 size-4 animate-spin" />
-										) : (
-											<Check className="mr-1.5 size-4" />
-										)}
-										Approve
-									</Button>
-									<Button
-										disabled={actioning}
-										onClick={() => setRejectOpen(true)}
-										variant="outline"
-										className="border-coral/30 bg-coral/5 text-coral hover:bg-coral/10"
-									>
-										<XCircle className="mr-1.5 size-4" />
-										Reject
-									</Button>
-								</>
-							)}
-
-							{isActive && (
+					<div className="mt-3 flex flex-wrap gap-2">
+						{isPending && (
+							<>
 								<Button
 									disabled={actioning}
-									onClick={() => setSuspendOpen(true)}
-									variant="outline"
-									className="border-coral/30 bg-coral/5 text-coral hover:bg-coral/10"
-								>
-									<AlertTriangle className="mr-1.5 size-4" />
-									Suspend
-								</Button>
-							)}
-
-							{isSuspended && (
-								<Button
-									disabled={actioning}
-									onClick={() => void handleActivate()}
+									onClick={() => void handleApprove()}
 									className="bg-orange text-white hover:bg-orange-deep"
 								>
 									{actioning ? (
@@ -520,24 +471,60 @@ export default function GateVehicleDetailsPage() {
 									) : (
 										<Check className="mr-1.5 size-4" />
 									)}
-									Activate
+									Approve
 								</Button>
-							)}
-						</div>
+								<Button
+									disabled={actioning}
+									onClick={() => setRejectOpen(true)}
+									variant="outline"
+									className="border-coral/30 bg-coral/5 text-coral hover:bg-coral/10"
+								>
+									<XCircle className="mr-1.5 size-4" />
+									Reject
+								</Button>
+							</>
+						)}
 
-						<div className="mt-5 border-t border-line pt-4">
+						{isActive && (
 							<Button
 								disabled={actioning}
-								onClick={() => setDeleteOpen(true)}
-								variant="ghost"
-								className="text-coral hover:bg-coral/10"
+								onClick={() => setSuspendOpen(true)}
+								variant="outline"
+								className="border-coral/30 bg-coral/5 text-coral hover:bg-coral/10"
 							>
-								<XCircle className="mr-1.5 size-4" />
-								Delete vehicle
+								<AlertTriangle className="mr-1.5 size-4" />
+								Suspend
 							</Button>
-						</div>
+						)}
+
+						{isSuspended && (
+							<Button
+								disabled={actioning}
+								onClick={() => void handleActivate()}
+								className="bg-orange text-white hover:bg-orange-deep"
+							>
+								{actioning ? (
+									<Loader2 className="mr-1.5 size-4 animate-spin" />
+								) : (
+									<Check className="mr-1.5 size-4" />
+								)}
+								Activate
+							</Button>
+						)}
 					</div>
-				)}
+
+					<div className="mt-5 border-t border-line pt-4">
+						<Button
+							disabled={actioning}
+							onClick={() => setDeleteOpen(true)}
+							variant="ghost"
+							className="text-coral hover:bg-coral/10"
+						>
+							<XCircle className="mr-1.5 size-4" />
+							Delete vehicle
+						</Button>
+					</div>
+				</div>
 
 				{suspendOpen && (
 					<ConfirmDialog

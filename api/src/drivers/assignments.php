@@ -27,7 +27,7 @@
                 AND a.unassigned_at IS NULL
             LEFT JOIN gate_vehicles v
                 ON v.id = a.vehicle_id
-            WHERE d.organisation_id = :organisation_id
+            WHERE d.organisation_id = :organisation_id && d.status = 'Approved'
             ORDER BY d.name ASC
         ";
 
