@@ -306,14 +306,6 @@ export default function GatePassesRoute() {
               )}
               Refresh
             </Button>
-
-            <Button
-              className="bg-orange text-white hover:bg-orange-deep"
-              onClick={() => navigate("/portal/passes/new")}
-            >
-              <Plus className="size-4" />
-              Issue Gate Pass
-            </Button>
           </div>
         </div>
 

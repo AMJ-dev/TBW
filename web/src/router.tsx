@@ -78,7 +78,6 @@ const GateConsolePage = lazy(() => import("@/pages/gate/console"));
 
 const TransportAppointmentsPage = lazy(() => import("@/pages/portal/transport/appointments"));
 const TransportPassesPage = lazy(() => import("@/pages/portal/transport/passes"));
-const TransportPassFormPage = lazy(() => import("@/pages/portal/transport/pass-form"));
 const TransportPassDetailsPage = lazy(() => import("@/pages/portal/transport/pass-details"));
 const TransportVehiclesPage = lazy(() => import("@/pages/portal/transport/vehicles"));
 const TransportVehicleFormPage = lazy(() => import("@/pages/portal/transport/vehicle-form"));
@@ -265,7 +264,6 @@ export default function Routers() {
 						<Route path="/portal/appointments/book" element={<TransportBookAppointmentsPage />} />
 						<Route path="/portal/vehicle/details/:id" element={<TransportVehicleDetailsPage />} />
 						<Route path="/portal/passes" element={<TransportPassesPage />} />
-						<Route path="/portal/passes/new" element={<TransportPassFormPage />} />
 						<Route path="/portal/passes/:id" element={<TransportPassDetailsPage />} />
 						
 						<Route path="/portal/cargo/:id" element={<CargoDetailPage />} />

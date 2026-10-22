@@ -192,11 +192,8 @@ const sections = [
         items: [
             { label: "Dashboard", to: "/gate/dashboard", icon: LayoutDashboard, access: ["system"] },
             { label: "Appointments", to: "/gate/appointments", icon: Clock3, access: ["system"] },
-            { label: "Gate Passes", to: "/gate/passes", icon: QrCode, access: ["system"] },
             { label: "Gate-in", to: "/gate/in", icon: Truck, access: ["system"] },
-            { label: "Gate-out", to: "/gate/out", icon: Truck, access: ["system"] },
-            { label: "Vehicle Registry", to: "/gate/vehicles", icon: CarFront, access: ["system"] },
-            { label: "Driver Registry", to: "/gate/drivers", icon: Users, access: ["system"] },
+            { label: "Gate-out", to: "/gate/out", icon: Truck, access: ["system"] }
         ],
     },
     {
@@ -207,6 +204,7 @@ const sections = [
             { label: "My Shipments", to: "/portal/shipments", icon: Package, access: ["organisation"] },
             { label: "Direct Intake Requests", to: "/portal/direct-intake", icon: Container, access: ["organisation"] },
             { label: "Bookings", to: "/portal/bookings", icon: CalendarDays, access: ["organisation"] },
+            { label: "Gate Passes", to: "/portal/passes", icon: QrCode, access: ["organisation"] },
             { label: "Appointments", to: "/portal/appointments", icon: Clock3, access: ["organisation"] },
             { label: "Vehicles", to: "/portal/vehicles", icon: CarFront, access: ["organisation"] },
             { label: "Drivers", to: "/portal/drivers", icon: Users, access: ["organisation"] },

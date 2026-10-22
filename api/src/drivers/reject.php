@@ -35,7 +35,7 @@
 
         $stmt = $conn->prepare("
             UPDATE gate_drivers
-            SET status = 'Rejected', updated_by = :actor
+            SET status = 'Rejected', rejected_by = :actor, rejected_at = NOW()
             WHERE id = :id AND organisation_id=:organisation_id LIMIT 1
         ");
         $stmt->execute([":actor" => $actor, ":id" => $id, ":organisation_id" => $organisation_id]);

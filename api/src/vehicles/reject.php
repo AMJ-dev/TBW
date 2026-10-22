@@ -49,22 +49,22 @@
             ]);
             exit;
         }
+        $actor_id = isset($my_details->id) ? $my_details->id : null;
 
         $update = $conn->prepare("
             UPDATE gate_vehicles
-            SET status = 'Rejected'
+            SET status = 'Rejected', rejected_by = :actor, rejected_at = NOW()
             WHERE id = :id AND organisation_id=:organisation_id
         ");
-        $update->execute([":id" => $id, ":organisation_id" => $organisation_id]);
+        $update->execute([":id" => $id, ":actor" => $actor_id, ":organisation_id" => $organisation_id]);
 
-        $actorId = isset($my_details->id) ? $my_details->id : null;
 
         $log = $conn->prepare("
             INSERT INTO gate_vehicle_action_logs (
                 id, vehicle_id, action, reason, actor_id
             ) VALUES (:id, :vehicle_id, 'rejected', :reason, :actor_id)
         ");
-        $log->execute([":id" => generateId(), ":vehicle_id" => $id, ":reason" => $reason, ":actor_id" => $actorId]);
+        $log->execute([":id" => generateId(), ":vehicle_id" => $id, ":reason" => $reason, ":actor_id" => $actor_id]);
 
         $conn->commit();
 

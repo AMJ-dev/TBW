@@ -42,22 +42,22 @@
             exit;
         }
 
-        $actor = $my_details->id ?? null;
+        $actor_id = $my_details->id ?? null;
 
         $stmt = $conn->prepare("
             UPDATE gate_drivers
-            SET status = 'Approved', updated_by = :actor
+            SET status = 'Approved', approved_by = :actor_id, approved_at = NOW()
             WHERE id = :id AND organisation_id=:organisation_id
             LIMIT 1
         ");
-        $stmt->execute([":actor" => $actor, ":id" => $id, ":organisation_id" => $organisation_id]);
+        $stmt->execute([":actor_id" => $actor_id, ":id" => $id, ":organisation_id" => $organisation_id]);
 
         $stmt = $conn->prepare("
             INSERT INTO gate_driver_action_logs
             (id, driver_id, action, previous_status, new_status, actor_id)
             VALUES (:id, :driver_id, 'approved', 'Pending review', 'Approved', :actor_id)
         ");
-        $stmt->execute([":id" => generateId(), ":driver_id" => $id, ":actor_id" => $actor]);
+        $stmt->execute([":id" => generateId(), ":driver_id" => $id, ":actor_id" => $actor_id]);
 
         $conn->commit();
 

@@ -95,11 +95,11 @@ export function PublicBrand({ compact = false }: { compact?: boolean }) {
 				<img src="/logo.png" alt="TRÏNŪ Bonded Terminal" className="w-14 h-14" />
 			)}
 		</div>
-	);
+	); 
 }
 
 export function PublicHeader() {
-	const { auth } = useContext(UserContext);
+	const { auth, my_details } = useContext(UserContext);
 	const [open, setOpen] = useState(false);
 	const [audienceOpen, setAudienceOpen] = useState(false);
 
@@ -190,10 +190,10 @@ export function PublicHeader() {
 
 				<div className="ml-auto flex items-center gap-2">
 					<Link
-						to={auth ? "/dashboard" : "/login"}
+						to={auth ? my_details?.account_type=="system" ? "/admin" : "/portal" : "/login"}
 						className="hidden text-[12px] font-medium text-ink-soft transition-colors hover:text-carmine sm:inline-flex"
 					>
-						{auth ? "Dashboard" : "Sign in"}
+						{auth ? my_details?.account_type=="system" ? "Admin" : "Portal" : "Sign in"}
 					</Link>
 					<Link to="/tracking">
 						<Button

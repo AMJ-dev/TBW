@@ -45,9 +45,17 @@
             ]);
             exit;
         }
+        $actor_id = isset($my_details->id) ? $my_details->id : null;
 
-        $stmt = $conn->prepare("UPDATE gate_vehicles SET `status` = 'Approved' WHERE id = :id");
-        if ($stmt->execute([":id" => $id])) {
+        $stmt = $conn->prepare("UPDATE gate_vehicles SET `status` = 'Approved', approved_by = :actor_id, approved_at = NOW() WHERE id = :id AND organisation_id=:organisation_id");
+        if ($stmt->execute([":id" => $id, ":actor_id" => $actor_id, ":organisation_id" => $organisation_id])) {
+            $log = $conn->prepare("
+                INSERT INTO gate_vehicle_action_logs (
+                    id, vehicle_id, action, previous_status, new_status, actor_id
+                ) VALUES (:id, :vehicle_id, 'approved', 'Pending review', 'Approved', :actor_id)
+            ");
+            $log->execute([":id" => generateId(), ":vehicle_id" => $id, ":actor_id" => $actor_id]);
+            
             echo json_encode([
                 "error" => false,
                 "data" => "Vehicle approved successfully.",
