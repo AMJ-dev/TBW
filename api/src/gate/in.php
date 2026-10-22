@@ -46,15 +46,6 @@ try {
                 WHERE ac.appointment_id = a.id
             ) AS container_nos,
             (
-                SELECT GROUP_CONCAT(
-                    pc.container_no
-                    ORDER BY pc.container_no
-                    SEPARATOR ','
-                )
-                FROM gate_pass_containers pc
-                WHERE pc.gate_pass_id = p.id
-            ) AS pass_container_nos,
-            (
                 SELECT gm.decision
                 FROM gate_movement_records gm
                 WHERE gm.gate_pass_id = p.id
@@ -156,12 +147,6 @@ try {
             )))
             : [];
 
-        $passContainers = !empty($row["pass_container_nos"])
-            ? array_values(array_filter(array_map(
-                "trim",
-                explode(",", (string) $row["pass_container_nos"])
-            )))
-            : [];
 
         $normalize = static function (array $values): array {
             $values = array_map(
@@ -247,7 +232,6 @@ try {
         }
 
         $row["container_nos"] = $appointmentContainers;
-        $row["pass_container_nos"] = $passContainers;
         $row["used"] = $used;
         $row["pass_expired"] = $passExpired;
         $row["assignment_eligible"] = $assignmentEligible;

@@ -99,7 +99,8 @@
                 transporter = :transporter,
                 insurance_expiry = :insurance_expiry,
                 roadworthiness_expiry = :roadworthiness_expiry,
-                notes = :notes
+                notes = :notes,
+                updated_by = :actor_id,
             WHERE id = :id AND organisation_id = :organisation_id
         ");
 
@@ -116,7 +117,8 @@
             ":roadworthiness_expiry" => $roadworthinessExpiry ?: null,
             ":notes" => $notes ?: null,
             ":id" => $id,
-            ":organisation_id" => $organisation_id
+            ":organisation_id" => $organisation_id,
+            ":actor_id" => $my_details->id
         ]);
 
         $stmt = $conn->prepare("

@@ -57,11 +57,6 @@ try {
             d.status AS driver_status,
             d.licence_expiry,
             (
-                SELECT GROUP_CONCAT(c.container_no ORDER BY c.container_no SEPARATOR ',')
-                FROM gate_pass_containers c
-                WHERE c.gate_pass_id = p.id
-            ) AS pass_container_nos,
-            (
                 SELECT GROUP_CONCAT(ac.container_no ORDER BY ac.container_no SEPARATOR ',')
                 FROM gate_appointment_containers ac
                 WHERE ac.appointment_id = a.id
@@ -176,10 +171,6 @@ try {
                 : $appointmentStatus === "in terminal"
         );
 
-    $containers = !empty($pass["pass_container_nos"])
-        ? array_values(array_filter(array_map("trim", explode(",", (string) $pass["pass_container_nos"]))))
-        : [];
-
     $appointmentContainers = !empty($pass["appointment_container_nos"])
         ? array_values(array_filter(array_map("trim", explode(",", (string) $pass["appointment_container_nos"]))))
         : [];
@@ -195,8 +186,8 @@ try {
     };
 
     $cargoEligible =
-        count($containers) > 0 &&
-        $normalize($containers) === $normalize($appointmentContainers);
+        count($appointmentContainers) > 0 &&
+        $appointmentContainers;
 
     $assignmentEligible = (bool) $pass["assignment_eligible"];
 

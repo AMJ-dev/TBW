@@ -23,6 +23,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
+import {copy_text} from "@/lib/functions"
 
 type AppointmentStatus =
 	| "Confirmed"
@@ -34,6 +35,8 @@ type AppointmentStatus =
 
 interface AppointmentRecord {
 	id: string;
+	pass_id: string;
+	booking_ref: string;
 	appointmentDate: string;
 	slotTime: string;
 	truckNo: string;
@@ -47,6 +50,8 @@ interface AppointmentRecord {
 
 interface ApiAppointment {
 	id?: string | number;
+	pass_id?: string | number;
+	booking_ref?: string;
 	appointment_id?: string | number;
 	appointment_date?: string;
 	date?: string;
@@ -118,6 +123,8 @@ function normalizeAppointment(item: ApiAppointment): AppointmentRecord {
 
 	return {
 		id: String(item.id ?? item.appointment_id ?? ""),
+		pass_id: String(item.pass_id ?? ""),
+		booking_ref: String(item.booking_ref ?? ""),
 		appointmentDate: String(item.appointment_date ?? item.date ?? ""),
 		slotTime: String(item.slot_time ?? item.slotTime ?? ""),
 		truckNo: String(
@@ -428,6 +435,7 @@ export default function GateAppointmentsRoute() {
 					<table className="w-full min-w-[1050px] text-left text-sm">
 						<thead>
 							<tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+								<th className="px-4 py-3 font-medium">Booking Ref</th>
 								<th className="px-4 py-3 font-medium">Appointment</th>
 								<th className="px-4 py-3 font-medium">Slot Window</th>
 								<th className="px-4 py-3 font-medium">Truck Plate</th>
@@ -435,13 +443,14 @@ export default function GateAppointmentsRoute() {
 								<th className="px-4 py-3 font-medium">Container No.</th>
 								<th className="px-4 py-3 font-medium">Assigned Lane</th>
 								<th className="px-4 py-3 font-medium">Status</th>
+								<th className="px-4 py-3 font-medium">Actions</th>
 							</tr>
 						</thead>
 
 						<tbody className="divide-y divide-line">
 							{loading ? (
 								<tr>
-									<td colSpan={8} className="px-4 py-12 text-center">
+									<td colSpan={9} className="px-4 py-12 text-center">
 										<LoaderCircle className="mx-auto mb-3 size-5 animate-spin text-orange" />
 										<p className="text-sm text-ink-soft">
 											Loading appointments...
@@ -451,7 +460,7 @@ export default function GateAppointmentsRoute() {
 							) : filteredAppointments.length === 0 ? (
 								<tr>
 									<td
-										colSpan={8}
+										colSpan={9}
 										className="px-4 py-12 text-center text-sm text-ink-soft"
 									>
 										<Search className="mx-auto mb-3 size-5 opacity-50" />
@@ -464,12 +473,17 @@ export default function GateAppointmentsRoute() {
 										key={appointment.id}
 										className="transition-colors hover:bg-sand/60"
 									>
+										<td className="cursor-pointer px-4 py-3.5 font-mono text-xs font-semibold text-orange-deep" onClick={() => copy_text(appointment.booking_ref)}>
+											{appointment.booking_ref || "—"}
+										</td>
+
 										<td className="px-4 py-3.5 text-xs text-ink">
 											{formatDate(appointment.appointmentDate)}
 											<p className="mt-1 font-mono text-[10px] text-ink-soft">
 												{appointment.id}
 											</p>
 										</td>
+
 
 										<td className="px-4 py-3.5 font-mono text-xs font-semibold text-orange-deep">
 											{appointment.slotTime || "—"}
@@ -504,6 +518,17 @@ export default function GateAppointmentsRoute() {
 												tone={statusTone(appointment.status)}
 											/>
 										</td>
+										
+									<td className="px-4 py-3.5 text-right">
+										<Button
+											variant="ghost"
+											size="sm"
+											onClick={() => navigate(`/portal/passes/${appointment.pass_id}`)}
+											className="text-xs font-semibold text-orange-deep hover:bg-orange/10"
+										>
+											Gate QR Pass
+										</Button>
+									</td>
 									</tr>
 								))
 							)}

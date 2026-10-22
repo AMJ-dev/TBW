@@ -20,6 +20,7 @@ import { AppShell, StatusBadge, statusTone, Metric } from "@/components/auth-she
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
+import {copy_text} from "@/lib/functions"
 
 type GatePass = {
   id: string;
@@ -445,7 +446,7 @@ export default function GatePassesRoute() {
                 ) : (
                   filteredPasses.map((pass) => (
                     <tr key={pass.id} className="transition-colors hover:bg-sand/50">
-                      <td className="px-4 py-3.5 font-mono text-xs font-semibold text-orange-deep">
+                      <td className="cursor-pointer px-4 py-3.5 font-mono text-xs font-semibold text-orange-deep" onClick={()=>copy_text(pass.passCode)}>
                         {pass.passCode || "—"}
                       </td>
                       <td className="px-4 py-3.5 font-mono text-xs font-bold text-ink">

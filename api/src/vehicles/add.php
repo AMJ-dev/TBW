@@ -101,8 +101,9 @@
                 insurance_expiry,
                 roadworthiness_expiry,
                 notes,
-                status
-            ) VALUES (:id, :organisation_id, :plate, :kind, :make, :model, :year, :capacity, :owner, :transporter, :insurance_expiry, :roadworthiness_expiry, :notes, :status)
+                status,
+                created_by
+            ) VALUES (:id, :organisation_id, :plate, :kind, :make, :model, :year, :capacity, :owner, :transporter, :insurance_expiry, :roadworthiness_expiry, :notes, :status, :actor_id)
         ");
 
         $stmt->execute([
@@ -119,7 +120,8 @@
             ":insurance_expiry" => $insuranceExpiry ?: null,
             ":roadworthiness_expiry" => $roadworthinessExpiry ?: null,
             ":notes" => $notes ?: null,
-            ":status" => "Pending review"
+            ":status" => "Pending review",
+            ":created_by" => $my_details->id
         ]);
 
         $stmt = $conn->prepare("

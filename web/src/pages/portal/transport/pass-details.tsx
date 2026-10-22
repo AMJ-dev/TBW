@@ -9,6 +9,10 @@ import {
   RefreshCw,
   ShieldCheck,
   Ticket,
+  Box,
+  Scale,
+  Clock,
+  CalendarDays,
 } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
@@ -19,6 +23,23 @@ import {
 } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { http, type Resp } from "@/lib/httpClient";
+import { cn } from "@/lib/utils";
+
+type ContainerDetail = {
+  id: string;
+  container_no: string;
+  number: string;
+  size: string | null;
+  seal_no: string | null;
+  package_count: number | string | null;
+  gross_weight: number | string | null;
+  status: string | null;
+  gate_in_at: string | null;
+  received_at: string | null;
+  stored_at: string | null;
+  gate_out_at: string | null;
+  updated_at: string | null;
+};
 
 type GatePass = {
   id: string;
@@ -31,6 +52,7 @@ type GatePass = {
   valid_until: string;
   status: string;
   container_nos: string[];
+  containers?: ContainerDetail[];
 };
 
 export default function GatePassDetailsPage() {
@@ -52,7 +74,7 @@ export default function GatePassDetailsPage() {
       }
 
       try {
-        const response = await http.get(`gate-passes/view/${id}/`);
+        const response = await http.get(`/appointments/pass/${id}/`);
         const resp: Resp = response.data;
 
         if (resp.error) {
@@ -89,7 +111,7 @@ export default function GatePassDetailsPage() {
     void loadPass();
   }, [loadPass]);
 
-  const formatDate = (value: string) => {
+  const formatDate = (value: string | null) => {
     if (!value) return "—";
     const date = new Date(value.replace(" ", "T"));
     return Number.isNaN(date.getTime())
@@ -113,7 +135,7 @@ export default function GatePassDetailsPage() {
         initial={{ opacity: 0, x: 32 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.25, ease: "easeOut" }}
-        className="mx-auto max-w-4xl space-y-6"
+        className="mx-auto max-w-5xl space-y-6"
       >
         <div className="flex items-center justify-between print:hidden">
           <Button
@@ -245,29 +267,6 @@ export default function GatePassDetailsPage() {
                     </p>
                   </div>
                 </div>
-
-                <div className="mt-8 border-t border-line border-dashed pt-6">
-                  <h4 className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-                    Authorised Containers ({pass.container_nos.length})
-                  </h4>
-
-                  {pass.container_nos.length ? (
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {pass.container_nos.map((container) => (
-                        <span
-                          key={container}
-                          className="rounded-md border border-line bg-sand px-3 py-2 font-mono text-sm font-semibold text-ink"
-                        >
-                          {container}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-sm text-ink-soft">
-                      No containers authorised on this pass.
-                    </p>
-                  )}
-                </div>
               </div>
 
               <div className="flex flex-col items-center justify-center border-t border-line bg-sand/30 p-8 lg:border-l lg:border-t-0">
@@ -292,6 +291,136 @@ export default function GatePassDetailsPage() {
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* Detailed Container Section */}
+            <div className="border-t border-line bg-sand/10 p-6 sm:p-8">
+              <div className="mb-4 flex items-center justify-between">
+                <h4 className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+                  Authorised Containers ({pass.containers?.length || pass.container_nos.length})
+                </h4>
+              </div>
+
+              {pass.containers && pass.containers.length > 0 ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {pass.containers.map((container) => (
+                    <div
+                      key={container.id || container.container_no}
+                      className="rounded-xl border border-line bg-paper p-4 shadow-sm"
+                    >
+                      <div className="flex items-start justify-between border-b border-line border-dashed pb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="grid size-8 place-items-center rounded-md bg-ink text-sand">
+                            <Box className="size-4" />
+                          </div>
+                          <div>
+                            <p className="font-mono text-base font-bold text-ink">
+                              {container.container_no}
+                            </p>
+                            {container.size && (
+                              <p className="text-[10px] uppercase tracking-wider text-ink-soft">
+                                Size: {container.size}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {container.status && (
+                          <StatusBadge
+                            label={container.status.replace(/_/g, " ")}
+                            tone={statusTone(container.status)}
+                          />
+                        )}
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="size-3.5 text-ink-soft" />
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-ink-soft">
+                              Seal No.
+                            </p>
+                            <p className="font-mono text-xs font-semibold text-ink">
+                              {container.seal_no || "—"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Scale className="size-3.5 text-ink-soft" />
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-ink-soft">
+                              Gross Weight
+                            </p>
+                            <p className="font-mono text-xs font-semibold text-ink">
+                              {container.gross_weight
+                                ? `${Number(container.gross_weight).toLocaleString()} kg`
+                                : "—"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Box className="size-3.5 text-ink-soft" />
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-ink-soft">
+                              Packages
+                            </p>
+                            <p className="font-mono text-xs font-semibold text-ink">
+                              {container.package_count
+                                ? Number(container.package_count).toLocaleString()
+                                : "—"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <CalendarDays className="size-3.5 text-ink-soft" />
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wider text-ink-soft">
+                              Gate In
+                            </p>
+                            <p className="font-mono text-[10px] font-semibold text-ink">
+                              {formatDate(container.gate_in_at)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {(container.stored_at || container.gate_out_at) && (
+                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line pt-3">
+                          {container.stored_at && (
+                            <div className="flex items-center gap-1.5 text-[10px] text-ink-soft">
+                              <Clock className="size-3" />
+                              <span>Stored: {formatDate(container.stored_at)}</span>
+                            </div>
+                          )}
+                          {container.gate_out_at && (
+                            <div className="flex items-center gap-1.5 text-[10px] text-ink-soft">
+                              <Clock className="size-3" />
+                              <span>Out: {formatDate(container.gate_out_at)}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : pass.container_nos.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {pass.container_nos.map((container) => (
+                    <span
+                      key={container}
+                      className="rounded-md border border-line bg-sand px-3 py-2 font-mono text-sm font-semibold text-ink"
+                    >
+                      {container}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-ink-soft">
+                  No containers authorised on this pass.
+                </p>
+              )}
             </div>
           </section>
         )}

@@ -203,7 +203,6 @@ const sections = [
             { label: "Dashboard", to: "/portal/dashboard", icon: LayoutDashboard, access: ["organisation"] },
             { label: "My Shipments", to: "/portal/shipments", icon: Package, access: ["organisation"] },
             { label: "Direct Intake Requests", to: "/portal/direct-intake", icon: Container, access: ["organisation"] },
-            { label: "Bookings", to: "/portal/bookings", icon: CalendarDays, access: ["organisation"] },
             { label: "Gate Passes", to: "/portal/passes", icon: QrCode, access: ["organisation"] },
             { label: "Appointments", to: "/portal/appointments", icon: Clock3, access: ["organisation"] },
             { label: "Vehicles", to: "/portal/vehicles", icon: CarFront, access: ["organisation"] },

@@ -18,6 +18,7 @@ try {
     $sql = "
         SELECT
             a.id,
+            a.booking_ref,
             a.appointment_date,
             a.slot_time,
             a.status,
@@ -36,14 +37,15 @@ try {
         FROM gate_appointments a
         INNER JOIN gate_vehicles v ON v.id = a.vehicle_id
         INNER JOIN gate_drivers d ON d.id = a.driver_id
+        WHERE a.organisation_id = :organisation_id
         ORDER BY
             a.appointment_date DESC,
             a.slot_time ASC,
             a.created_at DESC
     ";
-
+    // gate_passes gp gate_appointments
     $stmt = $conn->prepare($sql);
-    $stmt->execute();
+    $stmt->execute([":organisation_id" => $my_details->organisation_id]);
 
     $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

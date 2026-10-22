@@ -19,6 +19,7 @@
                 gp.id,
                 gp.pass_code,
                 gp.vehicle_id,
+                gp.appointment_id,
                 gp.driver_id,
                 gp.type,
                 gp.issued_at,
@@ -44,28 +45,28 @@
         $passes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         if (count($passes) > 0) {
-            $passIds = array_column($passes, "id");
-            $placeholders = implode(",", array_fill(0, count($passIds), "?"));
+            $appointmentIds = array_column($passes, "appointment_id");
+            $placeholders = implode(",", array_fill(0, count($appointmentIds), "?"));
 
             $containerStmt = $conn->prepare("
-                SELECT gate_pass_id, container_no
-                FROM gate_pass_containers
-                WHERE gate_pass_id COLLATE utf8mb4_unicode_ci IN ($placeholders)
+                SELECT appointment_id, container_no
+                FROM gate_appointment_containers
+                WHERE appointment_id COLLATE utf8mb4_unicode_ci IN ($placeholders)
                 ORDER BY container_no ASC
             ");
 
-            $containerStmt->execute($passIds);
+            $containerStmt->execute($appointmentIds);
             $containers = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
 
             $containersByPass = [];
 
             foreach ($containers as $container) {
-                $containersByPass[$container["gate_pass_id"]][] =
+                $containersByPass[$container["appointment_id"]][] =
                     $container["container_no"];
             }
 
             foreach ($passes as &$pass) {
-                $pass["container_nos"] = $containersByPass[$pass["id"]] ?? [];
+                $pass["container_nos"] = $containersByPass[$pass["appointment_id"]] ?? [];
             }
 
             unset($pass);

@@ -108,7 +108,6 @@ const OperationsReviewPage = lazy(() => import("@/pages/shipment/review"));
 const OperationsShipmentReviewPage = lazy(() => import("@/pages/shipment/shipment-review-details"));
 
 const PortalDashboardPage = lazy(() => import("@/pages/portal/dashboard"));
-const PortalBookingsPage = lazy(() => import("@/pages/portal/bookings"));
 const CargoPage = lazy(() => import("@/pages/portal/cargo"));
 const CargoDetailPage = lazy(() => import("@/pages/portal/cargo/$id"));
 const ContainerDetailPage = lazy(() => import("@/pages/portal/cargo/container"));
@@ -246,7 +245,6 @@ export default function Routers() {
 
 						<Route path="/portal" element={<PortalDashboardPage />} />
 						<Route path="/portal/dashboard" element={<PortalDashboardPage />} />
-						<Route path="/portal/bookings" element={<PortalBookingsPage />} />
 						<Route path="/portal/cargo" element={<CargoPage />} />
 						<Route path="/portal/shipments" element={<PortalShipmentsPage />} />
 						<Route path="/portal/shipment/new" element={<NewPortalShipmentPage />} />

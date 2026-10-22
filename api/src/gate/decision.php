@@ -75,11 +75,6 @@ try {
             p.status AS pass_status,
             p.valid_until,
             (
-                SELECT GROUP_CONCAT(UPPER(TRIM(pc.container_no)) ORDER BY UPPER(TRIM(pc.container_no)) SEPARATOR ',')
-                FROM gate_pass_containers pc
-                WHERE pc.gate_pass_id = p.id
-            ) AS pass_containers,
-            (
                 SELECT GROUP_CONCAT(UPPER(TRIM(ac.container_no)) ORDER BY UPPER(TRIM(ac.container_no)) SEPARATOR ',')
                 FROM gate_appointment_containers ac
                 WHERE ac.appointment_id = a.id
@@ -155,20 +150,13 @@ try {
     $assignmentStmt->execute([$record["vehicle_id"], $record["driver_id"]]);
     $assignmentEligible = (bool) $assignmentStmt->fetch(PDO::FETCH_ASSOC);
 
-    $passContainers = !empty($record["pass_containers"])
-        ? array_values(array_unique(explode(",", (string) $record["pass_containers"])))
-        : [];
-
     $appointmentContainers = !empty($record["appointment_containers"])
         ? array_values(array_unique(explode(",", (string) $record["appointment_containers"])))
         : [];
 
-    sort($passContainers);
     sort($appointmentContainers);
 
-    $cargoEligible =
-        count($passContainers) > 0 &&
-        $passContainers === $appointmentContainers;
+    $cargoEligible = count($appointmentContainers) > 0 && $appointmentContainers;
 
     $appointmentEligible =
         $record["appointment_date"] === $today &&

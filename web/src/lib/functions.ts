@@ -2,6 +2,7 @@ import { useContext } from "react";
 import moment from "moment";
 import UserContext from "@/lib/userContext";
 import { api_url } from "@/lib/constants";
+import { toast } from "sonner";
 
 export const check_login = ()=>{
 	const {login} = useContext(UserContext);
@@ -16,6 +17,10 @@ export const get_token = ()=>{
         : sessionStorage.getItem("token");
     
     return token;
+}
+export const copy_text = (text:string)=>{
+    navigator.clipboard.writeText(text);
+    toast.success("Text copied to clipboard");
 }
 export const resolveSrc = (s: string) => {
     const ASSET_BASE = (api_url as string)?.replace(/\/+$/, "") || "";
