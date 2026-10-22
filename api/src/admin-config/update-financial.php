@@ -133,7 +133,7 @@
             $conn->rollBack();
         }
 
-        http_response_code(400);
+        
 
         echo json_encode([
             "error" => true,
@@ -145,7 +145,7 @@
             $conn->rollBack();
         }
 
-        http_response_code(500);
+        
 
         echo json_encode([
             "error" => true,

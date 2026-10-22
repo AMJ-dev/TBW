@@ -4,7 +4,6 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 header("Cache-Control: no-store, private");
 
 if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-    http_response_code(405);
     echo json_encode([
         "error" => true,
         "data" => "Method not allowed.",
@@ -188,7 +187,6 @@ try {
         ]
     ]);
 } catch (Throwable $e) {
-    http_response_code(500);
 
     echo json_encode([
         "error" => true,

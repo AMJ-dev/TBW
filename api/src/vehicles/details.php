@@ -70,7 +70,6 @@
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         if (empty($rows)) {
-            http_response_code(404);
             echo json_encode([
                 "error" => true,
                 "data" => "Vehicle not found.",
@@ -164,7 +163,6 @@
         ]);
 
     } catch (Throwable $e) {
-        http_response_code(500);
         echo json_encode([
             "error" => true,
             "data" => "Could not load vehicle.",

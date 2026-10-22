@@ -101,7 +101,7 @@
     } catch (Throwable $e) {
         error_log("Storage configuration GET failed: " . $e->getMessage());
 
-        http_response_code(500);
+        
         echo json_encode([
             "error" => true,
             "data" => "Could not load storage configuration.",

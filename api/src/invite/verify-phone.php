@@ -2,7 +2,6 @@
     require_once dirname(__DIR__, 2) . "/include/set-header.php";
 
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
         echo json_encode([
             "error" => true,
             "data" => "Method not allowed",
@@ -15,7 +14,7 @@
     $code = trim($_POST["code"] ?? "");
 
     if ($token === "" || $code === "") {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => "Token and verification code are required",
@@ -25,7 +24,7 @@
     }
 
     if (!preg_match("/^\d{6}$/", $code)) {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => "Invalid verification code",
@@ -65,7 +64,7 @@
         if (!$invite) {
             $conn->rollBack();
 
-            http_response_code(404);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid invitation",
@@ -77,7 +76,7 @@
         if ($invite["accepted_at"] !== null) {
             $conn->rollBack();
 
-            http_response_code(409);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Invitation has already been completed",
@@ -89,7 +88,6 @@
         if ($invite["revoked_at"] !== null || strtotime($invite["expires_at"]) < time()) {
             $conn->rollBack();
 
-            http_response_code(410);
             echo json_encode([
                 "error" => true,
                 "data" => "Invitation is no longer valid",
@@ -119,7 +117,7 @@
         if (!$otp) {
             $conn->rollBack();
 
-            http_response_code(400);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "No active verification code was found",
@@ -131,7 +129,7 @@
         if (strtotime($otp["expires_at"]) < time()) {
             $conn->rollBack();
 
-            http_response_code(400);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Verification code has expired",
@@ -143,7 +141,6 @@
         if ((int) $otp["attempts"] >= (int) $otp["max_attempts"]) {
             $conn->rollBack();
 
-            http_response_code(429);
             echo json_encode([
                 "error" => true,
                 "data" => "Too many verification attempts",
@@ -163,7 +160,7 @@
 
             $conn->commit();
 
-            http_response_code(400);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Incorrect verification code",
@@ -228,7 +225,7 @@
             $conn->rollBack();
         }
 
-        http_response_code(500);
+        
 
         echo json_encode([
             "error" => true,

@@ -10,7 +10,6 @@
     $jobTitle = trim($_POST["job_title"] ?? "");
 
     if (!in_array($accountType, ["system", "organisation"], true)) {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Invalid account type",
@@ -20,7 +19,6 @@
     }
 
     if ($fullName === "" || $email === "" || $phone === "" || $roleId === "") {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Full name, email, phone and role are required",
@@ -30,7 +28,6 @@
     }
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Invalid email address",
@@ -40,7 +37,6 @@
     }
 
     if ($accountType === "organisation" && $organisationId === "") {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Organisation is required",
@@ -72,8 +68,6 @@
 
         if (!$role) {
             $conn->rollBack();
-
-            http_response_code(404);
             echo json_encode([
                 "error" => true,
                 "data" => "Role not found",
@@ -84,8 +78,6 @@
 
         if (!(bool)$role["is_active"]) {
             $conn->rollBack();
-
-            http_response_code(400);
             echo json_encode([
                 "error" => true,
                 "data" => "Selected role is not active",
@@ -96,8 +88,6 @@
 
         if ($role["scope"] !== $accountType) {
             $conn->rollBack();
-
-            http_response_code(400);
             echo json_encode([
                 "error" => true,
                 "data" => "Selected role does not match the account type",
@@ -129,8 +119,6 @@
 
             if (!$organisation) {
                 $conn->rollBack();
-
-                http_response_code(404);
                 echo json_encode([
                     "error" => true,
                     "data" => "Organisation not found",

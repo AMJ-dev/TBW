@@ -8,13 +8,13 @@
     $allowedParties = ['', 'Organisation', 'Carrier', 'Operations'];
 
     if (mb_strlen($reason) < 5 || mb_strlen($reason) > 2000) {
-        http_response_code(422);
+        
         echo json_encode(['error' => true, 'data' => 'Enter a reason between 5 and 2000 characters.', 'code' => null]);
         exit;
     }
 
     if (!in_array($responsibleParty, $allowedParties, true)) {
-        http_response_code(422);
+        
         echo json_encode(['error' => true, 'data' => 'Invalid responsible party.', 'code' => null]);
         exit;
     }
@@ -28,7 +28,7 @@
 
         if (!$manifest) {
             $conn->rollBack();
-            http_response_code(404);
+            
             echo json_encode(['error' => true, 'data' => 'Manifest not found.', 'code' => null]);
             exit;
         }
@@ -36,7 +36,7 @@
         $status = (string)$manifest['status'];
         if (in_array($status, ['Duplicate', 'Discrepancy'], true)) {
             $conn->rollBack();
-            http_response_code(409);
+            
             echo json_encode(['error' => true, 'data' => 'This manifest is already flagged for review or marked as a duplicate.', 'code' => null]);
             exit;
         }
@@ -83,6 +83,6 @@
         if ($conn->inTransaction()) {
             $conn->rollBack();
         }
-        http_response_code(500);
+        
         echo json_encode(['error' => true, 'data' => 'Unable to flag manifest. Please try again.', 'code' => $e->getMessage()]);
     }

@@ -3,7 +3,6 @@
     $id = trim($_GET["id"] ?? "");
 
     if ($id === "") {
-        http_response_code(400);
 
         echo json_encode([
             "error" => true,
@@ -15,7 +14,6 @@
     }
 
     if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-        http_response_code(405);
 
         echo json_encode([
             "error" => true,
@@ -84,14 +82,11 @@
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {
-            http_response_code(404);
-
             echo json_encode([
                 "error" => true,
                 "data" => "User not found",
                 "code" => null
             ]);
-
             exit;
         }
 
@@ -195,9 +190,6 @@
         ]);
 
     } catch (Throwable $e) {
-
-        http_response_code(500);
-
         echo json_encode([
             "error" => true,
             "data" => $e->getMessage(),

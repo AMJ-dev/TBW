@@ -6,7 +6,6 @@
         !is_array($_FILES['file']) ||
         (int)($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK
     ) {
-        http_response_code(422);
         echo json_encode(['error' => true, 'data' => 'Choose a manifest file to upload.', 'code' => null]);
         exit;
     }
@@ -28,7 +27,6 @@
     ];
 
     if (!in_array($source, $allowed_source, true)) {
-        http_response_code(422);
         echo json_encode(['error' => true, 'data' => 'Choose EDI, CSV or XLSX as the intake source.', 'code' => null]);
         exit;
     }
@@ -36,7 +34,6 @@
     $tmpName = (string)($_FILES['file']['tmp_name'] ?? '');
 
     if ($tmpName === '' || !is_uploaded_file($tmpName)) {
-        http_response_code(422);
         echo json_encode(['error' => true, 'data' => 'The uploaded file is invalid.', 'code' => null]);
         exit;
     }
@@ -46,20 +43,17 @@
     $fileSize = (int)($_FILES['file']['size'] ?? 0);
 
     if (!in_array($extension, $extensions[$source], true)) {
-        http_response_code(422);
         echo json_encode(['error' => true, 'data' => 'The uploaded file extension does not match the selected source.', 'code' => null]);
         exit;
     }
 
     if ($fileSize < 1 || $fileSize > 15728640) {
-        http_response_code(422);
         echo json_encode(['error' => true, 'data' => 'File must be no larger than 15 MB and cannot be empty.', 'code' => null]);
         exit;
     }
 
     try {
         if (!class_exists('finfo')) {
-            http_response_code(500);
             echo json_encode(['error' => true, 'data' => 'File MIME detection is unavailable on this server.', 'code' => null]);
             exit;
         }
@@ -68,14 +62,12 @@
         $mime = $finfo->file($tmpName);
 
         if (!is_string($mime) || !in_array($mime, $mimeTypes[$source], true)) {
-            http_response_code(422);
             echo json_encode(['error' => true, 'data' => 'The uploaded file type is not supported for the selected source.', 'code' => null]);
             exit;
         }
 
         if ($source === 'XLSX' && $extension === 'xlsx') {
             if (!class_exists('ZipArchive')) {
-                http_response_code(500);
                 echo json_encode(['error' => true, 'data' => 'XLSX validation is unavailable on this server.', 'code' => null]);
                 exit;
             }
@@ -84,7 +76,6 @@
             $opened = $zip->open($tmpName);
 
             if ($opened !== true) {
-                http_response_code(422);
                 echo json_encode(['error' => true, 'data' => 'The XLSX file is invalid or corrupted.', 'code' => null]);
                 exit;
             }
@@ -95,7 +86,6 @@
             $zip->close();
 
             if (!$validXlsx) {
-                http_response_code(422);
                 echo json_encode(['error' => true, 'data' => 'The uploaded file is not a valid XLSX workbook.', 'code' => null]);
                 exit;
             }
@@ -106,7 +96,6 @@
     $uploaded = upload_files($uploadFile, $extensions[$source]);
 
         if (!is_array($uploaded) || !empty($uploaded['error'])) {
-            http_response_code(422);
             echo json_encode([
                 'error' => true,
                 'data' => is_array($uploaded)
@@ -120,7 +109,6 @@
         $filePath = (string)($uploaded['data'] ?? '');
 
         if ($filePath === '') {
-            http_response_code(500);
             echo json_encode(['error' => true, 'data' => 'Upload helper did not return a file path.', 'code' => null]);
             exit;
         }
@@ -303,7 +291,6 @@
             ]
         ]);
     } catch (Throwable $e) {
-        http_response_code(500);
         echo json_encode([
             'error' => true,
             'data' => 'Unable to process manifest upload.',

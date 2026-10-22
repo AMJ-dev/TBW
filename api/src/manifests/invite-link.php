@@ -2,19 +2,19 @@
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 if (($my_details->account_type ?? '') !== 'system' || empty($my_details->id)) {
-    http_response_code(403);
+   
     echo json_encode(['error'=>true,'data'=>'Access denied.','code'=>null]);
     exit;
 }
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST');
-    http_response_code(405);
+   
     echo json_encode(['error'=>true,'data'=>'Method not allowed.','code'=>null]);
     exit;
 }
 $manifestId = trim((string)($_POST['manifest_id'] ?? ''));
 if ($manifestId === '') {
-    http_response_code(422);
+    
     echo json_encode(['error'=>true,'data'=>'Manifest ID is required.','code'=>null]);
     exit;
 }
@@ -24,12 +24,12 @@ try {
     $stmt->execute([$manifestId]);
     $manifest = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$manifest) {
-        http_response_code(404);
+        
         echo json_encode(['error'=>true,'data'=>'Manifest not found.','code'=>null]);
         exit;
     }
     if ($manifest['consignee_status'] !== 'unregistered') {
-        http_response_code(409);
+        
         echo json_encode(['error'=>true,'data'=>'This consignee is already linked to an organisation.','code'=>null]);
         exit;
     }
@@ -46,6 +46,6 @@ try {
     echo json_encode(['error'=>false,'data'=>'Consignee onboarding link generated.','code'=>['link'=>$link,'url'=>$link,'expires_at'=>$expiresAt,'consignee'=>$manifest['consignee']]]);
 } catch (Throwable $e) {
     if ($conn->inTransaction()) $conn->rollBack();
-    http_response_code(500);
+    
     echo json_encode(['error'=>true,'data'=>'Unable to generate consignee invite link.','code'=>null]);
 }

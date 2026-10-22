@@ -15,7 +15,6 @@
     $pauseOnCustomsHold = $_POST["pause_on_customs_hold"] ?? false;
 
     $fail = static function (int $status, string $message): void {
-        http_response_code($status);
         echo json_encode([
             "error" => true,
             "data" => $message,
@@ -323,7 +322,7 @@
         error_log("Storage configuration SAVE failed: " . $e->getMessage());
 
         if ($e->getCode() === "23000") {
-            http_response_code(409);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "A configuration conflicts with an existing database record. Please refresh and try again.",
@@ -332,7 +331,7 @@
             exit;
         }
 
-        http_response_code(500);
+        
         echo json_encode([
             "error" => true,
             "data" => "Could not save storage configuration.",
@@ -345,7 +344,7 @@
 
         error_log("Storage configuration SAVE failed: " . $e->getMessage());
 
-        http_response_code(500);
+        
         echo json_encode([
             "error" => true,
             "data" => "Could not save storage configuration.",

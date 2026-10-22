@@ -7,7 +7,6 @@
     $roleId = trim($_POST["role_id"] ?? "");
 
     if ($fullName === "" || $email === "" || $phone === "" || $roleId === "") {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Full name, email, phone and role are required",
@@ -17,7 +16,6 @@
     }
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Invalid email address",
@@ -30,7 +28,6 @@
     $invitedBy = trim((string)($my_details->id ?? ""));
 
     if ($organisationId === "" || $invitedBy === "") {
-        http_response_code(403);
         echo json_encode([
             "error" => true,
             "data" => "Organisation information is not available",
@@ -62,8 +59,6 @@
 
         if (!$role) {
             $conn->rollBack();
-
-            http_response_code(404);
             echo json_encode([
                 "error" => true,
                 "data" => "Role not found",
@@ -74,8 +69,6 @@
 
         if ((int)$role["is_active"] !== 1 || $role["scope"] !== "organisation") {
             $conn->rollBack();
-
-            http_response_code(400);
             echo json_encode([
                 "error" => true,
                 "data" => "Selected role is not available",
@@ -115,8 +108,6 @@
 
             if ($existingUser["organisation_id"] !== $organisationId) {
                 $conn->rollBack();
-
-                http_response_code(409);
                 echo json_encode([
                     "error" => true,
                     "data" => "A user with this " . $matchedBy . " already exists",
@@ -127,8 +118,6 @@
 
             if ($existingUser["id"] === $invitedBy) {
                 $conn->rollBack();
-
-                http_response_code(409);
                 echo json_encode([
                     "error" => true,
                     "data" => "You cannot invite yourself",
@@ -158,8 +147,6 @@
 
             if ($member && $member["membership_status"] === "active") {
                 $conn->rollBack();
-
-                http_response_code(409);
                 echo json_encode([
                     "error" => true,
                     "data" => "This user is already an active member of your organisation",
@@ -186,7 +173,6 @@
             if ($stmt->fetch(PDO::FETCH_ASSOC)) {
                 $conn->rollBack();
 
-                http_response_code(409);
                 echo json_encode([
                     "error" => true,
                     "data" => "An active invitation already exists for this user",
@@ -367,7 +353,6 @@
         if (!$sent) {
             $conn->rollBack();
 
-            http_response_code(500);
             echo json_encode([
                 "error" => true,
                 "data" => "Unable to send invitation email. Please try again.",
@@ -394,7 +379,6 @@
         }
 
         if ((int)$e->getCode() === 23000) {
-            http_response_code(409);
             echo json_encode([
                 "error" => true,
                 "data" => "Email or phone number already exists",
@@ -402,8 +386,6 @@
             ]);
             exit;
         }
-
-        http_response_code(500);
 
         echo json_encode([
             "error" => true,

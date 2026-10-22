@@ -5,7 +5,7 @@ header("Content-Type: application/json; charset=UTF-8");
 
 try {
     if (!isset($_GET["id"]) || trim($_GET["id"]) === "") {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => "Manifest ID is required.",
@@ -52,7 +52,7 @@ try {
     $manifest = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$manifest) {
-        http_response_code(404);
+        
         echo json_encode([
             "error" => true,
             "data" => "Manifest not found.",
@@ -72,7 +72,7 @@ try {
         ]
     ]);
 } catch (Throwable $e) {
-    http_response_code(500);
+    
     echo json_encode([
         "error" => true,
         "data" => "Could not load this manifest.",

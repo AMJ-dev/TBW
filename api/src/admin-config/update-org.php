@@ -5,7 +5,6 @@
     $oldFiles = [];
 
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
         echo json_encode(["error" => true, "data" => "Method not allowed", "code" => null]);
         exit;
     }
@@ -17,7 +16,6 @@
         $role = $q->fetch(PDO::FETCH_ASSOC);
 
         if (!$role || $role["role_key"] !== "system_admin") {
-            http_response_code(403);
             echo json_encode(["error" => true, "data" => "Access denied", "code" => null]);
             exit;
         }
@@ -30,31 +28,31 @@
         $licences = json_decode($_POST["licences"] ?? "[]", true);
 
         if ($legal === "") {
-            http_response_code(400);
+            
             echo json_encode(["error" => true, "data" => "Legal name is required", "code" => null]);
             exit;
         }
 
         if (!in_array($type, ["terminal", "importer", "agent"], true)) {
-            http_response_code(400);
+            
             echo json_encode(["error" => true, "data" => "Invalid organisation type", "code" => null]);
             exit;
         }
 
         if ($email !== "" && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            http_response_code(400);
+            
             echo json_encode(["error" => true, "data" => "Contact email is not valid", "code" => null]);
             exit;
         }
 
         if ($date !== "" && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-            http_response_code(400);
+            
             echo json_encode(["error" => true, "data" => "Invalid date of incorporation", "code" => null]);
             exit;
         }
 
         if (!is_array($licences)) {
-            http_response_code(400);
+            
             echo json_encode(["error" => true, "data" => "Invalid licence data", "code" => null]);
             exit;
         }
@@ -70,7 +68,7 @@
         $org = $q->fetch(PDO::FETCH_ASSOC);
 
         if (!$org) {
-            http_response_code(404);
+            
             echo json_encode(["error" => true, "data" => "Organisation not found", "code" => null]);
             exit;
         }
@@ -282,6 +280,6 @@
             }
         }
 
-        http_response_code(500);
+        
         echo json_encode(["error" => true, "data" => $e->getMessage(), "code" => null]);
     }

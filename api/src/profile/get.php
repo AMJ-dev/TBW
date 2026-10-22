@@ -62,7 +62,6 @@
                 "data" => "Your organisation could not be found.",
                 "code" => []
             ]);
-            http_response_code(401);
             exit;
         }
 
@@ -108,7 +107,6 @@
             "data" => "Your account does not have an active role.",
             "code" => []
         ]);
-        http_response_code(401);
         exit;
     }
 

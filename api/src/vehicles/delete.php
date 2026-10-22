@@ -5,7 +5,6 @@
     $reason = trim($_POST["reason"] ?? "");
 
     if ($id === "" || mb_strlen($reason) < 5) {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Vehicle ID and a reason of at least 5 characters are required.",
@@ -35,7 +34,6 @@
 
         if (!$vehicle) {
             $conn->rollBack();
-            http_response_code(404);
             echo json_encode([
                 "error" => true,
                 "data" => "Vehicle not found.",
@@ -75,11 +73,8 @@
             "code" => ["id" => $id]
         ]);
     } catch (Throwable $e) {
-        if ($conn->inTransaction()) {
-            $conn->rollBack();
-        }
+        if ($conn->inTransaction()) $conn->rollBack();
 
-        http_response_code(500);
         echo json_encode([
             "error" => true,
             "data" => "Could not remove vehicle.",

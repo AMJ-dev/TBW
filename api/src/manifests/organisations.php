@@ -3,7 +3,7 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET' && ($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: GET, POST');
-    http_response_code(405);
+   
     echo json_encode(['error'=>true,'data'=>'Method not allowed.','code'=>null]);
     exit;
 }
@@ -18,6 +18,6 @@ try {
     $stmt->execute([':name'=>$like,':rc'=>$like]);
     echo json_encode(['error'=>false,'data'=>'Organisations loaded.','code'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]);
 } catch (Throwable $e) {
-    http_response_code(500);
+    
     echo json_encode(['error'=>true,'data'=>'Unable to load organisations.','code'=>null]);
 }

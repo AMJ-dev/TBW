@@ -10,13 +10,13 @@
         $m = $get->fetch(PDO::FETCH_ASSOC);
         if (!$m) {
             $conn->rollBack();
-            http_response_code(404);
+            
             echo json_encode(['error'=>true,'data'=>'Manifest not found.','code'=>null]);
             exit;
         }
         if (!in_array($m['status'], ['Pre-advice', 'Discrepancy', 'Review required'], true)) {
             $conn->rollBack();
-            http_response_code(409);
+            
             echo json_encode([
                 'error' => true,
                 'data' => 'This manifest cannot be validated in its current status.',
@@ -28,13 +28,13 @@
         $dup->execute([':id'=>$id,':ref'=>$m['manifest_ref'],':bl'=>$m['bill_of_lading']]);
         if ($dup->fetchColumn()) {
             $conn->rollBack();
-            http_response_code(409);
+            
             echo json_encode(['error'=>true,'data'=>'Duplicate manifest reference or bill of lading found.','code'=>null]);
             exit;
         }
         if (trim((string)$m['vessel'])==='' || trim((string)$m['shipping_line'])==='' || trim((string)$m['origin_port'])==='' || trim((string)$m['eta'])==='') {
             $conn->rollBack();
-            http_response_code(422);
+            
             echo json_encode(['error'=>true,'data'=>'Vessel, shipping line, origin port and ETA are required for validation.','code'=>null]);
             exit;
         }
@@ -66,6 +66,6 @@
         echo json_encode(['error'=>false,'data'=>'Manifest validated.','code'=>['id'=>$id,'status'=>'Validated','matched_shipment_id'=>$shipmentId,'shipment_reference'=>$shipmentId ? $candidates[0]['shipment_reference'] : null,'match_required'=>!$shipmentId,'candidate_count'=>count($candidates)]]);
     } catch (Throwable $e) {
         if ($conn->inTransaction()) $conn->rollBack();
-        http_response_code(500);
+        
         echo json_encode(['error'=>true,'data'=>'Unable to validate manifest.','code'=>$e->getMessage()]);
     }

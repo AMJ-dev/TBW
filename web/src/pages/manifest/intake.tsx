@@ -366,8 +366,9 @@ export default function OperationsManifestIntakePage() {
 			toast.success("Manifest added.");
 			navigate("/operations/manifest");
 		} catch (err: any) {
+			console.log(err);
 			toast.error(
-				err?.response?.data?.message || "Could not add the manifest."
+				err?.response?.data || "Could not add the manifest."
 			);
 		} finally {
 			setSubmitting(false);

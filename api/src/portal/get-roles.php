@@ -4,7 +4,6 @@
         $organisationId = trim((string)($my_details->organisation_id ?? ""));
 
         if ($organisationId === "") {
-            http_response_code(403);
             echo json_encode([
                 "error" => true,
                 "data" => "Organisation not found",
@@ -42,7 +41,7 @@
             ]
         ]);
     } catch (Throwable $e) {
-        http_response_code(500);
+        
 
         echo json_encode([
             "error" => true,

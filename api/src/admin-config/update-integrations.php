@@ -5,7 +5,6 @@
     header("Cache-Control: no-store, private");
     
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
         echo json_encode([
             "error" => true,
             "data" => "Method not allowed.",
@@ -15,7 +14,7 @@
     }
 
     if (!isset($_POST["integrations"], $_POST["credentials"])) {
-        http_response_code(422);
+        
         echo json_encode([
             "error" => true,
             "data" => "Integrations and credentials are required.",
@@ -33,7 +32,7 @@
         !is_array($credentials) ||
         ($credentials !== [] && array_is_list($credentials))
     ) {
-        http_response_code(422);
+        
         echo json_encode([
             "error" => true,
             "data" => "Invalid integrations or credentials payload.",
@@ -47,7 +46,6 @@
         !is_string($my_details->id) ||
         $my_details->id === ""
     ) {
-        http_response_code(401);
         echo json_encode([
             "error" => true,
             "data" => "Unable to identify the current user.",
@@ -70,7 +68,7 @@
     }
 
     if (!is_string($encryptionKey) || strlen($encryptionKey) !== 32) {
-        http_response_code(500);
+        
         echo json_encode([
             "error" => true,
             "data" => "Integration encryption key is missing or invalid.",
@@ -332,8 +330,6 @@
         }
 
         $isValidationError = $e instanceof InvalidArgumentException;
-
-        http_response_code($isValidationError ? 422 : 500);
 
         echo json_encode([
             "error" => true,

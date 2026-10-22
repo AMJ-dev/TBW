@@ -15,7 +15,7 @@ try {
     $config = $q->fetch(PDO::FETCH_ASSOC);
 
     if (!$config) {
-        http_response_code(404);
+        
         echo json_encode([
             "error" => true,
             "data" => "Maintenance schedule not found",
@@ -69,7 +69,7 @@ try {
     ]);
 } catch (Throwable $e) {
     error_log($e->getMessage());
-    http_response_code(500);
+    
 
     echo json_encode([
         "error" => true,

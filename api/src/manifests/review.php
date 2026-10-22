@@ -4,7 +4,7 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-    http_response_code(405);
+   
     echo json_encode([
         "error" => true,
         "data" => "Method not allowed.",
@@ -17,7 +17,7 @@ if (
     empty($my_details->id) ||
     ($my_details->account_type ?? "") !== "system"
 ) {
-    http_response_code(403);
+   
     echo json_encode([
         "error" => true,
         "data" => "You are not authorised to access Operations manifest reviews.",
@@ -134,7 +134,7 @@ try {
     ]);
 
 } catch (PDOException $e) {
-    http_response_code(500);
+    
 
     echo json_encode([
         "error" => true,

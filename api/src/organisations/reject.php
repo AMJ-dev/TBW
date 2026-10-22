@@ -4,7 +4,6 @@
     $id = trim($_GET["id"] ?? "");
 
     if ($id === "") {
-        http_response_code(400);
 
         echo json_encode([
             "error" => true,
@@ -16,7 +15,6 @@
     }
 
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
 
         echo json_encode([
             "error" => true,
@@ -31,7 +29,6 @@
     $documents = $_POST["documents"] ?? [];
 
     if ($reason === "") {
-        http_response_code(400);
 
         echo json_encode([
             "error" => true,
@@ -65,7 +62,6 @@
         $organisation = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$organisation) {
-            http_response_code(404);
 
             echo json_encode([
                 "error" => true,
@@ -77,7 +73,6 @@
         }
 
         if (in_array($organisation["verification_status"], ["verified", "suspended"], true)) {
-            http_response_code(400);
 
             echo json_encode([
                 "error" => true,
@@ -129,8 +124,6 @@
             if ($status === "rejected" && $documentReason === "") {
                 $conn->rollBack();
 
-                http_response_code(400);
-
                 echo json_encode([
                     "error" => true,
                     "data" => "A rejection reason is required for every rejected document",
@@ -166,8 +159,6 @@
 
             if (!$documentRecord) {
                 $conn->rollBack();
-
-                http_response_code(400);
 
                 echo json_encode([
                     "error" => true,
@@ -274,7 +265,6 @@
             $conn->rollBack();
         }
 
-        http_response_code(500);
 
         echo json_encode([
             "error" => true,

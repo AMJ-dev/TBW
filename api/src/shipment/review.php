@@ -2,9 +2,6 @@
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
     if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-        http_response_code(405);
-        header("Allow: GET");
-
         echo json_encode([
             "error" => true,
             "data" => "Method not allowed.",
@@ -56,10 +53,6 @@
             "code" => $shipments
         ]);
     } catch (Throwable $e) {
-        error_log("Shipment declaration review error: " . $e->getMessage());
-
-        http_response_code(500);
-
         echo json_encode([
             "error" => true,
             "data" => "Could not load shipment declarations.",

@@ -280,7 +280,7 @@
 
         error_log("MFA setup verification error: " . $e->getMessage());
 
-        http_response_code(500);
+        
 
         echo json_encode([
             "error" => true,

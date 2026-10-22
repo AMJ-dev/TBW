@@ -5,7 +5,7 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 header("Content-Type: application/json; charset=UTF-8");
 
 if (($_SERVER["REQUEST_METHOD"] ?? "") !== "POST") {
-    http_response_code(405);
+   
     echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
     exit;
 }
@@ -15,13 +15,12 @@ $accountType = (string) ($my_details->account_type ?? "");
 $roleId = (string) ($my_details->system_role_id ?? "");
 
 if ($userId === "") {
-    http_response_code(401);
     echo json_encode(["error" => true, "data" => "Authentication required.", "code" => null]);
     exit;
 }
 
 if ($accountType !== "system" || $roleId === "") {
-    http_response_code(403);
+   
     echo json_encode(["error" => true, "data" => "Access denied.", "code" => null]);
     exit;
 }
@@ -37,7 +36,7 @@ $permission = $conn->prepare("
 $permission->execute([":role_id" => $roleId]);
 
 if (!$permission->fetchColumn()) {
-    http_response_code(403);
+   
     echo json_encode(["error" => true, "data" => "You do not have permission to approve manifests.", "code" => null]);
     exit;
 }
@@ -64,37 +63,37 @@ $fields = [
 ];
 
 if ($id === "") {
-    http_response_code(422);
+    
     echo json_encode(["error" => true, "data" => "Manifest ID is required.", "code" => null]);
     exit;
 }
 
 if (mb_strlen($reason) < 5 || mb_strlen($reason) > 2000) {
-    http_response_code(422);
+    
     echo json_encode(["error" => true, "data" => "Enter a correction reason between 5 and 2000 characters.", "code" => null]);
     exit;
 }
 
 if ($fields["manifest_ref"] === "" || $fields["bill_of_lading"] === "" || $fields["consignee"] === "") {
-    http_response_code(422);
+    
     echo json_encode(["error" => true, "data" => "Manifest reference, bill of lading and consignee are required.", "code" => null]);
     exit;
 }
 
 if (!ctype_digit($fields["containers"]) || !ctype_digit($fields["packages"])) {
-    http_response_code(422);
+    
     echo json_encode(["error" => true, "data" => "Containers and packages must be whole numbers.", "code" => null]);
     exit;
 }
 
 if ((int) $fields["containers"] < 0 || (int) $fields["packages"] < 0) {
-    http_response_code(422);
+    
     echo json_encode(["error" => true, "data" => "Containers and packages cannot be negative.", "code" => null]);
     exit;
 }
 
 if ($fields["consignee_email"] !== "" && !filter_var($fields["consignee_email"], FILTER_VALIDATE_EMAIL)) {
-    http_response_code(422);
+    
     echo json_encode(["error" => true, "data" => "Enter a valid consignee email address.", "code" => null]);
     exit;
 }
@@ -113,7 +112,7 @@ try {
 
     if (!$old) {
         $conn->rollBack();
-        http_response_code(404);
+        
         echo json_encode(["error" => true, "data" => "Manifest not found.", "code" => null]);
         exit;
     }
@@ -124,7 +123,7 @@ try {
         !in_array($old["review_status"], ["Pending", "In Review"], true)
     ) {
         $conn->rollBack();
-        http_response_code(409);
+        
         echo json_encode(["error" => true, "data" => "This manifest is no longer awaiting Operations review.", "code" => null]);
         exit;
     }
@@ -191,6 +190,6 @@ try {
         $conn->rollBack();
     }
 
-    http_response_code(500);
+    
     echo json_encode(["error" => true, "data" => "Could not save and approve the manifest.", "code" => null]);
 }

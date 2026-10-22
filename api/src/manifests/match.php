@@ -12,13 +12,13 @@
         $manifest = $mQuery->fetch(PDO::FETCH_ASSOC);
         if (!$manifest) {
             $conn->rollBack();
-            http_response_code(404);
+            
             echo json_encode(['error'=>true,'data'=>'Manifest not found.','code'=>null]);
             exit;
         }
         if (in_array($manifest['status'], ['Duplicate','Discrepancy'], true)) {
             $conn->rollBack();
-            http_response_code(409);
+            
             echo json_encode(['error'=>true,'data'=>'Resolve the manifest discrepancy before linking a shipment.','code'=>null]);
             exit;
         }
@@ -27,7 +27,7 @@
         $shipment = $sQuery->fetch(PDO::FETCH_ASSOC);
         if (!$shipment) {
             $conn->rollBack();
-            http_response_code(404);
+            
             echo json_encode(['error'=>true,'data'=>'Shipment declaration not found.','code'=>null]);
             exit;
         }
@@ -35,7 +35,7 @@
             $reason = trim((string)($_POST['reason'] ?? ''));
             if ($reason === '') {
                 $conn->rollBack();
-                http_response_code(422);
+                
                 echo json_encode(['error'=>true,'data'=>'Bill of lading does not match. Provide a reason to confirm a manual exception.','code'=>null]);
                 exit;
             }
@@ -79,6 +79,6 @@
         echo json_encode(['error'=>false,'data'=>'Shipment linked to manifest.','code'=>['manifest_id'=>$manifestId,'shipment_id'=>$shipmentId,'shipment_reference'=>$shipment['shipment_reference']]]);
     } catch (Throwable $e) {
         if ($conn->inTransaction()) $conn->rollBack();
-        http_response_code(500);
+        
         echo json_encode(['error'=>true,'data'=>'Unable to link shipment to manifest.','code'=>$e->getMessage()]);
     }

@@ -15,7 +15,7 @@
             $allowStaffAccess === null ||
             $noticeBannerEnabled === null
         ) {
-            http_response_code(400);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid boolean configuration value",
@@ -36,7 +36,7 @@
             $notices = json_decode($notices, true);
 
             if (json_last_error() !== JSON_ERROR_NONE) {
-                http_response_code(400);
+                
                 echo json_encode([
                     "error" => true,
                     "data" => "Invalid notices JSON",
@@ -47,7 +47,7 @@
         }
 
         if (!is_array($notices)) {
-            http_response_code(400);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Notices must be an array",
@@ -381,7 +381,7 @@
             $conn->rollBack();
         }
 
-        http_response_code(400);
+        
 
         echo json_encode([
             "error" => true,

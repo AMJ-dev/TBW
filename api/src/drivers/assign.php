@@ -3,7 +3,6 @@
 
 
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
         echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
         exit;
     }
@@ -13,7 +12,7 @@
     $actor_id = $my_details->id ?? null;
 
     if ($driver_id === "" || $vehicle_id === "") {
-        http_response_code(422);
+        
         echo json_encode(["error" => true, "data" => "Driver and vehicle are required.", "code" => null]);
         exit;
     }
@@ -33,21 +32,21 @@
 
         if (!$driver) {
             $conn->rollBack();
-            http_response_code(404);
+            
             echo json_encode(["error" => true, "data" => "Driver not found.", "code" => null]);
             exit;
         }
 
         if (strtolower((string)$driver["status"]) !== "approved") {
             $conn->rollBack();
-            http_response_code(422);
+            
             echo json_encode(["error" => true, "data" => "Only approved drivers can be assigned a vehicle.", "code" => null]);
             exit;
         }
 
         if (empty($driver["licence_expiry"]) || $driver["licence_expiry"] < date("Y-m-d")) {
             $conn->rollBack();
-            http_response_code(422);
+            
             echo json_encode(["error" => true, "data" => "The driver's licence is expired or missing.", "code" => null]);
             exit;
         }
@@ -64,14 +63,14 @@
 
         if (!$vehicle) {
             $conn->rollBack();
-            http_response_code(404);
+            
             echo json_encode(["error" => true, "data" => "Vehicle not found.", "code" => null]);
             exit;
         }
 
         if (strtolower((string)$vehicle["status"]) !== "approved") {
             $conn->rollBack();
-            http_response_code(422);
+            
             echo json_encode(["error" => true, "data" => "Only approved vehicles can be assigned.", "code" => null]);
             exit;
         }
@@ -85,7 +84,7 @@
             $vehicle["roadworthiness_expiry"] < $today
         ) {
             $conn->rollBack();
-            http_response_code(422);
+            
             echo json_encode(["error" => true, "data" => "The vehicle's insurance or roadworthiness document is expired or missing.", "code" => null]);
             exit;
         }
@@ -119,7 +118,7 @@
 
         if ($stmt->fetch(PDO::FETCH_ASSOC)) {
             $conn->rollBack();
-            http_response_code(409);
+            
             echo json_encode(["error" => true, "data" => "This vehicle is already assigned to another driver.", "code" => null]);
             exit;
         }
@@ -180,6 +179,6 @@
             $conn->rollBack();
         }
 
-        http_response_code(500);
+        
         echo json_encode(["error" => true, "data" => "Could not assign vehicle.", "code" => null]);
     }

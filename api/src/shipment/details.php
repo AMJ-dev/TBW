@@ -3,7 +3,6 @@
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-    http_response_code(405);
     echo json_encode([
         "error" => true,
         "data" => "Method not allowed",
@@ -16,7 +15,6 @@ try {
     $userId = (string) ($my_details->id ?? "");
 
     if ($userId === "") {
-        http_response_code(401);
         echo json_encode([
             "error" => true,
             "data" => "Authentication required.",
@@ -28,7 +26,6 @@ try {
     $shipmentId = trim((string) ($_GET["id"] ?? ""));
 
     if ($shipmentId === "") {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Shipment id is required.",
@@ -40,7 +37,6 @@ try {
     $organizationId = (string) ($my_details->organisation_id ?? "");
 
     if ($organizationId === "") {
-        http_response_code(403);
         echo json_encode([
             "error" => true,
             "data" => "Organisation access is required.",
@@ -94,7 +90,6 @@ try {
     $shipment = $q->fetch(PDO::FETCH_ASSOC);
 
     if (!$shipment) {
-        http_response_code(404);
         echo json_encode([
             "error" => true,
             "data" => "Shipment not found.",
@@ -258,7 +253,6 @@ try {
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 } catch (Throwable $e) {
-    http_response_code(500);
     echo json_encode([
         "error" => true,
         "data" => "Could not load this shipment.",

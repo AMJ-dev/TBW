@@ -4,7 +4,7 @@
     $token = trim($_GET["token"] ?? "");
 
     if ($token === "") {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => "Invitation token is required",
@@ -55,7 +55,7 @@
         $invite = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$invite) {
-            http_response_code(404);
+            
 
             echo json_encode([
                 "error" => true,
@@ -136,7 +136,7 @@
             ]
         ]);
     } catch (Throwable $e) {
-        http_response_code(500);
+        
 
         echo json_encode([
             "error" => true,

@@ -5,7 +5,6 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 header("Content-Type: application/json; charset=utf-8");
 
 function respond(int $status, bool $error, string $message, ?array $code = null): void {
-    http_response_code($status);
     echo json_encode([
         "error" => $error,
         "data" => $message,

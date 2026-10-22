@@ -4,7 +4,7 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 header("Content-Type: application/json; charset=utf-8");
 
 if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-    http_response_code(405);
+   
     echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
     exit;
 }
@@ -83,6 +83,6 @@ try {
 
     echo json_encode(["error" => false, "data" => "Gate-out queue loaded successfully.", "code" => $rows]);
 } catch (Throwable $e) {
-    http_response_code(500);
+    
     echo json_encode(["error" => true, "data" => "Could not load gate-out queue.", "code" => null]);
 }

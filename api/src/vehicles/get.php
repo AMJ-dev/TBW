@@ -4,7 +4,6 @@
     $id = trim($_GET["id"] ?? "");
 
     if ($id === "") {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Vehicle ID is required.",
@@ -25,7 +24,6 @@
         $vehicle = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$vehicle) {
-            http_response_code(404);
             echo json_encode([
                 "error" => true,
                 "data" => "Vehicle not found.",
@@ -52,7 +50,6 @@
             "code" => $vehicle
         ]);
     } catch (Throwable $e) {
-        http_response_code(500);
         echo json_encode([
             "error" => true,
             "data" => "Could not load vehicle.",

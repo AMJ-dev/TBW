@@ -18,6 +18,6 @@
         fclose($stream);
         echo json_encode(['error'=>false,'data'=>'Export generated.','code'=>$csv]);
     } catch (Throwable $e) {
-        http_response_code(500);
+        
         echo json_encode(['error'=>true,'data'=>'Unable to export manifests.','code'=>null]);
     }

@@ -4,7 +4,6 @@
     header("Content-Type: application/json; charset=utf-8");
 
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
         echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
         exit;
     }
@@ -17,7 +16,7 @@
     $type = trim((string)($_POST["type"] ?? "Terminal Entry"));
 
     if (!is_array($container_nos)) {
-        http_response_code(422);
+        
         echo json_encode(["error" => true, "data" => "Container numbers must be an array.", "code" => null]);
         exit;
     }
@@ -29,20 +28,20 @@
     $container_nos = array_values(array_unique(array_filter($container_nos)));
 
     if (empty($vehicle_id) || empty($driver_id) || empty($raw_date) || empty($slot_time) || empty($container_nos)) {
-        http_response_code(422);
+        
         echo json_encode(["error" => true, "data" => "Vehicle, driver, date, time slot, and at least one container are required.", "code" => null]);
         exit;
     }
 
     if (count($container_nos) !== count($_POST["container_nos"]) || count($container_nos) > 100) {
-        http_response_code(422);
+        
         echo json_encode(["error" => true, "data" => "Remove empty or duplicate containers. Maximum 100 allowed.", "code" => null]);
         exit;
     }
 
     foreach ($container_nos as $c_no) {
         if (mb_strlen($c_no) > 30) {
-            http_response_code(422);
+            
             echo json_encode(["error" => true, "data" => "A container number exceeds the allowed length.", "code" => null]);
             exit;
         }
@@ -50,7 +49,7 @@
 
     $appointment_dt = DateTime::createFromFormat("!Y-m-d", $raw_date);
     if (!$appointment_dt || $appointment_dt->format("Y-m-d") !== $raw_date) {
-        http_response_code(422);
+        
         echo json_encode(["error" => true, "data" => "Invalid appointment date format (YYYY-MM-DD).", "code" => null]);
         exit;
     }
@@ -58,7 +57,7 @@
     $appointment_date = $appointment_dt->format("Y-m-d 00:00:00");
 
     if ($appointment_dt->format("Y-m-d") < date("Y-m-d")) {
-        http_response_code(422);
+        
         echo json_encode(["error" => true, "data" => "Appointment date cannot be in the past.", "code" => null]);
         exit;
     }
@@ -69,7 +68,7 @@
     ];
 
     if (!in_array($slot_time, $allowed_slots, true)) {
-        http_response_code(422);
+        
         echo json_encode(["error" => true, "data" => "Invalid appointment time slot.", "code" => null]);
         exit;
     }
@@ -87,7 +86,7 @@
         $vehicle = $vehicle_stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$vehicle) {
-            http_response_code(404);
+            
             echo json_encode(["error" => true, "data" => "Selected vehicle was not found.", "code" => null]);
             exit;
         }
@@ -97,7 +96,7 @@
             empty($vehicle["insurance_expiry"]) || $vehicle["insurance_expiry"] < date("Y-m-d") ||
             empty($vehicle["roadworthiness_expiry"]) || $vehicle["roadworthiness_expiry"] < date("Y-m-d")
         ) {
-            http_response_code(422);
+            
             echo json_encode(["error" => true, "data" => "Vehicle approval, insurance, or roadworthiness is invalid or expired.", "code" => null]);
             exit;
         }
@@ -112,13 +111,13 @@
         $driver = $driver_stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$driver) {
-            http_response_code(404);
+            
             echo json_encode(["error" => true, "data" => "Selected driver was not found.", "code" => null]);
             exit;
         }
 
         if ($driver["status"] !== "Approved" || empty($driver["licence_expiry"]) || $driver["licence_expiry"] < date("Y-m-d")) {
-            http_response_code(422);
+            
             echo json_encode(["error" => true, "data" => "Driver approval or licence validity is invalid or expired.", "code" => null]);
             exit;
         }
@@ -133,7 +132,7 @@
         $assignment_stmt->execute([":driver_id" => $driver_id, ":vehicle_id" => $vehicle_id]);
 
         if (!$assignment_stmt->fetch(PDO::FETCH_ASSOC)) {
-            http_response_code(422);
+            
             echo json_encode(["error" => true, "data" => "The selected driver is not actively assigned to this vehicle.", "code" => null]);
             exit;
         }
@@ -156,7 +155,7 @@
         ]);
 
         if ($conflict_stmt->fetch(PDO::FETCH_ASSOC)) {
-            http_response_code(409);
+            
             echo json_encode(["error" => true, "data" => "This vehicle or driver already has an active appointment for that time slot.", "code" => null]);
             exit;
         }
@@ -187,7 +186,7 @@
         $container_conflict = $container_conflict_stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($container_conflict) {
-            http_response_code(409);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Container {$container_conflict['container_no']} already has an active appointment on this date.",
@@ -259,7 +258,6 @@
 
         $conn->commit();
 
-        http_response_code(201);
         echo json_encode([
             "error" => false,
             "data" => "Appointment booked successfully.",
@@ -283,7 +281,7 @@
         
         error_log("Appointment Booking Error: " . $e->getMessage());
 
-        http_response_code(500);
+        
         echo json_encode([
             "error" => true,
             "data" => "Could not create appointment.",

@@ -83,6 +83,7 @@ const TransportVehiclesPage = lazy(() => import("@/pages/portal/transport/vehicl
 const TransportVehicleFormPage = lazy(() => import("@/pages/portal/transport/vehicle-form"));
 const TransportDriversPage = lazy(() => import("@/pages/portal/transport/drivers"));
 const TransportDriverFormPage = lazy(() => import("@/pages/portal/transport/driver-form"));
+const DirectIntakePage = lazy(() => import("@/pages/portal/transport/direct-intake"));
 const TransportDriverAssignmentsPage = lazy(() => import("@/pages/portal/transport/driver-assignments"));
 const TransportBookAppointmentsPage = lazy(() => import("@/pages/portal/transport/book-appointments"));
 const TransportVehicleDetailsPage = lazy(() => import("@/pages/portal/transport/vehicle-details"));
@@ -248,6 +249,7 @@ export default function Routers() {
 						<Route path="/portal/cargo" element={<CargoPage />} />
 						<Route path="/portal/shipments" element={<PortalShipmentsPage />} />
 						<Route path="/portal/shipment/new" element={<NewPortalShipmentPage />} />
+						<Route path="/portal/direct-intake" element={<DirectIntakePage />} />
 						<Route path="/portal/shipment/edit/:id" element={<NewPortalShipmentPage />} />
 						<Route path="/portal/shipments/:id" element={<PortalShipmentDetailsPage />} />
 						

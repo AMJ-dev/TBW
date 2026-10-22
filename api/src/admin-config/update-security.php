@@ -4,13 +4,12 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 header("Cache-Control: no-store, private");
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    http_response_code(405);
+   
     echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
     exit;
 }
 
 if (!isset($my_details->id) || !is_string($my_details->id) || $my_details->id === "") {
-    http_response_code(401);
     echo json_encode(["error" => true, "data" => "Unable to identify the current user.", "code" => null]);
     exit;
 }
@@ -46,7 +45,7 @@ $settings = [];
 
 foreach ($booleanFields as $field) {
     if (!array_key_exists($field, $_POST)) {
-        http_response_code(422);
+        
         echo json_encode(["error" => true, "data" => "Missing setting: " . $field, "code" => null]);
         exit;
     }
@@ -54,7 +53,7 @@ foreach ($booleanFields as $field) {
     $value = $_POST[$field];
 
     if (!in_array($value, ["0", "1", 0, 1, "true", "false", true, false], true)) {
-        http_response_code(422);
+        
         echo json_encode(["error" => true, "data" => "Invalid setting: " . $field, "code" => null]);
         exit;
     }
@@ -64,7 +63,7 @@ foreach ($booleanFields as $field) {
 
 foreach ($numberRules as $field => $range) {
     if (!isset($_POST[$field]) || filter_var($_POST[$field], FILTER_VALIDATE_INT) === false) {
-        http_response_code(422);
+        
         echo json_encode(["error" => true, "data" => "Invalid numeric setting: " . $field, "code" => null]);
         exit;
     }
@@ -72,7 +71,7 @@ foreach ($numberRules as $field => $range) {
     $value = (int) $_POST[$field];
 
     if ($value < $range[0] || $value > $range[1]) {
-        http_response_code(422);
+        
         echo json_encode([
             "error" => true,
             "data" => $field . " must be between " . $range[0] . " and " . $range[1] . ".",
@@ -150,7 +149,7 @@ try {
         $conn->rollBack();
     }
 
-    http_response_code(500);
+    
     echo json_encode([
         "error" => true,
         "data" => "Could not save security configuration.",

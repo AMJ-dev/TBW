@@ -2,7 +2,6 @@
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
     if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-        http_response_code(405);
         echo json_encode(["error" => true, "data" => "Method not allowed", "code" => null]);
         exit;
     }
@@ -14,7 +13,6 @@
         $role = $q->fetch(PDO::FETCH_ASSOC);
 
         if (!$role || $role["role_key"] !== "system_admin") {
-            http_response_code(403);
             echo json_encode(["error" => true, "data" => "Access denied", "code" => null]);
             exit;
         }
@@ -32,7 +30,7 @@
         $org = $q->fetch(PDO::FETCH_ASSOC);
 
         if (!$org) {
-            http_response_code(404);
+            
             echo json_encode(["error" => true, "data" => "Organisation not found", "code" => null]);
             exit;
         }
@@ -90,6 +88,6 @@
             ]
         ]);
     } catch (Throwable $e) {
-        http_response_code(500);
+        
         echo json_encode(["error" => true, "data" => $e->getMessage(), "code" => null]);
     }

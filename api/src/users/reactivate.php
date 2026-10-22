@@ -4,26 +4,20 @@
     $id = trim($_GET["id"] ?? "");
 
     if ($id === "") {
-        http_response_code(400);
-
         echo json_encode([
             "error" => true,
             "data" => "Invalid user ID",
             "code" => null
         ]);
-
         exit;
     }
 
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
-
         echo json_encode([
             "error" => true,
             "data" => "Method not allowed",
             "code" => null
         ]);
-
         exit;
     }
 
@@ -47,8 +41,6 @@
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$user) {
-            http_response_code(404);
-
             echo json_encode([
                 "error" => true,
                 "data" => "User not found",
@@ -59,7 +51,6 @@
         }
 
         if (!in_array($user["account_status"], ["suspended", "inactive"], true)) {
-            http_response_code(400);
 
             echo json_encode([
                 "error" => true,
@@ -93,9 +84,6 @@
         ]);
 
     } catch (Throwable $e) {
-
-        http_response_code(500);
-
         echo json_encode([
             "error" => true,
             "data" => $e->getMessage(),

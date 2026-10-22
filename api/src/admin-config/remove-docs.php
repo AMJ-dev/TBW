@@ -2,7 +2,6 @@
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
         echo json_encode(["error" => true, "data" => "Method not allowed", "code" => null]);
         exit;
     }
@@ -14,7 +13,6 @@
         $role = $q->fetch(PDO::FETCH_ASSOC);
 
         if (!$role || $role["role_key"] !== "system_admin") {
-            http_response_code(403);
             echo json_encode(["error" => true, "data" => "Access denied", "code" => null]);
             exit;
         }
@@ -23,7 +21,7 @@
         $docId = trim($data["document_id"] ?? "");
 
         if ($docId === "") {
-            http_response_code(400);
+            
             echo json_encode(["error" => true, "data" => "Invalid document ID", "code" => null]);
             exit;
         }
@@ -47,13 +45,13 @@
         $doc = $q->fetch(PDO::FETCH_ASSOC);
 
         if (!$doc || ($id !== "" && $doc["organisation_id"] !== $id)) {
-            http_response_code(404);
+            
             echo json_encode(["error" => true, "data" => "Document not found", "code" => null]);
             exit;
         }
 
         if ($doc["status"] !== "pending") {
-            http_response_code(400);
+            
             echo json_encode(["error" => true, "data" => "Only pending documents can be removed", "code" => null]);
             exit;
         }
@@ -93,6 +91,6 @@
             $conn->rollBack();
         }
 
-        http_response_code(500);
+        
         echo json_encode(["error" => true, "data" => $e->getMessage(), "code" => null]);
     }

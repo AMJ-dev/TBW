@@ -4,7 +4,6 @@
     header("Content-Type: application/json; charset=utf-8");
 
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
         echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
         exit;
     }
@@ -13,7 +12,7 @@
     $actor_id = $my_details->id ?? null;
 
     if ($driver_id === "") {
-        http_response_code(422);
+        
         echo json_encode(["error" => true, "data" => "Driver ID is required.", "code" => null]);
         exit;
     }
@@ -32,7 +31,7 @@
 
         if (!$stmt->fetch(PDO::FETCH_ASSOC)) {
             $conn->rollBack();
-            http_response_code(404);
+            
             echo json_encode(["error" => true, "data" => "Driver not found.", "code" => null]);
             exit;
         }
@@ -50,7 +49,7 @@
 
         if (!$assignment) {
             $conn->rollBack();
-            http_response_code(404);
+            
             echo json_encode(["error" => true, "data" => "This driver has no active vehicle assignment.", "code" => null]);
             exit;
         }
@@ -88,6 +87,6 @@
             $conn->rollBack();
         }
 
-        http_response_code(500);
+        
         echo json_encode(["error" => true, "data" => "Could not unassign vehicle.", "code" => $e->getMessage()]);
     }

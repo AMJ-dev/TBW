@@ -7,7 +7,7 @@
     $invitedBy = trim((string)($my_details->id ?? ""));
 
     if ($userId === "" || $membershipId === "") {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => "User ID and membership ID are required",
@@ -17,7 +17,6 @@
     }
 
     if ($organisationId === "" || $invitedBy === "") {
-        http_response_code(403);
         echo json_encode([
             "error" => true,
             "data" => "Organisation information is not available",
@@ -59,7 +58,7 @@
         if (!$member) {
             $conn->rollBack();
 
-            http_response_code(404);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Organisation membership not found",
@@ -71,7 +70,7 @@
         if ($member["membership_status"] !== "pending") {
             $conn->rollBack();
 
-            http_response_code(400);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "This user does not have a pending invitation",
@@ -98,7 +97,7 @@
         if ($stmt->fetch(PDO::FETCH_ASSOC)) {
             $conn->rollBack();
 
-            http_response_code(409);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "The current invitation has not expired yet",
@@ -179,7 +178,7 @@
         if (!$sent) {
             $conn->rollBack();
 
-            http_response_code(500);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Unable to send invitation email. Please try again.",
@@ -206,7 +205,7 @@
             $conn->rollBack();
         }
 
-        http_response_code(500);
+        
 
         echo json_encode([
             "error" => true,

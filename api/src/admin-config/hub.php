@@ -6,7 +6,6 @@
         $organisationId = trim((string)($my_details->organisation_id ?? ""));
 
         if ($userId === "") {
-            http_response_code(403);
             echo json_encode([
                 "error" => true,
                 "data" => "Authentication required",
@@ -39,7 +38,6 @@
         }
 
         if (!$isSystemAdmin) {
-            http_response_code(403);
             echo json_encode([
                 "error" => true,
                 "data" => "You do not have permission to access system configuration",
@@ -335,7 +333,6 @@
             ]
         ]);
     } catch (Throwable $e) {
-        http_response_code(500);
 
         echo json_encode([
             "error" => true,

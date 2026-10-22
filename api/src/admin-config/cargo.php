@@ -7,7 +7,6 @@
         $version = $q->fetch(PDO::FETCH_ASSOC);
 
         if (!$version) {
-            http_response_code(500);
             echo json_encode(["error" => true, "data" => "Cargo configuration has not been seeded. Run database/cargo_lifecycle.sql first."]);
             exit;
         }
@@ -63,7 +62,6 @@
         $settings = $q->fetch(PDO::FETCH_ASSOC);
 
         if (!$settings) {
-            http_response_code(500);
             echo json_encode(["error" => true, "data" => "Lifecycle settings are missing for the current configuration."]);
             exit;
         }
@@ -111,6 +109,5 @@
 
         echo json_encode(["error" => false, "data" => true, "code" => $payload]);
     } catch (Throwable $e) {
-        http_response_code(500);
         echo json_encode(["error" => true, "data" => "Could not load cargo configuration."]);
     }

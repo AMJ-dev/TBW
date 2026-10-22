@@ -2,7 +2,6 @@
     require_once dirname(__DIR__, 2) . "/include/set-header.php";
 
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
         echo json_encode([
             "error" => true,
             "data" => "Method not allowed",
@@ -18,7 +17,7 @@
     $passwordConfirmation = $_POST["password_confirmation"] ?? "";
 
     if ($token === "" || $fullName === "" || $password === "") {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => "Required fields are missing",
@@ -28,7 +27,7 @@
     }
 
     if ($password !== $passwordConfirmation) {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => "Passwords do not match",
@@ -44,7 +43,7 @@
         !preg_match("/\d/", $password) ||
         !preg_match("/[^A-Za-z0-9]/", $password)
     ) {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => "Password does not meet the requirements",
@@ -85,7 +84,7 @@
         if (!$invite) {
             $conn->rollBack();
 
-            http_response_code(404);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid invitation",
@@ -97,7 +96,7 @@
         if ($invite["accepted_at"] !== null) {
             $conn->rollBack();
 
-            http_response_code(409);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Invitation has already been used",
@@ -109,7 +108,6 @@
         if ($invite["revoked_at"] !== null) {
             $conn->rollBack();
 
-            http_response_code(410);
             echo json_encode([
                 "error" => true,
                 "data" => "Invitation has been revoked",
@@ -121,7 +119,6 @@
         if (strtotime($invite["expires_at"]) < time()) {
             $conn->rollBack();
 
-            http_response_code(410);
             echo json_encode([
                 "error" => true,
                 "data" => "Invitation has expired",
@@ -259,7 +256,7 @@
             $conn->rollBack();
         }
 
-        http_response_code(500);
+        
 
         echo json_encode([
             "error" => true,

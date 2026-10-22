@@ -3,7 +3,7 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST');
-    http_response_code(405);
+   
     echo json_encode(['error'=>true,'data'=>'Method not allowed.','code'=>null]);
     exit;
 }
@@ -16,7 +16,7 @@ $email = trim((string)($_POST['email'] ?? ''));
 $phone = trim((string)($_POST['phone'] ?? ''));
 $address = trim((string)($_POST['registered_address'] ?? ''));
 if (!preg_match('/^[a-f0-9]{64}$/i', $token) || $name === '' || strlen($name)>255 || $contact === '' || strlen($contact)>150 || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email)>254) {
-    http_response_code(422);
+    
     echo json_encode(['error'=>true,'data'=>'Provide a valid invitation, organisation name, contact person and email address.','code'=>null]);
     exit;
 }
@@ -27,7 +27,6 @@ try {
     $invite = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$invite || $invite['revoked_at'] !== null || $invite['accepted_at'] !== null || strtotime($invite['expires_at']) < time()) {
         $conn->rollBack();
-        http_response_code(410);
         echo json_encode(['error'=>true,'data'=>'This invitation is invalid, expired, revoked, or already used. Request a new invitation.','code'=>null]);
         exit;
     }
@@ -39,6 +38,6 @@ try {
     echo json_encode(['error'=>false,'data'=>'Onboarding details submitted for review. The organisation has not been created or verified.','code'=>['status'=>'pending']]);
 } catch (Throwable $e) {
     if ($conn->inTransaction()) $conn->rollBack();
-    http_response_code(500);
+    
     echo json_encode(['error'=>true,'data'=>'Unable to submit onboarding details.','code'=>null]);
 }

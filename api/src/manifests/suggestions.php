@@ -2,21 +2,21 @@
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 if (($my_details->account_type ?? '') !== 'system' || empty($my_details->id)) {
-    http_response_code(403);
+   
     echo json_encode(['error' => true, 'data' => 'Access denied.', 'code' => null]);
     exit;
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST');
-    http_response_code(405);
+   
     echo json_encode(['error' => true, 'data' => 'Method not allowed.', 'code' => null]);
     exit;
 }
 
 $manifestId = trim((string)($_POST['manifest_id'] ?? ''));
 if ($manifestId === '') {
-    http_response_code(422);
+    
     echo json_encode(['error' => true, 'data' => 'Manifest ID is required.', 'code' => null]);
     exit;
 }
@@ -27,7 +27,7 @@ try {
     $manifest = $manifestQuery->fetch(PDO::FETCH_ASSOC);
 
     if (!$manifest) {
-        http_response_code(404);
+        
         echo json_encode(['error' => true, 'data' => 'Manifest not found.', 'code' => null]);
         exit;
     }
@@ -103,6 +103,6 @@ try {
 
     echo json_encode(['error' => false, 'data' => true, 'code' => ['suggestions' => $suggestions]], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } catch (Throwable $e) {
-    http_response_code(500);
+    
     echo json_encode(['error' => true, 'data' => 'Unable to generate shipment matching suggestions.', 'code' => null]);
 }

@@ -4,7 +4,7 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 header("Content-Type: application/json; charset=utf-8");
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    http_response_code(405);
+   
     echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
     exit;
 }
@@ -20,19 +20,19 @@ $overrideReason = trim((string) ($_POST["override_reason"] ?? ""));
 
 if (!in_array($direction, ["in", "out"], true) ||
     !in_array($decision, ["ADMIT", "REFER", "REJECT"], true)) {
-    http_response_code(422);
+    
     echo json_encode(["error" => true, "data" => "Invalid direction or decision.", "code" => null]);
     exit;
 }
 
 if ($passId === "" && $passCode === "" && $appointmentId === "" && $recordId === "") {
-    http_response_code(422);
+    
     echo json_encode(["error" => true, "data" => "A gate pass or appointment ID is required.", "code" => null]);
     exit;
 }
 
 if (in_array($decision, ["REFER", "REJECT"], true) && strlen($reason) < 5) {
-    http_response_code(422);
+    
     echo json_encode(["error" => true, "data" => "Provide a reason of at least 5 characters.", "code" => null]);
     exit;
 }
@@ -94,7 +94,7 @@ try {
 
     if (!$record) {
         $conn->rollBack();
-        http_response_code(404);
+        
         echo json_encode(["error" => true, "data" => "Gate pass or appointment not found.", "code" => null]);
         exit;
     }
@@ -103,7 +103,7 @@ try {
         ($passCode !== "" && $record["pass_code"] !== $passCode) ||
         ($appointmentId !== "" && $record["appointment_id"] !== $appointmentId)) {
         $conn->rollBack();
-        http_response_code(422);
+        
         echo json_encode(["error" => true, "data" => "Supplied identifiers do not match the gate pass.", "code" => null]);
         exit;
     }
@@ -245,7 +245,7 @@ try {
 
     if ($decision === "ADMIT" && $direction === "out") {
         $conn->rollBack();
-        http_response_code(422);
+        
         echo json_encode([
             "error" => true,
             "data" => "Gate-out is blocked until financial clearance and release authorisation are verified by the server.",
@@ -256,7 +256,7 @@ try {
 
     if ($decision === "ADMIT" && count($holds) > 0) {
         $conn->rollBack();
-        http_response_code(422);
+        
         echo json_encode([
             "error" => true,
             "data" => "Admission blocked. Resolve the outstanding checks first.",
@@ -362,7 +362,7 @@ try {
     }
 
     error_log("Gate decision error: " . $e->getMessage());
-    http_response_code(500);
+    
     echo json_encode([
         "error" => true,
         "data" => "Could not record gate decision.",

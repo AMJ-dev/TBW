@@ -3,7 +3,6 @@
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    http_response_code(405);
     echo json_encode([
         "error" => true,
         "data" => "Method not allowed",
@@ -19,7 +18,6 @@ try {
     $userId = (string) ($my_details->id ?? "");
 
     if ($userId === "") {
-        http_response_code(401);
         echo json_encode([
             "error" => true,
             "data" => "Authentication required.",
@@ -489,15 +487,9 @@ try {
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 } catch (InvalidArgumentException $e) {
-    if ($transactionStarted && $conn->inTransaction()) {
-        $conn->rollBack();
-    }
+    if ($transactionStarted && $conn->inTransaction()) $conn->rollBack();
 
-    foreach ($createdFiles as $file) {
-        delete_file($file);
-    }
-
-    http_response_code(422);
+    foreach ($createdFiles as $file) delete_file($file);
     echo json_encode([
         "error" => true,
         "data" => $e->getMessage(),
@@ -505,15 +497,9 @@ try {
     ]);
 
 } catch (Throwable $e) {
-    if ($transactionStarted && $conn->inTransaction()) {
-        $conn->rollBack();
-    }
+    if ($transactionStarted && $conn->inTransaction())  $conn->rollBack();
 
-    foreach ($createdFiles as $file) {
-        delete_file($file);
-    }
-
-    http_response_code(500);
+    foreach ($createdFiles as $file) delete_file($file);
     echo json_encode([
         "error" => true,
         "data" => "Could not save the shipment.",

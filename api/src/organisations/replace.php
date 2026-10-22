@@ -5,8 +5,6 @@ require_once dirname(__DIR__, 2) . "/include/check-user.php";
 header("Content-Type: application/json");
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    http_response_code(405);
-
     echo json_encode([
         "error" => true,
         "data" => "Method not allowed",
@@ -17,8 +15,6 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 }
 
 if ($my_details->account_type !== "organisation") {
-    http_response_code(403);
-
     echo json_encode([
         "error" => true,
         "data" => "Only organisation accounts can submit registration updates.",
@@ -35,8 +31,6 @@ $rc_number = trim($_POST["rc_number"] ?? "");
 $tin = trim($_POST["tin"] ?? "");
 
 if ($organisation_id === "") {
-    http_response_code(400);
-
     echo json_encode([
         "error" => true,
         "data" => "Organisation not found.",
@@ -47,8 +41,6 @@ if ($organisation_id === "") {
 }
 
 if ($name === "") {
-    http_response_code(400);
-
     echo json_encode([
         "error" => true,
         "data" => "Company name is required.",
@@ -59,8 +51,6 @@ if ($name === "") {
 }
 
 if ($rc_number === "") {
-    http_response_code(400);
-
     echo json_encode([
         "error" => true,
         "data" => "RC number is required.",
@@ -71,8 +61,6 @@ if ($rc_number === "") {
 }
 
 if (strlen($name) > 255) {
-    http_response_code(400);
-
     echo json_encode([
         "error" => true,
         "data" => "Company name is too long.",
@@ -83,8 +71,6 @@ if (strlen($name) > 255) {
 }
 
 if (strlen($rc_number) > 100) {
-    http_response_code(400);
-
     echo json_encode([
         "error" => true,
         "data" => "RC number is too long.",
@@ -95,8 +81,6 @@ if (strlen($rc_number) > 100) {
 }
 
 if ($tin !== "" && strlen($tin) > 100) {
-    http_response_code(400);
-
     echo json_encode([
         "error" => true,
         "data" => "TIN is too long.",
@@ -109,8 +93,6 @@ if ($tin !== "" && strlen($tin) > 100) {
 $documents = $_FILES["documents"] ?? [];
 
 if (!empty($documents) && !isset($documents["name"])) {
-    http_response_code(400);
-
     echo json_encode([
         "error" => true,
         "data" => "Invalid document upload data.",
@@ -157,8 +139,6 @@ try {
     if (!$organisation) {
         $conn->rollBack();
 
-        http_response_code(404);
-
         echo json_encode([
             "error" => true,
             "data" => "Organisation not found.",
@@ -170,8 +150,6 @@ try {
 
     if (!in_array($organisation["verification_status"], ["rejected", "pending"], true)) {
         $conn->rollBack();
-
-        http_response_code(400);
 
         echo json_encode([
             "error" => true,
@@ -243,8 +221,6 @@ try {
             if (!isset($rejectedDocuments[$documentId])) {
                 $conn->rollBack();
 
-                http_response_code(400);
-
                 echo json_encode([
                     "error" => true,
                     "data" => "One or more selected documents are not rejected documents belonging to your organisation.",
@@ -292,8 +268,6 @@ try {
         ) {
             $conn->rollBack();
 
-            http_response_code(400);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid uploaded document.",
@@ -309,8 +283,6 @@ try {
 
         if ($error !== UPLOAD_ERR_OK) {
             $conn->rollBack();
-
-            http_response_code(400);
 
             echo json_encode([
                 "error" => true,
@@ -329,8 +301,6 @@ try {
         if ($fileSize <= 0 || $fileSize > $maxFileSize) {
             $conn->rollBack();
 
-            http_response_code(400);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Each document must be 5MB or smaller.",
@@ -346,8 +316,6 @@ try {
 
         if (!is_uploaded_file($tmpName)) {
             $conn->rollBack();
-
-            http_response_code(400);
 
             echo json_encode([
                 "error" => true,
@@ -365,8 +333,6 @@ try {
 
         if (!in_array($mimeType, $allowedMimeTypes, true)) {
             $conn->rollBack();
-
-            http_response_code(400);
 
             echo json_encode([
                 "error" => true,
@@ -399,8 +365,6 @@ try {
         if (!empty($missingDocuments)) {
             $conn->rollBack();
 
-            http_response_code(400);
-
             echo json_encode([
                 "error" => true,
                 "data" => "You must replace every rejected document before submitting your registration.",
@@ -430,8 +394,6 @@ try {
 
     if (!$registrationRequest) {
         $conn->rollBack();
-
-        http_response_code(400);
 
         echo json_encode([
             "error" => true,
@@ -614,7 +576,6 @@ try {
     }
 
     if ((int)$e->errorInfo[1] === 1062) {
-        http_response_code(409);
 
         echo json_encode([
             "error" => true,
@@ -624,10 +585,6 @@ try {
 
         exit;
     }
-
-    error_log("Organisation registration submission error: " . $e->getMessage());
-
-    http_response_code(500);
 
     echo json_encode([
         "error" => true,
@@ -644,10 +601,6 @@ try {
     if (isset($absolutePath) && is_file($absolutePath)) {
         @unlink($absolutePath);
     }
-
-    error_log("Organisation registration submission error: " . $e->getMessage());
-
-    http_response_code(500);
 
     echo json_encode([
         "error" => true,

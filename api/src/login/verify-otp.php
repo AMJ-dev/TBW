@@ -491,7 +491,7 @@
         if ($conn->inTransaction()) $conn->rollBack();
         error_log("Login verify OTP error: " . $e->getMessage());
 
-        http_response_code(500);
+        
 
         echo json_encode([
             "error" => true,

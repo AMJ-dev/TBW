@@ -3,7 +3,6 @@
 
     try {
         if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-            http_response_code(405);
             echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
             exit;
         }
@@ -11,7 +10,7 @@
         $configJson = $_POST["config"] ?? "";
 
         if (!is_string($configJson) || trim($configJson) === "") {
-            http_response_code(400);
+            
             echo json_encode(["error" => true, "data" => "The configuration payload is required.", "code" => null]);
             exit;
         }
@@ -331,7 +330,7 @@
             $conn->rollBack();
         }
 
-        http_response_code(400);
+        
         echo json_encode(["error" => true, "data" => $e->getMessage(), "code" => null]);
     } catch (Throwable $e) {
         if (isset($conn) && $conn instanceof PDO && $conn->inTransaction()) {
@@ -339,6 +338,6 @@
         }
 
         error_log("Notification configuration update error: " . $e->getMessage());
-        http_response_code(500);
+        
         echo json_encode(["error" => true, "data" => "Unable to update notification configuration.", "code" => null]);
     }

@@ -7,7 +7,7 @@
     $currentUserId = trim((string)($my_details->id ?? ""));
 
     if ($userId === "" || $membershipId === "") {
-        http_response_code(400);
+    
         echo json_encode([
             "error" => true,
             "data" => "User ID and membership ID are required",
@@ -17,7 +17,6 @@
     }
 
     if ($organisationId === "" || $currentUserId === "") {
-        http_response_code(403);
         echo json_encode([
             "error" => true,
             "data" => "Organisation information is not available",
@@ -27,7 +26,7 @@
     }
 
     if ($userId === $currentUserId) {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => "You cannot remove yourself",
@@ -66,7 +65,7 @@
         if (!$member) {
             $conn->rollBack();
 
-            http_response_code(404);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Organisation membership not found",
@@ -78,7 +77,7 @@
         if ($member["membership_status"] === "revoked") {
             $conn->rollBack();
 
-            http_response_code(400);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "This user has already been removed",
@@ -130,7 +129,7 @@
             $conn->rollBack();
         }
 
-        http_response_code(500);
+        
 
         echo json_encode([
             "error" => true,

@@ -4,7 +4,6 @@
     header("Content-Type: application/json; charset=utf-8");
 
     if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-        http_response_code(405);
         echo json_encode([
             "error" => true,
             "data" => "Method not allowed.",
@@ -17,7 +16,7 @@
     $organisation_id = $my_details->organisation_id ?? null;
 
     if ($id === "") {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => "Gate pass ID is required.",
@@ -46,15 +45,15 @@
                 ON CAST(gp.vehicle_id AS CHAR) = CAST(v.id AS CHAR)
             INNER JOIN gate_drivers d
                 ON CAST(gp.driver_id AS CHAR) = CAST(d.id AS CHAR)
-            WHERE CAST(gp.id AS CHAR) = :id && gp.organisation_id
+            WHERE CAST(gp.id AS CHAR) = :id && gp.organisation_id =:organisation_id
             LIMIT 1
         ");
 
-        $stmt->execute(["id" => $id, "organisation_id" => $organisation_id]);
+        $stmt->execute([":id" => $id, "organisation_id" => $organisation_id]);
         $pass = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$pass) {
-            http_response_code(404);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Gate pass not found.",
@@ -95,7 +94,7 @@
             "code" => $pass
         ]);
     } catch (Throwable $e) {
-        http_response_code(500);
+        
         echo json_encode([
             "error" => true,
             "data" => "Could not load gate pass.",

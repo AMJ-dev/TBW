@@ -18,7 +18,6 @@
     $allowedKinds = ["Flatbed", "Container", "Reefer", "Box", "Tanker"];
 
     if ($id === "" || $plate === "" || $kind === "") {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Vehicle ID, plate number, and vehicle type are required.",
@@ -28,7 +27,6 @@
     }
 
     if (!in_array($kind, $allowedKinds, true)) {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Invalid vehicle type.",
@@ -38,7 +36,6 @@
     }
 
     if ($year !== "" && (!ctype_digit($year) || (int)$year < 1900 || (int)$year > (int)date("Y") + 1)) {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Invalid vehicle year.",
@@ -52,7 +49,6 @@
             $parsed = DateTime::createFromFormat("!Y-m-d", $date);
 
             if (!$parsed || $parsed->format("Y-m-d") !== $date) {
-                http_response_code(400);
                 echo json_encode([
                     "error" => true,
                     "data" => "Invalid document expiry date.",
@@ -77,7 +73,6 @@
         ]);
 
         if ($check->fetch(PDO::FETCH_ASSOC)) {
-            http_response_code(409);
             echo json_encode([
                 "error" => true,
                 "data" => "Another vehicle already uses this plate number.",
@@ -134,7 +129,6 @@
         $vehicle = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$vehicle) {
-            http_response_code(404);
             echo json_encode([
                 "error" => true,
                 "data" => "Vehicle not found.",
@@ -149,7 +143,6 @@
             "code" => $vehicle
         ]);
     } catch (PDOException $e) {
-        http_response_code(500);
         echo json_encode([
             "error" => true,
             "data" => "Could not update vehicle.",

@@ -8,7 +8,6 @@
         $organisation_id = $my_details->organisation_id ?? null;
 
         if (!$organisation_id) {
-            http_response_code(403);
             echo json_encode([
                 "error" => true,
                 "data" => "Organisation not found.",
@@ -160,7 +159,6 @@
             "code" => array_values($vehicles)
         ]);
     } catch (Throwable $e) {
-        http_response_code(500);
         echo json_encode([
             "error" => true,
             "data" => "Could not load vehicles.",

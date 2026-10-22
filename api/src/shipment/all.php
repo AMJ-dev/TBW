@@ -3,7 +3,7 @@
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-    http_response_code(405);
+   
     echo json_encode([
         "error" => true,
         "data" => "Method not allowed",
@@ -16,7 +16,6 @@ try {
     $userId = (string) ($my_details->id ?? "");
 
     if ($userId === "") {
-        http_response_code(401);
         echo json_encode([
             "error" => true,
             "data" => "Authentication required.",
@@ -37,7 +36,6 @@ try {
     ];
 
     if ($accountType !== "system" || !in_array($systemRoleId, $allowedSystemRoles, true)) {
-        http_response_code(403);
         echo json_encode([
             "error" => true,
             "data" => "You do not have permission to view shipments.",
@@ -286,7 +284,7 @@ try {
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 } catch (Throwable $e) {
-    http_response_code(500);
+    
     echo json_encode([
         "error" => true,
         "data" => "Could not load shipments.",

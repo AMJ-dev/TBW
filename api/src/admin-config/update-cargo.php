@@ -76,7 +76,6 @@ function cargoConfigSnapshot($conn, $versionId) {
 
 try {
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
         echo json_encode([
             "error" => true,
             "data" => "Method not allowed",
@@ -108,7 +107,7 @@ try {
     }
 
     if (!is_array($configuration)) {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => "A valid configuration field is required",
@@ -506,7 +505,7 @@ try {
     }
 
     if (str_starts_with($e->getMessage(), "VALIDATION: ")) {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => substr($e->getMessage(), 12),
@@ -517,7 +516,7 @@ try {
 
     error_log("Cargo configuration update error: " . $e->getMessage());
 
-    http_response_code(500);
+    
     echo json_encode([
         "error" => true,
         "data" => "Unable to update cargo configuration.",

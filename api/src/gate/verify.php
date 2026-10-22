@@ -4,7 +4,7 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 header("Content-Type: application/json; charset=utf-8");
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    http_response_code(405);
+   
     echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
     exit;
 }
@@ -15,7 +15,7 @@ $plate = strtoupper(trim((string) ($_POST["plate"] ?? "")));
 $direction = strtolower(trim((string) ($_POST["direction"] ?? "in")));
 
 if (!in_array($direction, ["in", "out"], true)) {
-    http_response_code(422);
+    
     echo json_encode(["error" => true, "data" => "Direction must be in or out.", "code" => null]);
     exit;
 }
@@ -26,7 +26,7 @@ if ($query !== "" && $passCode === "" && $plate === "") {
 }
 
 if ($passCode === "" && $plate === "") {
-    http_response_code(422);
+    
     echo json_encode(["error" => true, "data" => "Enter a pass code or vehicle plate.", "code" => null]);
     exit;
 }
@@ -126,7 +126,7 @@ try {
     $pass = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$pass) {
-        http_response_code(404);
+        
         echo json_encode(["error" => true, "data" => "No matching gate pass found.", "code" => null]);
         exit;
     }
@@ -335,7 +335,7 @@ try {
     }
 
     error_log("Gate pass verification error: " . $e->getMessage());
-    http_response_code(500);
+    
     echo json_encode([
         "error" => true,
         "data" => "Could not verify gate pass.",

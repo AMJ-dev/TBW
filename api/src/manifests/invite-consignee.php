@@ -2,20 +2,20 @@
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 if (($my_details->account_type ?? '') !== 'system' || empty($my_details->id)) {
-    http_response_code(403);
+   
     echo json_encode(['error'=>true,'data'=>'Access denied.','code'=>null]);
     exit;
 }
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Allow: POST');
-    http_response_code(405);
+   
     echo json_encode(['error'=>true,'data'=>'Method not allowed.','code'=>null]);
     exit;
 }
 $manifestId = trim((string)($_POST['manifest_id'] ?? ''));
 $email = trim((string)($_POST['email'] ?? ''));
 if ($manifestId === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    http_response_code(422);
+    
     echo json_encode(['error'=>true,'data'=>'A manifest ID and valid consignee email are required.','code'=>null]);
     exit;
 }
@@ -24,12 +24,12 @@ try {
     $stmt->execute([$manifestId]);
     $manifest = $stmt->fetch(PDO::FETCH_ASSOC);
     if (!$manifest) {
-        http_response_code(404);
+        
         echo json_encode(['error'=>true,'data'=>'Manifest not found.','code'=>null]);
         exit;
     }
     if ($manifest['consignee_status'] !== 'unregistered') {
-        http_response_code(409);
+        
         echo json_encode(['error'=>true,'data'=>'This consignee is already linked to an organisation.','code'=>null]);
         exit;
     }
@@ -51,13 +51,12 @@ try {
     $message = '<p>You have been invited to complete consignee onboarding on TRÏNŪ.</p><p>Consignee: <strong>'.$safeName.'</strong></p><p>This link expires in 7 days and does not automatically register or verify an organisation.</p><p><a href="'.$safeLink.'">Continue onboarding</a></p><p>If you were not expecting this invitation, you can ignore this email.</p>';
     $sent = send_email($email, (string)$manifest['consignee'], $subject, $message);
     if ($sent === false || $sent === null || (is_array($sent) && !empty($sent['error']))) {
-        http_response_code(502);
         echo json_encode(['error'=>true,'data'=>'Invite created, but the email could not be sent. Copy the invite link and share it securely.','code'=>['link'=>$link,'expires_at'=>$expiresAt]]);
         exit;
     }
     echo json_encode(['error'=>false,'data'=>'Consignee onboarding invitation sent.','code'=>['email'=>$email,'expires_at'=>$expiresAt]]);
 } catch (Throwable $e) {
     if ($conn->inTransaction()) $conn->rollBack();
-    http_response_code(500);
+    
     echo json_encode(['error'=>true,'data'=>'Unable to send consignee invitation.','code'=>null]);
 }

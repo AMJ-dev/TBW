@@ -1,7 +1,7 @@
 <?php
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    http_response_code(405);
+   
     echo json_encode([
         "error" => true,
         "data" => "Method not allowed",
@@ -613,7 +613,7 @@ try {
     if ($conn->inTransaction()) {
         $conn->rollBack();
     }
-    http_response_code(422);
+    
     echo json_encode([
         "error" => true,
         "data" => $e->getMessage(),
@@ -623,7 +623,7 @@ try {
     if ($conn->inTransaction()) {
         $conn->rollBack();
     }
-    http_response_code(500);
+    
     echo json_encode([
         "error" => true,
         "data" => $e->getMessage(),

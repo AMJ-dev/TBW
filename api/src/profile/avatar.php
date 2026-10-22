@@ -87,11 +87,6 @@
         ]);
 
     } catch (Throwable $e) {
-
-        error_log("Profile avatar error: " . $e->getMessage());
-
-        http_response_code(500);
-
         echo json_encode([
             "error" => true,
             "data" => "An error occurred while updating your profile photo.",

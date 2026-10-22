@@ -70,7 +70,6 @@
                 ]
             ]);
         } catch (Throwable $e) {
-            http_response_code(500);
 
             echo json_encode([
                 "error" => true,
@@ -91,8 +90,6 @@
         $contact_phone = trim($_POST["contact_phone"] ?? "");
 
         if ($name === "") {
-            http_response_code(400);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Organisation name is required",
@@ -103,7 +100,6 @@
         }
 
         if (!in_array($org_type, ["terminal", "importer", "agent"], true)) {
-            http_response_code(400);
 
             echo json_encode([
                 "error" => true,
@@ -115,8 +111,6 @@
         }
 
         if ($rc_number === "") {
-            http_response_code(400);
-
             echo json_encode([
                 "error" => true,
                 "data" => "RC number is required",
@@ -127,7 +121,6 @@
         }
 
         if ($contact_email !== "" && !filter_var($contact_email, FILTER_VALIDATE_EMAIL)) {
-            http_response_code(400);
 
             echo json_encode([
                 "error" => true,
@@ -153,7 +146,7 @@
             ]);
 
             if ($check->fetch(PDO::FETCH_ASSOC)) {
-                http_response_code(409);
+                
 
                 echo json_encode([
                     "error" => true,
@@ -305,8 +298,6 @@
                 $conn->rollBack();
             }
 
-            http_response_code(500);
-
             echo json_encode([
                 "error" => true,
                 "data" => $e->getMessage(),
@@ -316,8 +307,6 @@
 
         exit;
     }
-
-    http_response_code(405);
 
     echo json_encode([
         "error" => true,

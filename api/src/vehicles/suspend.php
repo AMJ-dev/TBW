@@ -5,7 +5,7 @@
     $reason = trim($_POST["reason"] ?? "");
 
     if ($id === "" || mb_strlen($reason) < 5) {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => "Vehicle ID and a reason of at least 5 characters are required.",
@@ -30,7 +30,7 @@
 
         if (!$vehicle) {
             $conn->rollBack();
-            http_response_code(404);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Vehicle not found.",
@@ -41,7 +41,7 @@
 
         if (!in_array($vehicle["status"], ["Approved", "Pending review", "Inactive"], true)) {
             $conn->rollBack();
-            http_response_code(409);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Vehicle cannot be suspended from its current status.",
@@ -78,7 +78,7 @@
             $conn->rollBack();
         }
 
-        http_response_code(500);
+        
         echo json_encode([
             "error" => true,
             "data" => "Could not suspend vehicle.",

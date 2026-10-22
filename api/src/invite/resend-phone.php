@@ -2,7 +2,6 @@
     require_once dirname(__DIR__, 2) . "/include/set-header.php";
 
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
         echo json_encode([
             "error" => true,
             "data" => "Method not allowed",
@@ -14,7 +13,7 @@
     $token = trim($_POST["token"] ?? "");
 
     if ($token === "") {
-        http_response_code(400);
+        
         echo json_encode([
             "error" => true,
             "data" => "Invitation token is required",
@@ -53,7 +52,7 @@
         if (!$invite) {
             $conn->rollBack();
 
-            http_response_code(404);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid invitation",
@@ -69,7 +68,6 @@
         ) {
             $conn->rollBack();
 
-            http_response_code(410);
             echo json_encode([
                 "error" => true,
                 "data" => "Invitation is no longer valid",
@@ -81,7 +79,7 @@
         if (empty($invite["phone"])) {
             $conn->rollBack();
 
-            http_response_code(400);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "No phone number is available for verification",
@@ -112,7 +110,6 @@
             if ($seconds < 60) {
                 $conn->rollBack();
 
-                http_response_code(429);
                 echo json_encode([
                     "error" => true,
                     "data" => "Please wait before requesting another code",
@@ -126,7 +123,6 @@
             if ((int) $lastOtp["resend_count"] >= 5) {
                 $conn->rollBack();
 
-                http_response_code(429);
                 echo json_encode([
                     "error" => true,
                     "data" => "Too many verification codes requested",
@@ -203,7 +199,7 @@
         if ($sent === false) {
             $conn->rollBack();
 
-            http_response_code(500);
+            
             echo json_encode([
                 "error" => true,
                 "data" => "Unable to send verification code",
@@ -227,7 +223,7 @@
             $conn->rollBack();
         }
 
-        http_response_code(500);
+        
 
         echo json_encode([
             "error" => true,
