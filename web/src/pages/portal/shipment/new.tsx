@@ -17,6 +17,11 @@ import {
 	Trash2,
 	Upload,
 	X,
+	Building2,
+	User,
+	ChevronDown,
+	Loader2,
+	Search,
 } from "lucide-react";
 import { AppShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
@@ -45,6 +50,54 @@ type ConfigOptions = {
 	packagingTypes: OptionRow[];
 	containerSizes: OptionRow[];
 	supportingDocuments: DocumentRequirement[];
+};
+
+type ConsigneeType = "organisation" | "individual";
+type ConsigneeStatus = "linked" | "unregistered";
+
+interface RegisteredOrganisation {
+	id: string;
+	name: string;
+	rcNumber?: string;
+	status: "verified" | "pending" | "under_review" | string;
+}
+
+interface RegisteredAgent {
+	id: string;
+	name: string;
+	licenceNumber: string;
+	contactEmail?: string;
+	contactPhone?: string;
+}
+
+interface ConsigneeValue {
+	type: ConsigneeType;
+	organisationId: string | null;
+	organisationName: string;
+	status: ConsigneeStatus;
+	contactPerson: string;
+	fullName: string;
+	email: string;
+	phone: string;
+	address: string;
+	country: string;
+	agentId: string | null;
+	agentName: string;
+}
+
+const emptyConsignee: ConsigneeValue = {
+	type: "organisation",
+	organisationId: null,
+	organisationName: "",
+	status: "unregistered",
+	contactPerson: "",
+	fullName: "",
+	email: "",
+	phone: "",
+	address: "",
+	country: "",
+	agentId: null,
+	agentName: "",
 };
 
 const emptyOptions: ConfigOptions = {
@@ -144,6 +197,7 @@ interface ExistingShipment {
 	consignee?: string;
 	consignee_email?: string;
 	consignee_phone?: string;
+	consignee_address?: string;
 	cargo_description?: string;
 	cargo_category?: string;
 	package_type?: string;
@@ -155,6 +209,8 @@ interface ExistingShipment {
 	temperature_controlled?: string;
 	temperature?: string;
 	special_instructions?: string;
+	agent?: string;
+	agentId?: string;
 	containers?: Array<{
 		container_no?: string;
 		size?: string;
@@ -217,6 +273,13 @@ const matchRequirementKey = (
 	};
 };
 
+const extractList = <T,>(payload: any): T[] => {
+	if (Array.isArray(payload)) return payload as T[];
+	if (Array.isArray(payload?.results)) return payload.results as T[];
+	if (Array.isArray(payload?.data)) return payload.data as T[];
+	return [];
+};
+
 export default function NewPortalShipmentPage() {
 	const navigate = useNavigate();
 	const params = useParams<{ id?: string }>();
@@ -243,9 +306,6 @@ export default function NewPortalShipmentPage() {
 		originPort: "",
 		destinationPort: "",
 		expectedArrival: "",
-		consignee: "",
-		consigneeEmail: "",
-		consigneePhone: "",
 		cargoDescription: "",
 		cargoCategory: "",
 		packageType: "",
@@ -258,6 +318,8 @@ export default function NewPortalShipmentPage() {
 		temperature: "",
 		specialInstructions: "",
 	});
+
+	const [consignee, setConsignee] = useState<ConsigneeValue>(emptyConsignee);
 
 	const [containers, setContainers] = useState<ContainerItem[]>([
 		emptyContainer(),
@@ -369,9 +431,6 @@ export default function NewPortalShipmentPage() {
 				originPort: String(record.origin_port ?? ""),
 				destinationPort: String(record.destination_port ?? ""),
 				expectedArrival: String(record.expected_arrival ?? "").slice(0, 10),
-				consignee: String(record.consignee ?? ""),
-				consigneeEmail: String(record.consignee_email ?? ""),
-				consigneePhone: String(record.consignee_phone ?? ""),
 				cargoDescription: String(record.cargo_description ?? ""),
 				cargoCategory: String(record.cargo_category ?? ""),
 				packageType: String(record.package_type ?? ""),
@@ -389,6 +448,20 @@ export default function NewPortalShipmentPage() {
 				temperature: String(record.temperature ?? ""),
 				specialInstructions: String(record.special_instructions ?? ""),
 			});
+
+			setConsignee((prev) => ({
+				...prev,
+				organisationId: (record as any).consignee_organisation_id ?? null,
+				organisationName: String(record.consignee ?? ""),
+				status: (record as any).consignee_organisation_id
+					? "linked"
+					: "unregistered",
+				email: String(record.consignee_email ?? ""),
+				phone: String(record.consignee_phone ?? ""),
+				address: String(record.consignee_address ?? ""),
+				agentId: (record as any).agent_id ?? (record as any).agentId ?? null,
+				agentName: String((record as any).agent ?? ""),
+			}));
 
 			if (Array.isArray(record.containers) && record.containers.length) {
 				setContainers(
@@ -411,7 +484,7 @@ export default function NewPortalShipmentPage() {
 			if (Array.isArray(record.documents) && record.documents.length) {
 				const reqs = (loadedOptions ?? options).supportingDocuments;
 				setDocuments(
-					record.documents.map<ShipmentDocument>((doc:any) => {
+					record.documents.map<ShipmentDocument>((doc: any) => {
 						const match = matchRequirementKey(
 							doc.document_type,
 							doc.document_label,
@@ -627,9 +700,23 @@ export default function NewPortalShipmentPage() {
 				return false;
 			}
 
-			if (!form.consignee.trim() || !form.packageCount.trim()) {
+			const consigneeName =
+				consignee.type === "organisation"
+					? consignee.organisationName.trim()
+					: consignee.fullName.trim();
+
+			if (!consigneeName || !form.packageCount.trim()) {
 				toast.error("Enter the consignee and total package count.");
 				return false;
+			}
+
+			if (consignee.type === "organisation" && !consignee.organisationId) {
+				if (!consignee.email.trim() && !consignee.phone.trim()) {
+					toast.error(
+						"This consignee is not yet in TRÏNŪ. Provide at least an email or phone number so we can follow up."
+					);
+					return false;
+				}
 			}
 
 			if (
@@ -728,6 +815,11 @@ export default function NewPortalShipmentPage() {
 	const buildFormData = (status: "draft" | "pending_review") => {
 		const formData = new FormData();
 
+		const consigneeName =
+			consignee.type === "organisation"
+				? consignee.organisationName.trim()
+				: consignee.fullName.trim();
+
 		const fields: Record<string, string> = {
 			shipment_type: form.shipmentType,
 			bill_of_lading: form.billOfLading.trim(),
@@ -740,9 +832,15 @@ export default function NewPortalShipmentPage() {
 			origin_port: form.originPort.trim(),
 			destination_port: form.destinationPort.trim(),
 			expected_arrival: form.expectedArrival,
-			consignee: form.consignee.trim(),
-			consignee_email: form.consigneeEmail.trim(),
-			consignee_phone: form.consigneePhone.trim(),
+			consignee: consigneeName,
+			consignee_type: consignee.type,
+			consignee_organisation_id: consignee.organisationId ?? "",
+			consignee_status: consignee.organisationId ? "linked" : "unregistered",
+			consignee_email: consignee.email.trim(),
+			consignee_phone: consignee.phone.trim(),
+			consignee_address: consignee.address.trim(),
+			agentId: consignee.agentId ?? "",
+			agent: consignee.agentName,
 			cargo_description: form.cargoDescription.trim(),
 			cargo_category: form.cargoCategory,
 			package_type: form.packageType,
@@ -816,7 +914,9 @@ export default function NewPortalShipmentPage() {
 		return formData;
 	};
 
-	const persistShipment = async (status: "draft" | "pending_review"): Promise<string | null> => {
+	const persistShipment = async (
+		status: "draft" | "pending_review"
+	): Promise<string | null> => {
 		const endpoint = shipmentId
 			? `/portal/shipments/update/${shipmentId}/`
 			: "/portal/shipments/save/";
@@ -1234,7 +1334,9 @@ export default function NewPortalShipmentPage() {
 										Port of loading
 										<Input
 											value={form.originPort}
-											onChange={(event) => updateField("originPort", event.target.value)}
+											onChange={(event) =>
+												updateField("originPort", event.target.value)
+											}
 											placeholder="Origin port"
 											className="mt-1.5 h-11 border-line bg-sand text-ink"
 										/>
@@ -1244,7 +1346,12 @@ export default function NewPortalShipmentPage() {
 										Destination port
 										<Input
 											value={form.destinationPort}
-											onChange={(event) => updateField("destinationPort", event.target.value)}
+											onChange={(event) =>
+												updateField(
+													"destinationPort",
+													event.target.value
+												)
+											}
 											placeholder="Destination port"
 											className="mt-1.5 h-11 border-line bg-sand text-ink"
 										/>
@@ -1255,7 +1362,12 @@ export default function NewPortalShipmentPage() {
 										<Input
 											type="date"
 											value={form.expectedArrival}
-											onChange={(event) => updateField("expectedArrival", event.target.value)}
+											onChange={(event) =>
+												updateField(
+													"expectedArrival",
+													event.target.value
+												)
+											}
 											className="mt-1.5 h-11 border-line bg-sand font-mono text-ink"
 										/>
 									</label>
@@ -1402,55 +1514,6 @@ export default function NewPortalShipmentPage() {
 												className="mt-1.5 h-11 border-line bg-sand font-mono text-ink"
 											/>
 										</label>
-
-										<label className={labelClass}>
-											Consignee name
-											<span className="text-coral"> *</span>
-											<Input
-												required
-												value={form.consignee}
-												onChange={(event) =>
-													updateField(
-														"consignee",
-														event.target.value
-													)
-												}
-												placeholder="Company or recipient name"
-												className="mt-1.5 h-11 border-line bg-sand text-ink"
-											/>
-										</label>
-
-										<label className={labelClass}>
-											Consignee email
-											<Input
-												type="email"
-												value={form.consigneeEmail}
-												onChange={(event) =>
-													updateField(
-														"consigneeEmail",
-														event.target.value
-													)
-												}
-												placeholder="recipient@example.com"
-												className="mt-1.5 h-11 border-line bg-sand font-mono text-ink"
-											/>
-										</label>
-
-										<label className={labelClass}>
-											Consignee phone
-											<Input
-												type="tel"
-												value={form.consigneePhone}
-												onChange={(event) =>
-													updateField(
-														"consigneePhone",
-														event.target.value
-													)
-												}
-												placeholder="Contact number"
-												className="mt-1.5 h-11 border-line bg-sand font-mono text-ink"
-											/>
-										</label>
 									</div>
 
 									<div className="grid gap-4 border-t border-line p-5 sm:grid-cols-2 sm:p-6">
@@ -1529,6 +1592,15 @@ export default function NewPortalShipmentPage() {
 											/>
 										</label>
 									</div>
+								</div>
+
+								<div className="rounded-2xl bg-paper ring-1 ring-line">
+									<ConsigneeDetails
+										value={consignee}
+										onChange={setConsignee}
+										disabled={submitting}
+										source="manifest"
+									/>
 								</div>
 
 								<div className="rounded-2xl bg-paper ring-1 ring-line">
@@ -1997,7 +2069,14 @@ export default function NewPortalShipmentPage() {
 											},
 											{
 												label: "Consignee",
-												value: form.consignee || "Not provided",
+												value:
+													consignee.type === "organisation"
+														? consignee.organisationName || "Not provided"
+														: consignee.fullName || "Not provided",
+											},
+											{
+												label: "Agent",
+												value: consignee.agentName || "Not provided",
 											},
 											{
 												label: "Total packages",
@@ -2214,5 +2293,695 @@ function CheckboxCard({
 				</span>
 			</span>
 		</label>
+	);
+}
+
+function ConsigneeDetails({
+	value,
+	onChange,
+	disabled = false,
+	source = "manual",
+}: {
+	value: ConsigneeValue;
+	onChange: (next: ConsigneeValue) => void;
+	disabled?: boolean;
+	source?: "manifest" | "manual";
+}) {
+	const update = (patch: Partial<ConsigneeValue>) =>
+		onChange({ ...value, ...patch });
+
+	const isOrganisation = value.type === "organisation";
+	const isUnregistered =
+		isOrganisation && !value.organisationId && !!value.organisationName;
+
+	return (
+		<div className="space-y-5 p-5 sm:p-6">
+			<div>
+				<h3 className="font-display text-sm font-bold text-ink">
+					Consignee details
+				</h3>
+				<p className="mt-1 text-xs leading-5 text-ink-soft">
+					Who is receiving the cargo. Used by Operations to verify the recipient
+					and resolve discrepancies.
+				</p>
+			</div>
+
+			<div>
+				<p className={labelClass}>Consignee type</p>
+				<div className="mt-2 flex flex-wrap gap-2">
+					{(
+						[
+							{ key: "organisation", label: "Organisation", icon: Building2 },
+							{ key: "individual", label: "Individual", icon: User },
+						] as const
+					).map((option) => {
+						const Icon = option.icon;
+						const active = value.type === option.key;
+						return (
+							<label
+								key={option.key}
+								className={cn(
+									"flex cursor-pointer items-center gap-2 rounded-full border px-3.5 py-2 text-[12px] font-medium transition-colors",
+									active
+										? "border-orange bg-orange/5 text-orange-deep ring-1 ring-orange/25"
+										: "border-line bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink",
+									disabled && "cursor-not-allowed opacity-60"
+								)}
+							>
+								<input
+									type="radio"
+									name="consignee-type"
+									value={option.key}
+									checked={active}
+									disabled={disabled}
+									onChange={() =>
+										update({
+											type: option.key,
+											organisationId:
+												option.key === "organisation"
+													? value.organisationId
+													: null,
+											organisationName:
+												option.key === "organisation"
+													? value.organisationName
+													: "",
+										})
+									}
+									className="sr-only"
+								/>
+								<Icon className="size-3.5" />
+								{option.label}
+							</label>
+						);
+					})}
+				</div>
+			</div>
+
+			{isOrganisation ? (
+				<div>
+					<p className={labelClass}>
+						Organisation / company name
+						<span className="text-coral"> *</span>
+					</p>
+					<OrgSearchPicker
+						value={{
+							id: value.organisationId,
+							name: value.organisationName,
+						}}
+						onChange={(next) =>
+							update({
+								organisationId: next.id,
+								organisationName: next.name,
+								status: next.id ? "linked" : "unregistered",
+							})
+						}
+						disabled={disabled}
+					/>
+					<p className="mt-2 text-[11px] leading-5 text-ink-soft">
+						Start typing to search registered organisations. If the consignee
+						isn't in TRÏNŪ yet, you can continue — we'll record them by the
+						name on the manifest and follow up with an onboarding invite.
+					</p>
+				</div>
+			) : (
+				<label className="block">
+					<span className={labelClass}>
+						Full name
+						<span className="text-coral"> *</span>
+					</span>
+					<Input
+						required
+						disabled={disabled}
+						value={value.fullName}
+						onChange={(e) => update({ fullName: e.target.value })}
+						placeholder="Enter full name"
+						className={cn(
+							inputClass,
+							disabled && "cursor-not-allowed opacity-60"
+						)}
+					/>
+				</label>
+			)}
+
+			{isUnregistered && (
+				<div className="rounded-xl border border-orange/25 bg-orange/5 p-3.5">
+					<div className="flex items-start gap-3">
+						<Info className="mt-0.5 size-4 shrink-0 text-orange-deep" />
+						<div className="min-w-0">
+							<p className="text-[12px] font-semibold text-ink">
+								This consignee is not yet in TRÏNŪ
+							</p>
+							<p className="mt-1 text-[11px] leading-5 text-ink-soft">
+								We'll record them by the name you entered. Provide at least
+								one contact method below so Operations can follow up and
+								send an onboarding invite.
+							</p>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{isOrganisation && (
+				<label className="block">
+					<span className={labelClass}>Contact person</span>
+					<Input
+						disabled={disabled}
+						value={value.contactPerson}
+						onChange={(e) => update({ contactPerson: e.target.value })}
+						placeholder="Name of contact person"
+						className={cn(
+							inputClass,
+							disabled && "cursor-not-allowed opacity-60"
+						)}
+					/>
+				</label>
+			)}
+
+			<div className="grid gap-5 sm:grid-cols-2">
+				<label className="block">
+					<span className={labelClass}>
+						Email address
+						{isUnregistered && <span className="text-coral"> ·</span>}
+					</span>
+					<Input
+						type="email"
+						disabled={disabled}
+						value={value.email}
+						onChange={(e) => update({ email: e.target.value })}
+						placeholder="contact@company.com"
+						className={cn(
+							inputClass,
+							disabled && "cursor-not-allowed opacity-60"
+						)}
+					/>
+				</label>
+
+				<label className="block">
+					<span className={labelClass}>
+						Phone number
+						{isUnregistered && <span className="text-coral"> ·</span>}
+					</span>
+					<Input
+						type="tel"
+						disabled={disabled}
+						value={value.phone}
+						onChange={(e) => update({ phone: e.target.value })}
+						placeholder="+234 …"
+						className={cn(
+							inputClass,
+							disabled && "cursor-not-allowed opacity-60"
+						)}
+					/>
+				</label>
+			</div>
+
+			<label className="block">
+				<span className={labelClass}>Address</span>
+				<textarea
+					rows={3}
+					disabled={disabled}
+					value={value.address}
+					onChange={(e) => update({ address: e.target.value })}
+					placeholder="Street address, city and state"
+					className={cn(
+						textareaClass,
+						disabled && "cursor-not-allowed opacity-60"
+					)}
+				/>
+			</label>
+
+			<label className="block">
+				<span className={labelClass}>Country</span>
+				<Input
+					disabled={disabled}
+					value={value.country}
+					onChange={(e) => update({ country: e.target.value })}
+					placeholder="e.g. Nigeria"
+					className={cn(
+						inputClass,
+						disabled && "cursor-not-allowed opacity-60"
+					)}
+				/>
+			</label>
+
+			<div>
+				<p className={labelClass}>Licensed agent</p>
+				<AgentSearchPicker
+					value={{
+						id: value.agentId,
+						name: value.agentName,
+					}}
+					onChange={(next) =>
+						update({ agentId: next.id, agentName: next.name })
+					}
+					disabled={disabled}
+				/>
+				<p className="mt-2 text-[11px] leading-5 text-ink-soft">
+					{value.agentId
+						? "Linked to a verified TRÏNŪ agent record."
+						: "Start typing to search licensed clearing agents."}
+				</p>
+			</div>
+
+			{source === "manifest" && (
+				<div className="flex items-start gap-3 rounded-xl border border-orange/25 bg-orange/5 p-3.5">
+					<Info className="mt-0.5 size-4 shrink-0 text-orange-deep" />
+					<div className="min-w-0">
+						<p className="text-[12px] font-semibold text-ink">
+							Imported from the manifest
+						</p>
+						<p className="mt-1 text-[11px] leading-5 text-ink-soft">
+							Consignee details from the carrier are treated as unverified
+							until an operator confirms them. Existing verified contact
+							details on a linked organisation will not be overwritten by
+							this record.
+						</p>
+					</div>
+				</div>
+			)}
+		</div>
+	);
+}
+
+function useDebounced<T>(value: T, delay = 300): T {
+	const [debounced, setDebounced] = useState(value);
+	useEffect(() => {
+		const t = setTimeout(() => setDebounced(value), delay);
+		return () => clearTimeout(t);
+	}, [value, delay]);
+	return debounced;
+}
+
+function OrgSearchPicker({
+	value,
+	onChange,
+	disabled = false,
+}: {
+	value: { id: string | null; name: string };
+	onChange: (next: { id: string | null; name: string }) => void;
+	disabled?: boolean;
+}) {
+	const [open, setOpen] = useState(false);
+	const [query, setQuery] = useState("");
+	const [results, setResults] = useState<RegisteredOrganisation[]>([]);
+	const [searching, setSearching] = useState(false);
+
+	const debouncedQuery = useDebounced(query, 300);
+
+	useEffect(() => {
+		if (!open) return;
+		const q = debouncedQuery.trim();
+		if (q.length < 2) {
+			setResults([]);
+			setSearching(false);
+			return;
+		}
+		let cancelled = false;
+		(async () => {
+			setSearching(true);
+			try {
+				const res = await http.post(`operations/manifests/organisations/`, { q });
+				const resp: Resp = res.data;
+				if (cancelled) return;
+				if (resp.error) {
+					setResults([]);
+					return;
+				}
+				const list = extractList<any>(resp.code);
+				setResults(
+					list.map((o) => ({
+						id: o.id,
+						name: o.name ?? o.organisation_name ?? "—",
+						rcNumber: o.rc_number ?? o.rcNumber,
+						status: o.status ?? o.verification_status ?? "pending",
+					}))
+				);
+			} catch {
+				if (!cancelled) setResults([]);
+			} finally {
+				if (!cancelled) setSearching(false);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [debouncedQuery, open]);
+
+	const choose = (org: RegisteredOrganisation) => {
+		onChange({ id: org.id, name: org.name });
+		setOpen(false);
+		setQuery("");
+	};
+
+	const clear = () => {
+		onChange({ id: null, name: "" });
+		setQuery("");
+	};
+
+	const typedName = query.trim();
+	const canUseAsUnregistered = typedName.length >= 2 && !searching;
+
+	const useAsUnregistered = () => {
+		onChange({ id: null, name: typedName });
+		setOpen(false);
+		setQuery("");
+	};
+
+	return (
+		<div className="relative mt-1.5">
+			<div
+				className={cn(
+					"flex h-11 w-full items-center gap-2 rounded-md border border-line bg-sand px-3 text-sm text-ink transition focus-within:ring-2 focus-within:ring-orange/30",
+					disabled && "cursor-not-allowed opacity-60"
+				)}
+			>
+				<Building2 className="size-3.5 shrink-0 text-ink-soft" />
+				<input
+					type="text"
+					disabled={disabled}
+					value={open ? query : value.name}
+					placeholder={
+						value.name ? value.name : "Search registered organisations…"
+					}
+					onFocus={() => {
+						if (disabled) return;
+						setOpen(true);
+						setQuery("");
+					}}
+					onChange={(e) => setQuery(e.target.value)}
+					className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-soft/70"
+				/>
+				{value.id && (
+					<span className="rounded-full bg-orange/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-orange-deep ring-1 ring-orange/25">
+						Linked
+					</span>
+				)}
+				{value.name && !value.id && (
+					<span className="rounded-full bg-amber/15 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-orange-deep ring-1 ring-orange/25">
+						Not yet in TRÏNŪ
+					</span>
+				)}
+				{value.name && !disabled && (
+					<button
+						type="button"
+						onClick={clear}
+						className="grid size-5 shrink-0 place-items-center rounded text-ink-soft hover:bg-sand-2 hover:text-ink"
+						aria-label="Clear organisation"
+					>
+						<X className="size-3" />
+					</button>
+				)}
+				{searching ? (
+					<Loader2 className="size-3.5 shrink-0 animate-spin text-ink-soft" />
+				) : (
+					<ChevronDown
+						className={cn(
+							"size-4 shrink-0 text-ink-soft transition-transform",
+							open && "rotate-180"
+						)}
+					/>
+				)}
+			</div>
+
+			{open && (
+				<div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line">
+					<div className="max-h-72 overflow-y-auto p-1">
+						{query.trim().length < 2 ? (
+							<div className="px-3 py-6 text-center text-[12px] text-ink-soft">
+								Type at least 2 characters to search registered
+								organisations.
+							</div>
+						) : searching ? (
+							<div className="flex items-center justify-center gap-2 px-3 py-6 text-[12px] text-ink-soft">
+								<Loader2 className="size-3.5 animate-spin" />
+								Searching…
+							</div>
+						) : (
+							<>
+								{results.map((org) => {
+									const active = org.id === value.id;
+									return (
+										<button
+											key={org.id}
+											type="button"
+											onClick={() => choose(org)}
+											className={cn(
+												"flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+												active
+													? "bg-orange/10 ring-1 ring-orange/25"
+													: "hover:bg-sand"
+											)}
+										>
+											<span
+												className={cn(
+													"mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg",
+													active
+														? "bg-orange text-white"
+														: "bg-sand text-ink-soft ring-1 ring-line"
+												)}
+											>
+												{active ? (
+													<Check className="size-4" />
+												) : (
+													<Building2 className="size-4" />
+												)}
+											</span>
+											<span className="min-w-0 flex-1">
+												<span className="block truncate text-[13px] font-semibold text-ink">
+													{org.name}
+												</span>
+												{org.rcNumber && (
+													<span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+														{org.rcNumber}
+													</span>
+												)}
+											</span>
+											{org.status === "verified" && (
+												<span className="rounded-full bg-teal/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-teal-deep ring-1 ring-teal/25">
+													Verified
+												</span>
+											)}
+										</button>
+									);
+								})}
+
+								{results.length === 0 && (
+									<div className="px-3 py-4 text-center text-[12px] text-ink-soft">
+										No registered organisation matches.
+									</div>
+								)}
+
+								{canUseAsUnregistered && (
+									<button
+										type="button"
+										onClick={useAsUnregistered}
+										className="cursor-pointer mt-1 flex w-full items-start gap-3 rounded-lg bg-orange/5 px-3 py-3 text-left transition-colors ring-1 ring-orange/20 hover:bg-orange/10"
+									>
+										<span className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-orange text-white">
+											<Plus className="size-4" />
+										</span>
+										<span className="min-w-0 flex-1">
+											<span className="block text-[13px] font-semibold text-ink">
+												Use "{typedName}" as an unregistered consignee
+											</span>
+											<span className="mt-1 block text-[11px] leading-5 text-ink-soft">
+												We'll record them by the name on the manifest. You
+												can send an onboarding invite after the manifest
+												is added.
+											</span>
+										</span>
+									</button>
+								)}
+							</>
+						)}
+					</div>
+				</div>
+			)}
+		</div>
+	);
+}
+
+function AgentSearchPicker({
+	value,
+	onChange,
+	disabled = false,
+}: {
+	value: { id: string | null; name: string };
+	onChange: (next: { id: string | null; name: string }) => void;
+	disabled?: boolean;
+}) {
+	const [open, setOpen] = useState(false);
+	const [query, setQuery] = useState("");
+	const [results, setResults] = useState<RegisteredAgent[]>([]);
+	const [searching, setSearching] = useState(false);
+
+	const debouncedQuery = useDebounced(query, 300);
+
+	useEffect(() => {
+		if (!open) return;
+		const q = debouncedQuery.trim();
+		if (q.length < 2) {
+			setResults([]);
+			setSearching(false);
+			return;
+		}
+		let cancelled = false;
+		(async () => {
+			setSearching(true);
+			try {
+				const res = await http.post(`operations/manifests/agents/`, { q });
+				const resp: Resp = res.data;
+				if (cancelled) return;
+				if (resp.error) {
+					setResults([]);
+					return;
+				}
+				const list = extractList<any>(resp.code);
+				setResults(
+					list.map((a) => ({
+						id: a.id,
+						name: a.name ?? "—",
+						licenceNumber: a.licence_number ?? a.licenceNumber ?? "—",
+						contactEmail: a.contact_email ?? a.contactEmail,
+						contactPhone: a.contact_phone ?? a.contactPhone,
+					}))
+				);
+			} catch {
+				if (!cancelled) setResults([]);
+			} finally {
+				if (!cancelled) setSearching(false);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [debouncedQuery, open]);
+
+	const choose = (agent: RegisteredAgent) => {
+		onChange({ id: agent.id, name: agent.name });
+		setOpen(false);
+		setQuery("");
+	};
+
+	const clear = () => {
+		onChange({ id: null, name: "" });
+		setQuery("");
+	};
+
+	return (
+		<div className="relative mt-1.5">
+			<div
+				className={cn(
+					"flex h-11 w-full items-center gap-2 rounded-md border border-line bg-sand px-3 text-sm text-ink transition focus-within:ring-2 focus-within:ring-orange/30",
+					disabled && "cursor-not-allowed opacity-60"
+				)}
+			>
+				<User className="size-3.5 shrink-0 text-ink-soft" />
+				<input
+					type="text"
+					disabled={disabled}
+					value={open ? query : value.name}
+					placeholder={value.name ? value.name : "Search licensed agents…"}
+					onFocus={() => {
+						if (disabled) return;
+						setOpen(true);
+						setQuery("");
+					}}
+					onChange={(e) => setQuery(e.target.value)}
+					className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-soft/70"
+				/>
+				{value.id && (
+					<span className="rounded-full bg-orange/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-orange-deep ring-1 ring-orange/25">
+						Linked
+					</span>
+				)}
+				{value.name && !disabled && (
+					<button
+						type="button"
+						onClick={clear}
+						className="grid size-5 shrink-0 place-items-center rounded text-ink-soft hover:bg-sand-2 hover:text-ink"
+						aria-label="Clear agent"
+					>
+						<X className="size-3" />
+					</button>
+				)}
+				{searching ? (
+					<Loader2 className="size-3.5 shrink-0 animate-spin text-ink-soft" />
+				) : (
+					<ChevronDown
+						className={cn(
+							"size-4 shrink-0 text-ink-soft transition-transform",
+							open && "rotate-180"
+						)}
+					/>
+				)}
+			</div>
+
+			{open && (
+				<div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line">
+					<div className="max-h-64 overflow-y-auto p-1">
+						{query.trim().length < 2 ? (
+							<div className="px-3 py-6 text-center text-[12px] text-ink-soft">
+								Type at least 2 characters to search licensed agents.
+							</div>
+						) : searching ? (
+							<div className="flex items-center justify-center gap-2 px-3 py-6 text-[12px] text-ink-soft">
+								<Loader2 className="size-3.5 animate-spin" />
+								Searching…
+							</div>
+						) : results.length === 0 ? (
+							<div className="px-3 py-6 text-center text-[12px] text-ink-soft">
+								No licensed agent matches that search.
+							</div>
+						) : (
+							results.map((agent) => {
+								const active = agent.id === value.id;
+								return (
+									<button
+										key={agent.id}
+										type="button"
+										onClick={() => choose(agent)}
+										className={cn(
+											"flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+											active
+												? "bg-orange/10 ring-1 ring-orange/25"
+												: "hover:bg-sand"
+										)}
+									>
+										<span
+											className={cn(
+												"mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg",
+												active
+													? "bg-orange text-white"
+													: "bg-sand text-ink-soft ring-1 ring-line"
+											)}
+										>
+											{active ? (
+												<Check className="size-4" />
+											) : (
+												<User className="size-4" />
+											)}
+										</span>
+										<span className="min-w-0 flex-1">
+											<span className="block truncate text-[13px] font-semibold text-ink">
+												{agent.name}
+											</span>
+											<span className="mt-0.5 block truncate font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+												{agent.licenceNumber}
+											</span>
+											{(agent.contactEmail || agent.contactPhone) && (
+												<span className="mt-1 block truncate text-[11px] text-ink-soft">
+													{agent.contactEmail} · {agent.contactPhone}
+												</span>
+											)}
+										</span>
+									</button>
+								);
+							})
+						)}
+					</div>
+				</div>
+			)}
+		</div>
 	);
 }

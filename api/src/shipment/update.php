@@ -41,7 +41,7 @@ try {
         FROM portal_shipments
         WHERE id = :id AND organisation_id = :organisation_id
         LIMIT 1
-    ");
+    "); 
     $ownership->execute([
         ":id" => $shipmentId,
         ":organisation_id" => $my_details->organisation_id
@@ -66,7 +66,12 @@ try {
         exit;
     }
 
-    if (($_POST["declaration_accepted"] ?? "0") !== "1") {
+    $requestedStatus = trim($_POST["status"] ?? "pending_review");
+    $status = in_array($requestedStatus, ["draft", "pending_review"], true)
+        ? $requestedStatus
+        : "pending_review";
+
+    if ($status === "pending_review" && ($_POST["declaration_accepted"] ?? "0") !== "1") {
         throw new InvalidArgumentException("Please accept the shipment declaration before submitting.");
     }
 
@@ -259,7 +264,8 @@ try {
         }
     }
 
-    foreach ($requiredDocuments as $requiredDocument) {
+    if ($status === "pending_review") {
+        foreach ($requiredDocuments as $requiredDocument) {
         $key = $requiredDocument["document_key"];
         $alreadyUploaded = false;
 
@@ -282,6 +288,7 @@ try {
                 "Missing required document: " . $requiredDocument["label"] . "."
             );
         }
+        }
     }
 
     $conn->beginTransaction();
@@ -302,6 +309,14 @@ try {
             consignee = :consignee,
             consignee_email = :consignee_email,
             consignee_phone = :consignee_phone,
+            consignee_type = :consignee_type,
+            consignee_organisation_id = :consignee_organisation_id,
+            consignee_status = :consignee_status,
+            consignee_contact_person = :consignee_contact_person,
+            consignee_address = :consignee_address,
+            consignee_country = :consignee_country,
+            licensed_agent_id = :licensed_agent_id,
+            licensed_agent_name = :licensed_agent_name,
             cargo_description = :cargo_description,
             cargo_category = :cargo_category,
             package_type = :package_type,
@@ -332,6 +347,26 @@ try {
     $q->bindValue(":consignee", trim($_POST["consignee"] ?? "") ?: null);
     $q->bindValue(":consignee_email", $consigneeEmail ?: null);
     $q->bindValue(":consignee_phone", trim($_POST["consignee_phone"] ?? "") ?: null);
+
+    $consigneeType = trim($_POST["consignee_type"] ?? "organisation");
+    if (!in_array($consigneeType, ["organisation", "individual"], true)) {
+        throw new InvalidArgumentException("Invalid consignee type.");
+    }
+
+    $consigneeOrganisationId = trim($_POST["consignee_organisation_id"] ?? "") ?: null;
+    $consigneeStatus = $consigneeOrganisationId ? "linked" : "unregistered";
+    $licensedAgentId = trim($_POST["agentId"] ?? $_POST["licensed_agent_id"] ?? "") ?: null;
+    $licensedAgentName = trim($_POST["agent"] ?? $_POST["licensed_agent_name"] ?? "") ?: null;
+
+    $q->bindValue(":consignee_type", $consigneeType);
+    $q->bindValue(":consignee_organisation_id", $consigneeOrganisationId);
+    $q->bindValue(":consignee_status", $consigneeStatus);
+    $q->bindValue(":consignee_contact_person", trim($_POST["consignee_contact_person"] ?? "") ?: null);
+    $q->bindValue(":consignee_address", trim($_POST["consignee_address"] ?? "") ?: null);
+    $q->bindValue(":consignee_country", trim($_POST["consignee_country"] ?? "") ?: null);
+    $q->bindValue(":licensed_agent_id", $licensedAgentId);
+    $q->bindValue(":licensed_agent_name", $licensedAgentName);
+
     $q->bindValue(":cargo_description", trim($_POST["cargo_description"] ?? "") ?: null);
     $q->bindValue(":cargo_category", $cargoCategory);
     $q->bindValue(":package_type", $packageType);
@@ -344,10 +379,6 @@ try {
     $q->bindValue(":temperature", trim($_POST["temperature"] ?? "") ?: null);
     $q->bindValue(":special_instructions", trim($_POST["special_instructions"] ?? "") ?: null);
     $q->bindValue(":customs_reference", trim($_POST["customs_reference"] ?? "") ?: null);
-    $requestedStatus = trim($_POST["status"] ?? "pending_review");
-    $status = in_array($requestedStatus, ["draft", "pending_review"], true)
-        ? $requestedStatus
-        : "pending_review";
     $q->bindValue(":status", $status);
     $q->bindValue(":id", $shipmentId);
     $q->bindValue(":organisation_id", $my_details->organisation_id);

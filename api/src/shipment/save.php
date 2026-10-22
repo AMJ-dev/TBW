@@ -26,14 +26,14 @@ try {
         exit;
     }
 
-    if (($_POST["declaration_accepted"] ?? "0") !== "1") {
-        throw new InvalidArgumentException("Please accept the shipment declaration before submitting.");
-    }
-
     $requestedStatus = trim($_POST["status"] ?? "pending_review");
     $status = in_array($requestedStatus, ["draft", "pending_review"], true)
         ? $requestedStatus
         : "pending_review";
+
+    if ($status === "pending_review" && ($_POST["declaration_accepted"] ?? "0") !== "1") {
+        throw new InvalidArgumentException("Please accept the shipment declaration before submitting.");
+    }
 
     $shipmentType = trim($_POST["shipment_type"] ?? "");
     $cargoCategory = trim($_POST["cargo_category"] ?? "");
@@ -53,9 +53,33 @@ try {
     }
 
     $consigneeEmail = trim($_POST["consignee_email"] ?? "");
+    $consigneeType = trim($_POST["consignee_type"] ?? "organisation");
+    $consigneeOrganisationId = trim($_POST["consignee_organisation_id"] ?? "");
+    $consigneeStatus = trim($_POST["consignee_status"] ?? ($consigneeOrganisationId !== "" ? "linked" : "unregistered"));
+    $consigneeContactPerson = trim($_POST["consignee_contact_person"] ?? $_POST["consigneeContactPerson"] ?? "");
+    $consigneeAddress = trim($_POST["consignee_address"] ?? "");
+    $consigneeCountry = trim($_POST["consignee_country"] ?? "");
+    $licensedAgentId = trim($_POST["agentId"] ?? $_POST["licensed_agent_id"] ?? "");
+    $licensedAgentName = trim($_POST["agent"] ?? $_POST["licensed_agent"] ?? "");
+
+    if (!in_array($consigneeType, ["organisation", "individual"], true)) {
+        throw new InvalidArgumentException("Invalid consignee type.");
+    }
 
     if ($consigneeEmail !== "" && !filter_var($consigneeEmail, FILTER_VALIDATE_EMAIL)) {
         throw new InvalidArgumentException("Invalid consignee email.");
+    }
+
+    if ($status === "pending_review" && trim($_POST["consignee"] ?? "") === "") {
+        throw new InvalidArgumentException("Consignee name is required.");
+    }
+
+    if ($consigneeType === "organisation" && $consigneeOrganisationId === "") {
+        if ($consigneeEmail === "" && trim($_POST["consignee_phone"] ?? "") === "") {
+            if ($status === "pending_review") {
+                throw new InvalidArgumentException("For an unregistered consignee, provide an email address or phone number.");
+            }
+        }
     }
 
     $expectedArrival = trim($_POST["expected_arrival"] ?? "");
@@ -224,13 +248,15 @@ try {
         }
     }
 
-    foreach ($requiredDocuments as $requiredDocument) {
-        $key = $requiredDocument["document_key"];
+    if ($status === "pending_review") {
+        foreach ($requiredDocuments as $requiredDocument) {
+            $key = $requiredDocument["document_key"];
 
-        if (empty($documentCounts[$key])) {
-            throw new InvalidArgumentException(
-                "Missing required document: " . $requiredDocument["label"] . "."
-            );
+            if (empty($documentCounts[$key])) {
+                throw new InvalidArgumentException(
+                    "Missing required document: " . $requiredDocument["label"] . "."
+                );
+            }
         }
     }
 
@@ -345,7 +371,9 @@ try {
             id, shipment_reference, user_id, organisation_id, shipment_type, bill_of_lading, booking_number,
             vessel_name, voyage_number, shipping_line, origin_country,
             origin_port, destination_port, expected_arrival, consignee,
-            consignee_email, consignee_phone, cargo_description,
+            consignee_email, consignee_phone, consignee_type, consignee_organisation_id,
+            consignee_status, consignee_contact_person, consignee_address, consignee_country,
+            licensed_agent_id, licensed_agent_name, cargo_description,
             cargo_category, package_type, package_count, gross_weight,
             volume, hs_code, dangerous_goods, temperature_controlled,
             temperature, special_instructions, customs_reference, status
@@ -353,7 +381,9 @@ try {
             :id, :shipment_reference, :user_id, :organisation_id, :shipment_type, :bill_of_lading, :booking_number,
             :vessel_name, :voyage_number, :shipping_line, :origin_country,
             :origin_port, :destination_port, :expected_arrival, :consignee,
-            :consignee_email, :consignee_phone, :cargo_description,
+            :consignee_email, :consignee_phone, :consignee_type, :consignee_organisation_id,
+            :consignee_status, :consignee_contact_person, :consignee_address, :consignee_country,
+            :licensed_agent_id, :licensed_agent_name, :cargo_description,
             :cargo_category, :package_type, :package_count, :gross_weight,
             :volume, :hs_code, :dangerous_goods, :temperature_controlled,
             :temperature, :special_instructions, :customs_reference, :status
@@ -377,6 +407,14 @@ try {
     $q->bindValue(":consignee", trim($_POST["consignee"] ?? "") ?: null);
     $q->bindValue(":consignee_email", $consigneeEmail ?: null);
     $q->bindValue(":consignee_phone", trim($_POST["consignee_phone"] ?? "") ?: null);
+    $q->bindValue(":consignee_type", $consigneeType);
+    $q->bindValue(":consignee_organisation_id", $consigneeOrganisationId ?: null);
+    $q->bindValue(":consignee_status", $consigneeStatus);
+    $q->bindValue(":consignee_contact_person", $consigneeContactPerson ?: null);
+    $q->bindValue(":consignee_address", $consigneeAddress ?: null);
+    $q->bindValue(":consignee_country", $consigneeCountry ?: null);
+    $q->bindValue(":licensed_agent_id", $licensedAgentId ?: null);
+    $q->bindValue(":licensed_agent_name", $licensedAgentName ?: null);
     $q->bindValue(":cargo_description", trim($_POST["cargo_description"] ?? "") ?: null);
     $q->bindValue(":cargo_category", $cargoCategory);
     $q->bindValue(":package_type", $packageType);

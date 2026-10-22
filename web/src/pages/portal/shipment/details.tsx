@@ -40,6 +40,12 @@ type ShipmentContainer = {
 	seal_no?: string | null;
 	package_count?: string | number | null;
 	gross_weight?: string | number | null;
+	status?: string | null;
+	gate_in_at?: string | null;
+	received_at?: string | null;
+	stored_at?: string | null;
+	gate_out_at?: string | null;
+	updated_at?: string | null;
 	created_at?: string;
 };
 
@@ -88,6 +94,17 @@ type ManifestReview = {
 	requires_action?: boolean;
 	manifest_requires_action?: boolean;
 	notes?: string | null;
+	containers?: number | null;
+	packages?: number | null;
+	gross_weight?: string | number | null;
+	consignee?: string | null;
+	consignee_type?: string | null;
+	agent?: string | null;
+	source?: string | null;
+	eta?: string | null;
+	origin_port?: string | null;
+	shipping_line?: string | null;
+	vessel?: string | null;
 };
 
 type ShipmentRecord = {
@@ -108,6 +125,16 @@ type ShipmentRecord = {
 	consignee?: string;
 	consignee_email?: string | null;
 	consignee_phone?: string | null;
+	consignee_type?: string | null;
+	consignee_organisation_id?: string | null;
+	consignee_status?: string | null;
+	consignee_contact_person?: string | null;
+	consignee_address?: string | null;
+	consignee_country?: string | null;
+	licensed_agent_id?: string | null;
+	licensed_agent_name?: string | null;
+	agentId?: string | null;
+	agent?: string | null;
 	cargo_description?: string | null;
 	cargo_category?: string | null;
 	package_type?: string | null;
@@ -137,15 +164,7 @@ const statusLabel = (status?: string | null): string => {
 	if (!status) return "Unknown";
 	return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 };
-const toDatetimeLocal = (value?: string | null): string => {
-	if (!value) return "";
-	const date = new Date(String(value).replace(" ", "T"));
-	if (Number.isNaN(date.getTime())) return "";
-	const pad = (n: number) => String(n).padStart(2, "0");
-	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-		date.getDate()
-	)}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-};
+
 const formatDate = (value?: string | null): string => {
 	if (!value) return "—";
 	const date = new Date(String(value).replace(" ", "T"));
@@ -233,7 +252,7 @@ export default function PortalShipmentDetailsPage() {
 		setError("");
 		try {
 			const res = await http.get(`/portal/shipment/${id}/`);
-			const resp: Resp = res.data;
+			const resp: Resp = (res?.data ?? res) as Resp;
 
 			if (resp.error) {
 				setError(
@@ -244,9 +263,9 @@ export default function PortalShipmentDetailsPage() {
 				return;
 			}
 
-			const payload: any = resp.code ?? {};
+			const payload: any = resp.code ?? resp.data ?? {};
 			const record: ShipmentRecord | undefined =
-				payload.shipment ?? payload.data ?? payload;
+				payload.shipment ?? payload.data?.shipment ?? payload.data ?? payload;
 
 			if (!record || typeof record !== "object" || !record.id) {
 				setError("Shipment record is empty.");
@@ -255,15 +274,9 @@ export default function PortalShipmentDetailsPage() {
 
 			setShipment({
 				...record,
-				containers: Array.isArray(record.containers)
-					? record.containers
-					: [],
-				documents: Array.isArray(record.documents)
-					? record.documents
-					: [],
-				reviews: Array.isArray(record.reviews)
-					? record.reviews
-					: [],
+				containers: Array.isArray(record.containers) ? record.containers : [],
+				documents: Array.isArray(record.documents) ? record.documents : [],
+				reviews: Array.isArray(record.reviews) ? record.reviews : [],
 			});
 		} catch (err: any) {
 			setError(
@@ -288,10 +301,7 @@ export default function PortalShipmentDetailsPage() {
 					<div className="h-32 animate-pulse rounded-2xl bg-sand" />
 					<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 						{[0, 1, 2, 3].map((i) => (
-							<div
-								key={i}
-								className="h-24 animate-pulse rounded-xl bg-sand"
-							/>
+							<div key={i} className="h-24 animate-pulse rounded-xl bg-sand" />
 						))}
 					</div>
 					<div className="h-64 animate-pulse rounded-2xl bg-sand" />
@@ -351,34 +361,39 @@ export default function PortalShipmentDetailsPage() {
 	const documentCount = shipment.document_count ?? documents.length;
 	const manifest = shipment.manifest ?? null;
 
-	const manifestNeedsAction = manifest?.manifest_requires_action === true || manifest?.requires_action === true;
-
+	const manifestNeedsAction =
+		manifest?.manifest_requires_action === true ||
+		manifest?.requires_action === true;
 
 	return (
 		<AppShell
 			title={shipment.bill_of_lading || "Shipment details"}
 			eyebrow="Stakeholder Portal · Shipment"
 		>
-			<div className="space-y-5 pb-8">
+			<div className="space-y-6 pb-12">
 				<Link
 					to="/portal/shipments"
-					className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft hover:text-orange"
+					className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-soft transition-colors hover:text-orange"
 				>
 					<ArrowLeft className="size-3.5" />
 					Back to shipments
 				</Link>
 
+				{/* Hero Section */}
 				<motion.section
 					initial={{ opacity: 0, y: 10 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.3 }}
-					className="relative overflow-hidden rounded-2xl border bg-card p-5 sm:p-6"
+					className="relative overflow-hidden rounded-3xl border border-line bg-slate p-6 shadow-sm sm:p-8"
 				>
-					<div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-						<div className="min-w-0">
-							<div className="flex flex-wrap items-center gap-2">
-								<span className="inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground">
-									<Ship className="size-3.5 text-primary" />
+					<div className="absolute inset-0 bg-gradient-to-r from-slate/80 to-slate" />
+					<div className="absolute -right-20 -top-20 size-64 rounded-full bg-orange/10 blur-3xl" />
+					
+					<div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-start">
+						<div className="min-w-0 flex-1">
+							<div className="flex flex-wrap items-center gap-3">
+								<span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-sand/90 backdrop-blur-sm">
+									<Ship className="size-3.5 text-orange" />
 									Shipment declaration
 								</span>
 								<StatusBadge
@@ -387,35 +402,33 @@ export default function PortalShipmentDetailsPage() {
 								/>
 							</div>
 
-							<h1 className="mt-3 max-w-3xl font-display text-2xl font-bold leading-tight tracking-tight sm:text-3xl">
+							<h1 className="mt-4 max-w-3xl font-display text-2xl font-bold leading-tight tracking-tight text-sand sm:text-3xl">
 								{shipment.bill_of_lading || "Untitled shipment"}
 							</h1>
+							
 							{shipment.shipment_reference && (
-								<div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-orange/20 bg-orange/5 px-3 py-2">
-									<Hash className="size-4 text-orange" />
-									<span className="font-mono text-xs font-semibold tracking-wide text-orange-deep">
+								<div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-orange/30 bg-orange/10 px-3 py-1.5 text-orange">
+									<Hash className="size-3.5" />
+									<span className="font-mono text-xs font-semibold tracking-wide">
 										{shipment.shipment_reference}
 									</span>
 								</div>
 							)}
-							<p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+							
+							<p className="mt-3 max-w-2xl text-sm leading-relaxed text-sand/70">
 								{shipment.cargo_description ||
 									"No cargo description was provided for this declaration."}
 							</p>
 
-							<div className="mt-5 flex flex-wrap gap-2">
-								<QuickStat
+							<div className="mt-6 flex flex-wrap gap-2">
+								<HeroStat
 									icon={Hash}
 									label="Booking"
 									value={shipment.booking_number || "—"}
 									mono
 								/>
-								<QuickStat
-									icon={MapPin}
-									label="Route"
-									value={route}
-								/>
-								<QuickStat
+								<HeroStat icon={MapPin} label="Route" value={route} />
+								<HeroStat
 									icon={CalendarDays}
 									label="Submitted"
 									value={formatDate(shipment.created_at)}
@@ -423,11 +436,11 @@ export default function PortalShipmentDetailsPage() {
 							</div>
 						</div>
 
-						<div className="flex flex-wrap gap-2">
+						<div className="flex flex-wrap gap-2 sm:flex-col sm:items-end">
 							<Button
 								variant="outline"
 								onClick={() => navigate("/portal/shipments")}
-								className="gap-2"
+								className="gap-2 border-white/20 bg-white/5 text-sand hover:bg-white/10 hover:text-white"
 							>
 								<ArrowLeft className="size-4" />
 								All shipments
@@ -436,7 +449,8 @@ export default function PortalShipmentDetailsPage() {
 					</div>
 				</motion.section>
 
-				<section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+				{/* Summary Metrics */}
+				<section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
 					<SummaryTile
 						icon={ContainerIcon}
 						label="Containers"
@@ -479,28 +493,33 @@ export default function PortalShipmentDetailsPage() {
 					/>
 				</section>
 
+				{/* Manifest Review Section */}
 				{manifest && (
 					<motion.section
 						initial={{ opacity: 0, y: 8 }}
 						animate={{ opacity: 1, y: 0 }}
 						className={cn(
-							"overflow-hidden rounded-2xl border p-5 sm:p-6",
+							"overflow-hidden rounded-3xl border p-6 sm:p-8 shadow-sm",
 							manifestNeedsAction
 								? "border-coral/30 bg-coral/5"
 								: "border-line bg-paper"
 						)}
 					>
-						<div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-							<div className="flex min-w-0 gap-3">
-								<div className={cn(
-									"grid size-10 shrink-0 place-items-center rounded-xl",
-									manifestNeedsAction ? "bg-coral/10 text-coral" : "bg-orange/10 text-orange-deep"
-								)}>
-									<AlertTriangle className="size-5" />
+						<div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-start">
+							<div className="flex min-w-0 gap-4">
+								<div
+									className={cn(
+										"grid size-12 shrink-0 place-items-center rounded-2xl",
+										manifestNeedsAction
+											? "bg-coral/10 text-coral"
+											: "bg-orange/10 text-orange-deep"
+									)}
+								>
+									<AlertTriangle className="size-6" />
 								</div>
 								<div className="min-w-0">
 									<div className="flex flex-wrap items-center gap-2">
-										<h2 className="font-display text-base font-bold text-ink">
+										<h2 className="font-display text-lg font-bold text-ink">
 											Manifest review
 										</h2>
 										<StatusBadge
@@ -508,15 +527,24 @@ export default function PortalShipmentDetailsPage() {
 											tone={statusTone(manifest.status ?? "")}
 										/>
 									</div>
-									<p className="mt-1 text-sm leading-6 text-ink-soft">
+									<p className="mt-1.5 max-w-2xl text-sm leading-6 text-ink-soft">
 										{manifestNeedsAction
 											? "Operations has flagged an issue associated with this shipment. Review the reason and follow the requested action."
 											: "A manifest is linked to this shipment. Review its current status and any operator notes here."}
 									</p>
-									<dl className="mt-4 grid gap-3 sm:grid-cols-2">
+									
+									<dl className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
 										<Field icon={Hash} label="Manifest reference" value={manifest.manifest_ref || "—"} mono />
 										<Field icon={Hash} label="Manifest bill of lading" value={manifest.bill_of_lading || "—"} mono />
 										<Field icon={User} label="Responsible party" value={manifest.review_responsible_party || "Not specified"} />
+										<Field icon={Ship} label="Vessel" value={manifest.vessel || "—"} />
+										<Field icon={Ship} label="Shipping line" value={manifest.shipping_line || "—"} />
+										<Field icon={MapPin} label="Manifest origin port" value={manifest.origin_port || "—"} />
+										<Field icon={CalendarDays} label="Manifest ETA" value={manifest.eta || "—"} />
+										<Field icon={ContainerIcon} label="Manifest containers" value={formatNumber(manifest.containers)} />
+										<Field icon={Package} label="Manifest packages" value={formatNumber(manifest.packages)} />
+										<Field icon={User} label="Manifest consignee" value={manifest.consignee || "—"} />
+										<Field icon={Info} label="Manifest source" value={manifest.source || "—"} />
 										<Field icon={CalendarDays} label="Last flagged" value={formatDateTime(manifest.flagged_at)} />
 									</dl>
 								</div>
@@ -531,22 +559,23 @@ export default function PortalShipmentDetailsPage() {
 								</Button>
 							)}
 						</div>
+						
 						{manifest.review_reason && (
-							<div className="mt-4 rounded-xl border border-coral/20 bg-background p-4">
+							<div className="mt-6 rounded-2xl border border-coral/20 bg-background p-5">
 								<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-coral">
 									Reason for flag
 								</p>
-								<p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-ink">
+								<p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">
 									{manifest.review_reason}
 								</p>
 							</div>
 						)}
 						{manifest.notes && (
-							<div className="mt-3 rounded-xl border border-line bg-background p-4">
+							<div className="mt-3 rounded-2xl border border-line bg-background p-5">
 								<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 									Operator notes
 								</p>
-								<p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-ink">
+								<p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-ink">
 									{manifest.notes}
 								</p>
 							</div>
@@ -554,53 +583,24 @@ export default function PortalShipmentDetailsPage() {
 					</motion.section>
 				)}
 
-				<div className="grid gap-5 lg:grid-cols-[1.4fr_1fr] lg:items-start">
-					<div className="space-y-5">
+				{/* Main Content Grid */}
+				<div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-start">
+					
+					{/* Left Column */}
+					<div className="space-y-6">
 						<Panel
 							icon={Ship}
 							title="Shipping information"
 							description="Primary references for this declaration."
 						>
-							<dl className="grid gap-4 p-5 sm:grid-cols-2">
-								<Field
-									icon={Hash}
-									label="Bill of lading"
-									value={shipment.bill_of_lading ?? "—"}
-									mono
-								/>
-								<Field
-									icon={Hash}
-									label="Shipment reference"
-									value={shipment.shipment_reference ?? "—"}
-									mono
-								/>
-								<Field
-									icon={Hash}
-									label="Booking number"
-									value={shipment.booking_number ?? "—"}
-									mono
-								/>
-								<Field
-									icon={Ship}
-									label="Shipment type"
-									value={shipment.shipment_type ?? "—"}
-								/>
-								<Field
-									icon={Ship}
-									label="Shipping line"
-									value={shipment.shipping_line ?? "—"}
-								/>
-								<Field
-									icon={Ship}
-									label="Vessel name"
-									value={shipment.vessel_name ?? "—"}
-								/>
-								<Field
-									icon={Hash}
-									label="Voyage number"
-									value={shipment.voyage_number ?? "—"}
-									mono
-								/>
+							<dl className="grid gap-6 p-6 sm:grid-cols-2">
+								<Field icon={Hash} label="Bill of lading" value={shipment.bill_of_lading ?? "—"} mono />
+								<Field icon={Hash} label="Shipment reference" value={shipment.shipment_reference ?? "—"} mono />
+								<Field icon={Hash} label="Booking number" value={shipment.booking_number ?? "—"} mono />
+								<Field icon={Ship} label="Shipment type" value={shipment.shipment_type ?? "—"} />
+								<Field icon={Ship} label="Shipping line" value={shipment.shipping_line ?? "—"} />
+								<Field icon={Ship} label="Vessel name" value={shipment.vessel_name ?? "—"} />
+								<Field icon={Hash} label="Voyage number" value={shipment.voyage_number ?? "—"} mono />
 							</dl>
 						</Panel>
 
@@ -609,42 +609,38 @@ export default function PortalShipmentDetailsPage() {
 							title="Route & schedule"
 							description="Movement of cargo from origin to destination."
 						>
-							<div className="space-y-4 p-5">
-								<div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-									<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
+							<div className="space-y-6 p-6">
+								<div className="grid gap-4 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+									<div className="rounded-2xl bg-sand p-5 ring-1 ring-line">
 										<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 											Origin
 										</p>
-										<p className="mt-1.5 text-[14px] font-semibold text-ink">
+										<p className="mt-2 text-[15px] font-semibold text-ink">
 											{shipment.origin_port || "—"}
 										</p>
 										{shipment.origin_country && (
-											<p className="mt-0.5 font-mono text-[11px] text-ink-soft">
+											<p className="mt-1 font-mono text-[11px] text-ink-soft">
 												{shipment.origin_country}
 											</p>
 										)}
 									</div>
 
 									<div className="flex justify-center sm:block">
-										<ArrowRight className="size-5 rotate-90 text-orange sm:rotate-0" />
+										<ArrowRight className="size-6 rotate-90 text-orange sm:rotate-0" />
 									</div>
 
-									<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
+									<div className="rounded-2xl bg-sand p-5 ring-1 ring-line">
 										<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 											Destination
 										</p>
-										<p className="mt-1.5 text-[14px] font-semibold text-ink">
+										<p className="mt-2 text-[15px] font-semibold text-ink">
 											{shipment.destination_port || "—"}
 										</p>
 									</div>
 								</div>
 
-								<dl className="grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
-									<Field
-										icon={CalendarDays}
-										label="Expected arrival"
-										value={formatDate(shipment.expected_arrival)}
-									/>
+								<dl className="grid gap-6 border-t border-line pt-6 sm:grid-cols-2">
+									<Field icon={CalendarDays} label="Expected arrival" value={formatDate(shipment.expected_arrival)} />
 									<Field icon={MapPin} label="Route" value={route} />
 								</dl>
 							</div>
@@ -655,55 +651,26 @@ export default function PortalShipmentDetailsPage() {
 							title="Cargo declaration"
 							description="Description, quantities, and handling requirements."
 						>
-							<div className="space-y-4 p-5">
-								<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
+							<div className="space-y-6 p-6">
+								<div className="rounded-2xl bg-sand p-5 ring-1 ring-line">
 									<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 										Cargo description
 									</p>
-									<p className="mt-2 text-[13px] leading-6 text-ink">
-										{shipment.cargo_description ||
-											"No description provided."}
+									<p className="mt-2 text-sm leading-relaxed text-ink">
+										{shipment.cargo_description || "No description provided."}
 									</p>
 								</div>
 
-								<dl className="grid gap-4 sm:grid-cols-2">
-									<Field
-										icon={Package}
-										label="Cargo category"
-										value={shipment.cargo_category ?? "—"}
-									/>
-									<Field
-										icon={Package}
-										label="Packaging type"
-										value={shipment.package_type ?? "—"}
-									/>
-									<Field
-										icon={Hash}
-										label="Total packages"
-										value={formatNumber(shipment.package_count)}
-										mono
-									/>
-									<Field
-										icon={Hash}
-										label="Gross weight (kg)"
-										value={formatNumber(shipment.gross_weight)}
-										mono
-									/>
-									<Field
-										icon={Hash}
-										label="Volume (m³)"
-										value={formatNumber(shipment.volume)}
-										mono
-									/>
-									<Field
-										icon={Hash}
-										label="HS code"
-										value={shipment.hs_code ?? "—"}
-										mono
-									/>
+								<dl className="grid gap-6 sm:grid-cols-2">
+									<Field icon={Package} label="Cargo category" value={shipment.cargo_category ?? "—"} />
+									<Field icon={Package} label="Packaging type" value={shipment.package_type ?? "—"} />
+									<Field icon={Hash} label="Total packages" value={formatNumber(shipment.package_count)} mono />
+									<Field icon={Hash} label="Gross weight (kg)" value={formatNumber(shipment.gross_weight)} mono />
+									<Field icon={Hash} label="Volume (m³)" value={formatNumber(shipment.volume)} mono />
+									<Field icon={Hash} label="HS code" value={shipment.hs_code ?? "—"} mono />
 								</dl>
 
-								<div className="grid gap-3 border-t border-line pt-4 sm:grid-cols-2">
+								<div className="grid gap-4 border-t border-line pt-6 sm:grid-cols-2">
 									<FlagCard
 										icon={AlertTriangle}
 										active={shipment.dangerous_goods === "yes"}
@@ -725,14 +692,14 @@ export default function PortalShipmentDetailsPage() {
 								</div>
 
 								{shipment.special_instructions && (
-									<div className="rounded-xl bg-orange/5 p-4 ring-1 ring-orange/20">
+									<div className="rounded-2xl bg-orange/5 p-5 ring-1 ring-orange/20">
 										<div className="flex items-start gap-3">
 											<Info className="mt-0.5 size-4 shrink-0 text-orange-deep" />
 											<div className="min-w-0">
 												<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-orange-deep">
 													Special handling instructions
 												</p>
-												<p className="mt-1 text-[12px] leading-5 text-ink">
+												<p className="mt-1.5 text-sm leading-relaxed text-ink">
 													{shipment.special_instructions}
 												</p>
 											</div>
@@ -754,48 +721,51 @@ export default function PortalShipmentDetailsPage() {
 							}
 							badge={
 								containers.length > 0 ? (
-									<span className="rounded-full bg-orange/10 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-orange-deep">
+									<span className="rounded-full bg-orange/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-orange-deep">
 										{containers.length}
 									</span>
 								) : undefined
 							}
 						>
 							{containers.length === 0 ? (
-								<div className="p-6 text-center">
-									<div className="mx-auto grid size-12 place-items-center rounded-xl bg-sand text-ink-soft">
-										<ContainerIcon className="size-5" />
+								<div className="p-8 text-center">
+									<div className="mx-auto grid size-14 place-items-center rounded-2xl bg-sand text-ink-soft">
+										<ContainerIcon className="size-6" />
 									</div>
-									<p className="mt-3 text-[13px] font-semibold text-ink">
+									<p className="mt-4 text-sm font-semibold text-ink">
 										Not containerised
 									</p>
-									<p className="mt-1 text-[11px] leading-5 text-ink-soft">
+									<p className="mt-1 text-xs leading-5 text-ink-soft">
 										This shipment was declared without any containers.
 									</p>
 								</div>
 							) : (
-								<ul className="divide-y divide-line">
+								<div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
 									{containers.map((container, index) => (
-										<li
+										<div
 											key={container.id}
-											className="flex flex-wrap items-start gap-4 p-5"
+											className="flex flex-col justify-between gap-4 rounded-2xl border border-line bg-sand/50 p-5"
 										>
-											<div className="grid size-10 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-												<ContainerIcon className="size-4" />
+											<div className="flex items-start justify-between">
+												<div>
+													<p className="font-mono text-base font-bold text-ink">
+														{container.container_no}
+													</p>
+													<p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+														Container {index + 1}
+													</p>
+												</div>
+												<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
+													<ContainerIcon className="size-4" />
+												</div>
 											</div>
-											<div className="min-w-[180px] flex-1">
-												<p className="font-mono text-[13px] font-semibold text-ink">
-													{container.container_no}
-												</p>
-												<p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-													Container {index + 1}
-												</p>
-											</div>
-											<dl className="flex min-w-[220px] flex-1 flex-wrap gap-x-6 gap-y-2">
+											
+											<div className="grid grid-cols-2 gap-3 border-t border-line/50 pt-4">
 												<div>
 													<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
 														Size
 													</dt>
-													<dd className="mt-0.5 text-[12px] text-ink">
+													<dd className="mt-1 text-[13px] font-medium text-ink">
 														{container.size || "—"}
 													</dd>
 												</div>
@@ -803,7 +773,7 @@ export default function PortalShipmentDetailsPage() {
 													<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
 														Seal
 													</dt>
-													<dd className="mt-0.5 font-mono text-[12px] text-ink">
+													<dd className="mt-1 font-mono text-[13px] text-ink">
 														{container.seal_no || "—"}
 													</dd>
 												</div>
@@ -811,7 +781,7 @@ export default function PortalShipmentDetailsPage() {
 													<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
 														Packages
 													</dt>
-													<dd className="mt-0.5 font-mono text-[12px] text-ink">
+													<dd className="mt-1 font-mono text-[13px] text-ink">
 														{formatNumber(container.package_count)}
 													</dd>
 												</div>
@@ -819,46 +789,46 @@ export default function PortalShipmentDetailsPage() {
 													<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
 														Weight
 													</dt>
-													<dd className="mt-0.5 font-mono text-[12px] text-ink">
-														{container.gross_weight
-															? `${formatNumber(
-																	container.gross_weight
-															  )} kg`
-															: "—"}
+													<dd className="mt-1 font-mono text-[13px] text-ink">
+														{container.gross_weight ? `${formatNumber(container.gross_weight)} kg` : "—"}
 													</dd>
 												</div>
-											</dl>
-										</li>
+											</div>
+										</div>
 									))}
-								</ul>
+								</div>
 							)}
 						</Panel>
 					</div>
 
-					<div className="space-y-5">
+					{/* Right Column */}
+					<div className="space-y-6">
 						<Panel
 							icon={User}
 							title="Consignee"
-							description="Recipient of the declared cargo."
+							description="Recipient and contact details for the declared cargo."
 						>
-							<dl className="grid gap-4 p-5">
-								<Field
-									icon={User}
-									label="Consignee name"
-									value={shipment.consignee ?? "—"}
-								/>
-								<Field
-									icon={Mail}
-									label="Email"
-									value={shipment.consignee_email ?? "—"}
-									mono
-								/>
-								<Field
-									icon={Phone}
-									label="Phone"
-									value={shipment.consignee_phone ?? "—"}
-									mono
-								/>
+							<dl className="grid gap-5 p-6 sm:grid-cols-2">
+								<Field icon={User} label="Consignee name" value={shipment.consignee ?? "—"} />
+								<Field icon={Info} label="Consignee type" value={statusLabel(shipment.consignee_type)} />
+								<Field icon={Mail} label="Email" value={shipment.consignee_email ?? "—"} mono />
+								<Field icon={Phone} label="Phone" value={shipment.consignee_phone ?? "—"} mono />
+								<Field icon={User} label="Contact person" value={shipment.consignee_contact_person ?? "—"} />
+								<Field icon={Info} label="Registration status" value={statusLabel(shipment.consignee_status)} />
+								<Field icon={MapPin} label="Address" value={shipment.consignee_address ?? "—"} />
+								<Field icon={MapPin} label="Country" value={shipment.consignee_country ?? "—"} />
+								<Field icon={Hash} label="Linked organisation ID" value={shipment.consignee_organisation_id ?? "—"} mono />
+							</dl>
+						</Panel>
+
+						<Panel
+							icon={ShieldCheck}
+							title="Licensed agent"
+							description="Licensed agent selected for this shipment declaration."
+						>
+							<dl className="grid gap-5 p-6 sm:grid-cols-2">
+								<Field icon={User} label="Agent name" value={shipment.licensed_agent_name || shipment.agent || "—"} />
+								<Field icon={Hash} label="Agent ID" value={shipment.licensed_agent_id || shipment.agentId || "—"} mono />
 							</dl>
 						</Panel>
 
@@ -874,21 +844,21 @@ export default function PortalShipmentDetailsPage() {
 							}
 							badge={
 								documents.length > 0 ? (
-									<span className="rounded-full bg-orange/10 px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.08em] text-orange-deep">
+									<span className="rounded-full bg-orange/10 px-2.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-[0.08em] text-orange-deep">
 										{documents.length}
 									</span>
 								) : undefined
 							}
 						>
 							{documents.length === 0 ? (
-								<div className="p-6 text-center">
-									<div className="mx-auto grid size-12 place-items-center rounded-xl bg-sand text-ink-soft">
-										<FileText className="size-5" />
+								<div className="p-8 text-center">
+									<div className="mx-auto grid size-14 place-items-center rounded-2xl bg-sand text-ink-soft">
+										<FileText className="size-6" />
 									</div>
-									<p className="mt-3 text-[13px] font-semibold text-ink">
+									<p className="mt-4 text-sm font-semibold text-ink">
 										No documents attached
 									</p>
-									<p className="mt-1 text-[11px] leading-5 text-ink-soft">
+									<p className="mt-1 text-xs leading-5 text-ink-soft">
 										Upload supporting documents from the documents centre.
 									</p>
 								</div>
@@ -897,21 +867,16 @@ export default function PortalShipmentDetailsPage() {
 									{documents.map((doc) => {
 										const href = resolveSrc(doc.file_path ?? "");
 										return (
-											<li
-												key={doc.id}
-												className="flex items-start gap-3 p-4"
-											>
-												<div className="grid size-10 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-													<FileText className="size-4" />
+											<li key={doc.id} className="flex items-start gap-4 p-5 transition-colors hover:bg-sand/30">
+												<div className="grid size-10 shrink-0 place-items-center rounded-xl bg-orange/10 text-orange-deep">
+													<FileText className="size-5" />
 												</div>
 												<div className="min-w-0 flex-1">
-													<p className="truncate text-[12px] font-semibold text-ink">
+													<p className="truncate text-[13px] font-semibold text-ink">
 														{doc.original_name}
 													</p>
-													<p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-														{doc.document_label ||
-															doc.document_type}{" "}
-														· {formatBytes(doc.file_size)}
+													<p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+														{doc.document_label || doc.document_type} · {formatBytes(doc.file_size)}
 													</p>
 													<p className="mt-0.5 font-mono text-[10px] text-ink-soft">
 														Uploaded {formatDate(doc.uploaded_at)}
@@ -923,10 +888,10 @@ export default function PortalShipmentDetailsPage() {
 														target="_blank"
 														rel="noopener noreferrer"
 														download
-														className="grid size-8 shrink-0 place-items-center rounded-md text-orange-deep transition-colors hover:bg-orange/10"
+														className="grid size-9 shrink-0 place-items-center rounded-lg border border-line bg-paper text-ink-soft transition-colors hover:border-orange hover:text-orange"
 														aria-label={`Download ${doc.original_name}`}
 													>
-														<Download className="size-3.5" />
+														<Download className="size-4" />
 													</a>
 												)}
 											</li>
@@ -952,7 +917,7 @@ export default function PortalShipmentDetailsPage() {
 										{showReviews ? "Hide" : "Show"}
 										<ChevronDown
 											className={cn(
-												"size-3 transition-transform",
+												"size-3.5 transition-transform",
 												showReviews && "rotate-180"
 											)}
 										/>
@@ -966,7 +931,7 @@ export default function PortalShipmentDetailsPage() {
 											animate={{ height: "auto", opacity: 1 }}
 											exit={{ height: 0, opacity: 0 }}
 											transition={{ duration: 0.2 }}
-											className="relative space-y-5 overflow-hidden p-5 pl-8 before:absolute before:bottom-5 before:left-[22px] before:top-5 before:w-px before:bg-line"
+											className="relative space-y-6 overflow-hidden p-6 pl-9 before:absolute before:bottom-6 before:left-[27px] before:top-6 before:w-px before:bg-line"
 										>
 											{reviews.map((review, index) => (
 												<ReviewItem
@@ -1017,16 +982,16 @@ export default function PortalShipmentDetailsPage() {
 							</ul>
 						</Panel>
 
-						<div className="rounded-2xl bg-paper p-4 ring-1 ring-line">
-							<div className="flex items-start gap-3">
-								<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-									<Info className="size-4" />
+						<div className="rounded-2xl border border-line bg-paper p-5">
+							<div className="flex items-start gap-4">
+								<div className="grid size-10 shrink-0 place-items-center rounded-xl bg-orange/10 text-orange-deep">
+									<Info className="size-5" />
 								</div>
 								<div className="min-w-0">
-									<p className="text-[12px] font-semibold text-ink">
+									<p className="text-sm font-semibold text-ink">
 										About this declaration
 									</p>
-									<p className="mt-1 text-[11px] leading-5 text-ink-soft">
+									<p className="mt-1.5 text-xs leading-relaxed text-ink-soft">
 										Submitting a declaration does not confirm terminal
 										acceptance, customs clearance or cargo release. Those
 										decisions are handled by the appropriate authorised
@@ -1042,7 +1007,7 @@ export default function PortalShipmentDetailsPage() {
 	);
 }
 
-function QuickStat({
+function HeroStat({
 	icon: Icon,
 	label,
 	value,
@@ -1054,14 +1019,14 @@ function QuickStat({
 	mono?: boolean;
 }) {
 	return (
-		<div className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1.5">
-			<Icon className="size-3.5 text-primary" />
-			<span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+		<div className="inline-flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 backdrop-blur-sm">
+			<Icon className="size-4 text-orange" />
+			<span className="font-mono text-[10px] uppercase tracking-[0.12em] text-sand/60">
 				{label}
 			</span>
 			<span
 				className={cn(
-					"text-[12px] font-medium text-foreground",
+					"text-[13px] font-medium text-sand",
 					mono && "font-mono"
 				)}
 			>
@@ -1083,7 +1048,7 @@ function SummaryTile({
 	detail: string;
 }) {
 	return (
-		<div className="rounded-2xl bg-paper p-5 ring-1 ring-line">
+		<div className="rounded-2xl border border-line bg-paper p-5 shadow-sm transition-all hover:shadow-md">
 			<div className="flex items-start justify-between gap-3">
 				<div>
 					<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
@@ -1094,7 +1059,7 @@ function SummaryTile({
 					</p>
 					<p className="mt-1 text-[11px] text-ink-soft">{detail}</p>
 				</div>
-				<div className="grid size-10 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
+				<div className="grid size-11 shrink-0 place-items-center rounded-xl bg-orange/10 text-orange-deep">
 					<Icon className="size-5" />
 				</div>
 			</div>
@@ -1116,17 +1081,17 @@ function Panel({
 	children: React.ReactNode;
 }) {
 	return (
-		<section className="overflow-hidden rounded-2xl bg-paper ring-1 ring-line">
-			<div className="flex flex-wrap items-start justify-between gap-3 border-b border-line p-5">
-				<div className="flex min-w-0 items-start gap-3">
-					<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-						<Icon className="size-4" />
+		<section className="overflow-hidden rounded-2xl border border-line bg-paper shadow-sm">
+			<div className="flex flex-wrap items-start justify-between gap-3 border-b border-line p-5 sm:p-6">
+				<div className="flex min-w-0 items-start gap-4">
+					<div className="grid size-10 shrink-0 place-items-center rounded-xl bg-orange/10 text-orange-deep">
+						<Icon className="size-5" />
 					</div>
 					<div className="min-w-0">
-						<h3 className="font-display text-sm font-bold text-ink">
+						<h3 className="font-display text-base font-bold text-ink">
 							{title}
 						</h3>
-						<p className="mt-0.5 text-[11px] leading-5 text-ink-soft">
+						<p className="mt-1 text-xs leading-5 text-ink-soft">
 							{description}
 						</p>
 					</div>
@@ -1183,7 +1148,7 @@ function FlagCard({
 	return (
 		<div
 			className={cn(
-				"flex items-center gap-3 rounded-xl border p-3.5",
+				"flex items-center gap-3 rounded-xl border p-4 transition-colors",
 				active
 					? tone === "coral"
 						? "border-coral/30 bg-coral/5"
@@ -1204,7 +1169,7 @@ function FlagCard({
 				<Icon className="size-4" />
 			</div>
 			<div className="min-w-0">
-				<p className="text-[12px] font-semibold text-ink">
+				<p className="text-[13px] font-semibold text-ink">
 					{active ? activeLabel : inactiveLabel}
 				</p>
 				<p className="mt-0.5 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
@@ -1232,31 +1197,21 @@ function TimelineRow({
 		tone === "success"
 			? "bg-teal-500/10 text-teal-700"
 			: tone === "warning"
-			? "bg-orange/10 text-orange-deep"
-			: tone === "critical"
-			? "bg-carmine/10 text-carmine"
-			: "bg-sky-500/10 text-sky-700";
+				? "bg-orange/10 text-orange-deep"
+				: tone === "critical"
+					? "bg-carmine/10 text-carmine"
+					: "bg-sky-500/10 text-sky-700";
 
 	return (
-		<li className="flex items-start gap-3 p-4">
-			<div
-				className={cn(
-					"grid size-9 shrink-0 place-items-center rounded-lg",
-					toneClass
-				)}
-			>
+		<li className="flex items-start gap-4 p-5">
+			<div className={cn("grid size-9 shrink-0 place-items-center rounded-lg", toneClass)}>
 				<Icon className="size-4" />
 			</div>
 			<div className="min-w-0 flex-1">
 				<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 					{label}
 				</p>
-				<p
-					className={cn(
-						"mt-1 truncate text-[12px] text-ink",
-						mono && "font-mono"
-					)}
-				>
+				<p className={cn("mt-1 truncate text-[13px] font-medium text-ink", mono && "font-mono")}>
 					{value}
 				</p>
 			</div>
@@ -1267,7 +1222,7 @@ function TimelineRow({
 function ReviewAvatar({ reviewer }: { reviewer: Reviewer | null }) {
 	if (!reviewer) {
 		return (
-			<span className="grid size-9 shrink-0 place-items-center rounded-full bg-sand text-ink-soft ring-2 ring-paper">
+			<span className="grid size-10 shrink-0 place-items-center rounded-full bg-sand text-ink-soft ring-4 ring-paper">
 				<User className="size-4" />
 			</span>
 		);
@@ -1280,7 +1235,7 @@ function ReviewAvatar({ reviewer }: { reviewer: Reviewer | null }) {
 			<img
 				src={resolveSrc(reviewer.pics ?? "")}
 				alt={reviewer.full_name}
-				className="size-9 shrink-0 rounded-full object-cover ring-2 ring-paper"
+				className="size-10 shrink-0 rounded-full object-cover ring-4 ring-paper"
 			/>
 		);
 	}
@@ -1294,19 +1249,13 @@ function ReviewAvatar({ reviewer }: { reviewer: Reviewer | null }) {
 		.toUpperCase();
 
 	return (
-		<span className="grid size-9 shrink-0 place-items-center rounded-full bg-ink font-display text-[11px] font-semibold text-sand ring-2 ring-paper">
+		<span className="grid size-10 shrink-0 place-items-center rounded-full bg-ink font-display text-[11px] font-bold text-sand ring-4 ring-paper">
 			{initials || "—"}
 		</span>
 	);
 }
 
-function ReviewItem({
-	review,
-	isLatest,
-}: {
-	review: ReviewEvent;
-	isLatest: boolean;
-}) {
+function ReviewItem({ review, isLatest }: { review: ReviewEvent; isLatest: boolean }) {
 	const tone =
 		decisionTone[review.decision] ?? {
 			bg: "bg-sand-2",
@@ -1319,14 +1268,14 @@ function ReviewItem({
 
 	return (
 		<li className="relative">
-			<div className="absolute -left-[26px] top-1.5">
+			<div className="absolute -left-[31px] top-0">
 				<ReviewAvatar reviewer={review.reviewer} />
 				{isLatest && (
-					<span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-orange ring-2 ring-paper" />
+					<span className="absolute -right-0.5 -top-0.5 size-3 rounded-full bg-orange ring-2 ring-paper" />
 				)}
 			</div>
 
-			<div className="ml-6 rounded-xl border border-line bg-background p-3.5">
+			<div className="ml-7 rounded-xl border border-line bg-background p-4">
 				<div className="flex flex-wrap items-start justify-between gap-2">
 					<div className="min-w-0">
 						<p className="text-[13px] font-semibold text-ink">
@@ -1343,10 +1292,10 @@ function ReviewItem({
 					</span>
 				</div>
 
-				<div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+				<div className="mt-3 flex flex-wrap items-center gap-2">
 					<span
 						className={cn(
-							"inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.12em] ring-1 ring-inset",
+							"inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.1em] ring-1 ring-inset",
 							tone.bg,
 							tone.text,
 							tone.ring
@@ -1357,16 +1306,16 @@ function ReviewItem({
 					</span>
 
 					{review.from_status && review.to_status && (
-						<span className="inline-flex items-center gap-1 rounded-full bg-sand-2 px-2 py-0.5 font-mono text-[10px] text-ink-soft ring-1 ring-line">
+						<span className="inline-flex items-center gap-1 rounded-full bg-sand-2 px-2.5 py-1 font-mono text-[10px] font-medium text-ink-soft ring-1 ring-line">
 							{statusLabel(review.from_status)}
-							<ArrowRight className="size-2.5" />
+							<ArrowRight className="size-3" />
 							{statusLabel(review.to_status)}
 						</span>
 					)}
 				</div>
 
 				{review.reason && (
-					<p className="mt-2.5 rounded-lg bg-sand/60 p-2.5 text-[12px] leading-5 text-ink-soft">
+					<p className="mt-3 rounded-lg bg-sand/60 p-3 text-[12px] leading-relaxed text-ink-soft">
 						{review.reason}
 					</p>
 				)}
