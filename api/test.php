@@ -1,255 +1,765 @@
+
 <?php
+
 require_once __DIR__ . "/include/conn.php";
 
+header('Content-Type: application/json; charset=utf-8');
 
-/*
-    header("Content-Type: application/json; charset=utf-8");
+if (!isset($conn) || !($conn instanceof PDO)) {
+    echo json_encode([
+        "error" => true,
+        "data" => "Database connection is unavailable.",
+        "code" => 500
+    ]);
+    exit;
+}
 
-    try {
-        $conn->beginTransaction();
+function pickValue($values)
+{
+    if (!is_array($values) || empty($values)) {
+        return '';
+    }
 
-        $drivers = [
-            ["name" => "Samuel Okafor", "phone" => "08031245061", "licence_number" => "RC12345678901", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2027-10-31", "transporter" => "Northstar Haulage Ltd", "notes" => "Container and heavy goods transport."],
-            ["name" => "Ibrahim Musa", "phone" => "08034567121", "licence_number" => "RC23456789012", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2027-08-15", "transporter" => "Northstar Haulage Ltd", "notes" => "Long-distance cargo operations."],
-            ["name" => "Chinedu Eze", "phone" => "08056781234", "licence_number" => "RC34567890123", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2028-02-20", "transporter" => "Primeway Logistics Ltd", "notes" => "Inter-state freight transport."],
-            ["name" => "Abubakar Sani", "phone" => "08067892345", "licence_number" => "RC45678901234", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2027-12-10", "transporter" => "Arewa Freight Services", "notes" => "Container and flatbed operations."],
-            ["name" => "Emeka Nwosu", "phone" => "08078903456", "licence_number" => "RC56789012345", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2027-06-30", "transporter" => "Primeway Logistics Ltd", "notes" => "Long-haul freight driver."],
-            ["name" => "Tunde Adeyemi", "phone" => "08089014567", "licence_number" => "RC67890123456", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2028-04-18", "transporter" => "Lagos Cargo Movers Ltd", "notes" => "Regional freight operations."],
-            ["name" => "Yusuf Abdullahi", "phone" => "08090125678", "licence_number" => "RC78901234567", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2027-09-25", "transporter" => "Arewa Freight Services", "notes" => "Container terminal deliveries."],
-            ["name" => "Ngozi Okeke", "phone" => "08021236789", "licence_number" => "RC89012345678", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2028-01-12", "transporter" => "Eastern Corridor Transport", "notes" => "Commercial freight operations."],
-            ["name" => "Bello Garba", "phone" => "08032347890", "licence_number" => "RC90123456789", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2027-11-08", "transporter" => "Northern Star Carriers", "notes" => "Terminal container transfers."],
-            ["name" => "Kelechi Obi", "phone" => "08043458901", "licence_number" => "RC11234567890", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2028-05-22", "transporter" => "Eastern Corridor Transport", "notes" => "Commercial freight driver."],
-            ["name" => "Amina Ibrahim", "phone" => "08034561278", "licence_number" => "RC22345678901", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2028-11-20", "transporter" => "Northstar Haulage Ltd", "notes" => "Long-distance container transport."],
-            ["name" => "Peter Chukwu", "phone" => "08061234578", "licence_number" => "RC33456789012", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2029-02-15", "transporter" => "Primeway Logistics Ltd", "notes" => "Commercial freight operations."],
-            ["name" => "Musa Danjuma", "phone" => "08072345689", "licence_number" => "RC44567890123", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2028-08-30", "transporter" => "Arewa Freight Services", "notes" => "Container terminal deliveries."],
-            ["name" => "Grace Ekanem", "phone" => "08083456790", "licence_number" => "RC55678901234", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2029-04-12", "transporter" => "Eastern Corridor Transport", "notes" => "Regional cargo transportation."],
-            ["name" => "Daniel Balogun", "phone" => "08094567812", "licence_number" => "RC66789012345", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2028-12-05", "transporter" => "Lagos Cargo Movers Ltd", "notes" => "Heavy goods transportation."],
-            ["name" => "Abdulrahman Bello", "phone" => "08025678934", "licence_number" => "RC77890123456", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2029-06-18", "transporter" => "Northern Star Carriers", "notes" => "Inter-state cargo deliveries."],
-            ["name" => "Victor Onoh", "phone" => "08036789145", "licence_number" => "RC88901234567", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2028-09-14", "transporter" => "Primeway Logistics Ltd", "notes" => "Container and flatbed operations."],
-            ["name" => "Fatima Sule", "phone" => "08047891256", "licence_number" => "RC99012345678", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2029-03-22", "transporter" => "Northstar Haulage Ltd", "notes" => "Commercial vehicle operations."],
-            ["name" => "Michael Adebayo", "phone" => "08058912367", "licence_number" => "RC10234567891", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2028-07-11", "transporter" => "Lagos Cargo Movers Ltd", "notes" => "Terminal and warehouse transfers."],
-            ["name" => "Josephine Nnamdi", "phone" => "08069123478", "licence_number" => "RC21345678902", "licence_class" => "Class G - Heavy Goods", "licence_expiry" => "2029-05-09", "transporter" => "Eastern Corridor Transport", "notes" => "Freight delivery operations."]
-        ];
+    return $values[array_rand($values)];
+}
 
-        $vehicles = [
-            ["plate" => "KJA-482XY", "kind" => "Container", "make" => "Sinotruk", "model" => "Howo T7H", "year" => 2022, "capacity" => "40 tonnes", "owner" => "Northstar Haulage Ltd", "transporter" => "Northstar Haulage Ltd", "insurance_expiry" => "2027-05-27", "roadworthiness_expiry" => "2027-04-02", "notes" => "Heavy-duty container tractor unit."],
-            ["plate" => "LND-284YX", "kind" => "Container", "make" => "MAN", "model" => "TGS 33.440", "year" => 2021, "capacity" => "40 tonnes", "owner" => "Primeway Logistics Ltd", "transporter" => "Primeway Logistics Ltd", "insurance_expiry" => "2027-08-20", "roadworthiness_expiry" => "2027-06-15", "notes" => "Container tractor unit."],
-            ["plate" => "ABJ-615ZT", "kind" => "Flatbed", "make" => "Mercedes-Benz", "model" => "Actros 3345", "year" => 2020, "capacity" => "35 tonnes", "owner" => "Arewa Freight Services", "transporter" => "Arewa Freight Services", "insurance_expiry" => "2027-09-12", "roadworthiness_expiry" => "2027-07-20", "notes" => "Flatbed for industrial cargo."],
-            ["plate" => "KAD-731WF", "kind" => "Tanker", "make" => "MAN", "model" => "TGS 26.400", "year" => 2022, "capacity" => "32000 litres", "owner" => "Northern Star Carriers", "transporter" => "Northern Star Carriers", "insurance_expiry" => "2027-12-18", "roadworthiness_expiry" => "2027-10-25", "notes" => "Tanker requiring cargo-specific authorization."],
-            ["plate" => "ENU-492QK", "kind" => "Reefer", "make" => "Isuzu", "model" => "FVR 34", "year" => 2023, "capacity" => "18 tonnes", "owner" => "Eastern Corridor Transport", "transporter" => "Eastern Corridor Transport", "insurance_expiry" => "2028-02-14", "roadworthiness_expiry" => "2027-11-30", "notes" => "Refrigerated cargo truck."],
-            ["plate" => "KAN-827LM", "kind" => "Box", "make" => "Mitsubishi Fuso", "model" => "Canter", "year" => 2021, "capacity" => "5 tonnes", "owner" => "Arewa Freight Services", "transporter" => "Arewa Freight Services", "insurance_expiry" => "2027-07-15", "roadworthiness_expiry" => "2027-05-19", "notes" => "Box truck for packaged freight."],
-            ["plate" => "PHC-358RD", "kind" => "Container", "make" => "Volvo", "model" => "FM 440", "year" => 2022, "capacity" => "40 tonnes", "owner" => "Primeway Logistics Ltd", "transporter" => "Primeway Logistics Ltd", "insurance_expiry" => "2027-11-22", "roadworthiness_expiry" => "2027-09-30", "notes" => "Container truck."],
-            ["plate" => "IBA-573NC", "kind" => "Flatbed", "make" => "DAF", "model" => "XF 480", "year" => 2020, "capacity" => "38 tonnes", "owner" => "Lagos Cargo Movers Ltd", "transporter" => "Lagos Cargo Movers Ltd", "insurance_expiry" => "2027-06-28", "roadworthiness_expiry" => "2027-05-10", "notes" => "Flatbed tractor for industrial cargo."],
-            ["plate" => "OWR-641HP", "kind" => "Container", "make" => "Scania", "model" => "R450", "year" => 2023, "capacity" => "40 tonnes", "owner" => "Northstar Haulage Ltd", "transporter" => "Northstar Haulage Ltd", "insurance_expiry" => "2028-03-20", "roadworthiness_expiry" => "2028-01-15", "notes" => "High-capacity container truck."],
-            ["plate" => "BEN-926KS", "kind" => "Reefer", "make" => "Hino", "model" => "500 Series", "year" => 2021, "capacity" => "15 tonnes", "owner" => "Eastern Corridor Transport", "transporter" => "Eastern Corridor Transport", "insurance_expiry" => "2027-10-10", "roadworthiness_expiry" => "2027-08-25", "notes" => "Refrigerated cargo vehicle."],
-            ["plate" => "ABJ-741MK", "kind" => "Container", "make" => "Mercedes-Benz", "model" => "Actros 1845", "year" => 2023, "capacity" => "40 tonnes", "owner" => "Northstar Haulage Ltd", "transporter" => "Northstar Haulage Ltd", "insurance_expiry" => "2028-06-15", "roadworthiness_expiry" => "2028-04-20", "notes" => "Container tractor unit."],
-            ["plate" => "KAN-562RT", "kind" => "Flatbed", "make" => "Volvo", "model" => "FH 460", "year" => 2022, "capacity" => "35 tonnes", "owner" => "Arewa Freight Services", "transporter" => "Arewa Freight Services", "insurance_expiry" => "2028-03-18", "roadworthiness_expiry" => "2028-01-25", "notes" => "Flatbed freight vehicle."],
-            ["plate" => "PHC-819JL", "kind" => "Reefer", "make" => "Hino", "model" => "500 Series", "year" => 2024, "capacity" => "15 tonnes", "owner" => "Eastern Corridor Transport", "transporter" => "Eastern Corridor Transport", "insurance_expiry" => "2028-09-12", "roadworthiness_expiry" => "2028-07-16", "notes" => "Refrigerated transport vehicle."],
-            ["plate" => "LAG-426NW", "kind" => "Box", "make" => "Isuzu", "model" => "NQR", "year" => 2022, "capacity" => "8 tonnes", "owner" => "Lagos Cargo Movers Ltd", "transporter" => "Lagos Cargo Movers Ltd", "insurance_expiry" => "2028-05-22", "roadworthiness_expiry" => "2028-03-30", "notes" => "Box truck for packaged cargo."],
-            ["plate" => "ENU-753KD", "kind" => "Container", "make" => "Scania", "model" => "R450", "year" => 2023, "capacity" => "40 tonnes", "owner" => "Primeway Logistics Ltd", "transporter" => "Primeway Logistics Ltd", "insurance_expiry" => "2028-10-14", "roadworthiness_expiry" => "2028-08-21", "notes" => "Long-haul container truck."],
-            ["plate" => "IBA-298QF", "kind" => "Flatbed", "make" => "DAF", "model" => "XF 480", "year" => 2021, "capacity" => "38 tonnes", "owner" => "Lagos Cargo Movers Ltd", "transporter" => "Lagos Cargo Movers Ltd", "insurance_expiry" => "2028-02-16", "roadworthiness_expiry" => "2027-12-20", "notes" => "Industrial cargo transport."],
-            ["plate" => "KAD-634VP", "kind" => "Container", "make" => "Sinotruk", "model" => "Howo NX", "year" => 2024, "capacity" => "40 tonnes", "owner" => "Northern Star Carriers", "transporter" => "Northern Star Carriers", "insurance_expiry" => "2028-11-05", "roadworthiness_expiry" => "2028-09-12", "notes" => "Heavy-duty container truck."],
-            ["plate" => "BEN-517GX", "kind" => "Tanker", "make" => "MAN", "model" => "TGS 26.400", "year" => 2022, "capacity" => "30000 litres", "owner" => "Northern Star Carriers", "transporter" => "Northern Star Carriers", "insurance_expiry" => "2028-07-25", "roadworthiness_expiry" => "2028-05-30", "notes" => "Tanker requiring cargo authorization."],
-            ["plate" => "OWR-835TZ", "kind" => "Reefer", "make" => "Mitsubishi Fuso", "model" => "Fighter", "year" => 2023, "capacity" => "12 tonnes", "owner" => "Eastern Corridor Transport", "transporter" => "Eastern Corridor Transport", "insurance_expiry" => "2028-08-17", "roadworthiness_expiry" => "2028-06-22", "notes" => "Refrigerated goods transport."],
-            ["plate" => "MAI-194RC", "kind" => "Container", "make" => "Volvo", "model" => "FM 440", "year" => 2022, "capacity" => "40 tonnes", "owner" => "Primeway Logistics Ltd", "transporter" => "Primeway Logistics Ltd", "insurance_expiry" => "2028-04-28", "roadworthiness_expiry" => "2028-02-14", "notes" => "Container haulage vehicle."]
-        ];
+function makeContainerNumber(): string
+{
+    $letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    $owners = ['MSCU', 'CMAU', 'MAEU', 'HLBU', 'TGHU', 'FSCU', 'BMOU', 'TEMU'];
+    $prefix = pickValue($owners);
+    $serial = '';
 
-        $driverIds = [];
-        $vehicleIds = [];
+    for ($i = 0; $i < 6; $i++) {
+        $serial .= (string) random_int(0, 9);
+    }
 
-        $findDriver = $conn->prepare(
-            "SELECT id FROM gate_drivers WHERE licence_number = ? LIMIT 1"
-        );
+    $values = [
+        'A' => 10, 'B' => 12, 'C' => 13, 'D' => 14,
+        'E' => 15, 'F' => 16, 'G' => 17, 'H' => 18,
+        'I' => 19, 'J' => 20, 'K' => 21, 'L' => 23,
+        'M' => 24, 'N' => 25, 'O' => 26, 'P' => 27,
+        'Q' => 28, 'R' => 29, 'S' => 30, 'T' => 31,
+        'U' => 32, 'V' => 34, 'W' => 35, 'X' => 36,
+        'Y' => 37, 'Z' => 38
+    ];
 
-        $insertDriver = $conn->prepare(
-            "INSERT INTO gate_drivers
-            (id, name, phone, licence_number, licence_class, licence_expiry,
-            assigned_vehicle, transporter, notes, status)
-            VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, 'Approved')"
-        );
+    $input = $prefix . $serial;
+    $sum = 0;
 
-        $updateDriver = $conn->prepare(
-            "UPDATE gate_drivers
-            SET name = ?, phone = ?, licence_class = ?, licence_expiry = ?,
-                transporter = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?"
-        );
+    for ($i = 0; $i < strlen($input); $i++) {
+        $char = $input[$i];
+        $value = ctype_digit($char) ? (int) $char : $values[$char];
+        $sum += $value * (2 ** $i);
+    }
 
-        foreach ($drivers as $driver) {
-            $findDriver->execute([$driver["licence_number"]]);
-            $existingId = $findDriver->fetchColumn();
+    return $input . (($sum % 11) % 10);
+}
 
-            if ($existingId) {
-                $driverId = $existingId;
-                $updateDriver->execute([
-                    $driver["name"],
-                    $driver["phone"],
-                    $driver["licence_class"],
-                    $driver["licence_expiry"],
-                    $driver["transporter"],
-                    $driver["notes"],
-                    $driverId
-                ]);
-            } else {
-                $driverId = generateID();
-                $insertDriver->execute([
-                    $driverId,
-                    $driver["name"],
-                    $driver["phone"],
-                    $driver["licence_number"],
-                    $driver["licence_class"],
-                    $driver["licence_expiry"],
-                    $driver["transporter"],
-                    $driver["notes"]
-                ]);
-            }
+function makeSealNumber(): string
+{
+    return 'NG' . random_int(100000, 999999) . strtoupper(bin2hex(random_bytes(2)));
+}
 
-            $driverIds[$driver["licence_number"]] = $driverId;
+function makeReference(string $prefix): string
+{
+    return $prefix . '-' . date('Y') . '-' . strtoupper(bin2hex(random_bytes(6)));
+}
+
+function isFake(?string $value): bool
+{
+    if ($value === null || trim($value) === '') {
+        return true;
+    }
+
+    $value = strtolower(trim($value));
+
+    if (in_array($value, [
+        'test', 'testing', 'demo', 'sample', 'unknown',
+        'n/a', 'na', 'null', 'undefined', 'none',
+        'consignee', 'customer', 'company', 'asas',
+        'dsbk', 'ksbk', 'ueywe', 'sdsdv', 'vjhv',
+        'hjvj', 'hjvh', 'asda', 'sa', 'svd', 'sd',
+        'mskjk', 'kjkj', 'swe-566-sds'
+    ], true)) {
+        return true;
+    }
+
+    if (preg_match('/^(.)\1{2,}$/i', $value)) {
+        return true;
+    }
+
+    if (preg_match('/^[a-z]{1,4}$/i', $value)) {
+        return true;
+    }
+
+    return false;
+}
+
+function isFakeContainerNumber(?string $value): bool
+{
+    if ($value === null || !preg_match('/^[A-Z]{3}U[0-9]{7}$/i', trim($value))) {
+        return true;
+    }
+
+    $value = strtoupper(trim($value));
+
+    $letterValues = [
+        'A' => 10, 'B' => 12, 'C' => 13, 'D' => 14,
+        'E' => 15, 'F' => 16, 'G' => 17, 'H' => 18,
+        'I' => 19, 'J' => 20, 'K' => 21, 'L' => 23,
+        'M' => 24, 'N' => 25, 'O' => 26, 'P' => 27,
+        'Q' => 28, 'R' => 29, 'S' => 30, 'T' => 31,
+        'U' => 32, 'V' => 34, 'W' => 35, 'X' => 36,
+        'Y' => 37, 'Z' => 38
+    ];
+
+    $sum = 0;
+
+    for ($i = 0; $i < 10; $i++) {
+        $char = $value[$i];
+        $number = ctype_digit($char) ? (int) $char : $letterValues[$char];
+        $sum += $number * (2 ** $i);
+    }
+
+    return (string) (($sum % 11) % 10) !== $value[10];
+}
+
+function uniqueContainerNumber(PDO $conn, string $shipmentId): string
+{
+    do {
+        $number = makeContainerNumber();
+
+        $stmt = $conn->prepare("
+            SELECT COUNT(*)
+            FROM portal_shipment_containers
+            WHERE shipment_id = :shipment_id
+              AND container_no = :container_no
+        ");
+
+        $stmt->execute([
+            'shipment_id' => $shipmentId,
+            'container_no' => $number
+        ]);
+
+        $exists = (int) $stmt->fetchColumn() > 0;
+    } while ($exists);
+
+    return $number;
+}
+
+function uniqueManifestContainerNumber(PDO $conn, string $manifestId): string
+{
+    do {
+        $number = makeContainerNumber();
+
+        $stmt = $conn->prepare("
+            SELECT COUNT(*)
+            FROM operation_manifest_containers
+            WHERE manifest_id = :manifest_id
+              AND container_no = :container_no
+        ");
+
+        $stmt->execute([
+            'manifest_id' => $manifestId,
+            'container_no' => $number
+        ]);
+
+        $exists = (int) $stmt->fetchColumn() > 0;
+    } while ($exists);
+
+    return $number;
+}
+
+$shippingLines = [
+    'Maersk',
+    'MSC',
+    'CMA CGM',
+    'Hapag-Lloyd',
+    'COSCO Shipping',
+    'Evergreen Marine'
+];
+
+$vessels = [
+    'Maersk Edirne',
+    'MSC Verona',
+    'CMA CGM Jacques Saade',
+    'Hapag-Lloyd Jakarta',
+    'COSCO Shipping Taurus',
+    'MSC Maya',
+    'Maersk Seoul'
+];
+
+$ports = [
+    'Apapa Port, Lagos, Nigeria',
+    'Tin Can Island Port, Lagos, Nigeria',
+    'Tema Port, Ghana',
+    'Durban Port, South Africa',
+    'Shanghai Port, China',
+    'Singapore Port, Singapore',
+    'Rotterdam Port, Netherlands',
+    'Jebel Ali Port, UAE',
+    'Antwerp Port, Belgium',
+    'Port Klang, Malaysia'
+];
+
+$consignees = [
+    [
+        'name' => 'Atlantic Industrial Supplies Ltd',
+        'email' => 'logistics@atlantic-industrial.example',
+        'phone' => '+2342015550101'
+    ],
+    [
+        'name' => 'Meridian Agricultural Exports Ltd',
+        'email' => 'exports@meridian-agri.example',
+        'phone' => '+2342015550102'
+    ],
+    [
+        'name' => 'Coastal Engineering Services Ltd',
+        'email' => 'cargo@coastal-engineering.example',
+        'phone' => '+2342015550103'
+    ],
+    [
+        'name' => 'Prime Packaging and Manufacturing Ltd',
+        'email' => 'logistics@prime-packaging.example',
+        'phone' => '+2342015550104'
+    ],
+    [
+        'name' => 'West African Consumer Products Ltd',
+        'email' => 'shipping@westafrican-consumer.example',
+        'phone' => '+2342015550105'
+    ]
+];
+
+$cargoTypes = [
+    [
+        'description' => 'Industrial machinery components and spare parts',
+        'category' => 'Industrial Equipment',
+        'package_type' => 'Pallets',
+        'hs_code' => '848390'
+    ],
+    [
+        'description' => 'Packaged consumer goods for commercial distribution',
+        'category' => 'Consumer Goods',
+        'package_type' => 'Cartons',
+        'hs_code' => '392390'
+    ],
+    [
+        'description' => 'Processed agricultural products for export',
+        'category' => 'Agricultural Products',
+        'package_type' => 'Bags',
+        'hs_code' => '120190'
+    ],
+    [
+        'description' => 'Electrical cables and industrial accessories',
+        'category' => 'Electrical Equipment',
+        'package_type' => 'Pallets',
+        'hs_code' => '854449'
+    ],
+    [
+        'description' => 'Plastic packaging materials for manufacturing',
+        'category' => 'Packaging Materials',
+        'package_type' => 'Cartons',
+        'hs_code' => '392020'
+    ]
+];
+
+$stats = [
+    'shipments_checked' => 0,
+    'shipments_updated' => 0,
+    'manifests_updated' => 0,
+    'manifests_linked' => 0,
+    'shipment_containers_created' => 0,
+    'manifest_containers_created' => 0,
+    'container_links_updated' => 0,
+    'container_count_mismatches' => []
+];
+
+try {
+    $conn->beginTransaction();
+
+    $link = $conn->prepare("
+        UPDATE operation_manifests m
+        INNER JOIN portal_shipments s
+            ON UPPER(TRIM(m.bill_of_lading)) =
+               UPPER(TRIM(s.bill_of_lading))
+        SET m.matched_shipment_id = s.id
+        WHERE m.matched_shipment_id IS NULL
+          AND m.bill_of_lading IS NOT NULL
+          AND TRIM(m.bill_of_lading) <> ''
+    ");
+
+    $link->execute();
+    $stats['manifests_linked'] = $link->rowCount();
+
+    $shipments = $conn->query("
+        SELECT s.*, m.id AS manifest_id,
+               m.manifest_ref, m.containers AS manifest_container_count,
+               m.packages AS manifest_packages,
+               m.gross_weight AS manifest_gross_weight,
+               m.consignee AS manifest_consignee,
+               m.vessel AS manifest_vessel,
+               m.shipping_line AS manifest_shipping_line,
+               m.origin_port AS manifest_origin_port,
+               m.eta AS manifest_eta,
+               m.bill_of_lading AS manifest_bill_of_lading
+        FROM portal_shipments s
+        LEFT JOIN operation_manifests m
+            ON m.matched_shipment_id = s.id
+        ORDER BY s.created_at ASC
+    ")->fetchAll();
+
+    $updateShipment = $conn->prepare("
+        UPDATE portal_shipments
+        SET shipping_line = :shipping_line,
+            vessel_name = :vessel_name,
+            origin_port = :origin_port,
+            destination_port = :destination_port,
+            expected_arrival = :expected_arrival,
+            consignee = :consignee,
+            consignee_email = :consignee_email,
+            consignee_phone = :consignee_phone,
+            cargo_description = :cargo_description,
+            cargo_category = :cargo_category,
+            package_type = :package_type,
+            package_count = :package_count,
+            gross_weight = :gross_weight,
+            volume = :volume,
+            hs_code = :hs_code,
+            dangerous_goods = 'no',
+            temperature_controlled = 'no',
+            temperature = NULL
+        WHERE id = :id
+    ");
+
+    $insertShipmentContainer = $conn->prepare("
+        INSERT INTO portal_shipment_containers
+            (id, shipment_id, container_no, size, seal_no,
+             package_count, gross_weight, status)
+        VALUES
+            (:id, :shipment_id, :container_no, :size, :seal_no,
+             :package_count, :gross_weight, 'EXPECTED')
+    ");
+
+    $insertManifestContainer = $conn->prepare("
+        INSERT INTO operation_manifest_containers
+            (id, manifest_id, container_no, seal_no, size,
+             package_count, gross_weight, matched_shipment_id,
+             matched_shipment_container_id)
+        VALUES
+            (:id, :manifest_id, :container_no, :seal_no, :size,
+             :package_count, :gross_weight, :shipment_id, :container_id)
+    ");
+
+    $updateManifestContainer = $conn->prepare("
+        UPDATE operation_manifest_containers
+        SET matched_shipment_id = :shipment_id,
+            matched_shipment_container_id = :container_id
+        WHERE id = :id
+    ");
+
+    $updateManifest = $conn->prepare("
+        UPDATE operation_manifests
+        SET vessel = :vessel,
+            shipping_line = :shipping_line,
+            origin_port = :origin_port,
+            eta = :eta,
+            containers = :containers,
+            packages = :packages,
+            gross_weight = :gross_weight,
+            consignee = :consignee
+        WHERE id = :id
+    ");
+
+    foreach ($shipments as $shipment) {
+        $stats['shipments_checked']++;
+
+        $shipmentId = $shipment['id'];
+        $manifestId = $shipment['manifest_id'];
+
+        $consignee = pickValue($consignees);
+        $cargo = pickValue($cargoTypes);
+
+        $shippingLine = isFake($shipment['shipping_line'])
+            ? pickValue($shippingLines)
+            : $shipment['shipping_line'];
+
+        $vessel = isFake($shipment['vessel_name'])
+            ? pickValue($vessels)
+            : $shipment['vessel_name'];
+
+        $origin = isFake($shipment['origin_port'])
+            ? pickValue($ports)
+            : $shipment['origin_port'];
+
+        $destination = isFake($shipment['destination_port'])
+            ? 'Apapa Port, Lagos, Nigeria'
+            : $shipment['destination_port'];
+
+        if (strcasecmp($origin, $destination) === 0) {
+            $destination = 'Tema Port, Ghana';
         }
 
-        $findVehicle = $conn->prepare(
-            "SELECT id FROM gate_vehicles WHERE plate = ? LIMIT 1"
-        );
+        $consigneeName = isFake($shipment['consignee'])
+            ? $consignee['name']
+            : $shipment['consignee'];
 
-        $insertVehicle = $conn->prepare(
-            "INSERT INTO gate_vehicles
-            (id, plate, kind, make, model, year, capacity, owner, transporter,
-            insurance_expiry, roadworthiness_expiry, notes, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Approved')"
-        );
+        $consigneeEmail = filter_var(
+            $shipment['consignee_email'],
+            FILTER_VALIDATE_EMAIL
+        ) && !preg_match('/@(example|test|invalid)\./i', $shipment['consignee_email'])
+            ? $shipment['consignee_email']
+            : $consignee['email'];
 
-        $updateVehicle = $conn->prepare(
-            "UPDATE gate_vehicles
-            SET kind = ?, make = ?, model = ?, year = ?, capacity = ?,
-                owner = ?, transporter = ?, insurance_expiry = ?,
-                roadworthiness_expiry = ?, notes = ?,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?"
-        );
+        $consigneePhone = preg_match(
+            '/^[+0-9() .-]{10,25}$/',
+            (string) $shipment['consignee_phone']
+        )
+            ? $shipment['consignee_phone']
+            : $consignee['phone'];
 
-        foreach ($vehicles as $vehicle) {
-            $findVehicle->execute([$vehicle["plate"]]);
-            $existingId = $findVehicle->fetchColumn();
+        $description = isFake($shipment['cargo_description'])
+            ? $cargo['description']
+            : $shipment['cargo_description'];
 
-            if ($existingId) {
-                $vehicleId = $existingId;
-                $updateVehicle->execute([
-                    $vehicle["kind"],
-                    $vehicle["make"],
-                    $vehicle["model"],
-                    $vehicle["year"],
-                    $vehicle["capacity"],
-                    $vehicle["owner"],
-                    $vehicle["transporter"],
-                    $vehicle["insurance_expiry"],
-                    $vehicle["roadworthiness_expiry"],
-                    $vehicle["notes"],
-                    $vehicleId
-                ]);
-            } else {
-                $vehicleId = generateID();
-                $insertVehicle->execute([
-                    $vehicleId,
-                    $vehicle["plate"],
-                    $vehicle["kind"],
-                    $vehicle["make"],
-                    $vehicle["model"],
-                    $vehicle["year"],
-                    $vehicle["capacity"],
-                    $vehicle["owner"],
-                    $vehicle["transporter"],
-                    $vehicle["insurance_expiry"],
-                    $vehicle["roadworthiness_expiry"],
-                    $vehicle["notes"]
-                ]);
-            }
+        $category = isFake($shipment['cargo_category'])
+            ? $cargo['category']
+            : $shipment['cargo_category'];
 
-            $vehicleIds[$vehicle["plate"]] = $vehicleId;
+        $packageType = isFake($shipment['package_type'])
+            ? $cargo['package_type']
+            : $shipment['package_type'];
+
+        $hsCode = isFake($shipment['hs_code'])
+            ? $cargo['hs_code']
+            : $shipment['hs_code'];
+
+        $packages = (float) $shipment['package_count'];
+
+        if ($packages <= 0) {
+            $packages = random_int(120, 1800);
         }
 
-        $closeAssignments = $conn->prepare(
-            "UPDATE gate_driver_vehicle_assignments
-            SET unassigned_at = NOW()
-            WHERE driver_id = ? AND unassigned_at IS NULL"
-        );
+        $weight = (float) $shipment['gross_weight'];
 
-        $findActiveAssignment = $conn->prepare(
-            "SELECT id
-            FROM gate_driver_vehicle_assignments
-            WHERE driver_id = ? AND vehicle_id = ?
-            AND unassigned_at IS NULL
-            LIMIT 1"
-        );
+        if ($weight <= 0) {
+            $weight = round(random_int(8000, 24000) + random_int(0, 999) / 1000, 3);
+        }
 
-        $insertAssignment = $conn->prepare(
-            "INSERT INTO gate_driver_vehicle_assignments
-            (id, driver_id, vehicle_id, assigned_at)
-            VALUES (?, ?, ?, NOW())"
-        );
+        $volume = (float) $shipment['volume'];
 
-        $updateDriverVehicle = $conn->prepare(
-            "UPDATE gate_drivers
-            SET assigned_vehicle = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?"
-        );
+        if ($volume <= 0) {
+            $volume = round(random_int(18, 65) + random_int(0, 999) / 1000, 3);
+        }
 
-        $assignmentsCreated = 0;
-        $driverEntries = array_values($drivers);
-        $vehicleEntries = array_values($vehicles);
-        $pairCount = min(count($driverEntries), count($vehicleEntries));
+        $arrival = $shipment['expected_arrival'];
 
-        for ($i = 0; $i < $pairCount; $i++) {
-            $driverLicence = $driverEntries[$i]["licence_number"];
-            $vehiclePlate = $vehicleEntries[$i]["plate"];
+        if (
+            empty($arrival) ||
+            strtotime($arrival) === false ||
+            strtotime($arrival) < strtotime('-180 days')
+        ) {
+            $arrival = date(
+                'Y-m-d H:i:s',
+                strtotime('+' . random_int(3, 24) . ' days')
+            );
+        }
 
-            $driverId = $driverIds[$driverLicence] ?? null;
-            $vehicleId = $vehicleIds[$vehiclePlate] ?? null;
+        $updateShipment->execute([
+            'shipping_line' => $shippingLine,
+            'vessel_name' => $vessel,
+            'origin_port' => $origin,
+            'destination_port' => $destination,
+            'expected_arrival' => $arrival,
+            'consignee' => $consigneeName,
+            'consignee_email' => $consigneeEmail,
+            'consignee_phone' => $consigneePhone,
+            'cargo_description' => $description,
+            'cargo_category' => $category,
+            'package_type' => $packageType,
+            'package_count' => $packages,
+            'gross_weight' => $weight,
+            'volume' => $volume,
+            'hs_code' => $hsCode,
+            'id' => $shipmentId
+        ]);
 
-            if (!$driverId || !$vehicleId) {
-                continue;
+        $stats['shipments_updated']++;
+
+        $containerQuery = $conn->prepare("
+            SELECT id, container_no, size, seal_no, package_count, gross_weight
+            FROM portal_shipment_containers
+            WHERE shipment_id = ?
+            ORDER BY created_at ASC
+        ");
+        $containerQuery->execute([$shipmentId]);
+        $containerRows = $containerQuery->fetchAll();
+
+        if ($manifestId !== null) {
+            $manifestContainerQuery = $conn->prepare("
+                SELECT id, container_no, seal_no, size, package_count, gross_weight
+                FROM operation_manifest_containers
+                WHERE manifest_id = ?
+                ORDER BY created_at ASC
+            ");
+            $manifestContainerQuery->execute([$manifestId]);
+            $manifestRows = $manifestContainerQuery->fetchAll();
+
+            $declaredCount = max(0, (int) $shipment['manifest_container_count']);
+
+            $targetCount = max(
+                $declaredCount,
+                count($manifestRows),
+                count($containerRows)
+            );
+
+            if ($targetCount === 0) {
+                $targetCount = random_int(1, 4);
             }
 
-            $findActiveAssignment->execute([$driverId, $vehicleId]);
+            while (count($manifestRows) < $targetCount) {
+                $containerNo = uniqueContainerNumber($conn, $shipmentId);
 
-            if ($findActiveAssignment->fetchColumn()) {
-                $updateDriverVehicle->execute([$vehiclePlate, $driverId]);
-                continue;
+                $size = pickValue(['20ft', '40ft', '40ft HC']);
+                $sealNo = makeSealNumber();
+                $containerPackages = round($packages / $targetCount, 2);
+                $containerWeight = round($weight / $targetCount, 3);
+
+                $containerId = generateID();
+                $manifestContainerId = generateID();
+
+                $insertShipmentContainer->execute([
+                    'id' => $containerId,
+                    'shipment_id' => $shipmentId,
+                    'container_no' => $containerNo,
+                    'size' => $size,
+                    'seal_no' => $sealNo,
+                    'package_count' => $containerPackages,
+                    'gross_weight' => $containerWeight
+                ]);
+
+                $insertManifestContainer->execute([
+                    'id' => $manifestContainerId,
+                    'manifest_id' => $manifestId,
+                    'container_no' => $containerNo,
+                    'seal_no' => $sealNo,
+                    'size' => $size,
+                    'package_count' => $containerPackages,
+                    'gross_weight' => $containerWeight,
+                    'shipment_id' => $shipmentId,
+                    'container_id' => $containerId
+                ]);
+
+                $containerRows[] = [
+                    'id' => $containerId,
+                    'container_no' => $containerNo,
+                    'size' => $size,
+                    'seal_no' => $sealNo,
+                    'package_count' => $containerPackages,
+                    'gross_weight' => $containerWeight
+                ];
+
+                $manifestRows[] = [
+                    'id' => $manifestContainerId,
+                    'container_no' => $containerNo,
+                    'seal_no' => $sealNo,
+                    'size' => $size,
+                    'package_count' => $containerPackages,
+                    'gross_weight' => $containerWeight
+                ];
+
+                $stats['shipment_containers_created']++;
+                $stats['manifest_containers_created']++;
             }
 
-            $closeAssignments->execute([$driverId]);
+            foreach ($manifestRows as $index => &$manifestRow) {
+                if (isFakeContainerNumber($manifestRow['container_no'])) {
+                    $newNumber = uniqueManifestContainerNumber($conn, $manifestId);
 
-            $insertAssignment->execute([
-                generateID(),
-                $driverId,
-                $vehicleId
+                    $change = $conn->prepare("
+                        UPDATE operation_manifest_containers
+                        SET container_no = ?
+                        WHERE id = ?
+                    ");
+                    $change->execute([$newNumber, $manifestRow['id']]);
+
+                    $manifestRow['container_no'] = $newNumber;
+                }
+            }
+            unset($manifestRow);
+
+            foreach ($containerRows as $index => &$containerRow) {
+                if (isFakeContainerNumber($containerRow['container_no'])) {
+                    $newNumber = uniqueContainerNumber($conn, $shipmentId);
+
+                    $change = $conn->prepare("
+                        UPDATE portal_shipment_containers
+                        SET container_no = ?
+                        WHERE id = ?
+                    ");
+                    $change->execute([$newNumber, $containerRow['id']]);
+
+                    $containerRow['container_no'] = $newNumber;
+                }
+            }
+            unset($containerRow);
+
+            foreach ($manifestRows as $manifestRow) {
+                $matchedContainer = null;
+
+                foreach ($containerRows as $containerRow) {
+                    if (
+                        strtoupper(trim($manifestRow['container_no'])) ===
+                        strtoupper(trim($containerRow['container_no']))
+                    ) {
+                        $matchedContainer = $containerRow;
+                        break;
+                    }
+                }
+
+                if ($matchedContainer === null) {
+                    $containerNo = $manifestRow['container_no'];
+                    $containerId = generateID();
+
+                    $size = $manifestRow['size'] ?: '40ft HC';
+                    $sealNo = isFake($manifestRow['seal_no'])
+                        ? makeSealNumber()
+                        : $manifestRow['seal_no'];
+
+                    $containerPackages = (float) $manifestRow['package_count'];
+                    $containerWeight = (float) $manifestRow['gross_weight'];
+
+                    $insertShipmentContainer->execute([
+                        'id' => $containerId,
+                        'shipment_id' => $shipmentId,
+                        'container_no' => $containerNo,
+                        'size' => $size,
+                        'seal_no' => $sealNo,
+                        'package_count' => $containerPackages,
+                        'gross_weight' => $containerWeight
+                    ]);
+
+                    $containerRows[] = [
+                        'id' => $containerId,
+                        'container_no' => $containerNo,
+                        'size' => $size,
+                        'seal_no' => $sealNo,
+                        'package_count' => $containerPackages,
+                        'gross_weight' => $containerWeight
+                    ];
+
+                    $matchedContainer = end($containerRows);
+                    $stats['shipment_containers_created']++;
+                }
+
+                $updateManifestContainer->execute([
+                    'shipment_id' => $shipmentId,
+                    'container_id' => $matchedContainer['id'],
+                    'id' => $manifestRow['id']
+                ]);
+
+                $stats['container_links_updated']++;
+            }
+
+            $finalCount = count($containerRows);
+            $manifestPackages = (int) round($packages);
+            $manifestWeight = number_format($weight, 3, '.', '') . ' kg';
+
+            $manifestVessel = isFake($shipment['manifest_vessel'])
+                ? $vessel
+                : $shipment['manifest_vessel'];
+
+            $manifestShippingLine = isFake($shipment['manifest_shipping_line'])
+                ? $shippingLine
+                : $shipment['manifest_shipping_line'];
+
+            $manifestOrigin = isFake($shipment['manifest_origin_port'])
+                ? $origin
+                : $shipment['manifest_origin_port'];
+
+            $manifestRef = isFake($shipment['manifest_ref'])
+                ? makeReference('TRN-MNF')
+                : $shipment['manifest_ref'];
+
+            $updateManifest->execute([
+                'vessel' => $manifestVessel,
+                'shipping_line' => $manifestShippingLine,
+                'origin_port' => $manifestOrigin,
+                'eta' => $arrival,
+                'containers' => $finalCount,
+                'packages' => $manifestPackages,
+                'gross_weight' => $manifestWeight,
+                'consignee' => $consigneeName,
+                'id' => $manifestId
             ]);
 
-            $updateDriverVehicle->execute([$vehiclePlate, $driverId]);
-            $assignmentsCreated++;
+            $stats['manifests_updated']++;
+
+            $check = $conn->prepare("
+                SELECT
+                    (SELECT COUNT(*)
+                     FROM portal_shipment_containers
+                     WHERE shipment_id = ?) AS saved_count,
+                    (SELECT COUNT(*)
+                     FROM operation_manifest_containers
+                     WHERE manifest_id = ?) AS manifest_count
+            ");
+            $check->execute([$shipmentId, $manifestId]);
+            $counts = $check->fetch();
+
+            if ((int) $counts['saved_count'] !== (int) $counts['manifest_count']) {
+                $stats['container_count_mismatches'][] = [
+                    'shipment_reference' => $shipment['shipment_reference'],
+                    'saved_count' => (int) $counts['saved_count'],
+                    'manifest_count' => (int) $counts['manifest_count']
+                ];
+            }
+        } elseif (count($containerRows) === 0) {
+            $targetCount = random_int(1, 4);
+
+            for ($i = 0; $i < $targetCount; $i++) {
+                $containerNo = uniqueContainerNumber($conn, $shipmentId);
+                $containerId = generateID();
+                $size = pickValue(['20ft', '40ft', '40ft HC']);
+                $sealNo = makeSealNumber();
+
+                $insertShipmentContainer->execute([
+                    'id' => $containerId,
+                    'shipment_id' => $shipmentId,
+                    'container_no' => $containerNo,
+                    'size' => $size,
+                    'seal_no' => $sealNo,
+                    'package_count' => round($packages / $targetCount, 2),
+                    'gross_weight' => round($weight / $targetCount, 3)
+                ]);
+
+                $stats['shipment_containers_created']++;
+            }
         }
-
-        $conn->commit();
-
-        echo json_encode([
-            "error" => false,
-            "data" => "Driver, vehicle, and assignment records processed successfully.",
-            "code" => [
-                "drivers_processed" => count($drivers),
-                "vehicles_processed" => count($vehicles),
-                "assignments_created" => $assignmentsCreated
-            ]
-        ]);
-    } catch (Throwable $e) {
-        if ($conn->inTransaction()) {
-            $conn->rollBack();
-        }
-
-        http_response_code(500);
-
-        echo json_encode([
-            "error" => true,
-            "data" => "Could not seed driver and vehicle records.",
-            "code" => $e->getMessage()
-        ]);
     }
-*/
+
+    $conn->commit();
+
+    echo json_encode([
+        "error" => false,
+        "data" => [
+            "message" => "Shipment and manifest repair completed.",
+            "stats" => $stats,
+            "notice" => "Generated shipping details are synthetic and must be checked against source documents before operational use."
+        ],
+        "code" => 200
+    ], JSON_PRETTY_PRINT);
+
+} catch (Throwable $e) {
+    if ($conn->inTransaction()) {
+        $conn->rollBack();
+    }
+
+    http_response_code(500);
+
+    echo json_encode([
+        "error" => true,
+        "data" => "Could not repair shipment data.",
+        "code" => $e->getMessage()
+    ]);
+}
