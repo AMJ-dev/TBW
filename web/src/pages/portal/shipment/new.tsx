@@ -833,6 +833,10 @@ export default function NewPortalShipmentPage() {
 			destination_port: form.destinationPort.trim(),
 			expected_arrival: form.expectedArrival,
 			consignee: consigneeName,
+			consignee_contact_person: consignee.contactPerson.trim(),
+			// country
+			consignee_country: consignee.country,
+			
 			consignee_type: consignee.type,
 			consignee_organisation_id: consignee.organisationId ?? "",
 			consignee_status: consignee.organisationId ? "linked" : "unregistered",

@@ -68,6 +68,24 @@ const textareaClass =
 const formatStatus = (status: string) =>
 	status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 
+const displayText = (value: any): string => {
+	if (value === null || value === undefined || value === "") return "—";
+	if (typeof value === "string" || typeof value === "number") return String(value);
+	if (typeof value === "object") {
+		return String(
+			value.organisation_name ??
+			value.organisationName ??
+			value.name ??
+			value.contact_person ??
+			value.contactPerson ??
+			value.fullName ??
+			value.email ??
+			"—"
+		);
+	}
+	return String(value);
+};
+
 const extractList = <T,>(payload: any): T[] => {
 	if (Array.isArray(payload)) return payload as T[];
 	if (Array.isArray(payload?.results)) return payload.results as T[];
@@ -86,7 +104,7 @@ const normalizeRecord = (m: any): ManifestRecord => ({
 	containers: Number(m.containers ?? 0),
 	packages: Number(m.packages ?? 0),
 	grossWeight: m.gross_weight ?? m.grossWeight ?? "—",
-	consignee: m.consignee ?? "—",
+	consignee: displayText(m.consignee_name ?? m.consignee ?? m.consignee_organisation_name),
 	consigneeOrganisationId: m.consignee_organisation_id ?? null,
 	consigneeStatus: (m.consignee_status ?? "unregistered") as ConsigneeStatus,
 	consigneeEmail: m.consignee_email ?? null,
@@ -113,15 +131,6 @@ export default function OperationsManifestDetailsPage() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState("");
 	const [actioning, setActioning] = useState(false);
-
-	const [shipmentQuery, setShipmentQuery] = useState("");
-	const [shipmentResults, setShipmentResults] = useState<any[]>([]);
-	const [matchSuggestions, setMatchSuggestions] = useState<any[]>([]);
-	const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-	const [shipmentId, setShipmentId] = useState("");
-	const [matchReason, setMatchReason] = useState("");
-	const [searchingShipments, setSearchingShipments] = useState(false);
-	const [matchingShipment, setMatchingShipment] = useState(false);
 
 	const [flagDialogOpen, setFlagDialogOpen] = useState(false);
 	const [flagReason, setFlagReason] = useState("");
@@ -160,7 +169,6 @@ export default function OperationsManifestDetailsPage() {
 			}
 			const normalized = normalizeRecord(record);
 			setManifest(normalized);
-			setShipmentQuery(normalized.bl);
 			setInviteEmail(normalized.consigneeEmail ?? "");
 		} catch (err: any) {
 			setError(
@@ -178,70 +186,13 @@ export default function OperationsManifestDetailsPage() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [id]);
 
-	useEffect(() => {
-		const q = shipmentQuery.trim();
-		if (q.length < 2) {
-			setShipmentResults([]);
-			return;
-		}
-		let cancelled = false;
-		const timer = window.setTimeout(async () => {
-			setSearchingShipments(true);
-			try {
-				const res = await http.post(`operations/manifests/shipments/`, { q });
-				const resp: Resp = res.data;
-				if (!cancelled)
-					setShipmentResults(resp.error ? [] : extractList<any>(resp.code));
-			} catch {
-				if (!cancelled) setShipmentResults([]);
-			} finally {
-				if (!cancelled) setSearchingShipments(false);
-			}
-		}, 300);
-		return () => {
-			cancelled = true;
-			window.clearTimeout(timer);
-		};
-	}, [shipmentQuery]);
-
-	useEffect(() => {
-		if (!manifest?.id) return;
-		let cancelled = false;
-		(async () => {
-			setLoadingSuggestions(true);
-			try {
-				const res = await http.post("operations/manifests/suggestions/", {
-					manifest_id: manifest.id,
-				});
-				const resp: Resp = res.data;
-				if (!cancelled)
-					setMatchSuggestions(
-						resp.error
-							? []
-							: extractList<any>(
-									(resp.code as any)?.suggestions ?? resp.code
-							  )
-					);
-			} catch {
-				if (!cancelled) setMatchSuggestions([]);
-			} finally {
-				if (!cancelled) setLoadingSuggestions(false);
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [manifest?.id]);
-
 	const isShipmentLinked = Boolean(
 		manifest?.matchedShipmentId ||
 		(manifest?.shipmentReference && manifest.shipmentReference.trim()) ||
 		(manifest?.shipmentReferences && manifest.shipmentReferences.trim())
 	);
-	const canChangeLink = manifest?.status === "Pre-advice" || manifest?.status === "Unmatched";
-	const correctionSubmitted = manifest?.status === "Review required";
-	const canValidate = isShipmentLinked && (canChangeLink || correctionSubmitted);
-	const canFlag = isShipmentLinked && (canChangeLink || correctionSubmitted);
+	const canValidate = isShipmentLinked && (manifest?.status === "Pre-advice" || manifest?.status === "Unmatched" || manifest?.status === "Review required");
+	const canFlag = isShipmentLinked && (manifest?.status === "Pre-advice" || manifest?.status === "Unmatched" || manifest?.status === "Review required");
 
 	useEffect(() => {
 		let cancelled = false;
@@ -260,8 +211,9 @@ export default function OperationsManifestDetailsPage() {
 					throw new Error(
 						String(resp.data || "Could not load linked shipment details.")
 					);
-				if (!cancelled)
-					setLinkedShipment((resp.code as any)?.shipment ?? resp.code ?? null);
+				const payload: any = resp.code ?? {};
+				const shipment = payload.shipment ?? payload.data?.shipment ?? payload.data ?? payload;
+				if (!cancelled) setLinkedShipment(shipment && typeof shipment === "object" ? shipment : null);
 			} catch (err: any) {
 				if (!cancelled)
 					setLinkedShipmentError(
@@ -334,53 +286,6 @@ export default function OperationsManifestDetailsPage() {
 			return false;
 		} finally {
 			setActioning(false);
-		}
-	};
-
-	const handleMatch = async (selectedShipmentId: string, reason: string) => {
-		if (!manifest) return false;
-		if (manifest.status !== "Pre-advice" && manifest.status !== "Unmatched") {
-			toast.error(
-				"The shipment link can only be changed while the manifest is unmatched or in Pre-advice."
-			);
-			return false;
-		}
-		setMatchingShipment(true);
-		try {
-			const res = await http.post(`operations/manifests/match/`, {
-				manifest_id: manifest.id,
-				shipment_id: selectedShipmentId,
-				reason,
-			});
-			const resp: Resp = res.data;
-			if (resp.error) {
-				toast.error(resp.data || "Could not link shipment declaration.");
-				return false;
-			}
-			toast.success(resp.data || "Shipment declaration linked.");
-			setManifest((current) =>
-				current
-					? {
-							...current,
-							matchedShipmentId: selectedShipmentId,
-							shipmentReference:
-								current.shipmentReference || selectedShipmentId,
-							shipmentReferences:
-								current.shipmentReferences ||
-								current.shipmentReference ||
-								selectedShipmentId,
-					  }
-					: current
-			);
-			await fetchManifest();
-			return true;
-		} catch (err: any) {
-			toast.error(
-				err?.response?.data?.message || "Could not link shipment declaration."
-			);
-			return false;
-		} finally {
-			setMatchingShipment(false);
 		}
 	};
 
@@ -537,11 +442,6 @@ export default function OperationsManifestDetailsPage() {
 								label={manifest.status}
 								tone={statusTone(manifest.status)}
 							/>
-							{correctionSubmitted && (
-								<span className="rounded bg-teal/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.1em] text-teal-deep ring-1 ring-teal/25">
-									Organisation resubmitted · Review required
-								</span>
-							)}
 							<span className="rounded bg-sand px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-soft">
 								{manifest.source}
 							</span>
@@ -916,230 +816,29 @@ export default function OperationsManifestDetailsPage() {
 							</div>
 						)}
 
-						{canChangeLink ? (
-							<section className="space-y-3 rounded-xl bg-sand p-4 ring-1 ring-line">
-								<div>
-									<p className="text-[13px] font-semibold text-ink">
-										Step 1 · Link shipment declaration
+						{/* Removed linking section entirely */}
+						<section className="rounded-xl border border-line bg-sand p-4">
+							<div className="flex items-start gap-3">
+								<span className="grid size-9 shrink-0 place-items-center rounded-lg bg-ink/5 text-ink-soft">
+									<ClipboardCheck className="size-4" />
+								</span>
+								<div className="min-w-0">
+									<p className="text-sm font-semibold text-ink">
+										Shipment linkage is managed automatically
 									</p>
-									<p className="mt-1 text-[11px] leading-5 text-ink-soft">
-										Select the declaration that belongs to this carrier
-										manifest. Check the bill of lading and container numbers
-										before confirming. A bill-of-lading mismatch requires an
-										explanation.
+									<p className="mt-1 text-xs leading-5 text-ink-soft">
+										Shipment declarations are linked automatically when the organisation submits a declaration that matches the bill of lading or container numbers on this manifest. Manual linking is not available.
 									</p>
-								</div>
-								<div className="rounded-lg border border-teal/25 bg-teal/5 p-3">
-									<div className="flex items-center justify-between gap-2">
-										<p className="text-xs font-semibold text-ink">
-											Suggested shipment matches
-										</p>
-										{loadingSuggestions && (
-											<Loader2 className="size-3.5 animate-spin text-ink-soft" />
-										)}
-									</div>
-									<p className="mt-1 text-[11px] leading-5 text-ink-soft">
-										Suggestions are based on exact bill-of-lading and saved
-										container-number matches. Nothing is linked until an
-										operations user confirms it.
-									</p>
-									{!loadingSuggestions && matchSuggestions.length === 0 && (
-										<p className="mt-2 text-[11px] text-ink-soft">
-											No exact bill-of-lading or container matches found.
-											Search manually below.
+									{isShipmentLinked && (
+										<p className="mt-2 text-xs font-semibold text-ink">
+											Linked shipment:{" "}
+											{manifest.shipmentReferences ||
+												manifest.shipmentReference}
 										</p>
 									)}
-									{matchSuggestions.length > 0 && (
-										<div className="mt-2 max-h-48 space-y-2 overflow-y-auto">
-											{matchSuggestions.map((s) => (
-												<div
-													key={s.id}
-													className={cn(
-														"rounded-lg border p-3",
-														shipmentId === s.id
-															? "border-orange bg-orange/10"
-															: "border-line bg-paper"
-													)}
-												>
-													<div className="flex items-start justify-between gap-3">
-														<div className="min-w-0">
-															<p className="text-xs font-semibold text-ink">
-																{s.shipment_reference || s.id}
-															</p>
-															<p className="mt-1 text-[11px] text-ink-soft">
-																BL: {s.bill_of_lading || "—"} ·{" "}
-																{s.consignee || "No consignee"}
-															</p>
-															<p className="mt-1 text-[10px] text-ink-soft">
-																{s.organisation_name || "No organisation"} ·
-																Score {s.match_score}%
-															</p>
-															<p className="mt-1 text-[10px] text-teal-deep">
-																{Array.isArray(s.match_reasons)
-																	? s.match_reasons.join(" · ")
-																	: "Potential match — verify details"}
-															</p>
-														</div>
-														<Button
-															type="button"
-															variant="outline"
-															className={cn(
-																"shrink-0",
-																shipmentId === s.id &&
-																	"border-orange bg-orange/10 text-ink"
-															)}
-															onClick={() => {
-																setShipmentId(s.id);
-																setShipmentQuery(
-																	s.shipment_reference ||
-																		s.bill_of_lading ||
-																		""
-																);
-															}}
-														>
-															{shipmentId === s.id
-																? "Selected"
-																: "Review match"}
-														</Button>
-													</div>
-												</div>
-											))}
-										</div>
-									)}
 								</div>
-								<input
-									value={shipmentQuery}
-									onChange={(e) => {
-										setShipmentQuery(e.target.value);
-										setShipmentId("");
-									}}
-									placeholder="Search by shipment reference, BL, consignee, vessel…"
-									className="h-10 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-orange/30"
-								/>
-								{searchingShipments && (
-									<p className="text-xs text-ink-soft">
-										Searching declarations…
-									</p>
-								)}
-								{shipmentResults.length > 0 && (
-									<div className="max-h-44 space-y-1 overflow-y-auto">
-										{shipmentResults.map((s) => (
-											<button
-												key={s.id}
-												type="button"
-												onClick={() => setShipmentId(s.id)}
-												className={cn(
-													"w-full rounded-lg border p-3 text-left transition",
-													shipmentId === s.id
-														? "border-orange bg-orange/10"
-														: "border-line bg-paper hover:bg-sand-2"
-												)}
-											>
-												<p className="text-xs font-semibold text-ink">
-													{s.shipment_reference || s.id}
-												</p>
-												<p className="mt-1 text-[11px] text-ink-soft">
-													BL: {s.bill_of_lading || "—"} ·{" "}
-													{s.consignee || "No consignee"}
-												</p>
-												<p className="mt-1 text-[10px] text-ink-soft">
-													{s.organisation_name || "No organisation"} ·{" "}
-													{s.vessel_name || "No vessel"} · {s.status}
-												</p>
-											</button>
-										))}
-									</div>
-								)}
-								{shipmentQuery.trim().length >= 2 &&
-									!searchingShipments &&
-									shipmentResults.length === 0 && (
-										<p className="text-xs text-ink-soft">
-											No shipment declarations found.
-										</p>
-									)}
-								{shipmentId &&
-									shipmentResults.find((s) => s.id === shipmentId) &&
-									shipmentResults
-										.find((s) => s.id === shipmentId)
-										.bill_of_lading?.trim()
-										.toLowerCase() !== manifest.bl.trim().toLowerCase() && (
-										<label className="block">
-											<span className={labelClass}>
-												Reason for BL mismatch{" "}
-												<span className="text-coral">*</span>
-											</span>
-											<textarea
-												rows={2}
-												value={matchReason}
-												onChange={(e) => setMatchReason(e.target.value)}
-												className={textareaClass}
-												placeholder="Explain why these records should be linked"
-											/>
-										</label>
-									)}
-								<div className="flex justify-end">
-									<Button
-										type="button"
-										disabled={
-											!shipmentId ||
-											matchingShipment ||
-											(shipmentResults.find((s) => s.id === shipmentId)
-												?.bill_of_lading?.trim()
-												.toLowerCase() !==
-												manifest.bl.trim().toLowerCase() &&
-												!matchReason.trim())
-										}
-										onClick={async () => {
-											const ok = await handleMatch(
-												shipmentId,
-												matchReason.trim()
-											);
-											if (ok) {
-												setShipmentId("");
-												setMatchReason("");
-											}
-										}}
-										className="bg-orange text-white hover:bg-orange-deep"
-									>
-										{matchingShipment ? (
-											<Loader2 className="mr-1.5 size-4 animate-spin" />
-										) : (
-											<Check className="mr-1.5 size-4" />
-										)}
-										Link shipment
-									</Button>
-								</div>
-							</section>
-						) : (
-							<section className="rounded-xl border border-line bg-sand p-4">
-								<div className="flex items-start gap-3">
-									<span className="grid size-9 shrink-0 place-items-center rounded-lg bg-ink/5 text-ink-soft">
-										<ClipboardCheck className="size-4" />
-									</span>
-									<div className="min-w-0">
-										<p className="text-sm font-semibold text-ink">
-											Shipment link is locked
-										</p>
-										<p className="mt-1 text-xs leading-5 text-ink-soft">
-											{manifest.status === "Validated"
-												? "This manifest has been validated. The linked shipment cannot be changed."
-												: manifest.status === "Discrepancy"
-													? "This manifest has been flagged for review. Resolve the issue through the authorised review process before changing the shipment link."
-													: manifest.status === "Duplicate"
-														? "This manifest is marked as a duplicate. The shipment link cannot be changed until the duplicate is resolved."
-														: "This manifest has moved beyond the matching stage. The shipment link cannot be changed."}
-										</p>
-										{isShipmentLinked && (
-											<p className="mt-2 text-xs font-semibold text-ink">
-												Linked shipment:{" "}
-												{manifest.shipmentReferences ||
-													manifest.shipmentReference}
-											</p>
-										)}
-									</div>
-								</div>
-							</section>
-						)}
+							</div>
+						</section>
 
 						<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
 							<div className="flex items-start gap-3">

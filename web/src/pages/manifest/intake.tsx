@@ -159,19 +159,44 @@ export default function OperationsManifestIntakePage() {
 				.filter(Boolean)
 				.join("\n")
 		);
-		setConsignee((current) => ({
-			...current,
-			type: "organisation",
-			organisationId:
-				shipment.consignee_organisation_id ??
-				shipment.consigneeOrganisationId ??
-				null,
-			organisationName: String(shipment.consignee ?? shipment.consignee_name ?? ""),
-			status:
-				shipment.consignee_organisation_id ?? shipment.consigneeOrganisationId
-					? "linked"
-					: "unregistered",
-		}));
+		const consigneeData =
+			typeof shipment.consignee === "object" && shipment.consignee !== null
+				? shipment.consignee
+				: {};
+		const agentData =
+			typeof shipment.agent === "object" && shipment.agent !== null
+				? shipment.agent
+				: {};
+		const consigneeId =
+			consigneeData.organisation_id ??
+			shipment.consignee_organisation_id ??
+			shipment.consigneeOrganisationId ??
+			null;
+		const consigneeType =
+			(consigneeData.type ?? shipment.consignee_type) === "individual"
+				? "individual"
+				: "organisation";
+		const agentId = agentData.id ?? shipment.licensed_agent_id ?? shipment.agent_id ?? null;
+		const agentName =
+			agentData.name ?? shipment.agent_name ?? shipment.licensed_agent_name ?? "";
+
+		setConsignee({
+			type: consigneeType,
+			organisationId: consigneeId ? String(consigneeId) : null,
+			organisationName: String(
+				consigneeData.organisation_name ??
+				(consigneeType === "organisation" ? shipment.consignee_name ?? (typeof shipment.consignee === "string" ? shipment.consignee : "") : "")
+			),
+			status: (consigneeData.status ?? shipment.consignee_status) === "linked" || consigneeId ? "linked" : "unregistered",
+			contactPerson: String(consigneeData.contact_person ?? shipment.consignee_contact_person ?? ""),
+			fullName: String(consigneeType === "individual" ? consigneeData.name ?? (typeof shipment.consignee === "string" ? shipment.consignee : "") : ""),
+			email: String(consigneeData.email ?? shipment.consignee_email ?? ""),
+			phone: String(consigneeData.phone ?? shipment.consignee_phone ?? ""),
+			address: String(consigneeData.address ?? shipment.consignee_address ?? ""),
+			country: String(consigneeData.country ?? shipment.consignee_country ?? ""),
+			agentId: agentId ? String(agentId) : null,
+			agentName: String(agentName),
+		});
 	};
 
 	useEffect(() => {
@@ -597,7 +622,7 @@ export default function OperationsManifestIntakePage() {
 															matchedShipment.bl ??
 															"—"}{" "}
 														· Consignee:{" "}
-														{matchedShipment.consignee ?? "—"}
+														{typeof matchedShipment.consignee === "object" ? matchedShipment.consignee.organisation_name ?? matchedShipment.consignee.name ?? "—" : matchedShipment.consignee ?? matchedShipment.consignee_name ?? "—"}
 													</p>
 													<p className="mt-1 text-xs text-ink-soft">
 														Status:{" "}
@@ -665,7 +690,7 @@ export default function OperationsManifestIntakePage() {
 														{shipment.bill_of_lading ??
 															shipment.bl ??
 															"—"}{" "}
-														· Consignee: {shipment.consignee ?? "—"}
+														· Consignee: {typeof shipment.consignee === "object" ? shipment.consignee.organisation_name ?? shipment.consignee.name ?? "—" : shipment.consignee ?? shipment.consignee_name ?? "—"}
 													</p>
 													<p className="mt-1 text-xs text-ink-soft">
 														Shipping line:{" "}
