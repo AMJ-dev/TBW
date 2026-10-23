@@ -97,6 +97,7 @@ RewriteRule ^public/maintenance/schedule/$ src/portal/maintenance.php [NC]
 RewriteRule ^portal/shipments/$ src/shipment/get.php [NC]
 RewriteRule ^portal/shipments/save/$ src/shipment/save.php [NC]
 RewriteRule ^portal/shipment/config/$ src/shipment/config.php [NC]
+RewriteRule ^portal/manifest/shipment-search/$ src/manifests/shipment-search.php [NC]
 RewriteRule ^portal/shipment/([0-9a-zA-Z-]+)/$ src/shipment/details.php?id=$1 [NC]
 RewriteRule ^portal/shipments/update/([0-9a-zA-Z-]+)/$ src/shipment/update.php?id=$1 [NC]
 

@@ -1,318 +1,306 @@
-
 <?php
 
 require_once __DIR__ . "/include/conn.php";
 
-header('Content-Type: application/json; charset=utf-8');
+header("Content-Type: application/json; charset=utf-8");
 
 if (!isset($conn) || !($conn instanceof PDO)) {
-    echo json_encode([
-        "error" => true,
-        "data" => "Database connection is unavailable.",
-        "code" => 500
-    ]);
+    http_response_code(500);
+    echo json_encode(["error" => true, "data" => "Database connection is unavailable.", "code" => 500]);
     exit;
 }
 
-function pickValue($values)
-{
-    if (!is_array($values) || empty($values)) {
-        return '';
-    }
+$conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$conn->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 
-    return $values[array_rand($values)];
+function repairId(): string
+{
+    if (function_exists("generateID")) {
+        return (string) generateID();
+    }
+    return bin2hex(random_bytes(16));
 }
 
-function makeContainerNumber(): string
+function repairPick(array $items)
 {
-    $letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    $owners = ['MSCU', 'CMAU', 'MAEU', 'HLBU', 'TGHU', 'FSCU', 'BMOU', 'TEMU'];
-    $prefix = pickValue($owners);
-    $serial = '';
-
-    for ($i = 0; $i < 6; $i++) {
-        $serial .= (string) random_int(0, 9);
+    if ($items === []) {
+        throw new RuntimeException("Cannot choose a value from an empty list.");
     }
 
-    $values = [
-        'A' => 10, 'B' => 12, 'C' => 13, 'D' => 14,
-        'E' => 15, 'F' => 16, 'G' => 17, 'H' => 18,
-        'I' => 19, 'J' => 20, 'K' => 21, 'L' => 23,
-        'M' => 24, 'N' => 25, 'O' => 26, 'P' => 27,
-        'Q' => 28, 'R' => 29, 'S' => 30, 'T' => 31,
-        'U' => 32, 'V' => 34, 'W' => 35, 'X' => 36,
-        'Y' => 37, 'Z' => 38
+    return $items[random_int(0, count($items) - 1)];
+}
+
+function repairPlaceholder($value): bool
+{
+    if ($value === null) {
+        return true;
+    }
+
+    $v = trim((string) $value);
+    if ($v === "") {
+        return true;
+    }
+
+    $lower = strtolower($v);
+    $known = [
+        "test", "testing", "demo", "sample", "unknown", "n/a", "na", "null",
+        "undefined", "none", "consignee", "customer", "company", "asdf",
+        "qwerty", "asdfgh", "test test", "your name", "enter name",
+        "tbd", "to be confirmed", "not available", "not applicable",
+        "kjvkdjfvf", "dsbk", "ksbk", "ueywe", "sdsdv", "vjhv", "hjvj",
+        "hjvh", "asda", "sa", "svd", "sd", "mskjk", "kjkj", "swe-566-sds"
     ];
 
-    $input = $prefix . $serial;
-    $sum = 0;
-
-    for ($i = 0; $i < strlen($input); $i++) {
-        $char = $input[$i];
-        $value = ctype_digit($char) ? (int) $char : $values[$char];
-        $sum += $value * (2 ** $i);
-    }
-
-    return $input . (($sum % 11) % 10);
-}
-
-function makeSealNumber(): string
-{
-    return 'NG' . random_int(100000, 999999) . strtoupper(bin2hex(random_bytes(2)));
-}
-
-function makeReference(string $prefix): string
-{
-    return $prefix . '-' . date('Y') . '-' . strtoupper(bin2hex(random_bytes(6)));
-}
-
-function isFake(?string $value): bool
-{
-    if ($value === null || trim($value) === '') {
+    if (in_array($lower, $known, true)) {
         return true;
     }
 
-    $value = strtolower(trim($value));
-
-    if (in_array($value, [
-        'test', 'testing', 'demo', 'sample', 'unknown',
-        'n/a', 'na', 'null', 'undefined', 'none',
-        'consignee', 'customer', 'company', 'asas',
-        'dsbk', 'ksbk', 'ueywe', 'sdsdv', 'vjhv',
-        'hjvj', 'hjvh', 'asda', 'sa', 'svd', 'sd',
-        'mskjk', 'kjkj', 'swe-566-sds'
-    ], true)) {
+    if (preg_match('/^(.)\1{2,}$/iu', $v)) {
         return true;
     }
 
-    if (preg_match('/^(.)\1{2,}$/i', $value)) {
+    if (preg_match('/^(?:[a-z]{1,4}|[0-9]{1,4})$/i', $v)) {
         return true;
     }
 
-    if (preg_match('/^[a-z]{1,4}$/i', $value)) {
+    $letters = preg_replace('/[^a-z]/i', '', $v);
+    if (strlen($letters) >= 7) {
+        $vowels = preg_match_all('/[aeiou]/i', $letters);
+        if ($vowels === 0) {
+            return true;
+        }
+        if (strlen($letters) >= 9 && ($vowels / strlen($letters)) < 0.18) {
+            return true;
+        }
+    }
+
+    if (preg_match('/^(.){1,2}(?:[^aeiou\s]){4,}$/i', $v)) {
         return true;
     }
 
     return false;
 }
 
-function isFakeContainerNumber(?string $value): bool
+function repairContainerNumber(): string
 {
-    if ($value === null || !preg_match('/^[A-Z]{3}U[0-9]{7}$/i', trim($value))) {
-        return true;
-    }
+    $owners = ["MSCU", "CMAU", "MAEU", "HLBU", "TGHU", "FSCU", "BMOU", "TEMU"];
+    $prefix = repairPick($owners);
+    $base = $prefix . str_pad((string) random_int(0, 999999), 6, "0", STR_PAD_LEFT);
 
-    $value = strtoupper(trim($value));
-
-    $letterValues = [
-        'A' => 10, 'B' => 12, 'C' => 13, 'D' => 14,
-        'E' => 15, 'F' => 16, 'G' => 17, 'H' => 18,
-        'I' => 19, 'J' => 20, 'K' => 21, 'L' => 23,
-        'M' => 24, 'N' => 25, 'O' => 26, 'P' => 27,
-        'Q' => 28, 'R' => 29, 'S' => 30, 'T' => 31,
-        'U' => 32, 'V' => 34, 'W' => 35, 'X' => 36,
-        'Y' => 37, 'Z' => 38
+    $values = [
+        "A" => 10, "B" => 12, "C" => 13, "D" => 14, "E" => 15,
+        "F" => 16, "G" => 17, "H" => 18, "I" => 19, "J" => 20,
+        "K" => 21, "L" => 23, "M" => 24, "N" => 25, "O" => 26,
+        "P" => 27, "Q" => 28, "R" => 29, "S" => 30, "T" => 31,
+        "U" => 32, "V" => 34, "W" => 35, "X" => 36, "Y" => 37, "Z" => 38
     ];
 
     $sum = 0;
-
-    for ($i = 0; $i < 10; $i++) {
-        $char = $value[$i];
-        $number = ctype_digit($char) ? (int) $char : $letterValues[$char];
-        $sum += $number * (2 ** $i);
+    for ($i = 0; $i < strlen($base); $i++) {
+        $char = $base[$i];
+        $sum += (ctype_digit($char) ? (int) $char : $values[$char]) * (2 ** $i);
     }
 
-    return (string) (($sum % 11) % 10) !== $value[10];
+    return $base . (string) (($sum % 11) % 10);
 }
 
-function uniqueContainerNumber(PDO $conn, string $shipmentId): string
+function repairContainerFormat($value): bool
 {
-    do {
-        $number = makeContainerNumber();
+    $value = strtoupper(trim((string) $value));
+    if (!preg_match('/^[A-Z]{3}U[0-9]{7}$/', $value)) {
+        return false;
+    }
 
-        $stmt = $conn->prepare("
-            SELECT COUNT(*)
-            FROM portal_shipment_containers
-            WHERE shipment_id = :shipment_id
-              AND container_no = :container_no
-        ");
+    $values = [
+        "A" => 10, "B" => 12, "C" => 13, "D" => 14, "E" => 15,
+        "F" => 16, "G" => 17, "H" => 18, "I" => 19, "J" => 20,
+        "K" => 21, "L" => 23, "M" => 24, "N" => 25, "O" => 26,
+        "P" => 27, "Q" => 28, "R" => 29, "S" => 30, "T" => 31,
+        "U" => 32, "V" => 34, "W" => 35, "X" => 36, "Y" => 37, "Z" => 38
+    ];
 
-        $stmt->execute([
-            'shipment_id' => $shipmentId,
-            'container_no' => $number
-        ]);
+    $sum = 0;
+    for ($i = 0; $i < 10; $i++) {
+        $char = $value[$i];
+        $sum += (ctype_digit($char) ? (int) $char : $values[$char]) * (2 ** $i);
+    }
 
-        $exists = (int) $stmt->fetchColumn() > 0;
-    } while ($exists);
-
-    return $number;
+    return (string) (($sum % 11) % 10) === $value[10];
 }
 
-function uniqueManifestContainerNumber(PDO $conn, string $manifestId): string
+function repairSealNumber(): string
 {
-    do {
-        $number = makeContainerNumber();
-
-        $stmt = $conn->prepare("
-            SELECT COUNT(*)
-            FROM operation_manifest_containers
-            WHERE manifest_id = :manifest_id
-              AND container_no = :container_no
-        ");
-
-        $stmt->execute([
-            'manifest_id' => $manifestId,
-            'container_no' => $number
-        ]);
-
-        $exists = (int) $stmt->fetchColumn() > 0;
-    } while ($exists);
-
-    return $number;
+    return "TST-" . strtoupper(bin2hex(random_bytes(4)));
 }
 
-$shippingLines = [
-    'Maersk',
-    'MSC',
-    'CMA CGM',
-    'Hapag-Lloyd',
-    'COSCO Shipping',
-    'Evergreen Marine'
+function repairUniqueValue(PDO $conn, string $table, string $column, string $value): bool
+{
+    $allowed = [
+        "portal_shipment_containers" => ["container_no", "seal_no"],
+        "operation_manifest_containers" => ["container_no", "seal_no"]
+    ];
+
+    if (!isset($allowed[$table]) || !in_array($column, $allowed[$table], true)) {
+        throw new RuntimeException("Unsupported uniqueness check.");
+    }
+
+    $stmt = $conn->prepare("SELECT COUNT(*) FROM {$table} WHERE {$column} = ?");
+    $stmt->execute([$value]);
+    return (int) $stmt->fetchColumn() === 0;
+}
+
+function repairUniqueContainer(PDO $conn): string
+{
+    for ($i = 0; $i < 100; $i++) {
+        $value = repairContainerNumber();
+        $a = $conn->prepare("SELECT COUNT(*) FROM portal_shipment_containers WHERE container_no = ?");
+        $a->execute([$value]);
+        $b = $conn->prepare("SELECT COUNT(*) FROM operation_manifest_containers WHERE container_no = ?");
+        $b->execute([$value]);
+        if ((int) $a->fetchColumn() === 0 && (int) $b->fetchColumn() === 0) {
+            return $value;
+        }
+    }
+    throw new RuntimeException("Unable to generate a unique test container number.");
+}
+
+function repairUniqueSeal(PDO $conn): string
+{
+    for ($i = 0; $i < 100; $i++) {
+        $value = repairSealNumber();
+        if (
+            repairUniqueValue($conn, "portal_shipment_containers", "seal_no", $value) &&
+            repairUniqueValue($conn, "operation_manifest_containers", "seal_no", $value)
+        ) {
+            return $value;
+        }
+    }
+    throw new RuntimeException("Unable to generate a unique test seal number.");
+}
+
+$lines = [
+    "Maersk", "MSC", "CMA CGM", "Hapag-Lloyd", "COSCO Shipping", "Evergreen Marine"
 ];
 
-$vessels = [
-    'Maersk Edirne',
-    'MSC Verona',
-    'CMA CGM Jacques Saade',
-    'Hapag-Lloyd Jakarta',
-    'COSCO Shipping Taurus',
-    'MSC Maya',
-    'Maersk Seoul'
+$vesselsByLine = [
+    "Maersk" => ["Maersk Edirne", "Maersk Seoul"],
+    "MSC" => ["MSC Verona", "MSC Maya"],
+    "CMA CGM" => ["CMA CGM Jacques Saade", "CMA CGM Antoine de Saint Exupery"],
+    "Hapag-Lloyd" => ["Hapag-Lloyd Jakarta", "Hapag-Lloyd Berlin Express"],
+    "COSCO Shipping" => ["COSCO Shipping Taurus", "COSCO Shipping Aquarius"],
+    "Evergreen Marine" => ["Ever Ace", "Ever Given"]
 ];
 
-$ports = [
-    'Apapa Port, Lagos, Nigeria',
-    'Tin Can Island Port, Lagos, Nigeria',
-    'Tema Port, Ghana',
-    'Durban Port, South Africa',
-    'Shanghai Port, China',
-    'Singapore Port, Singapore',
-    'Rotterdam Port, Netherlands',
-    'Jebel Ali Port, UAE',
-    'Antwerp Port, Belgium',
-    'Port Klang, Malaysia'
+$routes = [
+    ["origin_country" => "Nigeria", "origin_port" => "Apapa Port, Lagos", "destination_port" => "Port of Rotterdam, Netherlands"],
+    ["origin_country" => "Nigeria", "origin_port" => "Tin Can Island Port, Lagos", "destination_port" => "Port of Antwerp-Bruges, Belgium"],
+    ["origin_country" => "Nigeria", "origin_port" => "Lekki Deep Sea Port, Lagos", "destination_port" => "Port of Hamburg, Germany"],
+    ["origin_country" => "Nigeria", "origin_port" => "Onne Port, Rivers State", "destination_port" => "Port of Shanghai, China"],
+    ["origin_country" => "Nigeria", "origin_port" => "Calabar Port, Cross River State", "destination_port" => "Port of Singapore, Singapore"],
+    ["origin_country" => "Ghana", "origin_port" => "Port of Tema, Ghana", "destination_port" => "Port of Rotterdam, Netherlands"],
+    ["origin_country" => "South Africa", "origin_port" => "Port of Durban, South Africa", "destination_port" => "Port of Jebel Ali, United Arab Emirates"],
+    ["origin_country" => "China", "origin_port" => "Port of Shanghai, China", "destination_port" => "Port Klang, Malaysia"],
+    ["origin_country" => "Singapore", "origin_port" => "Port of Singapore, Singapore", "destination_port" => "Port of Rotterdam, Netherlands"],
+    ["origin_country" => "Netherlands", "origin_port" => "Port of Rotterdam, Netherlands", "destination_port" => "Port of New York and New Jersey, United States"]
 ];
 
-$consignees = [
-    [
-        'name' => 'Atlantic Industrial Supplies Ltd',
-        'email' => 'logistics@atlantic-industrial.example',
-        'phone' => '+2342015550101'
-    ],
-    [
-        'name' => 'Meridian Agricultural Exports Ltd',
-        'email' => 'exports@meridian-agri.example',
-        'phone' => '+2342015550102'
-    ],
-    [
-        'name' => 'Coastal Engineering Services Ltd',
-        'email' => 'cargo@coastal-engineering.example',
-        'phone' => '+2342015550103'
-    ],
-    [
-        'name' => 'Prime Packaging and Manufacturing Ltd',
-        'email' => 'logistics@prime-packaging.example',
-        'phone' => '+2342015550104'
-    ],
-    [
-        'name' => 'West African Consumer Products Ltd',
-        'email' => 'shipping@westafrican-consumer.example',
-        'phone' => '+2342015550105'
-    ]
+$portCountries = [
+    "Apapa Port, Lagos" => "Nigeria",
+    "Tin Can Island Port, Lagos" => "Nigeria",
+    "Lekki Deep Sea Port, Lagos" => "Nigeria",
+    "Onne Port, Rivers State" => "Nigeria",
+    "Calabar Port, Cross River State" => "Nigeria",
+    "Port of Tema, Ghana" => "Ghana",
+    "Port of Durban, South Africa" => "South Africa",
+    "Port of Shanghai, China" => "China",
+    "Port of Singapore, Singapore" => "Singapore",
+    "Port of Rotterdam, Netherlands" => "Netherlands",
+    "Port of Antwerp-Bruges, Belgium" => "Belgium",
+    "Port of Hamburg, Germany" => "Germany",
+    "Port of Jebel Ali, United Arab Emirates" => "United Arab Emirates",
+    "Port Klang, Malaysia" => "Malaysia",
+    "Port of New York and New Jersey, United States" => "United States"
 ];
 
 $cargoTypes = [
-    [
-        'description' => 'Industrial machinery components and spare parts',
-        'category' => 'Industrial Equipment',
-        'package_type' => 'Pallets',
-        'hs_code' => '848390'
-    ],
-    [
-        'description' => 'Packaged consumer goods for commercial distribution',
-        'category' => 'Consumer Goods',
-        'package_type' => 'Cartons',
-        'hs_code' => '392390'
-    ],
-    [
-        'description' => 'Processed agricultural products for export',
-        'category' => 'Agricultural Products',
-        'package_type' => 'Bags',
-        'hs_code' => '120190'
-    ],
-    [
-        'description' => 'Electrical cables and industrial accessories',
-        'category' => 'Electrical Equipment',
-        'package_type' => 'Pallets',
-        'hs_code' => '854449'
-    ],
-    [
-        'description' => 'Plastic packaging materials for manufacturing',
-        'category' => 'Packaging Materials',
-        'package_type' => 'Cartons',
-        'hs_code' => '392020'
-    ]
+    ["description" => "Industrial machinery components and spare parts", "category" => "Industrial Equipment", "package_type" => "Pallets", "hs_code" => "848390"],
+    ["description" => "Packaged consumer goods for commercial distribution", "category" => "Consumer Goods", "package_type" => "Cartons", "hs_code" => "392390"],
+    ["description" => "Processed agricultural products for export", "category" => "Agricultural Products", "package_type" => "Bags", "hs_code" => "120190"],
+    ["description" => "Electrical cables and industrial accessories", "category" => "Electrical Equipment", "package_type" => "Pallets", "hs_code" => "854449"],
+    ["description" => "Plastic packaging materials for manufacturing", "category" => "Packaging Materials", "package_type" => "Cartons", "hs_code" => "392020"]
+];
+
+$demoConsignees = [
+    ["name" => "Atlantic Industrial Supplies Ltd", "email" => "logistics@atlantic-industrial.test", "phone" => "+2348000000101"],
+    ["name" => "Meridian Agricultural Exports Ltd", "email" => "exports@meridian-agri.test", "phone" => "+2348000000102"],
+    ["name" => "Coastal Engineering Services Ltd", "email" => "cargo@coastal-engineering.test", "phone" => "+2348000000103"],
+    ["name" => "Prime Packaging and Manufacturing Ltd", "email" => "logistics@prime-packaging.test", "phone" => "+2348000000104"],
+    ["name" => "West African Consumer Products Ltd", "email" => "shipping@westafrican-consumer.test", "phone" => "+2348000000105"]
 ];
 
 $stats = [
-    'shipments_checked' => 0,
-    'shipments_updated' => 0,
-    'manifests_updated' => 0,
-    'manifests_linked' => 0,
-    'shipment_containers_created' => 0,
-    'manifest_containers_created' => 0,
-    'container_links_updated' => 0,
-    'container_count_mismatches' => []
+    "shipments_checked" => 0,
+    "shipments_updated" => 0,
+    "manifests_updated" => 0,
+    "manifests_linked" => 0,
+    "shipment_containers_created" => 0,
+    "manifest_containers_created" => 0,
+    "container_numbers_repaired" => 0,
+    "seal_numbers_repaired" => 0,
+    "container_links_updated" => 0,
+    "ambiguous_manifests" => [],
+    "unresolved_container_mismatches" => [],
+    "generated_values_are_test_data" => true
 ];
 
 try {
     $conn->beginTransaction();
 
-    $link = $conn->prepare("
-        UPDATE operation_manifests m
-        INNER JOIN portal_shipments s
-            ON UPPER(TRIM(m.bill_of_lading)) =
-               UPPER(TRIM(s.bill_of_lading))
-        SET m.matched_shipment_id = s.id
-        WHERE m.matched_shipment_id IS NULL
-          AND m.bill_of_lading IS NOT NULL
-          AND TRIM(m.bill_of_lading) <> ''
+    $unlinked = $conn->query("
+        SELECT id, bill_of_lading
+        FROM operation_manifests
+        WHERE matched_shipment_id IS NULL
+          AND bill_of_lading IS NOT NULL
+          AND TRIM(bill_of_lading) <> ''
+    ")->fetchAll();
+
+    $findShipment = $conn->prepare("
+        SELECT id
+        FROM portal_shipments
+        WHERE UPPER(TRIM(bill_of_lading)) = UPPER(TRIM(?))
     ");
 
-    $link->execute();
-    $stats['manifests_linked'] = $link->rowCount();
+    $linkManifest = $conn->prepare("
+        UPDATE operation_manifests
+        SET matched_shipment_id = ?
+        WHERE id = ? AND matched_shipment_id IS NULL
+    ");
 
-    $shipments = $conn->query("
-        SELECT s.*, m.id AS manifest_id,
-               m.manifest_ref, m.containers AS manifest_container_count,
-               m.packages AS manifest_packages,
-               m.gross_weight AS manifest_gross_weight,
-               m.consignee AS manifest_consignee,
-               m.vessel AS manifest_vessel,
-               m.shipping_line AS manifest_shipping_line,
-               m.origin_port AS manifest_origin_port,
-               m.eta AS manifest_eta,
-               m.bill_of_lading AS manifest_bill_of_lading
-        FROM portal_shipments s
-        LEFT JOIN operation_manifests m
-            ON m.matched_shipment_id = s.id
-        ORDER BY s.created_at ASC
-    ")->fetchAll();
+    foreach ($unlinked as $manifest) {
+        $findShipment->execute([$manifest["bill_of_lading"]]);
+        $matches = $findShipment->fetchAll();
+
+        if (count($matches) === 1) {
+            $linkManifest->execute([$matches[0]["id"], $manifest["id"]]);
+            $stats["manifests_linked"] += $linkManifest->rowCount();
+        } elseif (count($matches) > 1) {
+            $stats["ambiguous_manifests"][] = [
+                "manifest_id" => $manifest["id"],
+                "bill_of_lading" => $manifest["bill_of_lading"],
+                "matching_shipments" => count($matches)
+            ];
+        }
+    }
+
+    $shipments = $conn->query("SELECT * FROM portal_shipments ORDER BY id ASC")->fetchAll();
 
     $updateShipment = $conn->prepare("
         UPDATE portal_shipments
-        SET shipping_line = :shipping_line,
+        SET shipment_reference = :shipment_reference,
+            bill_of_lading = :bill_of_lading,
+            shipping_line = :shipping_line,
             vessel_name = :vessel_name,
+            origin_country = :origin_country,
             origin_port = :origin_port,
             destination_port = :destination_port,
             expected_arrival = :expected_arrival,
@@ -325,35 +313,38 @@ try {
             package_count = :package_count,
             gross_weight = :gross_weight,
             volume = :volume,
-            hs_code = :hs_code,
-            dangerous_goods = 'no',
-            temperature_controlled = 'no',
-            temperature = NULL
+            hs_code = :hs_code
         WHERE id = :id
     ");
 
     $insertShipmentContainer = $conn->prepare("
         INSERT INTO portal_shipment_containers
-            (id, shipment_id, container_no, size, seal_no,
-             package_count, gross_weight, status)
+            (id, shipment_id, container_no, size, seal_no, package_count, gross_weight, status)
         VALUES
-            (:id, :shipment_id, :container_no, :size, :seal_no,
-             :package_count, :gross_weight, 'EXPECTED')
+            (:id, :shipment_id, :container_no, :size, :seal_no, :package_count, :gross_weight, 'EXPECTED')
     ");
 
     $insertManifestContainer = $conn->prepare("
         INSERT INTO operation_manifest_containers
-            (id, manifest_id, container_no, seal_no, size,
-             package_count, gross_weight, matched_shipment_id,
-             matched_shipment_container_id)
+            (id, manifest_id, container_no, seal_no, size, package_count, gross_weight,
+             matched_shipment_id, matched_shipment_container_id)
         VALUES
-            (:id, :manifest_id, :container_no, :seal_no, :size,
-             :package_count, :gross_weight, :shipment_id, :container_id)
+            (:id, :manifest_id, :container_no, :seal_no, :size, :package_count, :gross_weight,
+             :shipment_id, :container_id)
+    ");
+
+    $updateShipmentContainer = $conn->prepare("
+        UPDATE portal_shipment_containers
+        SET container_no = :container_no, seal_no = :seal_no, size = :size
+        WHERE id = :id
     ");
 
     $updateManifestContainer = $conn->prepare("
         UPDATE operation_manifest_containers
-        SET matched_shipment_id = :shipment_id,
+        SET container_no = :container_no,
+            seal_no = :seal_no,
+            size = :size,
+            matched_shipment_id = :shipment_id,
             matched_shipment_container_id = :container_id
         WHERE id = :id
     ");
@@ -372,368 +363,351 @@ try {
     ");
 
     foreach ($shipments as $shipment) {
-        $stats['shipments_checked']++;
+        $stats["shipments_checked"]++;
+        $shipmentId = (string) $shipment["id"];
 
-        $shipmentId = $shipment['id'];
-        $manifestId = $shipment['manifest_id'];
-
-        $consignee = pickValue($consignees);
-        $cargo = pickValue($cargoTypes);
-
-        $shippingLine = isFake($shipment['shipping_line'])
-            ? pickValue($shippingLines)
-            : $shipment['shipping_line'];
-
-        $vessel = isFake($shipment['vessel_name'])
-            ? pickValue($vessels)
-            : $shipment['vessel_name'];
-
-        $origin = isFake($shipment['origin_port'])
-            ? pickValue($ports)
-            : $shipment['origin_port'];
-
-        $destination = isFake($shipment['destination_port'])
-            ? 'Apapa Port, Lagos, Nigeria'
-            : $shipment['destination_port'];
-
-        if (strcasecmp($origin, $destination) === 0) {
-            $destination = 'Tema Port, Ghana';
+        $line = $shipment["shipping_line"] ?? "";
+        if (repairPlaceholder($line)) {
+            $line = repairPick($lines);
         }
 
-        $consigneeName = isFake($shipment['consignee'])
-            ? $consignee['name']
-            : $shipment['consignee'];
+        $vessel = $shipment["vessel_name"] ?? "";
+        if (repairPlaceholder($vessel)) {
+            $vessel = repairPick($vesselsByLine[$line] ?? $vesselsByLine[repairPick($lines)]);
+        }
 
-        $consigneeEmail = filter_var(
-            $shipment['consignee_email'],
-            FILTER_VALIDATE_EMAIL
-        ) && !preg_match('/@(example|test|invalid)\./i', $shipment['consignee_email'])
-            ? $shipment['consignee_email']
-            : $consignee['email'];
+        $originCountry = trim((string) ($shipment["origin_country"] ?? ""));
+        $origin = trim((string) ($shipment["origin_port"] ?? ""));
+        $destination = trim((string) ($shipment["destination_port"] ?? ""));
 
-        $consigneePhone = preg_match(
-            '/^[+0-9() .-]{10,25}$/',
-            (string) $shipment['consignee_phone']
-        )
-            ? $shipment['consignee_phone']
-            : $consignee['phone'];
+        $knownOrigin = isset($portCountries[$origin]);
+        $knownDestination = in_array($destination, array_keys($portCountries), true);
+        $badRoute = repairPlaceholder($origin) || repairPlaceholder($destination)
+            || !$knownOrigin || !$knownDestination
+            || strcasecmp($origin, $destination) === 0;
 
-        $description = isFake($shipment['cargo_description'])
-            ? $cargo['description']
-            : $shipment['cargo_description'];
+        if ($badRoute) {
+            $route = repairPick($routes);
+            $originCountry = $route["origin_country"];
+            $origin = $route["origin_port"];
+            $destination = $route["destination_port"];
+        } else {
+            $originCountry = $portCountries[$origin];
+            if (repairPlaceholder($originCountry)) {
+                $originCountry = $portCountries[$origin];
+            }
+        }
 
-        $category = isFake($shipment['cargo_category'])
-            ? $cargo['category']
-            : $shipment['cargo_category'];
+        $consignee = $shipment["consignee"] ?? "";
+        $consigneeEmail = $shipment["consignee_email"] ?? "";
+        $consigneePhone = $shipment["consignee_phone"] ?? "";
 
-        $packageType = isFake($shipment['package_type'])
-            ? $cargo['package_type']
-            : $shipment['package_type'];
+        if (repairPlaceholder($consignee)) {
+            $demo = repairPick($demoConsignees);
+            $consignee = $demo["name"];
+            if (repairPlaceholder($consigneeEmail)) {
+                $consigneeEmail = $demo["email"];
+            }
+            if (repairPlaceholder($consigneePhone)) {
+                $consigneePhone = $demo["phone"];
+            }
+        }
 
-        $hsCode = isFake($shipment['hs_code'])
-            ? $cargo['hs_code']
-            : $shipment['hs_code'];
+        if (repairPlaceholder($consigneeEmail) || !filter_var($consigneeEmail, FILTER_VALIDATE_EMAIL)) {
+            $consigneeEmail = repairPick($demoConsignees)["email"];
+        }
 
-        $packages = (float) $shipment['package_count'];
+        if (repairPlaceholder($consigneePhone) || !preg_match('/^[+0-9() .-]{10,25}$/', (string) $consigneePhone)) {
+            $consigneePhone = repairPick($demoConsignees)["phone"];
+        }
 
+        $cargo = repairPick($cargoTypes);
+        $description = repairPlaceholder($shipment["cargo_description"] ?? null) ? $cargo["description"] : $shipment["cargo_description"];
+        $category = repairPlaceholder($shipment["cargo_category"] ?? null) ? $cargo["category"] : $shipment["cargo_category"];
+        $packageType = repairPlaceholder($shipment["package_type"] ?? null) ? $cargo["package_type"] : $shipment["package_type"];
+        $hsCode = repairPlaceholder($shipment["hs_code"] ?? null) ? $cargo["hs_code"] : $shipment["hs_code"];
+
+        $packages = (float) ($shipment["package_count"] ?? 0);
         if ($packages <= 0) {
-            $packages = random_int(120, 1800);
+            $packages = (float) random_int(120, 1800);
         }
 
-        $weight = (float) $shipment['gross_weight'];
-
+        $weight = (float) ($shipment["gross_weight"] ?? 0);
         if ($weight <= 0) {
             $weight = round(random_int(8000, 24000) + random_int(0, 999) / 1000, 3);
         }
 
-        $volume = (float) $shipment['volume'];
-
+        $volume = (float) ($shipment["volume"] ?? 0);
         if ($volume <= 0) {
             $volume = round(random_int(18, 65) + random_int(0, 999) / 1000, 3);
         }
 
-        $arrival = $shipment['expected_arrival'];
+        $arrival = $shipment["expected_arrival"] ?? null;
+        if (empty($arrival) || strtotime((string) $arrival) === false || strtotime((string) $arrival) < strtotime("-180 days")) {
+            $arrival = date("Y-m-d H:i:s", strtotime("+" . random_int(3, 24) . " days"));
+        }
 
-        if (
-            empty($arrival) ||
-            strtotime($arrival) === false ||
-            strtotime($arrival) < strtotime('-180 days')
-        ) {
-            $arrival = date(
-                'Y-m-d H:i:s',
-                strtotime('+' . random_int(3, 24) . ' days')
-            );
+        $shipmentRef = trim((string) ($shipment["shipment_reference"] ?? ""));
+        if (repairPlaceholder($shipmentRef) || preg_match('/^[a-z]{5,}$/i', $shipmentRef)) {
+            $shipmentRef = "TRN-SHP-DEMO-" . strtoupper(bin2hex(random_bytes(5)));
+        }
+
+        $bol = trim((string) ($shipment["bill_of_lading"] ?? ""));
+        if (repairPlaceholder($bol) || preg_match('/^[a-z]{6,}$/i', $bol)) {
+            $bol = "DEMO-BOL-" . strtoupper(bin2hex(random_bytes(4)));
         }
 
         $updateShipment->execute([
-            'shipping_line' => $shippingLine,
-            'vessel_name' => $vessel,
-            'origin_port' => $origin,
-            'destination_port' => $destination,
-            'expected_arrival' => $arrival,
-            'consignee' => $consigneeName,
-            'consignee_email' => $consigneeEmail,
-            'consignee_phone' => $consigneePhone,
-            'cargo_description' => $description,
-            'cargo_category' => $category,
-            'package_type' => $packageType,
-            'package_count' => $packages,
-            'gross_weight' => $weight,
-            'volume' => $volume,
-            'hs_code' => $hsCode,
-            'id' => $shipmentId
+            "shipment_reference" => $shipmentRef,
+            "bill_of_lading" => $bol,
+            "shipping_line" => $line,
+            "vessel_name" => $vessel,
+            "origin_country" => $originCountry,
+            "origin_port" => $origin,
+            "destination_port" => $destination,
+            "expected_arrival" => $arrival,
+            "consignee" => $consignee,
+            "consignee_email" => $consigneeEmail,
+            "consignee_phone" => $consigneePhone,
+            "cargo_description" => $description,
+            "cargo_category" => $category,
+            "package_type" => $packageType,
+            "package_count" => $packages,
+            "gross_weight" => $weight,
+            "volume" => $volume,
+            "hs_code" => $hsCode,
+            "id" => $shipmentId
         ]);
 
-        $stats['shipments_updated']++;
+        $stats["shipments_updated"]++;
 
-        $containerQuery = $conn->prepare("
-            SELECT id, container_no, size, seal_no, package_count, gross_weight
+        $manifestQuery = $conn->prepare("
+            SELECT *
+            FROM operation_manifests
+            WHERE matched_shipment_id = ?
+            ORDER BY id ASC
+        ");
+        $manifestQuery->execute([$shipmentId]);
+        $manifests = $manifestQuery->fetchAll();
+
+        if (count($manifests) > 1) {
+            $stats["ambiguous_manifests"][] = [
+                "shipment_id" => $shipmentId,
+                "reason" => "More than one manifest is linked to this shipment; automatic container reconciliation was skipped."
+            ];
+            continue;
+        }
+
+        $manifest = $manifests[0] ?? null;
+        $shipmentContainerQuery = $conn->prepare("
+            SELECT id, shipment_id, container_no, size, seal_no, package_count, gross_weight, status
             FROM portal_shipment_containers
             WHERE shipment_id = ?
-            ORDER BY created_at ASC
+            ORDER BY id ASC
         ");
-        $containerQuery->execute([$shipmentId]);
-        $containerRows = $containerQuery->fetchAll();
+        $shipmentContainerQuery->execute([$shipmentId]);
+        $shipmentContainers = $shipmentContainerQuery->fetchAll();
 
-        if ($manifestId !== null) {
+        $manifestContainers = [];
+        if ($manifest) {
             $manifestContainerQuery = $conn->prepare("
-                SELECT id, container_no, seal_no, size, package_count, gross_weight
+                SELECT id, manifest_id, container_no, seal_no, size, package_count, gross_weight,
+                       matched_shipment_id, matched_shipment_container_id
                 FROM operation_manifest_containers
                 WHERE manifest_id = ?
-                ORDER BY created_at ASC
+                ORDER BY id ASC
             ");
-            $manifestContainerQuery->execute([$manifestId]);
-            $manifestRows = $manifestContainerQuery->fetchAll();
+            $manifestContainerQuery->execute([$manifest["id"]]);
+            $manifestContainers = $manifestContainerQuery->fetchAll();
+        }
 
-            $declaredCount = max(0, (int) $shipment['manifest_container_count']);
+        if (count($shipmentContainers) === 0 && count($manifestContainers) > 0) {
+            foreach ($manifestContainers as $mc) {
+                $containerNo = strtoupper(trim((string) ($mc["container_no"] ?? "")));
+                if (!repairContainerFormat($containerNo)) {
+                    $containerNo = repairUniqueContainer($conn);
+                    $stats["container_numbers_repaired"]++;
+                }
 
-            $targetCount = max(
-                $declaredCount,
-                count($manifestRows),
-                count($containerRows)
-            );
+                $sealNo = trim((string) ($mc["seal_no"] ?? ""));
+                if (repairPlaceholder($sealNo) || strlen($sealNo) < 6) {
+                    $sealNo = repairUniqueSeal($conn);
+                    $stats["seal_numbers_repaired"]++;
+                }
 
-            if ($targetCount === 0) {
-                $targetCount = random_int(1, 4);
-            }
-
-            while (count($manifestRows) < $targetCount) {
-                $containerNo = uniqueContainerNumber($conn, $shipmentId);
-
-                $size = pickValue(['20ft', '40ft', '40ft HC']);
-                $sealNo = makeSealNumber();
-                $containerPackages = round($packages / $targetCount, 2);
-                $containerWeight = round($weight / $targetCount, 3);
-
-                $containerId = generateID();
-                $manifestContainerId = generateID();
+                $size = in_array($mc["size"] ?? "", ["20ft", "40ft", "40ft HC"], true) ? $mc["size"] : "40ft HC";
+                $containerId = repairId();
 
                 $insertShipmentContainer->execute([
-                    'id' => $containerId,
-                    'shipment_id' => $shipmentId,
-                    'container_no' => $containerNo,
-                    'size' => $size,
-                    'seal_no' => $sealNo,
-                    'package_count' => $containerPackages,
-                    'gross_weight' => $containerWeight
+                    "id" => $containerId,
+                    "shipment_id" => $shipmentId,
+                    "container_no" => $containerNo,
+                    "size" => $size,
+                    "seal_no" => $sealNo,
+                    "package_count" => (float) ($mc["package_count"] ?? 0),
+                    "gross_weight" => (float) ($mc["gross_weight"] ?? 0)
                 ]);
 
-                $insertManifestContainer->execute([
-                    'id' => $manifestContainerId,
-                    'manifest_id' => $manifestId,
-                    'container_no' => $containerNo,
-                    'seal_no' => $sealNo,
-                    'size' => $size,
-                    'package_count' => $containerPackages,
-                    'gross_weight' => $containerWeight,
-                    'shipment_id' => $shipmentId,
-                    'container_id' => $containerId
+                $updateManifestContainer->execute([
+                    "container_no" => $containerNo,
+                    "seal_no" => $sealNo,
+                    "size" => $size,
+                    "shipment_id" => $shipmentId,
+                    "container_id" => $containerId,
+                    "id" => $mc["id"]
                 ]);
 
-                $containerRows[] = [
-                    'id' => $containerId,
-                    'container_no' => $containerNo,
-                    'size' => $size,
-                    'seal_no' => $sealNo,
-                    'package_count' => $containerPackages,
-                    'gross_weight' => $containerWeight
-                ];
-
-                $manifestRows[] = [
-                    'id' => $manifestContainerId,
-                    'container_no' => $containerNo,
-                    'seal_no' => $sealNo,
-                    'size' => $size,
-                    'package_count' => $containerPackages,
-                    'gross_weight' => $containerWeight
-                ];
-
-                $stats['shipment_containers_created']++;
-                $stats['manifest_containers_created']++;
+                $stats["shipment_containers_created"]++;
+                $stats["container_links_updated"]++;
             }
 
-            foreach ($manifestRows as $index => &$manifestRow) {
-                if (isFakeContainerNumber($manifestRow['container_no'])) {
-                    $newNumber = uniqueManifestContainerNumber($conn, $manifestId);
+            $shipmentContainerQuery->execute([$shipmentId]);
+            $shipmentContainers = $shipmentContainerQuery->fetchAll();
+        }
 
-                    $change = $conn->prepare("
-                        UPDATE operation_manifest_containers
-                        SET container_no = ?
-                        WHERE id = ?
-                    ");
-                    $change->execute([$newNumber, $manifestRow['id']]);
+        if (count($shipmentContainers) === 0 && !$manifest) {
+            $targetCount = random_int(1, 4);
+            for ($i = 0; $i < $targetCount; $i++) {
+                $containerNo = repairUniqueContainer($conn);
+                $sealNo = repairUniqueSeal($conn);
+                $containerId = repairId();
+                $size = repairPick(["20ft", "40ft", "40ft HC"]);
 
-                    $manifestRow['container_no'] = $newNumber;
-                }
+                $insertShipmentContainer->execute([
+                    "id" => $containerId,
+                    "shipment_id" => $shipmentId,
+                    "container_no" => $containerNo,
+                    "size" => $size,
+                    "seal_no" => $sealNo,
+                    "package_count" => round($packages / $targetCount, 2),
+                    "gross_weight" => round($weight / $targetCount, 3)
+                ]);
+
+                $stats["shipment_containers_created"]++;
             }
-            unset($manifestRow);
 
-            foreach ($containerRows as $index => &$containerRow) {
-                if (isFakeContainerNumber($containerRow['container_no'])) {
-                    $newNumber = uniqueContainerNumber($conn, $shipmentId);
+            $shipmentContainerQuery->execute([$shipmentId]);
+            $shipmentContainers = $shipmentContainerQuery->fetchAll();
+        }
 
-                    $change = $conn->prepare("
-                        UPDATE portal_shipment_containers
-                        SET container_no = ?
-                        WHERE id = ?
-                    ");
-                    $change->execute([$newNumber, $containerRow['id']]);
+        if ($manifest) {
+            $manifestId = (string) $manifest["id"];
+            $usedShipmentContainers = [];
 
-                    $containerRow['container_no'] = $newNumber;
-                }
-            }
-            unset($containerRow);
+            foreach ($manifestContainers as $mc) {
+                $matchIndex = null;
+                $manifestNumber = strtoupper(trim((string) ($mc["container_no"] ?? "")));
 
-            foreach ($manifestRows as $manifestRow) {
-                $matchedContainer = null;
+                foreach ($shipmentContainers as $index => $sc) {
+                    if (isset($usedShipmentContainers[(string) $sc["id"]])) {
+                        continue;
+                    }
 
-                foreach ($containerRows as $containerRow) {
-                    if (
-                        strtoupper(trim($manifestRow['container_no'])) ===
-                        strtoupper(trim($containerRow['container_no']))
-                    ) {
-                        $matchedContainer = $containerRow;
+                    if ($manifestNumber !== "" && strtoupper(trim((string) $sc["container_no"])) === $manifestNumber) {
+                        $matchIndex = $index;
                         break;
                     }
                 }
 
-                if ($matchedContainer === null) {
-                    $containerNo = $manifestRow['container_no'];
-                    $containerId = generateID();
-
-                    $size = $manifestRow['size'] ?: '40ft HC';
-                    $sealNo = isFake($manifestRow['seal_no'])
-                        ? makeSealNumber()
-                        : $manifestRow['seal_no'];
-
-                    $containerPackages = (float) $manifestRow['package_count'];
-                    $containerWeight = (float) $manifestRow['gross_weight'];
-
-                    $insertShipmentContainer->execute([
-                        'id' => $containerId,
-                        'shipment_id' => $shipmentId,
-                        'container_no' => $containerNo,
-                        'size' => $size,
-                        'seal_no' => $sealNo,
-                        'package_count' => $containerPackages,
-                        'gross_weight' => $containerWeight
-                    ]);
-
-                    $containerRows[] = [
-                        'id' => $containerId,
-                        'container_no' => $containerNo,
-                        'size' => $size,
-                        'seal_no' => $sealNo,
-                        'package_count' => $containerPackages,
-                        'gross_weight' => $containerWeight
-                    ];
-
-                    $matchedContainer = end($containerRows);
-                    $stats['shipment_containers_created']++;
+                if ($matchIndex === null && count($manifestContainers) === 1 && count($shipmentContainers) === 1) {
+                    $matchIndex = 0;
                 }
 
-                $updateManifestContainer->execute([
-                    'shipment_id' => $shipmentId,
-                    'container_id' => $matchedContainer['id'],
-                    'id' => $manifestRow['id']
+                if ($matchIndex === null) {
+                    $stats["unresolved_container_mismatches"][] = [
+                        "shipment_id" => $shipmentId,
+                        "manifest_id" => $manifestId,
+                        "manifest_container_id" => $mc["id"],
+                        "reason" => "No unique match by container number."
+                    ];
+                    continue;
+                }
+
+                $sc = $shipmentContainers[$matchIndex];
+                $usedShipmentContainers[(string) $sc["id"]] = true;
+
+                $containerNo = strtoupper(trim((string) ($sc["container_no"] ?? "")));
+                if (!repairContainerFormat($containerNo)) {
+                    $containerNo = repairUniqueContainer($conn);
+                    $stats["container_numbers_repaired"]++;
+                }
+
+                $sealNo = trim((string) ($sc["seal_no"] ?? ""));
+                if (repairPlaceholder($sealNo) || strlen($sealNo) < 6) {
+                    $sealNo = repairUniqueSeal($conn);
+                    $stats["seal_numbers_repaired"]++;
+                }
+
+                $size = in_array($sc["size"] ?? "", ["20ft", "40ft", "40ft HC"], true) ? $sc["size"] : "40ft HC";
+
+                $updateShipmentContainer->execute([
+                    "container_no" => $containerNo,
+                    "seal_no" => $sealNo,
+                    "size" => $size,
+                    "id" => $sc["id"]
                 ]);
 
-                $stats['container_links_updated']++;
+                $updateManifestContainer->execute([
+                    "container_no" => $containerNo,
+                    "seal_no" => $sealNo,
+                    "size" => $size,
+                    "shipment_id" => $shipmentId,
+                    "container_id" => $sc["id"],
+                    "id" => $mc["id"]
+                ]);
+
+                $stats["container_links_updated"]++;
             }
 
-            $finalCount = count($containerRows);
-            $manifestPackages = (int) round($packages);
-            $manifestWeight = number_format($weight, 3, '.', '') . ' kg';
+            if (count($manifestContainers) === 0 && count($shipmentContainers) > 0) {
+                foreach ($shipmentContainers as $sc) {
+                    $mcId = repairId();
+                    $insertManifestContainer->execute([
+                        "id" => $mcId,
+                        "manifest_id" => $manifestId,
+                        "container_no" => $sc["container_no"],
+                        "seal_no" => $sc["seal_no"],
+                        "size" => $sc["size"],
+                        "package_count" => $sc["package_count"],
+                        "gross_weight" => $sc["gross_weight"],
+                        "shipment_id" => $shipmentId,
+                        "container_id" => $sc["id"]
+                    ]);
+                    $stats["manifest_containers_created"]++;
+                }
+                $manifestContainers = [];
+            }
 
-            $manifestVessel = isFake($shipment['manifest_vessel'])
-                ? $vessel
-                : $shipment['manifest_vessel'];
+            $manifestVessel = repairPlaceholder($manifest["vessel"] ?? null) ? $vessel : $manifest["vessel"];
+            $manifestLine = repairPlaceholder($manifest["shipping_line"] ?? null) ? $line : $manifest["shipping_line"];
+            $manifestOrigin = repairPlaceholder($manifest["origin_port"] ?? null) ? $origin : $manifest["origin_port"];
+            $manifestConsignee = repairPlaceholder($manifest["consignee"] ?? null) ? $consignee : $manifest["consignee"];
 
-            $manifestShippingLine = isFake($shipment['manifest_shipping_line'])
-                ? $shippingLine
-                : $shipment['manifest_shipping_line'];
-
-            $manifestOrigin = isFake($shipment['manifest_origin_port'])
-                ? $origin
-                : $shipment['manifest_origin_port'];
-
-            $manifestRef = isFake($shipment['manifest_ref'])
-                ? makeReference('TRN-MNF')
-                : $shipment['manifest_ref'];
+            $countStmt = $conn->prepare("SELECT COUNT(*) FROM operation_manifest_containers WHERE manifest_id = ?");
+            $countStmt->execute([$manifestId]);
+            $manifestCount = (int) $countStmt->fetchColumn();
 
             $updateManifest->execute([
-                'vessel' => $manifestVessel,
-                'shipping_line' => $manifestShippingLine,
-                'origin_port' => $manifestOrigin,
-                'eta' => $arrival,
-                'containers' => $finalCount,
-                'packages' => $manifestPackages,
-                'gross_weight' => $manifestWeight,
-                'consignee' => $consigneeName,
-                'id' => $manifestId
+                "vessel" => $manifestVessel,
+                "shipping_line" => $manifestLine,
+                "origin_port" => $manifestOrigin,
+                "eta" => $arrival,
+                "containers" => $manifestCount,
+                "packages" => (int) round($packages),
+                "gross_weight" => number_format($weight, 3, ".", "") . " kg",
+                "consignee" => $manifestConsignee,
+                "id" => $manifestId
             ]);
 
-            $stats['manifests_updated']++;
+            $stats["manifests_updated"]++;
 
-            $check = $conn->prepare("
-                SELECT
-                    (SELECT COUNT(*)
-                     FROM portal_shipment_containers
-                     WHERE shipment_id = ?) AS saved_count,
-                    (SELECT COUNT(*)
-                     FROM operation_manifest_containers
-                     WHERE manifest_id = ?) AS manifest_count
-            ");
-            $check->execute([$shipmentId, $manifestId]);
-            $counts = $check->fetch();
-
-            if ((int) $counts['saved_count'] !== (int) $counts['manifest_count']) {
-                $stats['container_count_mismatches'][] = [
-                    'shipment_reference' => $shipment['shipment_reference'],
-                    'saved_count' => (int) $counts['saved_count'],
-                    'manifest_count' => (int) $counts['manifest_count']
+            if ($manifestCount !== count($shipmentContainers)) {
+                $stats["unresolved_container_mismatches"][] = [
+                    "shipment_id" => $shipmentId,
+                    "manifest_id" => $manifestId,
+                    "shipment_container_count" => count($shipmentContainers),
+                    "manifest_container_count" => $manifestCount
                 ];
-            }
-        } elseif (count($containerRows) === 0) {
-            $targetCount = random_int(1, 4);
-
-            for ($i = 0; $i < $targetCount; $i++) {
-                $containerNo = uniqueContainerNumber($conn, $shipmentId);
-                $containerId = generateID();
-                $size = pickValue(['20ft', '40ft', '40ft HC']);
-                $sealNo = makeSealNumber();
-
-                $insertShipmentContainer->execute([
-                    'id' => $containerId,
-                    'shipment_id' => $shipmentId,
-                    'container_no' => $containerNo,
-                    'size' => $size,
-                    'seal_no' => $sealNo,
-                    'package_count' => round($packages / $targetCount, 2),
-                    'gross_weight' => round($weight / $targetCount, 3)
-                ]);
-
-                $stats['shipment_containers_created']++;
             }
         }
     }
@@ -743,12 +717,12 @@ try {
     echo json_encode([
         "error" => false,
         "data" => [
-            "message" => "Shipment and manifest repair completed.",
+            "message" => "Test shipment records were repaired.",
             "stats" => $stats,
-            "notice" => "Generated shipping details are synthetic and must be checked against source documents before operational use."
+            "notice" => "Values generated by this script are synthetic test data. Do not use them as verified shipping records."
         ],
         "code" => 200
-    ], JSON_PRETTY_PRINT);
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
 } catch (Throwable $e) {
     if ($conn->inTransaction()) {
@@ -756,10 +730,9 @@ try {
     }
 
     http_response_code(500);
-
     echo json_encode([
         "error" => true,
         "data" => "Could not repair shipment data.",
         "code" => $e->getMessage()
-    ]);
+    ], JSON_UNESCAPED_SLASHES);
 }

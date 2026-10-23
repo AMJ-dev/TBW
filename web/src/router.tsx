@@ -83,7 +83,7 @@ const TransportVehiclesPage = lazy(() => import("@/pages/portal/transport/vehicl
 const TransportVehicleFormPage = lazy(() => import("@/pages/portal/transport/vehicle-form"));
 const TransportDriversPage = lazy(() => import("@/pages/portal/transport/drivers"));
 const TransportDriverFormPage = lazy(() => import("@/pages/portal/transport/driver-form"));
-const DirectIntakePage = lazy(() => import("@/pages/portal/transport/direct-intake"));
+const DirectIntakePage = lazy(() => import("@/pages/portal/shipment/direct-intake"));
 const TransportDriverAssignmentsPage = lazy(() => import("@/pages/portal/transport/driver-assignments"));
 const TransportBookAppointmentsPage = lazy(() => import("@/pages/portal/transport/book-appointments"));
 const TransportVehicleDetailsPage = lazy(() => import("@/pages/portal/transport/vehicle-details"));
