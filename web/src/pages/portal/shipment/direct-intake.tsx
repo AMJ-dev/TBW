@@ -10,7 +10,6 @@ import {
   User,
   Loader2,
   ChevronDown,
-  FileText,
   Info,
   Package,
   Plus,
@@ -36,10 +35,19 @@ type ContainerItem = {
   packages: string;
 };
 
+type SearchOption = {
+  id: string;
+  name: string;
+  reference?: string;
+  status?: string;
+  email?: string;
+  phone?: string;
+};
+
 const initialContainer = (): ContainerItem => ({
   id: Date.now() + Math.random(),
   containerNumber: "",
-  containerType: "40FT Standard",
+  containerType: "40ft",
   sealNumber: "",
   cargoDescription: "",
   grossWeight: "",
@@ -57,17 +65,38 @@ const textareaClass =
 
 const cardClass = "rounded-2xl bg-paper ring-1 ring-line";
 
+function extractList(payload: any): any[] {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.results)) return payload.results;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.code)) return payload.code;
+  return [];
+}
+
+function useDebouncedValue<T>(value: T, delay = 300): T {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebounced(value), delay);
+    return () => window.clearTimeout(timer);
+  }, [value, delay]);
+
+  return debounced;
+}
+
 export default function DirectIntakePage() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState(1);
   const [reason, setReason] = useState("manifest_omission");
+
   const [billOfLading, setBillOfLading] = useState("");
   const [shippingLine, setShippingLine] = useState("");
   const [vessel, setVessel] = useState("");
   const [voyage, setVoyage] = useState("");
   const [arrivalDate, setArrivalDate] = useState("");
   const [originPort, setOriginPort] = useState("");
+
   const [consignee, setConsignee] = useState("");
   const [consigneeOrganisationId, setConsigneeOrganisationId] = useState("");
   const [consigneeEmail, setConsigneeEmail] = useState("");
@@ -76,8 +105,10 @@ export default function DirectIntakePage() {
   const [consigneeContactPerson, setConsigneeContactPerson] = useState("");
   const [consigneeAddress, setConsigneeAddress] = useState("");
   const [consigneeCountry, setConsigneeCountry] = useState("Nigeria");
+
   const [licensedAgent, setLicensedAgent] = useState("");
   const [licensedAgentId, setLicensedAgentId] = useState("");
+
   const [explanation, setExplanation] = useState("");
   const [containers, setContainers] = useState<ContainerItem[]>([
     initialContainer(),
@@ -85,6 +116,17 @@ export default function DirectIntakePage() {
   const [containerTypes, setContainerTypes] = useState<string[]>([]);
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState("");
+
+  const [documents, setDocuments] = useState<File[]>([]);
+  const [declaration, setDeclaration] = useState(false);
+  const [prepared, setPrepared] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [requestReference, setRequestReference] = useState("");
+  const [validationError, setValidationError] = useState("");
+  const [blSearchStatus, setBlSearchStatus] = useState("");
+  const [blSearching, setBlSearching] = useState(false);
+
+  const lastSearchedBl = useRef("");
 
   useEffect(() => {
     let active = true;
@@ -101,7 +143,7 @@ export default function DirectIntakePage() {
           throw new Error(
             typeof resp.data === "string"
               ? resp.data
-              : "Could not load container types."
+              : "Could not load container types.",
           );
         }
 
@@ -118,25 +160,40 @@ export default function DirectIntakePage() {
               .map((item: any) =>
                 typeof item === "string"
                   ? item.trim()
-                  : String(item?.label ?? item?.name ?? item?.value ?? item?.id ?? "").trim()
+                  : String(
+                      item?.label ??
+                        item?.name ??
+                        item?.value ??
+                        item?.id ??
+                        "",
+                    ).trim(),
               )
-              .filter((item: string) => item.length > 0)
+              .filter(Boolean)
           : [];
 
         if (!types.length) {
-          throw new Error("No container types were returned by shipment configuration.");
+          throw new Error(
+            "No container types were returned by shipment configuration.",
+          );
         }
 
         if (active) {
           setContainerTypes(types);
-          setContainers(current => current.map(item => ({ ...item, containerType: types.includes(item.containerType) ? item.containerType : (types[0] ?? item.containerType) })));
+          setContainers((current) =>
+            current.map((item) => ({
+              ...item,
+              containerType: types.includes(item.containerType)
+                ? item.containerType
+                : (types[0] ?? item.containerType),
+            })),
+          );
         }
       } catch (error) {
         if (active) {
           setConfigError(
             error instanceof Error
               ? error.message
-              : "Could not load container types."
+              : "Could not load container types.",
           );
         }
       } finally {
@@ -150,36 +207,32 @@ export default function DirectIntakePage() {
       active = false;
     };
   }, []);
-  const [documents, setDocuments] = useState<File[]>([]);
-  const [declaration, setDeclaration] = useState(false);
-  const [prepared, setPrepared] = useState(false);
-  const [requestReference, setRequestReference] = useState("");
-  const [validationError, setValidationError] = useState("");
-  const [blSearchStatus, setBlSearchStatus] = useState("");
-  const [blSearching, setBlSearching] = useState(false);
-  const lastSearchedBl = useRef("");
 
   useEffect(() => {
     const query = billOfLading.trim();
-    if (query.length < 3 || query.toUpperCase() === lastSearchedBl.current) return;
+
+    if (
+      query.length < 3 ||
+      query.toUpperCase() === lastSearchedBl.current
+    ) {
+      return;
+    }
+
     const timer = window.setTimeout(async () => {
       lastSearchedBl.current = query.toUpperCase();
       setBlSearching(true);
       setBlSearchStatus("");
+
       try {
         const response = await http.post("/portal/manifest/shipment-search/", { q: query });
+
         const payload = response.data;
-        const records = Array.isArray(payload?.code)
-          ? payload.code
-          : Array.isArray(payload?.data)
-            ? payload.data
-            : [];
-        const match = records.find((record: any) =>
-          String(record?.bill_of_lading ?? "").trim().toUpperCase() === query.toUpperCase()
-        ) ?? records[0];
+        const records = Array.isArray(payload?.code) ? payload.code : Array.isArray(payload?.data) ? payload.data : [];
+
+        const match = records.find((record: any) => String(record?.bill_of_lading ?? "").trim().toUpperCase() === query.toUpperCase()) ?? records[0];
 
         if (payload?.error || !match) {
-          setBlSearchStatus(records.length ? "No exact bill of lading match found." : "No existing shipment found. You can continue entering the details manually.");
+          setBlSearchStatus(records.length ? "No exact bill of lading match found." : "No existing shipment found. Enter the details manually.");
           return;
         }
 
@@ -191,6 +244,7 @@ export default function DirectIntakePage() {
         setOriginPort(String(match.origin_port ?? ""));
 
         const consigneeRecord = match.consignee && typeof match.consignee === "object" ? match.consignee : null;
+
         setConsignee(String(consigneeRecord?.organisation_name ?? consigneeRecord?.name ?? match.consignee_name ?? match.consignee ?? ""));
         setConsigneeOrganisationId(String(match.consignee_organisation_id ?? ""));
         setConsigneeType(match.consignee_type === "individual" ? "individual" : "organisation");
@@ -201,24 +255,27 @@ export default function DirectIntakePage() {
         setConsigneeCountry(String(match.consignee_country ?? ""));
 
         const agentRecord = match.agent && typeof match.agent === "object" ? match.agent : null;
+
         setLicensedAgentId(String(match.licensed_agent_id ?? ""));
         setLicensedAgent(String(agentRecord?.name ?? match.agent_name ?? match.licensed_agent_name ?? ""));
 
         if (Array.isArray(match.containers) && match.containers.length) {
-          setContainers(match.containers.map((container: any, index: number) => ({
-            id: Date.now() + index + Math.random(),
-            containerNumber: String(container.container_no ?? container.container_number ?? ""),
-            containerType: String(container.size ?? container.container_type ?? containerTypes[0] ?? "40FT Standard"),
-            sealNumber: String(container.seal_no ?? container.seal_number ?? ""),
-            cargoDescription: String(container.cargo_description ?? match.cargo_description ?? ""),
-            grossWeight: String(container.gross_weight ?? match.gross_weight ?? ""),
-            packages: String(container.package_count ?? container.packages ?? match.package_count ?? ""),
-          })));
+          setContainers(
+            match.containers.map((container: any, index: number) => ({
+              id: Date.now() + index + Math.random(),
+              containerNumber: String(container.container_no ?? container.container_number ?? ""),
+              containerType: String(container.size ?? container.container_type ?? containerTypes[0] ?? "40ft", ),
+              sealNumber: String(container.seal_no ?? container.seal_number ?? ""),
+              cargoDescription: String(container.cargo_description ?? match.cargo_description ?? ""),
+              grossWeight: String(container.gross_weight ?? match.gross_weight ?? ""),
+              packages: String(container.package_count ?? container.packages ?? match.package_count ?? ""),
+            })),
+          );
         }
 
         setBlSearchStatus(`Shipment details loaded${match.shipment_reference ? ` (${match.shipment_reference})` : ""}. Review the information before continuing.`);
       } catch {
-        setBlSearchStatus("Could not search for this bill of lading. You can continue entering the details manually.");
+        setBlSearchStatus("Could not search for this bill of lading. Enter the details manually.");
       } finally {
         setBlSearching(false);
       }
@@ -239,35 +296,16 @@ export default function DirectIntakePage() {
     );
   };
 
-  const addContainer = () => {
-    setContainers((current) => [
-      ...current,
-      {
-        ...initialContainer(),
-        containerType: containerTypes[0] ?? "",
-      },
-    ]);
-  };
+  const addContainer = () => setContainers((current) => [...current, {...initialContainer(), containerType: containerTypes[0] ?? ""}]);
 
-  const removeContainer = (id: number) => {
-    setContainers((current) =>
-      current.length > 1
-        ? current.filter((item) => item.id !== id)
-        : current,
-    );
-  };
-
+  const removeContainer = (id: number) => setContainers((current) => current.length > 1 ? current.filter((item) => item.id !== id) : current);
+  
   const addDocuments = (files: FileList | null) => {
     if (!files) return;
+
     setDocuments((current) => [
       ...current,
-      ...Array.from(files).filter(
-        (file) =>
-          !current.some(
-            (existing) =>
-              existing.name === file.name && existing.size === file.size,
-          ),
-      ),
+      ...Array.from(files).filter((file) => !current.some((existing) => existing.name === file.name && existing.size === file.size)),
     ]);
   };
 
@@ -275,25 +313,13 @@ export default function DirectIntakePage() {
     setDocuments((current) => current.filter((_, i) => i !== index));
   };
 
-  const completedContainers = containers.filter(
-    (item) =>
-      item.containerNumber.trim() && item.cargoDescription.trim(),
-  ).length;
-
-  const filledFields = [
-    billOfLading,
-    shippingLine,
-    vessel,
-    arrivalDate,
-    consignee,
-    explanation,
-  ].filter((value) => value.trim()).length;
+  const completedContainers = containers.filter((item) => item.containerNumber.trim() && item.cargoDescription.trim()).length;
 
   const handleContinue = () => {
     setValidationError("");
 
     if (step === 1) {
-      const missingFields = [];
+      const missingFields: string[] = [];
 
       if (!billOfLading.trim()) missingFields.push("bill of lading");
       if (!shippingLine.trim()) missingFields.push("shipping line");
@@ -303,9 +329,7 @@ export default function DirectIntakePage() {
       if (!explanation.trim()) missingFields.push("explanation");
 
       if (missingFields.length) {
-        setValidationError(
-          `Complete the required fields: ${missingFields.join(", ")}.`,
-        );
+        setValidationError(`Complete the required fields: ${missingFields.join(", ")}.`);
         return;
       }
 
@@ -316,24 +340,19 @@ export default function DirectIntakePage() {
     if (step === 2) {
       const incompleteContainer = containers.some(
         (item) =>
-          !item.containerNumber.trim() || !item.cargoDescription.trim(),
+          !item.containerNumber.trim() ||
+          !item.cargoDescription.trim(),
       );
 
       if (incompleteContainer) {
-        setValidationError(
-          "Enter a container number and cargo description for every container.",
-        );
+        setValidationError("Enter a container number and cargo description for every container.");
         return;
       }
 
-      const normalizedNumbers = containers.map((item) =>
-        item.containerNumber.trim().toUpperCase(),
-      );
+      const normalizedNumbers = containers.map((item) => item.containerNumber.trim().toUpperCase());
 
       if (new Set(normalizedNumbers).size !== normalizedNumbers.length) {
-        setValidationError(
-          "Each container number must be unique. Remove or correct duplicate numbers.",
-        );
+        setValidationError("Each container number must be unique. Correct duplicate numbers.");
         return;
       }
 
@@ -341,13 +360,11 @@ export default function DirectIntakePage() {
     }
   };
 
-  const handlePrepare = () => {
+  const handleSubmit = async () => {
     setValidationError("");
 
     if (!declaration) {
-      setValidationError(
-        "Confirm the declaration before preparing this direct intake request.",
-      );
+      setValidationError("Confirm the declaration before submitting this direct intake request.");
       return;
     }
 
@@ -357,13 +374,74 @@ export default function DirectIntakePage() {
       return;
     }
 
-    setRequestReference(
-      `TRN-DI-${new Date().getFullYear()}-${Math.random()
-        .toString(36)
-        .slice(2, 8)
-        .toUpperCase()}`,
-    );
-    setPrepared(true);
+    const incompleteContainer = containers.some(item => !item.containerNumber.trim() || !item.cargoDescription.trim());
+
+    if (incompleteContainer) {
+      setValidationError("Enter a container number and cargo description for every container.");
+      setStep(2);
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const formData = new FormData();
+
+      formData.append("reason", reason);
+      formData.append("bill_of_lading", billOfLading.trim());
+      formData.append("shipping_line", shippingLine.trim());
+      formData.append("vessel_name", vessel.trim());
+      formData.append("voyage_number", voyage.trim());
+      formData.append("expected_arrival", arrivalDate);
+      formData.append("origin_port", originPort.trim());
+
+      formData.append("consignee", consignee.trim());
+      formData.append("consignee_organisation_id", consigneeOrganisationId);
+      formData.append("consignee_type", consigneeType);
+      formData.append("consignee_email", consigneeEmail.trim());
+      formData.append("consignee_phone", consigneePhone.trim());
+      formData.append("consignee_contact_person", consigneeContactPerson.trim());
+      formData.append("consignee_address", consigneeAddress.trim());
+      formData.append("consignee_country", consigneeCountry.trim());
+
+      formData.append("licensed_agent_id", licensedAgentId);
+      formData.append("licensed_agent_name", licensedAgent.trim());
+      formData.append("explanation", explanation.trim());
+
+      formData.append(
+        "containers",
+        JSON.stringify(
+          containers.map((item) => ({
+            container_no: item.containerNumber.trim().toUpperCase(),
+            size: item.containerType,
+            seal_no: item.sealNumber.trim(),
+            cargo_description: item.cargoDescription.trim(),
+            gross_weight: item.grossWeight === "" ? null : Number(item.grossWeight),
+            package_count: item.packages === "" ? null : Number(item.packages),
+          })),
+        ),
+      );
+
+      documents.forEach((file) => formData.append("documents[]", file))
+      const response = await http.post("/portal/direct-intake/", formData)
+      const payload = response.data;
+
+      if (payload?.error) throw new Error(typeof payload.data === "string" ? payload.data : "Could not submit the direct intake request.");
+
+      const result = payload?.code;
+      const reference = result?.request_reference ?? result?.reference ?? result?.direct_intake_reference ?? result?.id ?? "";
+
+      setRequestReference(String(reference));
+      setPrepared(true);
+    } catch (error) {
+      setValidationError(
+        error instanceof Error
+          ? error.message
+          : "Could not submit the direct intake request.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const steps = [
@@ -374,28 +452,18 @@ export default function DirectIntakePage() {
 
   return (
     <AppShell title="Direct intake" eyebrow="Portal · Cargo requests">
-      <div
-        className="space-y-6 pb-8"
-        style={{
-          animation: "slideInFromLeft 260ms cubic-bezier(0.32, 0.72, 0, 1)",
-        }}
-      >
+      <div className="space-y-6 pb-8" style={{ animation: "slideInFromLeft 260ms cubic-bezier(0.32, 0.72, 0, 1)" }}>
         {validationError && (
           <div
             role="alert"
-            className="flex items-start gap-3 rounded-xl border border-coral/30 bg-coral/5 p-4 text-sm text-coral"
-          >
+            className="flex items-start gap-3 rounded-xl border border-coral/30 bg-coral/5 p-4 text-sm text-coral">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
             <p className="leading-5">{validationError}</p>
           </div>
         )}
+
         <div>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => navigate("/portal/shipments")}
-            className="-ml-3 mb-4 gap-2 text-ink-soft hover:text-ink"
-          >
+          <Button type="button" variant="ghost" onClick={() => navigate("/portal/shipments")} className="-ml-3 mb-4 gap-2 text-ink-soft hover:text-ink">
             <ArrowLeft className="size-4" />
             Back to shipments
           </Button>
@@ -409,9 +477,9 @@ export default function DirectIntakePage() {
                 Direct Intake
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-                Request operational approval for cargo that is missing from
-                the carrier manifest. Supply the original shipping
-                information, affected containers, and supporting evidence.
+                Request operational approval for cargo missing from the carrier
+                manifest. Supply the original shipping information, affected
+                containers, and supporting evidence.
               </p>
             </div>
 
@@ -424,7 +492,7 @@ export default function DirectIntakePage() {
                   Request reference
                 </p>
                 <p className="mt-1 font-mono text-xs font-semibold text-ink">
-                  {requestReference || "Pending"}
+                  {requestReference || "Assigned after submission"}
                 </p>
               </div>
             </div>
@@ -437,36 +505,27 @@ export default function DirectIntakePage() {
               <Check className="size-8" />
             </div>
             <h3 className="mt-5 font-display text-xl font-bold text-ink">
-              Request preview prepared
+              Direct intake request submitted
             </h3>
             <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-ink-soft">
-              Your direct intake request has been prepared for demonstration.
-              Nothing has been submitted or saved to the server.
+              The server accepted your request. Operations must review it before
+              intake proceeds.
             </p>
-            <div className="mx-auto mt-5 max-w-md rounded-xl border border-line bg-sand p-4 text-left">
-              <p className={labelClass}>Local reference</p>
-              <p className="mt-2 font-mono text-sm font-semibold text-ink">
-                {requestReference}
-              </p>
-              <p className="mt-3 text-xs text-ink-soft">
-                {containers.length} container(s) · {documents.length} supporting
-                document(s)
-              </p>
-            </div>
+            {requestReference && (
+              <div className="mx-auto mt-5 max-w-md rounded-xl border border-line bg-sand p-4 text-left">
+                <p className={labelClass}>Request reference</p>
+                <p className="mt-2 break-all font-mono text-sm font-semibold text-ink">
+                  {requestReference}
+                </p>
+              </div>
+            )}
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Button
                 variant="outline"
-                onClick={() => setPrepared(false)}
+                onClick={() => navigate("/portal/shipments")}
                 className="border-line"
               >
-                Return to request
-              </Button>
-              <Button
-                onClick={() => navigate("/portal/shipments")}
-                className="gap-2 bg-orange text-white hover:bg-orange-deep"
-              >
                 Back to shipments
-                <ArrowRight className="size-4" />
               </Button>
             </div>
           </section>
@@ -479,7 +538,7 @@ export default function DirectIntakePage() {
                     Direct intake application
                   </h3>
                   <p className="mt-1 text-xs text-ink-soft">
-                    Complete each section before preparing your request.
+                    Complete each section before submitting your request.
                   </p>
                 </div>
                 <span className="rounded-full bg-orange/10 px-3 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-orange-deep">
@@ -554,8 +613,8 @@ export default function DirectIntakePage() {
                           Original shipment details
                         </h3>
                         <p className="mt-1 text-xs leading-5 text-ink-soft">
-                          Reference the carrier shipment so Operations can
-                          investigate the missing manifest entry.
+                          Search for an existing shipment using its bill of
+                          lading or enter the information manually.
                         </p>
                       </div>
                     </div>
@@ -569,12 +628,21 @@ export default function DirectIntakePage() {
                       <Input
                         required
                         value={billOfLading}
-                        onChange={(e) => setBillOfLading(e.target.value)}
+                        onChange={(e) => {
+                          setBillOfLading(e.target.value);
+                          lastSearchedBl.current = "";
+                        }}
                         placeholder="Enter carrier B/L number"
                         className={cn(inputClass, "font-mono")}
                       />
-                      <p className="mt-1.5 text-[11px] leading-5 text-ink-soft" aria-live="polite">
-                        {blSearching ? "Searching existing shipments…" : blSearchStatus || "Enter a bill of lading to look up existing shipment details."}
+                      <p
+                        className="mt-1.5 text-[11px] leading-5 text-ink-soft"
+                        aria-live="polite"
+                      >
+                        {blSearching
+                          ? "Searching existing shipments…"
+                          : blSearchStatus ||
+                            "Enter at least 3 characters to search."}
                       </p>
                     </label>
 
@@ -671,7 +739,7 @@ export default function DirectIntakePage() {
                         rows={4}
                         value={explanation}
                         onChange={(e) => setExplanation(e.target.value)}
-                        placeholder="Explain why the cargo is missing from the manifest and provide any relevant references..."
+                        placeholder="Explain why the cargo is missing from the manifest and provide relevant references..."
                         className={textareaClass}
                       />
                     </label>
@@ -680,48 +748,155 @@ export default function DirectIntakePage() {
 
                 <section className={`${cardClass} overflow-visible p-5 sm:p-6`}>
                   <div className="mb-5">
-                    <h3 className="font-display text-sm font-bold text-ink">Consignee details</h3>
-                    <p className="mt-1.5 text-xs leading-5 text-ink-soft">Who is receiving the cargo. Used by Operations to verify the recipient and resolve discrepancies.</p>
+                    <h3 className="font-display text-sm font-bold text-ink">
+                      Consignee details
+                    </h3>
+                    <p className="mt-1.5 text-xs leading-5 text-ink-soft">
+                      Details of the person or organisation receiving the
+                      cargo.
+                    </p>
                   </div>
+
                   <div className="space-y-5">
                     <div>
                       <span className={labelClass}>Consignee type</span>
                       <div className="mt-2 flex flex-wrap gap-2">
-                        <button type="button" onClick={() => setConsigneeType("organisation")} className={cn("inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-xs font-medium transition", consigneeType === "organisation" ? "border-orange bg-orange/10 text-orange-deep" : "border-line bg-sand text-ink-soft hover:border-orange/40")}><Building2 className="size-3.5"/>Organisation</button>
-                        <button type="button" onClick={() => { setConsigneeType("individual"); setConsigneeOrganisationId(""); }} className={cn("inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-xs font-medium transition", consigneeType === "individual" ? "border-orange bg-orange/10 text-orange-deep" : "border-line bg-sand text-ink-soft hover:border-orange/40")}><User className="size-3.5"/>Individual</button>
+                        <button
+                          type="button"
+                          onClick={() => setConsigneeType("organisation")}
+                          className={cn(
+                            "inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-xs font-medium transition",
+                            consigneeType === "organisation"
+                              ? "border-orange bg-orange/10 text-orange-deep"
+                              : "border-line bg-sand text-ink-soft hover:border-orange/40",
+                          )}
+                        >
+                          <Building2 className="size-3.5" />
+                          Organisation
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConsigneeType("individual");
+                            setConsigneeOrganisationId("");
+                          }}
+                          className={cn(
+                            "inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-xs font-medium transition",
+                            consigneeType === "individual"
+                              ? "border-orange bg-orange/10 text-orange-deep"
+                              : "border-line bg-sand text-ink-soft hover:border-orange/40",
+                          )}
+                        >
+                          <User className="size-3.5" />
+                          Individual
+                        </button>
                       </div>
                     </div>
+
                     <div>
-                      <span className={labelClass}>{consigneeType === "organisation" ? "Organisation / company name" : "Consignee full name"} <span className="text-coral">*</span></span>
-                      {consigneeType === "organisation" ? <OrganisationSearchPicker value={{ id: consigneeOrganisationId || null, name: consignee }} onChange={(next) => { setConsigneeOrganisationId(next.id ?? ""); setConsignee(next.name); }} /> : <Input required value={consignee} onChange={(e) => setConsignee(e.target.value)} placeholder="Enter full name" className={inputClass}/>}
-                      <p className="mt-2 text-[11px] leading-5 text-ink-soft">{consigneeType === "organisation" ? "Start typing to search registered organisations. If the consignee isn't in TRÏNŪ yet, you can continue — we'll record them by name on the manifest and follow up with an onboarding invite." : "Enter the full name of the person receiving the cargo."}</p>
+                      <span className={labelClass}>
+                        {consigneeType === "organisation"
+                          ? "Organisation / company name"
+                          : "Consignee full name"}{" "}
+                        <span className="text-coral">*</span>
+                      </span>
+                      {consigneeType === "organisation" ? (
+                        <OrganisationSearchPicker
+                          value={{
+                            id: consigneeOrganisationId || null,
+                            name: consignee,
+                          }}
+                          onChange={(next) => {
+                            setConsigneeOrganisationId(next.id ?? "");
+                            setConsignee(next.name);
+                          }}
+                        />
+                      ) : (
+                        <Input
+                          required
+                          value={consignee}
+                          onChange={(e) => setConsignee(e.target.value)}
+                          placeholder="Enter full name"
+                          className={inputClass}
+                        />
+                      )}
+                      <p className="mt-2 text-[11px] leading-5 text-ink-soft">
+                        Search for a registered organisation or enter the
+                        consignee details manually.
+                      </p>
                     </div>
+
                     <label className="block">
                       <span className={labelClass}>Contact person</span>
-                      <Input value={consigneeContactPerson} onChange={(e) => setConsigneeContactPerson(e.target.value)} placeholder="Name of contact person" className={inputClass}/>
+                      <Input
+                        value={consigneeContactPerson}
+                        onChange={(e) =>
+                          setConsigneeContactPerson(e.target.value)
+                        }
+                        placeholder="Name of contact person"
+                        className={inputClass}
+                      />
                     </label>
+
                     <div className="grid gap-4 sm:grid-cols-2">
                       <label className="block">
                         <span className={labelClass}>Email address</span>
-                        <Input type="email" value={consigneeEmail} onChange={(e) => setConsigneeEmail(e.target.value)} placeholder="contact@company.com" className={inputClass}/>
+                        <Input
+                          type="email"
+                          value={consigneeEmail}
+                          onChange={(e) => setConsigneeEmail(e.target.value)}
+                          placeholder="contact@company.com"
+                          className={inputClass}
+                        />
                       </label>
                       <label className="block">
                         <span className={labelClass}>Phone number</span>
-                        <Input type="tel" value={consigneePhone} onChange={(e) => setConsigneePhone(e.target.value)} placeholder="+234 ..." className={inputClass}/>
+                        <Input
+                          type="tel"
+                          value={consigneePhone}
+                          onChange={(e) => setConsigneePhone(e.target.value)}
+                          placeholder="+234 ..."
+                          className={inputClass}
+                        />
                       </label>
                     </div>
+
                     <label className="block">
                       <span className={labelClass}>Address</span>
-                      <textarea rows={3} value={consigneeAddress} onChange={(e) => setConsigneeAddress(e.target.value)} placeholder="Street address, city and state" className={textareaClass}/>
+                      <textarea
+                        rows={3}
+                        value={consigneeAddress}
+                        onChange={(e) => setConsigneeAddress(e.target.value)}
+                        placeholder="Street address, city and state"
+                        className={textareaClass}
+                      />
                     </label>
+
                     <label className="block">
                       <span className={labelClass}>Country</span>
-                      <Input value={consigneeCountry} onChange={(e) => setConsigneeCountry(e.target.value)} placeholder="e.g. Nigeria" className={inputClass}/>
+                      <Input
+                        value={consigneeCountry}
+                        onChange={(e) => setConsigneeCountry(e.target.value)}
+                        placeholder="e.g. Nigeria"
+                        className={inputClass}
+                      />
                     </label>
+
                     <div>
                       <span className={labelClass}>Licensed agent</span>
-                      <AgentSearchPicker value={{ id: licensedAgentId || null, name: licensedAgent }} onChange={(next) => { setLicensedAgentId(next.id ?? ""); setLicensedAgent(next.name); }} />
-                      <p className="mt-2 text-[11px] leading-5 text-ink-soft">Start typing to search licensed clearing agents.</p>
+                      <AgentSearchPicker
+                        value={{
+                          id: licensedAgentId || null,
+                          name: licensedAgent,
+                        }}
+                        onChange={(next) => {
+                          setLicensedAgentId(next.id ?? "");
+                          setLicensedAgent(next.name);
+                        }}
+                      />
+                      <p className="mt-2 text-[11px] leading-5 text-ink-soft">
+                        Search for a registered licensed clearing agent.
+                      </p>
                     </div>
                   </div>
                 </section>
@@ -833,8 +1008,10 @@ export default function DirectIntakePage() {
                               "w-full rounded-md border px-3",
                             )}
                           >
-                            {configLoading && <option value="">Loading container types...</option>}
-                            {!configLoading && containerTypes.length === 0 && (
+                            {configLoading && (
+                              <option value="">Loading container types...</option>
+                            )}
+                            {!configLoading && !containerTypes.length && (
                               <option value="">No container types available</option>
                             )}
                             {containerTypes.map((type) => (
@@ -842,9 +1019,17 @@ export default function DirectIntakePage() {
                                 {type}
                               </option>
                             ))}
+                            {!containerTypes.includes(item.containerType) &&
+                              item.containerType && (
+                                <option value={item.containerType}>
+                                  {item.containerType}
+                                </option>
+                              )}
                           </select>
                           {configError && (
-                            <span className="mt-1 block text-xs text-coral">{configError}</span>
+                            <span className="mt-1 block text-xs text-coral">
+                              {configError}
+                            </span>
                           )}
                         </label>
 
@@ -902,8 +1087,7 @@ export default function DirectIntakePage() {
 
                         <label className="block sm:col-span-2">
                           <span className={labelClass}>
-                            Cargo description{" "}
-                            <span className="text-coral">*</span>
+                            Cargo description <span className="text-coral">*</span>
                           </span>
                           <textarea
                             required
@@ -940,57 +1124,64 @@ export default function DirectIntakePage() {
               <>
                 <section className={`${cardClass} overflow-visible p-5 sm:p-6`}>
                   <div className="mb-5">
-                    <h3 className="font-display text-sm font-bold text-ink">Consignee details</h3>
-                    <p className="mt-1.5 text-xs leading-5 text-ink-soft">Who is receiving the cargo. Used by Operations to verify the recipient and resolve discrepancies.</p>
+                    <h3 className="font-display text-sm font-bold text-ink">
+                      Supporting documents
+                    </h3>
+                    <p className="mt-1.5 text-xs leading-5 text-ink-soft">
+                      Attach documents that help Operations verify the direct
+                      intake request.
+                    </p>
                   </div>
 
-                  <div className="space-y-5">
-                    <div>
-                      <span className={labelClass}>Consignee type</span>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <button type="button" onClick={() => setConsigneeType("organisation")} className={cn("inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-xs font-medium transition", consigneeType === "organisation" ? "border-orange bg-orange/10 text-orange-deep" : "border-line bg-sand text-ink-soft hover:border-orange/40")}><Building2 className="size-3.5"/>Organisation</button>
-                        <button type="button" onClick={() => { setConsigneeType("individual"); setConsigneeOrganisationId(""); }} className={cn("inline-flex h-9 items-center gap-2 rounded-full border px-3.5 text-xs font-medium transition", consigneeType === "individual" ? "border-orange bg-orange/10 text-orange-deep" : "border-line bg-sand text-ink-soft hover:border-orange/40")}><User className="size-3.5"/>Individual</button>
-                      </div>
+                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-line bg-sand/50 p-8 text-center transition hover:border-orange/50 hover:bg-orange/5">
+                    <Upload className="size-7 text-orange-deep" />
+                    <span className="mt-3 text-sm font-semibold text-ink">
+                      Select supporting documents
+                    </span>
+                    <span className="mt-1 text-xs text-ink-soft">
+                      Choose files from your device
+                    </span>
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        addDocuments(e.target.files);
+                        e.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+
+                  {documents.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      {documents.map((file, index) => (
+                        <div
+                          key={`${file.name}-${file.size}-${index}`}
+                          className="flex items-center gap-3 rounded-lg border border-line bg-sand/60 p-3"
+                        >
+                          <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-paper ring-1 ring-line">
+                            <ClipboardList className="size-4 text-orange-deep" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-semibold text-ink">
+                              {file.name}
+                            </p>
+                            <p className="text-[10px] text-ink-soft">
+                              {(file.size / 1024).toFixed(1)} KB
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeDocument(index)}
+                            className="rounded-md p-2 text-ink-soft hover:bg-coral/10 hover:text-coral"
+                            aria-label={`Remove ${file.name}`}
+                          >
+                            <X className="size-4" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
-
-                    <div>
-                      <span className={labelClass}>{consigneeType === "organisation" ? "Organisation / company name" : "Consignee full name"} <span className="text-coral">*</span></span>
-                      {consigneeType === "organisation" ? <OrganisationSearchPicker value={{ id: consigneeOrganisationId || null, name: consignee }} onChange={(next) => { setConsigneeOrganisationId(next.id ?? ""); setConsignee(next.name); }} /> : <Input required value={consignee} onChange={(e) => setConsignee(e.target.value)} placeholder="Enter full name" className={inputClass}/>}
-                      <p className="mt-2 text-[11px] leading-5 text-ink-soft">{consigneeType === "organisation" ? "Start typing to search registered organisations. If the consignee isn't in TRÏNŪ yet, you can continue and enter their details manually." : "Enter the full name of the person receiving the cargo."}</p>
-                    </div>
-
-                    <label className="block">
-                      <span className={labelClass}>Contact person</span>
-                      <Input value={consigneeContactPerson} onChange={(e) => setConsigneeContactPerson(e.target.value)} placeholder="Name of contact person" className={inputClass}/>
-                    </label>
-
-                    <div className="grid gap-4 sm:grid-cols-2">
-                      <label className="block">
-                        <span className={labelClass}>Email address</span>
-                        <Input type="email" value={consigneeEmail} onChange={(e) => setConsigneeEmail(e.target.value)} placeholder="contact@company.com" className={inputClass}/>
-                      </label>
-                      <label className="block">
-                        <span className={labelClass}>Phone number</span>
-                        <Input type="tel" value={consigneePhone} onChange={(e) => setConsigneePhone(e.target.value)} placeholder="+234 ..." className={inputClass}/>
-                      </label>
-                    </div>
-
-                    <label className="block">
-                      <span className={labelClass}>Address</span>
-                      <textarea rows={3} value={consigneeAddress} onChange={(e) => setConsigneeAddress(e.target.value)} placeholder="Street address, city and state" className={textareaClass}/>
-                    </label>
-
-                    <label className="block">
-                      <span className={labelClass}>Country</span>
-                      <Input value={consigneeCountry} onChange={(e) => setConsigneeCountry(e.target.value)} placeholder="e.g. Nigeria" className={inputClass}/>
-                    </label>
-
-                    <div>
-                      <span className={labelClass}>Licensed agent</span>
-                      <AgentSearchPicker value={{ id: licensedAgentId || null, name: licensedAgent }} onChange={(next) => { setLicensedAgentId(next.id ?? ""); setLicensedAgent(next.name); }} />
-                      <p className="mt-2 text-[11px] leading-5 text-ink-soft">Start typing to search licensed clearing agents.</p>
-                    </div>
-                  </div>
+                  )}
                 </section>
 
                 <section className={`${cardClass} p-5 sm:p-6`}>
@@ -1001,7 +1192,7 @@ export default function DirectIntakePage() {
                         Review application
                       </h3>
                       <p className="mt-1 text-xs text-ink-soft">
-                        Check your information before preparing the request.
+                        Check your information before submitting.
                       </p>
                     </div>
                   </div>
@@ -1015,7 +1206,13 @@ export default function DirectIntakePage() {
                       ["Expected arrival", arrivalDate],
                       ["Origin port", originPort || "Not provided"],
                       ["Consignee", consignee],
+                      ["Contact person", consigneeContactPerson || "Not provided"],
+                      ["Consignee email", consigneeEmail || "Not provided"],
+                      ["Consignee phone", consigneePhone || "Not provided"],
+                      ["Consignee address", consigneeAddress || "Not provided"],
+                      ["Consignee country", consigneeCountry || "Not provided"],
                       ["Licensed agent", licensedAgent || "Not provided"],
+                      ["Reason", reason.replace(/_/g, " ")],
                     ].map(([label, value]) => (
                       <div
                         key={label}
@@ -1038,6 +1235,7 @@ export default function DirectIntakePage() {
                         {containers.length}
                       </span>
                     </div>
+
                     <div className="mt-3 space-y-2">
                       {containers.map((item, index) => (
                         <div
@@ -1046,12 +1244,16 @@ export default function DirectIntakePage() {
                         >
                           <Container className="mt-0.5 size-4 shrink-0 text-orange-deep" />
                           <div className="min-w-0 flex-1">
-                            <p className="font-mono text-xs font-semibold text-ink">
+                            <p className="break-all font-mono text-xs font-semibold text-ink">
                               {item.containerNumber}
                             </p>
                             <p className="mt-1 text-xs text-ink-soft">
-                              {item.containerType} ·{" "}
-                              {item.cargoDescription}
+                              {item.containerType} · {item.cargoDescription}
+                            </p>
+                            <p className="mt-1 text-[10px] text-ink-soft">
+                              Seal: {item.sealNumber || "Not provided"} ·
+                              Packages: {item.packages || "Not provided"} ·
+                              Weight: {item.grossWeight || "Not provided"} kg
                             </p>
                           </div>
                           <span className="font-mono text-[10px] text-ink-soft">
@@ -1065,9 +1267,9 @@ export default function DirectIntakePage() {
                   <div className="mt-4 flex items-start gap-3 rounded-xl border border-orange/25 bg-orange/5 p-4">
                     <AlertTriangle className="mt-0.5 size-4 shrink-0 text-orange-deep" />
                     <p className="text-xs leading-5 text-ink-soft">
-                      Direct intake requires Operations approval. Preparing
-                      this request does not authorize cargo release or
-                      guarantee acceptance.
+                      Direct intake requires Operations approval. Submitting
+                      this request does not authorise cargo release or guarantee
+                      acceptance.
                     </p>
                   </div>
 
@@ -1137,12 +1339,16 @@ export default function DirectIntakePage() {
                   ) : (
                     <Button
                       type="button"
-                      disabled={!declaration}
-                      onClick={handlePrepare}
+                      disabled={!declaration || submitting}
+                      onClick={handleSubmit}
                       className="gap-2 bg-orange text-white hover:bg-orange-deep"
                     >
-                      <ShieldCheck className="size-4" />
-                      Prepare request
+                      {submitting ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <ShieldCheck className="size-4" />
+                      )}
+                      {submitting ? "Submitting..." : "Submit request"}
                     </Button>
                   )}
                 </div>
@@ -1169,95 +1375,333 @@ export default function DirectIntakePage() {
   );
 }
 
-type ConsigneeOrganisation = { id: string; name: string; rcNumber?: string; status?: string };
-type LicensedAgent = { id: string; name: string; licenceNumber: string; contactEmail?: string; contactPhone?: string };
-
-function extractSearchList<T,>(payload: any): T[] {
-  if (Array.isArray(payload)) return payload;
-  if (Array.isArray(payload?.results)) return payload.results;
-  if (Array.isArray(payload?.data)) return payload.data;
-  return [];
-}
-
-function useDebouncedValue<T>(value: T, delay = 300): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setDebounced(value), delay);
-    return () => window.clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
-
-function OrganisationSearchPicker({ value, onChange }: { value: { id: string | null; name: string }; onChange: (next: { id: string | null; name: string }) => void }) {
+function OrganisationSearchPicker({
+  value,
+  onChange,
+}: {
+  value: { id: string | null; name: string };
+  onChange: (next: { id: string | null; name: string }) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<ConsigneeOrganisation[]>([]);
+  const [results, setResults] = useState<SearchOption[]>([]);
   const [searching, setSearching] = useState(false);
   const debouncedQuery = useDebouncedValue(query);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
+
     const q = debouncedQuery.trim();
-    if (q.length < 2) { setResults([]); setSearching(false); return; }
+    if (q.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+
     let cancelled = false;
+
     (async () => {
       setSearching(true);
+
       try {
-        const res = await http.post("operations/manifests/organisations/", { q });
-        const resp: Resp = res.data;
+        const response = await http.post(
+          "/operations/manifests/organisations/",
+          { q },
+        );
+        const resp: Resp = response.data;
+
         if (cancelled) return;
-        if (resp.error) { setResults([]); return; }
-        setResults(extractSearchList<any>(resp.code).map((o) => ({ id: String(o.id ?? ""), name: String(o.name ?? o.organisation_name ?? ""), rcNumber: o.rc_number ?? o.rcNumber, status: o.status })).filter((o) => o.id && o.name));
-      } catch { if (!cancelled) setResults([]); }
-      finally { if (!cancelled) setSearching(false); }
+
+        if (resp.error) {
+          setResults([]);
+          return;
+        }
+
+        setResults(
+          extractList(resp.code).map((item: any) => ({
+            id: String(item.id ?? ""),
+            name: String(
+              item.name ?? item.organisation_name ?? "",
+            ),
+            reference: String(item.rc_number ?? item.rcNumber ?? ""),
+            status: String(item.status ?? ""),
+          })).filter((item: SearchOption) => item.id && item.name),
+        );
+      } catch {
+        if (!cancelled) setResults([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [debouncedQuery, open]);
 
   useEffect(() => {
     if (!open) return;
-    const handle = (e: MouseEvent) => { if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false); };
+
+    const handle = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
   }, [open]);
 
-  return <div ref={containerRef} className="relative mt-1.5"><div className="flex h-11 items-center gap-2 rounded-md border border-line bg-sand px-3 text-sm text-ink focus-within:ring-2 focus-within:ring-orange/30"><Building2 className="size-3.5 shrink-0 text-ink-soft"/><input value={open ? query : value.name} onFocus={() => { setOpen(true); setQuery(""); }} onChange={(e) => { setQuery(e.target.value); onChange({ id: null, name: e.target.value }); }} placeholder="Search registered organisations…" className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-ink-soft/70"/>{value.id && <span className="rounded-full bg-orange/10 px-2 py-0.5 font-mono text-[9px] uppercase text-orange-deep">Linked</span>}{searching ? <Loader2 className="size-3.5 animate-spin text-ink-soft"/> : <ChevronDown className={`size-4 text-ink-soft transition-transform ${open ? "rotate-180" : ""}`}/>}</div>{open && <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line"><div className="max-h-64 overflow-y-auto p-1">{query.trim().length < 2 ? <div className="px-3 py-6 text-center text-[12px] text-ink-soft">Type at least 2 characters to search.</div> : searching ? <div className="flex items-center justify-center gap-2 px-3 py-6 text-[12px] text-ink-soft"><Loader2 className="size-3.5 animate-spin"/>Searching…</div> : results.length ? results.map((o) => <button key={o.id} type="button" onClick={() => { onChange({ id: o.id, name: o.name }); setOpen(false); setQuery(""); }} className="flex w-full items-center justify-between gap-3 rounded-lg p-3 text-left hover:bg-orange/5"><span className="min-w-0"><span className="block truncate text-[12px] font-semibold text-ink">{o.name}</span><span className="mt-1 block text-[10px] text-ink-soft">{o.rcNumber ? `RC ${o.rcNumber} · ` : ""}{o.status ? String(o.status).replace(/_/g, " ") : "Registered organisation"}</span></span><Check className="size-4 shrink-0 text-orange-deep"/></button>) : <div className="px-3 py-6 text-center text-[12px] text-ink-soft">No registered organisation found. You can keep the name entered.</div>}</div></div>}</div>;
+  return (
+    <div ref={containerRef} className="relative mt-1.5">
+      <div className="flex h-11 items-center gap-2 rounded-md border border-line bg-sand px-3 text-sm text-ink focus-within:ring-2 focus-within:ring-orange/30">
+        <Building2 className="size-3.5 shrink-0 text-ink-soft" />
+        <input
+          value={open ? query : value.name}
+          onFocus={() => {
+            setOpen(true);
+            setQuery("");
+          }}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            onChange({ id: null, name: event.target.value });
+          }}
+          placeholder="Search registered organisations..."
+          className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-ink-soft/70"
+        />
+        {value.id && (
+          <span className="rounded-full bg-orange/10 px-2 py-0.5 font-mono text-[9px] uppercase text-orange-deep">
+            Linked
+          </span>
+        )}
+        {searching ? (
+          <Loader2 className="size-3.5 animate-spin text-ink-soft" />
+        ) : (
+          <ChevronDown
+            className={cn(
+              "size-4 text-ink-soft transition-transform",
+              open && "rotate-180",
+            )}
+          />
+        )}
+      </div>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line">
+          <div className="max-h-64 overflow-y-auto p-1">
+            {query.trim().length < 2 ? (
+              <div className="px-3 py-6 text-center text-[12px] text-ink-soft">
+                Type at least 2 characters to search.
+              </div>
+            ) : searching ? (
+              <div className="flex items-center justify-center gap-2 px-3 py-6 text-[12px] text-ink-soft">
+                <Loader2 className="size-3.5 animate-spin" />
+                Searching...
+              </div>
+            ) : results.length ? (
+              results.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    onChange({ id: item.id, name: item.name });
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg p-3 text-left hover:bg-orange/5"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-[12px] font-semibold text-ink">
+                      {item.name}
+                    </span>
+                    <span className="mt-1 block text-[10px] text-ink-soft">
+                      {item.reference ? `RC ${item.reference} · ` : ""}
+                      {item.status || "Registered organisation"}
+                    </span>
+                  </span>
+                  <Check className="size-4 shrink-0 text-orange-deep" />
+                </button>
+              ))
+            ) : (
+              <div className="px-3 py-6 text-center text-[12px] text-ink-soft">
+                No registered organisation found. You can keep the name entered.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
-function AgentSearchPicker({ value, onChange }: { value: { id: string | null; name: string }; onChange: (next: { id: string | null; name: string }) => void }) {
+function AgentSearchPicker({
+  value,
+  onChange,
+}: {
+  value: { id: string | null; name: string };
+  onChange: (next: { id: string | null; name: string }) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<LicensedAgent[]>([]);
+  const [results, setResults] = useState<SearchOption[]>([]);
   const [searching, setSearching] = useState(false);
   const debouncedQuery = useDebouncedValue(query);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
+
     const q = debouncedQuery.trim();
-    if (q.length < 2) { setResults([]); setSearching(false); return; }
+    if (q.length < 2) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+
     let cancelled = false;
+
     (async () => {
       setSearching(true);
+
       try {
-        const res = await http.post("operations/manifests/agents/", { q });
-        const resp: Resp = res.data;
+        const response = await http.post(
+          "/operations/manifests/agents/",
+          { q },
+        );
+        const resp: Resp = response.data;
+
         if (cancelled) return;
-        if (resp.error) { setResults([]); return; }
-        setResults(extractSearchList<any>(resp.code).map((a) => ({ id: String(a.id ?? ""), name: String(a.name ?? ""), licenceNumber: String(a.licence_number ?? a.licenceNumber ?? ""), contactEmail: a.contact_email ?? a.contactEmail, contactPhone: a.contact_phone ?? a.contactPhone })).filter((a) => a.id && a.name));
-      } catch { if (!cancelled) setResults([]); }
-      finally { if (!cancelled) setSearching(false); }
+
+        if (resp.error) {
+          setResults([]);
+          return;
+        }
+
+        setResults(
+          extractList(resp.code).map((item: any) => ({
+            id: String(item.id ?? ""),
+            name: String(item.name ?? ""),
+            reference: String(
+              item.licence_number ?? item.licenceNumber ?? "",
+            ),
+            email: String(item.contact_email ?? item.contactEmail ?? ""),
+            phone: String(item.contact_phone ?? item.contactPhone ?? ""),
+          })).filter((item: SearchOption) => item.id && item.name),
+        );
+      } catch {
+        if (!cancelled) setResults([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+    };
   }, [debouncedQuery, open]);
 
   useEffect(() => {
     if (!open) return;
-    const handle = (e: MouseEvent) => { if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false); };
+
+    const handle = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+
     document.addEventListener("mousedown", handle);
     return () => document.removeEventListener("mousedown", handle);
   }, [open]);
 
-  return <div ref={containerRef} className="relative mt-1.5"><div className="flex h-11 items-center gap-2 rounded-md border border-line bg-sand px-3 text-sm text-ink focus-within:ring-2 focus-within:ring-orange/30"><User className="size-3.5 shrink-0 text-ink-soft"/><input value={open ? query : value.name} onFocus={() => { setOpen(true); setQuery(""); }} onChange={(e) => { setQuery(e.target.value); onChange({ id: null, name: e.target.value }); }} placeholder="Search licensed agents…" className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-ink-soft/70"/>{value.id && <span className="rounded-full bg-orange/10 px-2 py-0.5 font-mono text-[9px] uppercase text-orange-deep">Linked</span>}{searching ? <Loader2 className="size-3.5 animate-spin text-ink-soft"/> : <ChevronDown className={`size-4 text-ink-soft transition-transform ${open ? "rotate-180" : ""}`}/>}</div>{open && <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line"><div className="max-h-64 overflow-y-auto p-1">{query.trim().length < 2 ? <div className="px-3 py-6 text-center text-[12px] text-ink-soft">Type at least 2 characters to search licensed agents.</div> : searching ? <div className="flex items-center justify-center gap-2 px-3 py-6 text-[12px] text-ink-soft"><Loader2 className="size-3.5 animate-spin"/>Searching…</div> : results.length ? results.map((a) => <button key={a.id} type="button" onClick={() => { onChange({ id: a.id, name: a.name }); setOpen(false); setQuery(""); }} className="w-full rounded-lg p-3 text-left transition hover:bg-orange/5"><div className="flex items-center justify-between gap-3"><span className="truncate text-[12px] font-semibold text-ink">{a.name}</span><Check className="size-4 shrink-0 text-orange-deep"/></div><p className="mt-1 font-mono text-[10px] text-ink-soft">Licence: {a.licenceNumber || "Not provided"}</p>{(a.contactEmail || a.contactPhone) && <p className="mt-1 truncate text-[10px] text-ink-soft">{[a.contactEmail, a.contactPhone].filter(Boolean).join(" · ")}</p>}</button>) : <div className="px-3 py-6 text-center text-[12px] text-ink-soft">No registered licensed agent found.</div>}</div></div>}</div>;
+  return (
+    <div ref={containerRef} className="relative mt-1.5">
+      <div className="flex h-11 items-center gap-2 rounded-md border border-line bg-sand px-3 text-sm text-ink focus-within:ring-2 focus-within:ring-orange/30">
+        <User className="size-3.5 shrink-0 text-ink-soft" />
+        <input
+          value={open ? query : value.name}
+          onFocus={() => {
+            setOpen(true);
+            setQuery("");
+          }}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            onChange({ id: null, name: event.target.value });
+          }}
+          placeholder="Search licensed agents..."
+          className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-ink-soft/70"
+        />
+        {value.id && (
+          <span className="rounded-full bg-orange/10 px-2 py-0.5 font-mono text-[9px] uppercase text-orange-deep">
+            Linked
+          </span>
+        )}
+        {searching ? (
+          <Loader2 className="size-3.5 animate-spin text-ink-soft" />
+        ) : (
+          <ChevronDown
+            className={cn(
+              "size-4 text-ink-soft transition-transform",
+              open && "rotate-180",
+            )}
+          />
+        )}
+      </div>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line">
+          <div className="max-h-64 overflow-y-auto p-1">
+            {query.trim().length < 2 ? (
+              <div className="px-3 py-6 text-center text-[12px] text-ink-soft">
+                Type at least 2 characters to search licensed agents.
+              </div>
+            ) : searching ? (
+              <div className="flex items-center justify-center gap-2 px-3 py-6 text-[12px] text-ink-soft">
+                <Loader2 className="size-3.5 animate-spin" />
+                Searching...
+              </div>
+            ) : results.length ? (
+              results.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    onChange({ id: item.id, name: item.name });
+                    setOpen(false);
+                    setQuery("");
+                  }}
+                  className="w-full rounded-lg p-3 text-left transition hover:bg-orange/5"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-[12px] font-semibold text-ink">
+                      {item.name}
+                    </span>
+                    <Check className="size-4 shrink-0 text-orange-deep" />
+                  </div>
+                  <p className="mt-1 font-mono text-[10px] text-ink-soft">
+                    Licence: {item.reference || "Not provided"}
+                  </p>
+                  {(item.email || item.phone) && (
+                    <p className="mt-1 truncate text-[10px] text-ink-soft">
+                      {[item.email, item.phone].filter(Boolean).join(" · ")}
+                    </p>
+                  )}
+                </button>
+              ))
+            ) : (
+              <div className="px-3 py-6 text-center text-[12px] text-ink-soft">
+                No registered licensed agent found.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }

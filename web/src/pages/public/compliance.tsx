@@ -80,29 +80,6 @@ const services = [
 	},
 ] as const;
 
-const wording = [
-	{
-		use: "We support and coordinate the clearance process.",
-		avoid: "We clear your cargo.",
-	},
-	{
-		use: "We release cargo once Customs authorisation and all terminal obligations are satisfied.",
-		avoid: "We release your cargo.",
-	},
-	{
-		use: "We provide facilities and coordination for Customs examination.",
-		avoid: "Customs examination by our team.",
-	},
-	{
-		use: "Support with duty and charge payment processes.",
-		avoid: "Duty payment.",
-	},
-	{
-		use: "Only a specific licence or approval actually held, with reference.",
-		avoid: "Approved by Customs badge.",
-	},
-] as const;
-
 const publicTracking = [
 	"Reference, container, or bill of lading lookup",
 	"ISO 6346 check-digit validation on container numbers",
@@ -246,57 +223,6 @@ export default function CompliancePage() {
 									</article>
 								);
 							})}
-						</div>
-					</div>
-				</section>
-
-				{/* WORDING */}
-				<section className="border-y border-line bg-sand">
-					<div className="mx-auto max-w-7xl px-5 py-16 lg:px-8 lg:py-20">
-						<div className="grid gap-12 lg:grid-cols-[.9fr_1.1fr] lg:items-start">
-							<div>
-								<PublicKicker>Wording we use</PublicKicker>
-								<h2 className="mt-3 max-w-md font-display text-3xl font-bold text-ink sm:text-4xl">
-									Every claim is deliberate.
-								</h2>
-								<p className="mt-4 max-w-md leading-7 text-ink-soft">
-									Words matter in compliance. We use the exact language our regulatory
-									position requires, and we avoid the shortcuts that blur the line
-									between coordination and decision.
-								</p>
-							</div>
-
-							<div className="overflow-hidden rounded-2xl bg-slate text-sand ring-1 ring-slate">
-								<div className="grid grid-cols-2 border-b border-sand/10">
-									<div className="p-4">
-										<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">
-											We use
-										</p>
-									</div>
-									<div className="border-l border-sand/10 p-4">
-										<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-sand/50">
-											We avoid
-										</p>
-									</div>
-								</div>
-								<ul>
-									{wording.map((w) => (
-										<li
-											key={w.avoid}
-											className="grid grid-cols-2 border-b border-sand/10 last:border-b-0"
-										>
-											<div className="p-4">
-												<p className="text-[13px] leading-5 text-sand">{w.use}</p>
-											</div>
-											<div className="border-l border-sand/10 p-4">
-												<p className="text-[13px] leading-5 text-sand/45 line-through">
-													{w.avoid}
-												</p>
-											</div>
-										</li>
-									))}
-								</ul>
-							</div>
 						</div>
 					</div>
 				</section>
