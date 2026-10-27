@@ -248,6 +248,12 @@ const textareaClass =
 const labelClass =
 	"block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft";
 
+const formatTariffRate = (val?: number | string | null) => {
+	if (val === null || val === undefined || val === "") return "—";
+	const num = Number(val);
+	return Number.isNaN(num) ? "—" : `${num.toFixed(2)}%`;
+};
+
 const emptyContainer = (): ContainerItem => ({
 	containerNo: "",
 	size: "20ft",
@@ -1107,83 +1113,44 @@ export default function NewPortalShipmentPage() {
 		>
 			<div className="mx-auto max-w-5xl space-y-6 pb-24">
 				<div className="flex flex-wrap items-center justify-between gap-3">
-					<Button
-						variant="ghost"
-						onClick={() => navigate("/portal/shipments")}
-						className="-ml-3 gap-2 text-ink-soft hover:text-ink"
-					>
-						<ArrowLeft className="size-4" />
-						Back to shipments
-					</Button>
-
-					<Button
-						variant="outline"
-						disabled={saving || loadingShipment}
-						onClick={saveDraft}
-						className="gap-2 border-line bg-paper text-ink hover:bg-sand"
-					>
-						<ClipboardList className="size-4" />
-						{saving
-							? "Saving…"
-							: isEditing
-								? "Save changes"
-								: "Save draft"}
-					</Button>
-				</div>
-
-				<motion.section
-					initial={{ opacity: 0, y: 12 }}
-					animate={{ opacity: 1, y: 0 }}
-					className="relative overflow-hidden rounded-2xl bg-slate p-6 text-sand ring-1 ring-slate sm:p-8"
-				>
-					<div
-						aria-hidden="true"
-						className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full bg-orange/25 blur-3xl"
-					/>
-					<div
-						aria-hidden="true"
-						className="pointer-events-none absolute -left-24 bottom-0 size-56 rounded-full bg-carmine/20 blur-3xl"
-					/>
-
-					<div className="relative">
-						<div className="flex items-center gap-2">
-							<Ship className="size-4 text-orange" />
-							<p className="font-mono text-[10px] uppercase tracking-[0.18em] text-orange">
-								{isEditing
-									? "Editing existing declaration"
-									: "New shipment declaration"}
-							</p>
-						</div>
-
-						<h1 className="mt-4 max-w-2xl font-display text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
-							{isEditing
-								? "Update this shipment declaration before submission."
-								: "Submit shipment details for terminal validation."}
+					<div className="flex flex-col gap-1.5">
+						<nav
+							aria-label="Breadcrumb"
+							className="flex flex-wrap items-center gap-1.5 text-xs text-ink-soft"
+						>
+							<button
+								type="button"
+								onClick={() => navigate("/portal/shipments")}
+								className="font-medium transition hover:text-orange-deep"
+							>
+								Shipments
+							</button>
+							<span aria-hidden="true">/</span>
+							<span className="font-semibold text-ink">
+								{isEditing ? "Edit Shipment" : "New Shipment"}
+							</span>
+						</nav>
+						<h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+							{isEditing ? "Edit Shipment" : "Submit Shipment"}
 						</h1>
-
-						<p className="mt-4 max-w-2xl text-sm leading-6 text-sand/75 sm:text-base">
-							Provide accurate shipping and cargo information before
-							physical receiving and allocation. Submitting a
-							declaration does not confirm terminal acceptance,
-							customs clearance or cargo release.
-						</p>
-
-						<div className="mt-6 flex flex-wrap gap-2">
-							<span className="inline-flex items-center gap-1.5 rounded-full border border-sand/15 bg-sand/5 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-sand/70">
-								<Info className="size-3.5" />
-								Required fields marked *
-							</span>
-							<span className="inline-flex items-center gap-1.5 rounded-full border border-sand/15 bg-sand/5 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-sand/70">
-								Organisation submission
-							</span>
-							{isEditing && (
-								<span className="inline-flex items-center gap-1.5 rounded-full border border-orange/30 bg-orange/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-orange">
-									Editing · {shipmentId.slice(0, 8)}
-								</span>
-							)}
-						</div>
 					</div>
-				</motion.section>
+
+					<div className="flex items-center gap-2">
+						<Button
+							variant="outline"
+							disabled={saving || loadingShipment}
+							onClick={saveDraft}
+							className="gap-2 border-line bg-paper text-ink hover:bg-sand"
+						>
+							<ClipboardList className="size-4" />
+							{saving
+								? "Saving…"
+								: isEditing
+									? "Save changes"
+									: "Save draft"}
+						</Button>
+					</div>
+				</div>
 
 				{loadingShipment && (
 					<div className="rounded-xl bg-paper p-4 text-[12px] text-ink-soft ring-1 ring-line">
@@ -1746,32 +1713,32 @@ export default function NewPortalShipmentPage() {
 											)}
 
 											{selectedTariff && (
-												<div className="mt-3 flex flex-col gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+												<div className="mt-3 flex flex-col gap-3 rounded-xl border border-teal/25 bg-teal/5 p-4 sm:flex-row sm:items-center sm:justify-between">
 													<div className="min-w-0 flex-1">
 														<div className="flex items-center gap-2">
-															<CheckCircle2 className="size-4 text-emerald-600" />
-															<p className="text-[13px] font-semibold text-emerald-900">
+															<CheckCircle2 className="size-4 text-teal-deep" />
+															<p className="text-[13px] font-semibold text-teal-deep">
 																{selectedTariff.hs_code}
 															</p>
 														</div>
-														<p className="mt-1 truncate text-[13px] text-emerald-800">
+														<p className="mt-1 truncate text-[13px] text-ink">
 															{selectedTariff.description}
 														</p>
 													</div>
 													
 													<div className="flex flex-wrap items-center gap-x-5 gap-y-2">
 														<div>
-															<p className="font-mono text-[9px] uppercase tracking-wider text-emerald-600/80">Import duty</p>
-															<p className="font-mono text-[13px] font-semibold text-emerald-900">{selectedTariff.import_duty ?? "—"}{selectedTariff.import_duty ? "%" : ""}</p>
+															<p className="font-mono text-[9px] uppercase tracking-wider text-teal-deep/70">Import duty</p>
+															<p className="font-mono text-[13px] font-semibold text-teal-deep">{formatTariffRate(selectedTariff.import_duty)}</p>
 														</div>
 														<div>
-															<p className="font-mono text-[9px] uppercase tracking-wider text-emerald-600/80">VAT</p>
-															<p className="font-mono text-[13px] font-semibold text-emerald-900">{selectedTariff.vat ?? "—"}{selectedTariff.vat ? "%" : ""}</p>
+															<p className="font-mono text-[9px] uppercase tracking-wider text-teal-deep/70">VAT</p>
+															<p className="font-mono text-[13px] font-semibold text-teal-deep">{formatTariffRate(selectedTariff.vat)}</p>
 														</div>
 														{selectedTariff.levy && (
 															<div>
-																<p className="font-mono text-[9px] uppercase tracking-wider text-emerald-600/80">Levy</p>
-																<p className="font-mono text-[13px] font-semibold text-emerald-900">{selectedTariff.levy}%</p>
+																<p className="font-mono text-[9px] uppercase tracking-wider text-teal-deep/70">Levy</p>
+																<p className="font-mono text-[13px] font-semibold text-teal-deep">{selectedTariff.levy}%</p>
 															</div>
 														)}
 														
@@ -1780,7 +1747,7 @@ export default function NewPortalShipmentPage() {
 															variant="ghost"
 															size="sm"
 															onClick={clearCustomsTariff}
-															className="ml-2 h-8 px-2 text-xs text-emerald-700 hover:bg-emerald-100/50 hover:text-emerald-900"
+															className="ml-2 h-8 px-2 text-xs text-teal-deep hover:bg-teal/10 hover:text-teal-deep"
 														>
 															Clear
 														</Button>
