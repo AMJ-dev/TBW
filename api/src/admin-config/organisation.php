@@ -7,15 +7,6 @@
     }
 
     try {
-        $q = $conn->prepare("SELECT role_key FROM roles WHERE id = :id AND scope = 'system' AND is_active = 1 LIMIT 1");
-        $q->bindValue(":id", $my_details->system_role_id);
-        $q->execute();
-        $role = $q->fetch(PDO::FETCH_ASSOC);
-
-        if (!$role || $role["role_key"] !== "system_admin") {
-            echo json_encode(["error" => true, "data" => "Access denied", "code" => null]);
-            exit;
-        }
 
         $id = trim($_GET["id"] ?? "");
 

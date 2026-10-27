@@ -482,32 +482,17 @@ function AdminCustomsTariffsConfigurationPage() {
 		};
 
 		try {
-			const body = new URLSearchParams();
+			const body = new FormData();
+			Object.entries(payload).forEach(([key, value]) => body.append(key, String(value ?? "")));
 
-			Object.entries(payload).forEach(([key, value]) => {
-				body.append(key, String(value ?? ""));
-			});
+			const res = await http.post("admin/config/customs-tariffs/update/", body);
+			const resp: ApiResponse<{ tariff?: Tariff }> = res.data;
 
-			const response = await http.post(
-				"admin/config/customs-tariffs/update/",
-				body,
-			);
-
-			const result = response.data as ApiResponse<{
-				tariff?: Tariff;
-			}>;
-
-			if (result.error) {
-				throw new Error(result.data || "Could not save customs tariff.");
-			}
+			if (resp.error) throw new Error(resp.data || "Could not save customs tariff.");
 
 			setNotice({
 				type: "success",
-				message:
-					result.data ||
-					(editingTariff
-						? "Tariff updated successfully."
-						: "Tariff created successfully."),
+				message: resp.data || (editingTariff ? "Tariff updated successfully." : "Tariff created successfully."),
 			});
 
 			await loadTariffs();
@@ -546,7 +531,7 @@ function AdminCustomsTariffsConfigurationPage() {
 							<button
 								type="button"
 								onClick={goBackToConfiguration}
-								className="font-medium transition hover:text-carmine"
+								className="cursor-pointer font-medium transition hover:text-carmine"
 							>
 								Configuration
 							</button>
@@ -558,7 +543,7 @@ function AdminCustomsTariffsConfigurationPage() {
 					<button
 						type="button"
 						onClick={goBackToConfiguration}
-						className="inline-flex items-center gap-2 self-start rounded-lg border border-sand-200 bg-white px-3 py-2 text-xs font-semibold text-ink transition hover:border-carmine/30 hover:bg-carmine/5 hover:text-carmine sm:self-auto"
+						className="inline-flex cursor-pointer items-center gap-2 self-start rounded-lg border border-sand-200 bg-white px-3 py-2 text-xs font-semibold text-ink transition hover:border-carmine/30 hover:bg-carmine/5 hover:text-carmine sm:self-auto"
 					>
 						<ArrowLeft className="h-3.5 w-3.5" />
 						Back to Configuration
@@ -875,7 +860,7 @@ function AdminCustomsTariffsConfigurationPage() {
 																	<button
 																		type="button"
 																		onClick={() => openEditPage(tariff)}
-																		className="inline-flex items-center gap-2 rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-ink transition hover:border-carmine/30 hover:bg-carmine/5 hover:text-carmine"
+																		className="cursor-pointer inline-flex items-center gap-2 rounded-lg border border-sand-200 px-3 py-2 text-xs font-semibold text-ink transition hover:border-carmine/30 hover:bg-carmine/5 hover:text-carmine"
 																	>
 																		<Pencil className="h-3.5 w-3.5" />
 																		Edit

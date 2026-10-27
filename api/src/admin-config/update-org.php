@@ -10,16 +10,7 @@
     }
 
     try {
-        $q = $conn->prepare("SELECT role_key FROM roles WHERE id = :id AND scope = 'system' AND is_active = 1 LIMIT 1");
-        $q->bindValue(":id", $my_details->system_role_id);
-        $q->execute();
-        $role = $q->fetch(PDO::FETCH_ASSOC);
-
-        if (!$role || $role["role_key"] !== "system_admin") {
-            echo json_encode(["error" => true, "data" => "Access denied", "code" => null]);
-            exit;
-        }
-
+        
         $id = trim($_POST["organisation_id"] ?? $_GET["id"] ?? "");
         $legal = trim($_POST["legal_name"] ?? "");
         $type = trim($_POST["org_type"] ?? "terminal");
@@ -164,10 +155,9 @@
 
         $conn->beginTransaction();
 
-        $q = $conn->prepare("UPDATE organisations SET organisation_name = :legal_name, trading_name = :trading_name, organisation_type = :org_type, rc_number = :rc_number, tin = :tin, date_of_incorporation = :date_of_incorporation, sector = :sector, registered_address = :registered_address, operating_address = :operating_address, website = :website, contact_email = :contact_email, contact_phone = :contact_phone, contact_person = :contact_person, contact_person_title = :contact_person_title, updated_at = NOW() WHERE id = :id");
+        $q = $conn->prepare("UPDATE organisations SET organisation_name = :legal_name, trading_name = :trading_name, rc_number = :rc_number, tin = :tin, date_of_incorporation = :date_of_incorporation, sector = :sector, registered_address = :registered_address, operating_address = :operating_address, website = :website, contact_email = :contact_email, contact_phone = :contact_phone, contact_person = :contact_person, contact_person_title = :contact_person_title, updated_at = NOW() WHERE id = :id");
         $q->bindValue(":legal_name", $legal);
         $q->bindValue(":trading_name", trim($_POST["trading_name"] ?? ""));
-        $q->bindValue(":org_type", $type);
         $q->bindValue(":rc_number", trim($_POST["rc_number"] ?? ""));
         $q->bindValue(":tin", trim($_POST["tin"] ?? ""));
         $q->bindValue(":date_of_incorporation", $date === "" ? null : $date, $date === "" ? PDO::PARAM_NULL : PDO::PARAM_STR);

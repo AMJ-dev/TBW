@@ -78,8 +78,9 @@ RewriteRule ^admin/config/documents/$ src/admin-config/documents.php [NC]
 RewriteRule ^admin/config/documents/update/$ src/admin-config/update-documents.php [NC]
 RewriteRule ^admin/config/notifications/$ src/admin-config/notifications.php [NC]
 RewriteRule ^admin/config/notifications/update/$ src/admin-config/update-notifications.php [NC]
-
+# /admin/config/customs-tariffs/search/
 RewriteRule ^admin/config/customs-tariffs/$ src/admin-config/customs-tariffs.php [NC]
+RewriteRule ^admin/config/customs-tariffs/search/$ src/admin-config/search-customs-tariffs.php [NC]
 RewriteRule ^admin/config/customs-tariffs/update/$ src/admin-config/update-customs-tariffs.php [NC]
 
 RewriteRule ^admin/config/maintenance/$ src/admin-config/maintenance.php [NC]

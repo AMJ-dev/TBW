@@ -34,7 +34,6 @@ type OrgStatus =
 	| "rejected"
 	| "suspended";
 
-type OrgType = "terminal" | "importer" | "agent";
 
 type DocKey = "cac" | "tin" | "signatory_id" | "directors_list" | "utility_bill";
 
@@ -52,7 +51,6 @@ interface ApiDocument {
 interface OrganisationConfig {
 	legalName: string;
 	tradingName: string;
-	orgType: OrgType;
 	status: OrgStatus;
 	rcNumber: string;
 	tin: string;
@@ -78,7 +76,6 @@ interface OrgMeta {
 const emptyConfig: OrganisationConfig = {
 	legalName: "",
 	tradingName: "",
-	orgType: "terminal",
 	status: "pending",
 	rcNumber: "",
 	tin: "",
@@ -272,7 +269,6 @@ export default function AdminOrganisationConfigurationPage() {
 			setConfig({
 				legalName: org.legal_name ?? org.name ?? "",
 				tradingName: org.trading_name ?? "",
-				orgType: (org.org_type ?? org.type ?? "terminal") as OrgType,
 				status: (org.status ?? "pending") as OrgStatus,
 				rcNumber: org.rc_number ?? "",
 				tin: org.tin ?? "",
@@ -491,7 +487,6 @@ export default function AdminOrganisationConfigurationPage() {
 
 			form.append("legal_name", config.legalName.trim());
 			form.append("trading_name", config.tradingName.trim());
-			form.append("org_type", config.orgType);
 			form.append("rc_number", config.rcNumber.trim());
 			form.append("tin", config.tin.trim());
 			form.append(
@@ -664,40 +659,6 @@ export default function AdminOrganisationConfigurationPage() {
 				</div>
 
 				<div className="grid gap-4 p-5 sm:grid-cols-2">
-					<label className="block">
-						<span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-							<Building2 className="size-3.5 text-orange" />
-							Organisation type
-						</span>
-						<select
-							value={config.orgType}
-							onChange={(e) =>
-								update("orgType", e.target.value as OrgType)
-							}
-							className="mt-1.5 h-11 w-full rounded-md border border-line bg-sand px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-orange/25"
-						>
-							<option value="terminal">Terminal</option>
-							<option value="importer">Importer</option>
-							<option value="agent">Agent</option>
-						</select>
-					</label>
-
-					<div>
-						<span className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-							<ShieldCheck className="size-3.5 text-orange" />
-							Status
-						</span>
-						<div className="mt-2 flex items-center gap-2">
-							<StatusBadge
-								label={statusLabel[config.status] ?? config.status}
-								tone={statusTone(config.status)}
-							/>
-							<span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-								Read-only · set via review flow
-							</span>
-						</div>
-					</div>
-
 					<MetaField
 						icon={Clock3}
 						label="Submitted"
@@ -707,16 +668,6 @@ export default function AdminOrganisationConfigurationPage() {
 						icon={Clock3}
 						label="Last updated"
 						value={formatDate(meta.updatedAt)}
-					/>
-					<MetaField
-						icon={ShieldCheck}
-						label="Verified by"
-						value={meta.verifiedBy ?? "—"}
-					/>
-					<MetaField
-						icon={Clock3}
-						label="Verified at"
-						value={formatDate(meta.verifiedAt)}
 					/>
 				</div>
 
