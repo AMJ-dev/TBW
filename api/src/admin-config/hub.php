@@ -132,6 +132,19 @@
                 "enabled" => true
             ],
             [
+                "key" => "customs-tariffs",
+                "title" => "Customs Tariff & Commodity Classification",
+                "desc" => "Manage HS commodity codes, tariff rates, effective dates, and tariff workbook imports.",
+                "href" => "/admin/configuration/customs-tariffs",
+                "icon" => "Boxes",
+                "group" => "commercial",
+                "state" => "Available",
+                "stateTone" => "info",
+                "lastChanged" => "Not configured",
+                "featured" => false,
+                "enabled" => true
+            ],
+            [
                 "key" => "gate",
                 "title" => "Gate & Booking",
                 "desc" => "Configure appointment capacity, booking rules, cut-off periods, blackout periods, vehicle requirements and gate controls.",

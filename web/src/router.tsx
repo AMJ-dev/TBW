@@ -58,6 +58,7 @@ const AdminSecurityConfigurationPage = lazy(() => import("@/pages/admin/configur
 const AdminStorageConfigurationPage = lazy(() => import("@/pages/admin/configuration/storage"));
 const AdminTerminalConfigurationPage = lazy(() => import("@/pages/admin/configuration/terminal"));
 const AdminRetentionConfigurationPage = lazy(() => import("@/pages/admin/configuration/retention"));
+const AdminCustomsTariffsConfigurationPage = lazy(() => import("@/pages/admin/configuration/customs-tariffs"));
 
 const FinancePage = lazy(() => import("@/pages/finance"));
 const FinanceDashboardPage = lazy(() => import("@/pages/finance/dashboard"));
@@ -204,6 +205,7 @@ export default function Routers() {
 						<Route path="/admin/configuration/financial" element={<AdminFinancialConfigurationPage />} />
 						<Route path="/admin/configuration/financial" element={<AdminFinancialConfigurationPage />} />
 						<Route path="/admin/configuration/retention" element={<AdminRetentionConfigurationPage />} />
+						<Route path="/admin/configuration/customs-tariffs" element={<AdminCustomsTariffsConfigurationPage />} />
 						
 						<Route path="/finance" element={<FinancePage />} />
 						<Route path="/finance/dashboard" element={<FinanceDashboardPage />} />

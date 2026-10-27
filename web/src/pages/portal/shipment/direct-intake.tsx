@@ -429,7 +429,7 @@ export default function DirectIntakePage() {
       if (payload?.error) throw new Error(typeof payload.data === "string" ? payload.data : "Could not submit the direct intake request.");
 
       const result = payload?.code;
-      const reference = result?.request_reference ?? result?.reference ?? result?.direct_intake_reference ?? result?.id ?? "";
+      const reference = result?.shipment_reference ?? result?.manifest_reference ?? result?.id ?? "";
 
       setRequestReference(String(reference));
       setPrepared(true);
