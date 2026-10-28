@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
+import {statusLabel} from "@/lib/functions"
 
 type Shipment = {
 	id: string;
@@ -85,14 +86,6 @@ const displayValue = (value?: string | number | null) => {
 	}
 
 	return String(value);
-};
-
-const formatStatus = (value?: string | null) => {
-	if (!value) return "Unknown";
-
-	return value
-		.replace(/_/g, " ")
-		.replace(/\b\w/g, (character) => character.toUpperCase());
 };
 
 export default function OperationsReviewPage() {
@@ -493,7 +486,7 @@ export default function OperationsReviewPage() {
 																	</p>
 
 																	<span className="inline-flex rounded-md bg-sand px-2 py-1 text-[10px] text-ink-soft">
-																		{formatStatus(shipment.manifest_status)}
+																		{statusLabel(shipment.manifest_status)}
 																	</span>
 
 																	<button
@@ -538,7 +531,7 @@ export default function OperationsReviewPage() {
 
 														<td className="px-4 py-3.5">
 															<StatusBadge
-																label={formatStatus(shipment.status)}
+																label={statusLabel(shipment.status)}
 																tone={statusTone(shipment.status)}
 															/>
 														</td>
@@ -584,9 +577,7 @@ export default function OperationsReviewPage() {
 																		<div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
 																			<DetailItem
 																				label="Manifest status"
-																				value={formatStatus(
-																					shipment.manifest_status
-																				)}
+																				value={statusLabel(shipment.manifest_status)}
 																			/>
 																			<DetailItem
 																				label="Bill of lading"
@@ -630,9 +621,7 @@ export default function OperationsReviewPage() {
 																			/>
 																			<DetailItem
 																				label="Review status"
-																				value={formatStatus(
-																					shipment.manifest_review_status
-																				)}
+																				value={statusLabel(shipment.manifest_review_status)}
 																			/>
 																		</div>
 

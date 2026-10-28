@@ -17,6 +17,13 @@ import {
 	Clock3,
 	CalendarDays,
 	Package,
+	Ship,
+	ArrowRight,
+	MapPin,
+	User,
+	Scale,
+	CheckCircle2,
+	XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, StatusBadge, statusTone } from "@/components/auth-shell";
@@ -242,9 +249,7 @@ export default function OperationsManifestDetailsPage() {
 				return;
 			}
 			toast.success("Manifest marked as validated.");
-			setManifest((current) =>
-				current ? { ...current, status: "Validated" } : current
-			);
+			setManifest((current) => current ? { ...current, status: "Validated" } : current);
 			await fetchManifest();
 		} catch (err: any) {
 			toast.error(
@@ -431,7 +436,7 @@ export default function OperationsManifestDetailsPage() {
 						</Button>
 					</div>
 
-					<div className="space-y-4 p-5 sm:p-6">
+					<div className="space-y-6 p-5 sm:p-6">
 						<div className="flex flex-wrap items-center gap-2">
 							<StatusBadge
 								label={manifest.status}
@@ -499,9 +504,10 @@ export default function OperationsManifestDetailsPage() {
 							</div>
 						</div>
 
+						{/* Side-by-side Comparison Layout */}
 						{isShipmentLinked && (
-							<section className="space-y-4 rounded-xl border border-teal/25 bg-paper p-4 sm:p-5">
-								<div className="flex flex-wrap items-start justify-between gap-3">
+							<section className="space-y-4 rounded-xl border border-teal/25 bg-paper p-4 shadow-sm sm:p-5">
+								<div className="flex flex-wrap items-start justify-between gap-3 border-b border-line pb-4">
 									<div>
 										<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-teal-deep">
 											Linked declaration
@@ -512,14 +518,14 @@ export default function OperationsManifestDetailsPage() {
 												manifest.shipmentReference}
 										</h4>
 										<p className="mt-1 text-xs text-ink-soft">
-											Review declaration fields, container seals and uploaded
-											documents before validating or flagging.
+											Compare the manifest details against the declaration submitted by the organisation.
 										</p>
 									</div>
 									{loadingLinkedShipment && (
 										<Loader2 className="size-4 animate-spin text-teal-deep" />
 									)}
 								</div>
+								
 								{linkedShipmentError ? (
 									<div className="rounded-lg border border-coral/20 bg-coral/5 p-3 text-xs text-coral">
 										{linkedShipmentError} Ensure the operations linked-shipment
@@ -531,182 +537,98 @@ export default function OperationsManifestDetailsPage() {
 									</p>
 								) : linkedShipment ? (
 									<>
-										<dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-											{[
-												[
-													"Organisation",
-													linkedShipment.organisation_name ||
-														linkedShipment.organisation?.name,
-												],
-												["Shipment status", statusLabel(linkedShipment.status)],
-												[
-													"Bill of lading",
-													linkedShipment.bill_of_lading || linkedShipment.bl,
-												],
-												["Booking reference", linkedShipment.booking_reference],
-												[
-													"Vessel / voyage",
-													[
-														linkedShipment.vessel_name || linkedShipment.vessel,
-														linkedShipment.voyage_number || linkedShipment.voyage,
-													]
-														.filter(Boolean)
-														.join(" / "),
-												],
-												["Shipping line", linkedShipment.shipping_line],
-												[
-													"Origin",
-													linkedShipment.origin_port || linkedShipment.origin,
-												],
-												[
-													"Destination",
-													linkedShipment.destination_port ||
-														linkedShipment.destination,
-												],
-												[
-													"Expected arrival",
-													linkedShipment.expected_arrival || linkedShipment.eta,
-												],
-												[
-													"Consignee",
-													linkedShipment.consignee_name ||
-														linkedShipment.consignee,
-												],
-												["Consignee email", linkedShipment.consignee_email],
-												["Consignee phone", linkedShipment.consignee_phone],
-												["Cargo description", linkedShipment.cargo_description],
-												[
-													"Packages",
-													linkedShipment.package_count ?? linkedShipment.packages,
-												],
-												["Gross weight (KG)", linkedShipment.gross_weight],
-												["Volume", linkedShipment.volume],
-												["HS code", linkedShipment.hs_code],
-												["Customs reference", linkedShipment.customs_reference],
-											]
-												.filter(
-													([, value]) =>
-														value !== null &&
-														value !== undefined &&
-														String(value).trim() !== ""
-												)
-												.map(([label, value]) => (
-													<div
-														key={String(label)}
-														className="rounded-lg bg-sand/70 p-3"
-													>
-														<dt className="text-[10px] uppercase tracking-wide text-ink-soft">
-															{label}
-														</dt>
-														<dd className="mt-1 break-words text-xs font-medium text-ink">
-															{String(value)}
-														</dd>
-													</div>
-												))}
-										</dl>
-										
-										<div>
-											<h5 className="mb-3 text-sm font-bold text-ink">
-												Containers & Cargo Details
-											</h5>
-											{(linkedShipment.containers || []).length ? (
-												<div className="space-y-4">
-													{linkedShipment.containers.map((c: any, i: number) => (
-														<div key={c.id || c.container_no || i} className="overflow-hidden rounded-xl border border-line bg-sand/30 shadow-sm">
-															{/* Container Header */}
-															<div className="flex items-center justify-between border-b border-line bg-sand px-4 py-3">
-																<div className="flex items-center gap-3">
-																	<div className="grid size-9 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-																		<ContainerIcon className="size-4" />
-																	</div>
-																	<div>
-																		<p className="font-mono text-[13px] font-bold text-ink">
-																			{c.container_no || "—"}
-																		</p>
-																		<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">
-																			Container {i + 1}
-																		</p>
-																	</div>
-																</div>
-																{c.status && (
-																	<StatusBadge label={statusLabel(c.status)} tone={statusTone(c.status)} />
-																)}
-															</div>
-															
-															{/* Container Body */}
-															<div className="grid gap-5 p-4 sm:grid-cols-2">
-																<div className="space-y-4">
-																	<div>
-																		<p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-																			Cargo Description
-																		</p>
-																		<p className="mt-1 text-[12px] leading-relaxed text-ink">
-																			{c.cargo_description || "—"}
-																		</p>
-																	</div>
-																	
-																	<div className="rounded-lg border border-teal/20 bg-teal/5 p-3">
-																		<div className="flex items-start gap-2">
-																			<ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-teal-deep" />
-																			<div>
-																				<p className="font-mono text-[9px] uppercase tracking-[0.12em] text-teal-deep">
-																					Customs / HS Classification
-																				</p>
-																				<p className="mt-1 font-mono text-sm font-bold text-ink">
-																					{c.hs_code || c.tariff_hs_code || "—"}
-																				</p>
-																				{c.customs_tariff_id && (
-																					<p className="mt-1 font-mono text-[9px] text-ink-soft">
-																						Tariff ID: {c.customs_tariff_id}
-																					</p>
-																				)}
-																			</div>
-																		</div>
-																	</div>
-																</div>
-																
-																<div className="grid grid-cols-2 gap-3">
-																	<div>
-																		<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Size</p>
-																		<p className="mt-1 text-[12px] font-medium text-ink">{c.size || c.container_size || "—"}</p>
-																	</div>
-																	<div>
-																		<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Seal No.</p>
-																		<p className="mt-1 font-mono text-[12px] text-ink">{c.seal_no || "Not provided"}</p>
-																	</div>
-																	<div>
-																		<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Packages</p>
-																		<p className="mt-1 font-mono text-[12px] text-ink">{c.package_count ?? "—"}</p>
-																	</div>
-																	<div>
-																		<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Gross Weight</p>
-																		<p className="mt-1 font-mono text-[12px] text-ink">{c.gross_weight ?? "—"}</p>
-																	</div>
-																</div>
-															</div>
-															
-															{/* Container Timeline */}
-															{(c.gate_in_at || c.received_at || c.stored_at || c.gate_out_at) && (
-																<div className="border-t border-line bg-paper px-4 py-3">
-																	<div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[10px] text-ink-soft">
-																		{c.gate_in_at && <span className="flex items-center gap-1"><Clock3 className="size-3" /> Gate In: {c.gate_in_at}</span>}
-																		{c.received_at && <span className="flex items-center gap-1"><CalendarDays className="size-3" /> Received: {c.received_at}</span>}
-																		{c.stored_at && <span className="flex items-center gap-1"><Package className="size-3" /> Stored: {c.stored_at}</span>}
-																		{c.gate_out_at && <span className="flex items-center gap-1"><Check className="size-3" /> Gate Out: {c.gate_out_at}</span>}
-																	</div>
-																</div>
-															)}
-														</div>
-													))}
+										<div className="grid gap-6 md:grid-cols-2">
+											{/* Manifest Details Column */}
+											<div className="space-y-4">
+												<div className="flex items-center gap-2 border-b border-line pb-2">
+													<FileText className="size-4 text-ink-soft" />
+													<h5 className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink">Manifest Details</h5>
 												</div>
-											) : (
-												<p className="rounded-lg bg-sand p-3 text-xs text-ink-soft">
-													No container rows were returned for this declaration.
-												</p>
-											)}
+												
+												<dl className="grid grid-cols-2 gap-x-4 gap-y-5">
+													<CompareField label="Bill of lading" value={manifest.bl} mono />
+													<CompareField label="Vessel" value={manifest.vessel} />
+													<CompareField label="Shipping line" value={manifest.shippingLine} />
+													<CompareField label="Origin port" value={manifest.originPort} />
+													<CompareField label="ETA" value={manifest.eta} mono />
+													<CompareField label="Total containers" value={String(manifest.containers)} mono />
+													<CompareField label="Total packages" value={String(manifest.packages)} mono />
+													<CompareField label="Gross weight" value={manifest.grossWeight} mono />
+													<CompareField label="Consignee" value={manifest.consignee} />
+													<CompareField label="Agent" value={manifest.agent} />
+												</dl>
+												
+												{(linkedShipment.containers || []).length > 0 && (
+													<div className="mt-4">
+														<h6 className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">Manifest Containers</h6>
+														<div className="space-y-3">
+															{linkedShipment.containers.map((c: any, i: number) => (
+																<div key={`manifest-c-${i}`} className="rounded-lg border border-line bg-paper p-3">
+																	<div className="flex items-center gap-2">
+																		<ContainerIcon className="size-3.5 text-orange" />
+																		<p className="font-mono text-[12px] font-bold text-ink">{c.container_no || "—"}</p>
+																		<StatusBadge label={statusLabel(c.status)} tone={statusTone(c.status)} />
+																	</div>
+																	<div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
+																		<CompareField label="Size" value={c.size || "—"} />
+																		<CompareField label="Seal No." value={c.seal_no || "Not provided"} mono />
+																		<CompareField label="Packages" value={c.package_count || "—"} mono />
+																		<CompareField label="Gross Wt." value={c.gross_weight || "—"} mono />
+																	</div>
+																</div>
+															))}
+														</div>
+													</div>
+												)}
+											</div>
+
+											{/* Shipment Declaration Column */}
+											<div className="space-y-4">
+												<div className="flex items-center gap-2 border-b border-line pb-2">
+													<Ship className="size-4 text-teal-deep" />
+													<h5 className="font-mono text-[11px] uppercase tracking-[0.12em] text-teal-deep">Shipment Declaration</h5>
+												</div>
+												
+												<dl className="grid grid-cols-2 gap-x-4 gap-y-5">
+													<CompareField label="Bill of lading" value={linkedShipment.bill_of_lading || linkedShipment.bl} mono />
+													<CompareField label="Vessel" value={linkedShipment.vessel_name || linkedShipment.vessel} />
+													<CompareField label="Shipping line" value={linkedShipment.shipping_line} />
+													<CompareField label="Origin port" value={linkedShipment.origin_port || linkedShipment.origin} />
+													<CompareField label="ETA" value={linkedShipment.expected_arrival || linkedShipment.eta} mono />
+													<CompareField label="Total containers" value={String(linkedShipment.containers?.length || 0)} mono />
+													<CompareField label="Total packages" value={String(linkedShipment.package_count || 0)} mono />
+													<CompareField label="Gross weight" value={linkedShipment.gross_weight} mono />
+													<CompareField label="Consignee" value={linkedShipment.consignee} />
+													<CompareField label="Agent" value={linkedShipment.agent_organisation_name || linkedShipment.agent} />
+												</dl>
+
+												{(linkedShipment.containers || []).length > 0 && (
+													<div className="mt-4">
+														<h6 className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">Declared Containers</h6>
+														<div className="space-y-3">
+															{linkedShipment.containers.map((c: any, i: number) => (
+																<div key={`shipment-c-${i}`} className="rounded-lg border border-teal/20 bg-teal/5 p-3">
+																	<div className="flex items-center gap-2">
+																		<ContainerIcon className="size-3.5 text-teal-deep" />
+																		<p className="font-mono text-[12px] font-bold text-ink">{c.container_no || "—"}</p>
+																		<StatusBadge label={statusLabel(c.status)} tone={statusTone(c.status)} />
+																	</div>
+																	<div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
+																		<CompareField label="Size" value={c.size || "—"} />
+																		<CompareField label="Seal No." value={c.seal_no || "—"} mono />
+																		<CompareField label="Packages" value={c.package_count || "—"} mono />
+																		<CompareField label="Gross Wt." value={c.gross_weight || "—"} mono />
+																	</div>
+																</div>
+															))}
+														</div>
+													</div>
+												)}
+											</div>
 										</div>
-										
-										<div>
+
+										{/* Documents */}
+										<div className="border-t border-line pt-4">
 											<h5 className="mb-2 text-xs font-bold text-ink">
 												Uploaded documents
 											</h5>
@@ -893,8 +815,7 @@ export default function OperationsManifestDetailsPage() {
 										What validation does
 									</p>
 									<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-										Validation confirms the manifest fields are consistent, the
-										shipping line reference is registered, and no duplicate
+										Validation confirms the manifest fields are consistent, the										shipping line reference is registered, and no duplicate
 										exists. Validated manifests are available for the receiving
 										workflow.
 									</p>
@@ -1099,5 +1020,24 @@ export default function OperationsManifestDetailsPage() {
 				)}
 			</div>
 		</AppShell>
+	);
+}
+
+function CompareField({
+	label,
+	value,
+	mono = false,
+}: {
+	label: string;
+	value: string | null | undefined;
+	mono?: boolean;
+}) {
+	return (
+		<div>
+			<dt className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">{label}</dt>
+			<dd className={cn("mt-1 break-words text-[12px] font-medium text-ink", mono && "font-mono")}>
+				{value || "—"}
+			</dd>
+		</div>
 	);
 }

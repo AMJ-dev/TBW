@@ -36,11 +36,8 @@
                 m.correction_reason AS manifest_correction_reason,
                 m.matched_shipment_id
             FROM portal_shipments s
-            LEFT JOIN organisations o
-                ON o.id = s.organisation_id
-            LEFT JOIN operation_manifests m
-                ON m.matched_shipment_id = s.id
-            WHERE s.status = 'pending_review'
+            LEFT JOIN organisations o ON o.id = s.organisation_id
+            LEFT JOIN operation_manifests m ON m.matched_shipment_id = s.id
             ORDER BY s.created_at DESC
         ");
 
