@@ -40,6 +40,11 @@ type ShipmentContainer = {
 	seal_no?: string | null;
 	package_count?: string | number | null;
 	gross_weight?: string | number | null;
+	cargo_description?: string | null;
+	package_type?: string | null;
+	hs_code?: string | null;
+	customs_tariff_id?: string | null;
+	customs_tariff_description?: string | null;
 	status?: string | null;
 	gate_in_at?: string | null;
 	received_at?: string | null;
@@ -107,11 +112,34 @@ type ManifestReview = {
 	vessel?: string | null;
 };
 
+type ConsigneeDetails = {
+	type?: string;
+	organisation_id?: string | null;
+	organisation_name?: string | null;
+	status?: string | null;
+	name?: string | null;
+	contact_person?: string | null;
+	email?: string | null;
+	phone?: string | null;
+	address?: string | null;
+	country?: string | null;
+};
+
+type LicensedAgent = {
+	id?: string | null;
+	name?: string | null;
+	licence_number?: string | null;
+	contact_email?: string | null;
+	contact_phone?: string | null;
+	verification_status?: string | null;
+};
+
 type ShipmentRecord = {
 	id: string;
 	user_id?: string;
 	shipment_reference?: string | null;
 	organisation_id?: string;
+	organisation_name?: string;
 	shipment_type?: string;
 	bill_of_lading?: string;
 	booking_number?: string;
@@ -123,18 +151,24 @@ type ShipmentRecord = {
 	destination_port?: string;
 	expected_arrival?: string | null;
 	consignee?: string;
-	consignee_email?: string | null;
-	consignee_phone?: string | null;
 	consignee_type?: string | null;
 	consignee_organisation_id?: string | null;
 	consignee_status?: string | null;
 	consignee_contact_person?: string | null;
+	consignee_email?: string | null;
+	consignee_phone?: string | null;
 	consignee_address?: string | null;
 	consignee_country?: string | null;
+	consignee_organisation_name?: string | null;
 	licensed_agent_id?: string | null;
 	licensed_agent_name?: string | null;
-	agentId?: string | null;
-	agent?: string | null;
+	registered_agent_name?: string | null;
+	agent_licence_number?: string | null;
+	agent_contact_email?: string | null;
+	agent_contact_phone?: string | null;
+	agent_verification_status?: string | null;
+	agent_id?: string | null;
+	agent_name?: string | null;
 	cargo_description?: string | null;
 	cargo_category?: string | null;
 	package_type?: string | null;
@@ -151,6 +185,7 @@ type ShipmentRecord = {
 	created_at?: string;
 	updated_at?: string;
 	container_count?: number;
+	containers_count?: number;
 	document_count?: number;
 	containers?: ShipmentContainer[];
 	documents?: ShipmentDocument[];
@@ -158,6 +193,8 @@ type ShipmentRecord = {
 	latest_review?: ReviewEvent | null;
 	latest_review_reason?: string | null;
 	manifest?: ManifestReview | null;
+	consignee_details?: ConsigneeDetails | null;
+	licensed_agent?: LicensedAgent | null;
 };
 
 const statusLabel = (status?: string | null): string => {
@@ -360,6 +397,19 @@ export default function PortalShipmentDetailsPage() {
 	const containerCount = shipment.container_count ?? containers.length;
 	const documentCount = shipment.document_count ?? documents.length;
 	const manifest = shipment.manifest ?? null;
+	
+	const cDetails = shipment.consignee_details || {};
+	const consigneeName = cDetails.name || shipment.consignee || "—";
+	const consigneeType = cDetails.type || shipment.consignee_type || "—";
+	const consigneeEmail = cDetails.email || shipment.consignee_email || "—";
+	const consigneePhone = cDetails.phone || shipment.consignee_phone || "—";
+	const consigneeContact = cDetails.contact_person || shipment.consignee_contact_person || "—";
+	const consigneeAddress = cDetails.address || shipment.consignee_address || "—";
+	const consigneeCountry = cDetails.country || shipment.consignee_country || "—";
+	const consigneeOrgId = cDetails.organisation_id || shipment.consignee_organisation_id || "—";
+	const consigneeStatus = cDetails.status || shipment.consignee_status || "—";
+	
+	const agent = shipment.licensed_agent || {};
 
 	const manifestNeedsAction =
 		manifest?.manifest_requires_action === true ||
@@ -371,83 +421,49 @@ export default function PortalShipmentDetailsPage() {
 			eyebrow="Stakeholder Portal · Shipment"
 		>
 			<div className="space-y-6 pb-12">
-				<Link
-					to="/portal/shipments"
-					className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-soft transition-colors hover:text-orange"
-				>
-					<ArrowLeft className="size-3.5" />
-					Back to shipments
-				</Link>
-
-				{/* Hero Section */}
-				<motion.section
-					initial={{ opacity: 0, y: 10 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.3 }}
-					className="relative overflow-hidden rounded-3xl border border-line bg-slate p-6 shadow-sm sm:p-8"
-				>
-					<div className="absolute inset-0 bg-gradient-to-r from-slate/80 to-slate" />
-					<div className="absolute -right-20 -top-20 size-64 rounded-full bg-orange/10 blur-3xl" />
-					
-					<div className="relative flex flex-col justify-between gap-6 sm:flex-row sm:items-start">
-						<div className="min-w-0 flex-1">
-							<div className="flex flex-wrap items-center gap-3">
-								<span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-sand/90 backdrop-blur-sm">
-									<Ship className="size-3.5 text-orange" />
-									Shipment declaration
-								</span>
-								<StatusBadge
-									label={statusLabel(shipment.status)}
-									tone={statusTone(shipment.status ?? "")}
-								/>
-							</div>
-
-							<h1 className="mt-4 max-w-3xl font-display text-2xl font-bold leading-tight tracking-tight text-sand sm:text-3xl">
-								{shipment.bill_of_lading || "Untitled shipment"}
-							</h1>
-							
-							{shipment.shipment_reference && (
-								<div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-orange/30 bg-orange/10 px-3 py-1.5 text-orange">
-									<Hash className="size-3.5" />
-									<span className="font-mono text-xs font-semibold tracking-wide">
-										{shipment.shipment_reference}
-									</span>
-								</div>
-							)}
-							
-							<p className="mt-3 max-w-2xl text-sm leading-relaxed text-sand/70">
-								{shipment.cargo_description ||
-									"No cargo description was provided for this declaration."}
-							</p>
-
-							<div className="mt-6 flex flex-wrap gap-2">
-								<HeroStat
-									icon={Hash}
-									label="Booking"
-									value={shipment.booking_number || "—"}
-									mono
-								/>
-								<HeroStat icon={MapPin} label="Route" value={route} />
-								<HeroStat
-									icon={CalendarDays}
-									label="Submitted"
-									value={formatDate(shipment.created_at)}
-								/>
-							</div>
-						</div>
-
-						<div className="flex flex-wrap gap-2 sm:flex-col sm:items-end">
-							<Button
-								variant="outline"
-								onClick={() => navigate("/portal/shipments")}
-								className="gap-2 border-white/20 bg-white/5 text-sand hover:bg-white/10 hover:text-white"
+				{/* Standard Page Header */}
+				<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+					<div>
+						<div className="flex flex-wrap items-center gap-3">
+							<Link
+								to="/portal/shipments"
+								className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-soft transition-colors hover:text-orange"
 							>
-								<ArrowLeft className="size-4" />
-								All shipments
-							</Button>
+								<ArrowLeft className="size-3.5" />
+								Back to shipments
+							</Link>
+							<span className="text-ink-soft">/</span>
+							<span className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink">
+								{shipment.bill_of_lading || "Untitled"}
+							</span>
 						</div>
+						
+						<div className="mt-4 flex items-center gap-3">
+							<h1 className="font-display text-2xl font-bold text-ink">
+								{shipment.bill_of_lading || "Shipment details"}
+							</h1>
+							<StatusBadge
+								label={statusLabel(shipment.status)}
+								tone={statusTone(shipment.status ?? "")}
+							/>
+						</div>
+						
+						<p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-soft">
+							Submitted on {formatDate(shipment.created_at)} · {route}
+						</p>
 					</div>
-				</motion.section>
+					
+					<div className="flex shrink-0 gap-2">
+						<Button
+							variant="outline"
+							onClick={() => navigate("/portal/shipments")}
+							className="gap-2 border-line bg-paper text-ink hover:bg-sand"
+						>
+							<ArrowLeft className="size-4" />
+							All shipments
+						</Button>
+					</div>
+				</div>
 
 				{/* Summary Metrics */}
 				<section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -667,7 +683,6 @@ export default function PortalShipmentDetailsPage() {
 									<Field icon={Hash} label="Total packages" value={formatNumber(shipment.package_count)} mono />
 									<Field icon={Hash} label="Gross weight (kg)" value={formatNumber(shipment.gross_weight)} mono />
 									<Field icon={Hash} label="Volume (m³)" value={formatNumber(shipment.volume)} mono />
-									<Field icon={Hash} label="HS code" value={shipment.hs_code ?? "—"} mono />
 								</dl>
 
 								<div className="grid gap-4 border-t border-line pt-6 sm:grid-cols-2">
@@ -711,7 +726,7 @@ export default function PortalShipmentDetailsPage() {
 
 						<Panel
 							icon={ContainerIcon}
-							title="Containers"
+							title="Containers & Cargo"
 							description={
 								containers.length === 0
 									? "No containers were declared for this shipment."
@@ -740,60 +755,129 @@ export default function PortalShipmentDetailsPage() {
 									</p>
 								</div>
 							) : (
-								<div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+								<div className="space-y-5 p-6">
 									{containers.map((container, index) => (
 										<div
 											key={container.id}
-											className="flex flex-col justify-between gap-4 rounded-2xl border border-line bg-sand/50 p-5"
+											className="overflow-hidden rounded-2xl border border-line bg-paper shadow-sm"
 										>
-											<div className="flex items-start justify-between">
-												<div>
-													<p className="font-mono text-base font-bold text-ink">
-														{container.container_no}
-													</p>
-													<p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-														Container {index + 1}
-													</p>
+											{/* Container Header */}
+											<div className="flex items-center justify-between border-b border-line bg-sand/60 p-4 sm:px-5">
+												<div className="flex items-center gap-3">
+													<div className="grid size-10 shrink-0 place-items-center rounded-xl bg-orange/10 text-orange-deep">
+														<ContainerIcon className="size-5" />
+													</div>
+													<div>
+														<p className="font-mono text-base font-bold text-ink">
+															{container.container_no}
+														</p>
+														<p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+															Container {index + 1}
+														</p>
+													</div>
 												</div>
-												<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
-													<ContainerIcon className="size-4" />
+												{container.status && (
+													<StatusBadge label={statusLabel(container.status)} tone={statusTone(container.status)} />
+												)}
+											</div>
+
+											{/* Container Details / Info */}
+											<div className="grid gap-6 p-5 sm:grid-cols-2">
+												<div className="space-y-4">
+													{/* Cargo Description */}
+													<div>
+														<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+															Cargo Description (Declared Items)
+														</p>
+														<p className="mt-1 text-[13px] leading-relaxed text-ink">
+															{container.cargo_description || container.customs_tariff_description || "—"}
+														</p>
+													</div>
+
+													{/* HS Code / Customs Tariff */}
+													<div className="rounded-xl border border-teal/20 bg-teal/5 p-4">
+														<div className="flex items-start gap-3">
+															<ShieldCheck className="mt-0.5 size-4 shrink-0 text-teal-deep" />
+															<div>
+																<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-teal-deep">
+																	Customs / HS Classification
+																</p>
+																<p className="mt-1 font-mono text-base font-bold text-ink">
+																	{container.hs_code || "—"}
+																</p>
+																{container.customs_tariff_id && (
+																	<p className="mt-1 font-mono text-[10px] text-ink-soft">
+																		Tariff ID: {container.customs_tariff_id}
+																	</p>
+																)}
+															</div>
+														</div>
+													</div>
+												</div>
+
+												{/* Container Stats */}
+												<div className="grid grid-cols-2 gap-y-4">
+													<div>
+														<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+															Size
+														</dt>
+														<dd className="mt-1 text-[13px] font-medium text-ink">
+															{container.size || "—"}
+														</dd>
+													</div>
+													<div>
+														<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+															Seal Number
+														</dt>
+														<dd className="mt-1 font-mono text-[13px] text-ink">
+															{container.seal_no || "—"}
+														</dd>
+													</div>
+													<div>
+														<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+															Packages
+														</dt>
+														<dd className="mt-1 font-mono text-[13px] text-ink">
+															{formatNumber(container.package_count)}
+														</dd>
+													</div>
+													<div>
+														<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+															Gross Weight
+														</dt>
+														<dd className="mt-1 font-mono text-[13px] text-ink">
+															{container.gross_weight ? `${formatNumber(container.gross_weight)} kg` : "—"}
+														</dd>
+													</div>
 												</div>
 											</div>
-											
-											<div className="grid grid-cols-2 gap-3 border-t border-line/50 pt-4">
-												<div>
-													<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-														Size
-													</dt>
-													<dd className="mt-1 text-[13px] font-medium text-ink">
-														{container.size || "—"}
-													</dd>
+
+											{/* Container Timeline */}
+											{(container.gate_in_at || container.received_at || container.stored_at || container.gate_out_at) && (
+												<div className="border-t border-line bg-sand/30 px-5 py-4">
+													<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft mb-3">
+														Container Movement Timeline
+													</p>
+													<div className="grid grid-cols-2 gap-y-3 sm:grid-cols-4">
+														<div>
+															<span className="block font-mono text-[9px] uppercase text-ink-soft">Gate In</span>
+															<span className="mt-0.5 block text-[11px] text-ink">{container.gate_in_at ? formatDateTime(container.gate_in_at) : "—"}</span>
+														</div>
+														<div>
+															<span className="block font-mono text-[9px] uppercase text-ink-soft">Received</span>
+															<span className="mt-0.5 block text-[11px] text-ink">{container.received_at ? formatDateTime(container.received_at) : "—"}</span>
+														</div>
+														<div>
+															<span className="block font-mono text-[9px] uppercase text-ink-soft">Stored</span>
+															<span className="mt-0.5 block text-[11px] text-ink">{container.stored_at ? formatDateTime(container.stored_at) : "—"}</span>
+														</div>
+														<div>
+															<span className="block font-mono text-[9px] uppercase text-ink-soft">Gate Out</span>
+															<span className="mt-0.5 block text-[11px] text-ink">{container.gate_out_at ? formatDateTime(container.gate_out_at) : "—"}</span>
+														</div>
+													</div>
 												</div>
-												<div>
-													<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-														Seal
-													</dt>
-													<dd className="mt-1 font-mono text-[13px] text-ink">
-														{container.seal_no || "—"}
-													</dd>
-												</div>
-												<div>
-													<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-														Packages
-													</dt>
-													<dd className="mt-1 font-mono text-[13px] text-ink">
-														{formatNumber(container.package_count)}
-													</dd>
-												</div>
-												<div>
-													<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-														Weight
-													</dt>
-													<dd className="mt-1 font-mono text-[13px] text-ink">
-														{container.gross_weight ? `${formatNumber(container.gross_weight)} kg` : "—"}
-													</dd>
-												</div>
-											</div>
+											)}
 										</div>
 									))}
 								</div>
@@ -809,15 +893,15 @@ export default function PortalShipmentDetailsPage() {
 							description="Recipient and contact details for the declared cargo."
 						>
 							<dl className="grid gap-5 p-6 sm:grid-cols-2">
-								<Field icon={User} label="Consignee name" value={shipment.consignee ?? "—"} />
-								<Field icon={Info} label="Consignee type" value={statusLabel(shipment.consignee_type)} />
-								<Field icon={Mail} label="Email" value={shipment.consignee_email ?? "—"} mono />
-								<Field icon={Phone} label="Phone" value={shipment.consignee_phone ?? "—"} mono />
-								<Field icon={User} label="Contact person" value={shipment.consignee_contact_person ?? "—"} />
-								<Field icon={Info} label="Registration status" value={statusLabel(shipment.consignee_status)} />
-								<Field icon={MapPin} label="Address" value={shipment.consignee_address ?? "—"} />
-								<Field icon={MapPin} label="Country" value={shipment.consignee_country ?? "—"} />
-								<Field icon={Hash} label="Linked organisation ID" value={shipment.consignee_organisation_id ?? "—"} mono />
+								<Field icon={User} label="Consignee name" value={consigneeName} />
+								<Field icon={Info} label="Consignee type" value={statusLabel(consigneeType)} />
+								<Field icon={Mail} label="Email" value={consigneeEmail} mono />
+								<Field icon={Phone} label="Phone" value={consigneePhone} mono />
+								<Field icon={User} label="Contact person" value={consigneeContact} />
+								<Field icon={Info} label="Registration status" value={statusLabel(consigneeStatus)} />
+								<Field icon={MapPin} label="Address" value={consigneeAddress} />
+								<Field icon={MapPin} label="Country" value={consigneeCountry} />
+								<Field icon={Hash} label="Linked organisation ID" value={consigneeOrgId} mono />
 							</dl>
 						</Panel>
 
@@ -827,8 +911,12 @@ export default function PortalShipmentDetailsPage() {
 							description="Licensed agent selected for this shipment declaration."
 						>
 							<dl className="grid gap-5 p-6 sm:grid-cols-2">
-								<Field icon={User} label="Agent name" value={shipment.licensed_agent_name || shipment.agent || "—"} />
-								<Field icon={Hash} label="Agent ID" value={shipment.licensed_agent_id || shipment.agentId || "—"} mono />
+								<Field icon={User} label="Agent name" value={agent.name || shipment.agent_name || "—"} />
+								<Field icon={Hash} label="Agent ID" value={agent.id || shipment.agent_id || "—"} mono />
+								<Field icon={Hash} label="Licence number" value={agent.licence_number || "—"} mono />
+								<Field icon={Mail} label="Contact email" value={agent.contact_email || "—"} mono />
+								<Field icon={Phone} label="Contact phone" value={agent.contact_phone || "—"} mono />
+								<Field icon={Info} label="Verification" value={statusLabel(agent.verification_status)} />
 							</dl>
 						</Panel>
 

@@ -4,7 +4,6 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-   
     echo json_encode([
         "error" => true,
         "data" => "Method not allowed.",
@@ -17,7 +16,6 @@ if (
     empty($my_details->id) ||
     ($my_details->account_type ?? "") !== "system"
 ) {
-   
     echo json_encode([
         "error" => true,
         "data" => "You are not authorised to access Operations manifest reviews.",
@@ -36,7 +34,10 @@ try {
             COALESCE(NULLIF(ps.vessel_name, ''), om.vessel) AS vessel,
             COALESCE(NULLIF(ps.shipping_line, ''), om.shipping_line) AS shipping_line,
             COALESCE(NULLIF(ps.origin_port, ''), om.origin_port) AS origin_port,
-            COALESCE(NULLIF(ps.expected_arrival, '0000-00-00 00:00:00'), NULLIF(om.eta, '')) AS eta,
+            COALESCE(
+                NULLIF(ps.expected_arrival, '0000-00-00 00:00:00'),
+                NULLIF(om.eta, '')
+            ) AS eta,
 
             om.containers,
 
@@ -99,7 +100,6 @@ try {
             ps.package_count AS shipment_package_count,
             ps.gross_weight AS shipment_gross_weight,
             ps.volume,
-            ps.hs_code,
             ps.dangerous_goods,
             ps.temperature_controlled,
             ps.temperature,
@@ -111,34 +111,85 @@ try {
 
         FROM operation_manifests om
 
-        LEFT JOIN portal_shipments ps
-            ON ps.id = om.matched_shipment_id
+        LEFT JOIN portal_shipments ps ON ps.id = om.matched_shipment_id
 
-        WHERE om.review_responsible_party = :responsible_party
-            AND om.flagged_at IS NOT NULL
+        WHERE om.review_responsible_party = 'Operations' 
+          AND om.flagged_at IS NOT NULL
+          AND om.status = 'Review required'
 
         ORDER BY om.flagged_at DESC
     ";
 
     $stmt = $conn->prepare($sql);
-    $stmt->execute([
-        ":responsible_party" => "Operations"
-    ]);
+    $stmt->execute();
 
     $manifests = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $shipmentIds = [];
+
+    foreach ($manifests as $manifest) {
+        if (!empty($manifest["shipment_id"])) {
+            $shipmentIds[] = $manifest["shipment_id"];
+        }
+    }
+
+    $shipmentIds = array_values(array_unique($shipmentIds));
+    $containersByShipment = [];
+
+    if (!empty($shipmentIds)) {
+        $placeholders = implode(",", array_fill(0, count($shipmentIds), "?"));
+
+        $containerSql = "
+            SELECT
+                c.*,
+                ct.hs_code AS tariff_hs_code,
+                ct.description AS customs_tariff_description
+            FROM portal_shipment_containers c
+            LEFT JOIN customs_tariffs ct
+                ON ct.id = c.customs_tariff_id
+            WHERE c.shipment_id IN ($placeholders)
+            ORDER BY c.created_at ASC
+        ";
+
+        $containerStmt = $conn->prepare($containerSql);
+        $containerStmt->execute($shipmentIds);
+
+        $containers = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($containers as $container) {
+            $shipmentId = $container["shipment_id"];
+
+            if (!isset($containersByShipment[$shipmentId])) {
+                $containersByShipment[$shipmentId] = [];
+            }
+
+            $containersByShipment[$shipmentId][] = $container;
+        }
+    }
+
+    foreach ($manifests as &$manifest) {
+        $shipmentId = $manifest["shipment_id"] ?? null;
+
+        $manifest["shipment_containers"] = $shipmentId !== null
+            ? ($containersByShipment[$shipmentId] ?? [])
+            : [];
+
+        $manifest["container_count"] = count($manifest["shipment_containers"]);
+    }
+
+    unset($manifest);
 
     echo json_encode([
         "error" => false,
         "data" => $manifests,
         "code" => null
     ]);
-
-} catch (PDOException $e) {
-    
+} catch (Throwable $e) {
+    error_log("Operations manifest reviews error: " . $e->getMessage());
 
     echo json_encode([
         "error" => true,
         "data" => "Could not load Operations manifest reviews.",
-        "code" => 500
+        "code" => $e instanceof PDOException ? $e->getCode() : null
     ]);
 }

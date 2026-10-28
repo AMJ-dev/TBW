@@ -56,6 +56,6 @@
         echo json_encode([
             "error" => true,
             "data" => "Could not load shipment declarations.",
-            "code" => null
+            "code" => $e->getMessage()
         ]);
     }

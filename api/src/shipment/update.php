@@ -27,6 +27,7 @@ try {
     }
 
     $shipmentId = trim((string) ($_GET["id"] ?? $_POST["id"] ?? ""));
+
     if ($shipmentId === "") {
         echo json_encode([
             "error" => true,
@@ -39,13 +40,16 @@ try {
     $ownership = $conn->prepare("
         SELECT id, status, shipment_reference
         FROM portal_shipments
-        WHERE id = :id AND organisation_id = :organisation_id
+        WHERE id = :id
+          AND organisation_id = :organisation_id
         LIMIT 1
-    "); 
+    ");
+
     $ownership->execute([
         ":id" => $shipmentId,
         ":organisation_id" => $my_details->organisation_id
     ]);
+
     $existingShipment = $ownership->fetch(PDO::FETCH_ASSOC);
 
     if (!$existingShipment) {
@@ -66,18 +70,28 @@ try {
         exit;
     }
 
-    $requestedStatus = trim($_POST["status"] ?? "pending_review");
+    $requestedStatus = trim((string) ($_POST["status"] ?? "pending_review"));
+
     $status = in_array($requestedStatus, ["draft", "pending_review"], true)
         ? $requestedStatus
         : "pending_review";
 
-    if ($status === "pending_review" && ($_POST["declaration_accepted"] ?? "0") !== "1") {
-        throw new InvalidArgumentException("Please accept the shipment declaration before submitting.");
+    $declarationAccepted = strtolower(trim((string) (
+        $_POST["declaration_accepted"] ?? $_POST["declarationAccepted"] ?? "0"
+    )));
+
+    if (
+        $status === "pending_review" &&
+        !in_array($declarationAccepted, ["1", "true", "yes", "on"], true)
+    ) {
+        throw new InvalidArgumentException(
+            "Please accept the shipment declaration before submitting."
+        );
     }
 
-    $shipmentType = trim($_POST["shipment_type"] ?? "");
-    $cargoCategory = trim($_POST["cargo_category"] ?? "");
-    $packageType = trim($_POST["package_type"] ?? "");
+    $shipmentType = trim((string) ($_POST["shipment_type"] ?? $_POST["shipmentType"] ?? ""));
+    $cargoCategory = trim((string) ($_POST["cargo_category"] ?? $_POST["cargoCategory"] ?? ""));
+    $packageType = trim((string) ($_POST["package_type"] ?? $_POST["packageType"] ?? ""));
 
     if ($shipmentType === "" || $cargoCategory === "" || $packageType === "") {
         throw new InvalidArgumentException(
@@ -92,13 +106,55 @@ try {
         throw new InvalidArgumentException("Invalid container or document data.");
     }
 
-    $consigneeEmail = trim($_POST["consignee_email"] ?? "");
+    $consignee = trim((string) ($_POST["consignee"] ?? ""));
+    $consigneeEmail = trim((string) (
+        $_POST["consignee_email"] ?? $_POST["consigneeEmail"] ?? ""
+    ));
+    $consigneePhone = trim((string) (
+        $_POST["consignee_phone"] ?? $_POST["consigneePhone"] ?? ""
+    ));
 
-    if ($consigneeEmail !== "" && !filter_var($consigneeEmail, FILTER_VALIDATE_EMAIL)) {
+    if (
+        $consigneeEmail !== "" &&
+        !filter_var($consigneeEmail, FILTER_VALIDATE_EMAIL)
+    ) {
         throw new InvalidArgumentException("Invalid consignee email.");
     }
 
-    $expectedArrival = trim($_POST["expected_arrival"] ?? "");
+    if ($status === "pending_review" && $consignee === "") {
+        throw new InvalidArgumentException("Consignee name is required.");
+    }
+
+    $consigneeType = trim((string) (
+        $_POST["consignee_type"] ?? $_POST["consigneeType"] ?? "organisation"
+    ));
+
+    if (!in_array($consigneeType, ["organisation", "individual"], true)) {
+        throw new InvalidArgumentException("Invalid consignee type.");
+    }
+
+    $consigneeOrganisationId = trim((string) (
+        $_POST["consignee_organisation_id"]
+        ?? $_POST["consigneeOrganisationId"]
+        ?? ""
+    ));
+
+    if ($status === "pending_review") {
+        if (
+            $consigneeType === "organisation" &&
+            $consigneeOrganisationId === "" &&
+            $consigneeEmail === "" &&
+            $consigneePhone === ""
+        ) {
+            throw new InvalidArgumentException(
+                "For an unregistered consignee, provide an email address or phone number."
+            );
+        }
+    }
+
+    $expectedArrival = trim((string) (
+        $_POST["expected_arrival"] ?? $_POST["expectedArrival"] ?? ""
+    ));
 
     if ($expectedArrival !== "") {
         $arrivalDate = DateTime::createFromFormat("!Y-m-d", $expectedArrival);
@@ -112,18 +168,25 @@ try {
         $expectedArrival = null;
     }
 
-    foreach (["package_count", "gross_weight", "volume"] as $field) {
-        $value = $_POST[$field] ?? "";
+    $packageCount = $_POST["package_count"] ?? $_POST["packageCount"] ?? "";
+    $grossWeight = $_POST["gross_weight"] ?? $_POST["grossWeight"] ?? "";
+    $volume = $_POST["volume"] ?? "";
 
+    foreach ([$packageCount, $grossWeight, $volume] as $value) {
         if ($value !== "" && (!is_numeric($value) || (float) $value < 0)) {
-            throw new InvalidArgumentException(
-                "Invalid numeric value for " . $field . "."
-            );
+            throw new InvalidArgumentException("Invalid shipment quantity, weight or volume.");
         }
     }
 
-    $dangerousGoods = $_POST["dangerous_goods"] ?? "no";
-    $temperatureControlled = $_POST["temperature_controlled"] ?? "no";
+    $dangerousGoods = strtolower(trim((string) (
+        $_POST["dangerous_goods"] ?? $_POST["dangerousGoods"] ?? "no"
+    )));
+
+    $temperatureControlled = strtolower(trim((string) (
+        $_POST["temperature_controlled"]
+        ?? $_POST["temperatureControlled"]
+        ?? "no"
+    )));
 
     if (!in_array($dangerousGoods, ["yes", "no"], true)) {
         throw new InvalidArgumentException("Invalid dangerous goods value.");
@@ -133,43 +196,46 @@ try {
         throw new InvalidArgumentException("Invalid temperature-controlled value.");
     }
 
-    $q = $conn->prepare("
-        SELECT label
-        FROM terminal_shipment_types
-        WHERE label = :label AND is_active = 1
-        LIMIT 1
-    ");
-    $q->bindValue(":label", $shipmentType);
-    $q->execute();
+    $validationQueries = [
+        [
+            "sql" => "
+                SELECT label
+                FROM terminal_shipment_types
+                WHERE label = :label AND is_active = 1
+                LIMIT 1
+            ",
+            "value" => $shipmentType,
+            "message" => "Invalid shipment type."
+        ],
+        [
+            "sql" => "
+                SELECT label
+                FROM terminal_cargo_categories
+                WHERE label = :label AND is_active = 1
+                LIMIT 1
+            ",
+            "value" => $cargoCategory,
+            "message" => "Invalid cargo category."
+        ],
+        [
+            "sql" => "
+                SELECT label
+                FROM terminal_packaging_types
+                WHERE label = :label AND is_active = 1
+                LIMIT 1
+            ",
+            "value" => $packageType,
+            "message" => "Invalid packaging type."
+        ]
+    ];
 
-    if (!$q->fetchColumn()) {
-        throw new InvalidArgumentException("Invalid shipment type.");
-    }
+    foreach ($validationQueries as $validation) {
+        $query = $conn->prepare($validation["sql"]);
+        $query->execute([":label" => $validation["value"]]);
 
-    $q = $conn->prepare("
-        SELECT label
-        FROM terminal_cargo_categories
-        WHERE label = :label AND is_active = 1
-        LIMIT 1
-    ");
-    $q->bindValue(":label", $cargoCategory);
-    $q->execute();
-
-    if (!$q->fetchColumn()) {
-        throw new InvalidArgumentException("Invalid cargo category.");
-    }
-
-    $q = $conn->prepare("
-        SELECT label
-        FROM terminal_packaging_types
-        WHERE label = :label AND is_active = 1
-        LIMIT 1
-    ");
-    $q->bindValue(":label", $packageType);
-    $q->execute();
-
-    if (!$q->fetchColumn()) {
-        throw new InvalidArgumentException("Invalid packaging type.");
+        if (!$query->fetchColumn()) {
+            throw new InvalidArgumentException($validation["message"]);
+        }
     }
 
     $validContainers = [];
@@ -179,22 +245,26 @@ try {
             throw new InvalidArgumentException("Invalid container entry.");
         }
 
-        $containerNo = strtoupper(trim(
+        $containerNo = strtoupper(trim((string) (
             $container["containerNo"] ?? $container["container_no"] ?? ""
-        ));
+        )));
 
         if ($containerNo !== "") {
+            $container["containerNo"] = $containerNo;
             $validContainers[] = $container;
         }
     }
 
-    if ($cargoCategory === "Containerised Cargo" && count($validContainers) === 0) {
+    if (
+        $cargoCategory === "Containerised Cargo" &&
+        count($validContainers) === 0
+    ) {
         throw new InvalidArgumentException(
             "At least one container is required for containerised cargo."
         );
     }
 
-    $rq = $conn->prepare("
+    $requiredDocumentQuery = $conn->prepare("
         SELECT dt.document_key, dt.label
         FROM document_types dt
         INNER JOIN document_upload_location_types dult
@@ -205,8 +275,9 @@ try {
           AND dul.is_active = 1
           AND dult.is_required = 1
     ");
-    $rq->execute();
-    $requiredDocuments = $rq->fetchAll(PDO::FETCH_ASSOC);
+
+    $requiredDocumentQuery->execute();
+    $requiredDocuments = $requiredDocumentQuery->fetchAll(PDO::FETCH_ASSOC);
 
     $documentRuleQuery = $conn->prepare("
         SELECT dt.document_key, dt.label, dult.is_required, dult.allow_multiple
@@ -229,8 +300,21 @@ try {
             throw new InvalidArgumentException("Invalid document entry.");
         }
 
-        $documentKey = trim($document["type"] ?? "");
-        $index = filter_var($document["index"] ?? null, FILTER_VALIDATE_INT);
+        if (
+            !empty($document["existing"]) ||
+            (!empty($document["id"]) && !array_key_exists("index", $document))
+        ) {
+            continue;
+        }
+
+        $documentKey = trim((string) (
+            $document["type"] ?? $document["document_key"] ?? ""
+        ));
+
+        $index = filter_var(
+            $document["index"] ?? null,
+            FILTER_VALIDATE_INT
+        );
 
         if ($documentKey === "" || $index === false || $index < 0) {
             throw new InvalidArgumentException("Invalid document type or index.");
@@ -242,8 +326,10 @@ try {
 
         $documentIndexes[$index] = true;
 
-        $documentRuleQuery->bindValue(":document_key", $documentKey);
-        $documentRuleQuery->execute();
+        $documentRuleQuery->execute([
+            ":document_key" => $documentKey
+        ]);
+
         $rule = $documentRuleQuery->fetch(PDO::FETCH_ASSOC);
 
         if (!$rule) {
@@ -252,7 +338,8 @@ try {
             );
         }
 
-        $documentCounts[$documentKey] = ($documentCounts[$documentKey] ?? 0) + 1;
+        $documentCounts[$documentKey] =
+            ($documentCounts[$documentKey] ?? 0) + 1;
 
         if (
             (int) $rule["allow_multiple"] === 0 &&
@@ -266,35 +353,60 @@ try {
 
     if ($status === "pending_review") {
         foreach ($requiredDocuments as $requiredDocument) {
-        $key = $requiredDocument["document_key"];
-        $alreadyUploaded = false;
+            $key = $requiredDocument["document_key"];
+            $alreadyUploaded = false;
 
-        if (empty($documentCounts[$key])) {
-            $existingDoc = $conn->prepare("
-                SELECT 1
-                FROM portal_shipment_documents
-                WHERE shipment_id = :shipment_id AND document_type = :document_type
-                LIMIT 1
-            ");
-            $existingDoc->execute([
-                ":shipment_id" => $shipmentId,
-                ":document_type" => $requiredDocument["label"]
-            ]);
-            $alreadyUploaded = (bool) $existingDoc->fetchColumn();
-        }
+            if (empty($documentCounts[$key])) {
+                $existingDoc = $conn->prepare("
+                    SELECT 1
+                    FROM portal_shipment_documents
+                    WHERE shipment_id = :shipment_id
+                      AND document_type = :document_type
+                    LIMIT 1
+                ");
 
-        if (empty($documentCounts[$key]) && !$alreadyUploaded) {
-            throw new InvalidArgumentException(
-                "Missing required document: " . $requiredDocument["label"] . "."
-            );
-        }
+                $existingDoc->execute([
+                    ":shipment_id" => $shipmentId,
+                    ":document_type" => $requiredDocument["label"]
+                ]);
+
+                $alreadyUploaded = (bool) $existingDoc->fetchColumn();
+            }
+
+            if (empty($documentCounts[$key]) && !$alreadyUploaded) {
+                throw new InvalidArgumentException(
+                    "Missing required document: " .
+                    $requiredDocument["label"] . "."
+                );
+            }
         }
     }
+
+    $consigneeOrganisationId = $consigneeOrganisationId ?: null;
+
+    $consigneeStatus = $consigneeOrganisationId
+        ? "linked"
+        : "unregistered";
+
+    $licensedAgentId = trim((string) (
+        $_POST["agentId"]
+        ?? $_POST["licensed_agent_id"]
+        ?? $_POST["licensedAgentId"]
+        ?? ""
+    ));
+
+    $licensedAgentName = trim((string) (
+        $_POST["agent"]
+        ?? $_POST["licensed_agent"]
+        ?? $_POST["licensed_agent_name"]
+        ?? $_POST["licensedAgentName"]
+        ?? ""
+    ));
 
     $conn->beginTransaction();
     $transactionStarted = true;
 
-    $q = $conn->prepare("
+    $updateShipment = $conn->prepare("
         UPDATE portal_shipments SET
             shipment_type = :shipment_type,
             bill_of_lading = :bill_of_lading,
@@ -323,7 +435,6 @@ try {
             package_count = :package_count,
             gross_weight = :gross_weight,
             volume = :volume,
-            hs_code = :hs_code,
             dangerous_goods = :dangerous_goods,
             temperature_controlled = :temperature_controlled,
             temperature = :temperature,
@@ -331,111 +442,211 @@ try {
             customs_reference = :customs_reference,
             status = :status,
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = :id AND organisation_id = :organisation_id
+        WHERE id = :id
+          AND organisation_id = :organisation_id
     ");
 
-    $q->bindValue(":shipment_type", $shipmentType);
-    $q->bindValue(":bill_of_lading", trim($_POST["bill_of_lading"] ?? "") ?: null);
-    $q->bindValue(":booking_number", trim($_POST["booking_number"] ?? "") ?: null);
-    $q->bindValue(":vessel_name", trim($_POST["vessel_name"] ?? "") ?: null);
-    $q->bindValue(":voyage_number", trim($_POST["voyage_number"] ?? "") ?: null);
-    $q->bindValue(":shipping_line", trim($_POST["shipping_line"] ?? "") ?: null);
-    $q->bindValue(":origin_country", trim($_POST["origin_country"] ?? "") ?: null);
-    $q->bindValue(":origin_port", trim($_POST["origin_port"] ?? "") ?: null);
-    $q->bindValue(":destination_port", trim($_POST["destination_port"] ?? "") ?: null);
-    $q->bindValue(":expected_arrival", $expectedArrival);
-    $q->bindValue(":consignee", trim($_POST["consignee"] ?? "") ?: null);
-    $q->bindValue(":consignee_email", $consigneeEmail ?: null);
-    $q->bindValue(":consignee_phone", trim($_POST["consignee_phone"] ?? "") ?: null);
+    $shipmentBindings = [
+        ":shipment_type" => $shipmentType,
+        ":bill_of_lading" => trim((string) ($_POST["bill_of_lading"] ?? "")) ?: null,
+        ":booking_number" => trim((string) ($_POST["booking_number"] ?? "")) ?: null,
+        ":vessel_name" => trim((string) ($_POST["vessel_name"] ?? "")) ?: null,
+        ":voyage_number" => trim((string) ($_POST["voyage_number"] ?? "")) ?: null,
+        ":shipping_line" => trim((string) ($_POST["shipping_line"] ?? "")) ?: null,
+        ":origin_country" => trim((string) ($_POST["origin_country"] ?? "")) ?: null,
+        ":origin_port" => trim((string) ($_POST["origin_port"] ?? "")) ?: null,
+        ":destination_port" => trim((string) ($_POST["destination_port"] ?? "")) ?: null,
+        ":expected_arrival" => $expectedArrival,
+        ":consignee" => $consignee ?: null,
+        ":consignee_email" => $consigneeEmail ?: null,
+        ":consignee_phone" => $consigneePhone ?: null,
+        ":consignee_type" => $consigneeType,
+        ":consignee_organisation_id" => $consigneeOrganisationId,
+        ":consignee_status" => $consigneeStatus,
+        ":consignee_contact_person" => trim((string) (
+            $_POST["consignee_contact_person"]
+            ?? $_POST["consigneeContactPerson"]
+            ?? ""
+        )) ?: null,
+        ":consignee_address" => trim((string) (
+            $_POST["consignee_address"] ?? $_POST["consigneeAddress"] ?? ""
+        )) ?: null,
+        ":consignee_country" => trim((string) (
+            $_POST["consignee_country"] ?? $_POST["consigneeCountry"] ?? ""
+        )) ?: null,
+        ":licensed_agent_id" => $licensedAgentId ?: null,
+        ":licensed_agent_name" => $licensedAgentName ?: null,
+        ":cargo_description" => trim((string) (
+            $_POST["cargo_description"] ?? $_POST["cargoDescription"] ?? ""
+        )) ?: null,
+        ":cargo_category" => $cargoCategory,
+        ":package_type" => $packageType,
+        ":package_count" => $packageCount === "" ? null : $packageCount,
+        ":gross_weight" => $grossWeight === "" ? null : $grossWeight,
+        ":volume" => $volume === "" ? null : $volume,
+        ":dangerous_goods" => $dangerousGoods,
+        ":temperature_controlled" => $temperatureControlled,
+        ":temperature" => trim((string) ($_POST["temperature"] ?? "")) ?: null,
+        ":special_instructions" => trim((string) (
+            $_POST["special_instructions"]
+            ?? $_POST["specialInstructions"]
+            ?? ""
+        )) ?: null,
+        ":customs_reference" => trim((string) (
+            $_POST["customs_reference"] ?? $_POST["customsReference"] ?? ""
+        )) ?: null,
+        ":status" => $status,
+        ":id" => $shipmentId,
+        ":organisation_id" => $my_details->organisation_id
+    ];
 
-    $consigneeType = trim($_POST["consignee_type"] ?? "organisation");
-    if (!in_array($consigneeType, ["organisation", "individual"], true)) {
-        throw new InvalidArgumentException("Invalid consignee type.");
-    }
+    $updateShipment->execute($shipmentBindings);
 
-    $consigneeOrganisationId = trim($_POST["consignee_organisation_id"] ?? "") ?: null;
-    $consigneeStatus = $consigneeOrganisationId ? "linked" : "unregistered";
-    $licensedAgentId = trim($_POST["agentId"] ?? $_POST["licensed_agent_id"] ?? "") ?: null;
-    $licensedAgentName = trim($_POST["agent"] ?? $_POST["licensed_agent_name"] ?? "") ?: null;
-
-    $q->bindValue(":consignee_type", $consigneeType);
-    $q->bindValue(":consignee_organisation_id", $consigneeOrganisationId);
-    $q->bindValue(":consignee_status", $consigneeStatus);
-    $q->bindValue(":consignee_contact_person", trim($_POST["consignee_contact_person"] ?? "") ?: null);
-    $q->bindValue(":consignee_address", trim($_POST["consignee_address"] ?? "") ?: null);
-    $q->bindValue(":consignee_country", trim($_POST["consignee_country"] ?? "") ?: null);
-    $q->bindValue(":licensed_agent_id", $licensedAgentId);
-    $q->bindValue(":licensed_agent_name", $licensedAgentName);
-
-    $q->bindValue(":cargo_description", trim($_POST["cargo_description"] ?? "") ?: null);
-    $q->bindValue(":cargo_category", $cargoCategory);
-    $q->bindValue(":package_type", $packageType);
-    $q->bindValue(":package_count", ($_POST["package_count"] ?? "") === "" ? null : $_POST["package_count"]);
-    $q->bindValue(":gross_weight", ($_POST["gross_weight"] ?? "") === "" ? null : $_POST["gross_weight"]);
-    $q->bindValue(":volume", ($_POST["volume"] ?? "") === "" ? null : $_POST["volume"]);
-    $q->bindValue(":hs_code", trim($_POST["hs_code"] ?? "") ?: null);
-    $q->bindValue(":dangerous_goods", $dangerousGoods);
-    $q->bindValue(":temperature_controlled", $temperatureControlled);
-    $q->bindValue(":temperature", trim($_POST["temperature"] ?? "") ?: null);
-    $q->bindValue(":special_instructions", trim($_POST["special_instructions"] ?? "") ?: null);
-    $q->bindValue(":customs_reference", trim($_POST["customs_reference"] ?? "") ?: null);
-    $q->bindValue(":status", $status);
-    $q->bindValue(":id", $shipmentId);
-    $q->bindValue(":organisation_id", $my_details->organisation_id);
-    $q->execute();
-
-    if ($q->rowCount() === 0) {
-        $check = $conn->prepare("
-            SELECT id FROM portal_shipments
-            WHERE id = :id AND organisation_id = :organisation_id
-            LIMIT 1
-        ");
-        $check->execute([
-            ":id" => $shipmentId,
-            ":organisation_id" => $my_details->organisation_id
-        ]);
-        if (!$check->fetchColumn()) {
-            throw new RuntimeException("Shipment could not be updated.");
-        }
-    }
-
-    $removeContainers = $conn->prepare("
-        DELETE FROM portal_shipment_containers WHERE shipment_id = :shipment_id
+    $checkShipment = $conn->prepare("
+        SELECT id
+        FROM portal_shipments
+        WHERE id = :id
+          AND organisation_id = :organisation_id
+        LIMIT 1
     ");
-    $removeContainers->execute([":shipment_id" => $shipmentId]);
+
+    $checkShipment->execute([
+        ":id" => $shipmentId,
+        ":organisation_id" => $my_details->organisation_id
+    ]);
+
+    if (!$checkShipment->fetchColumn()) {
+        throw new RuntimeException("Shipment could not be updated.");
+    }
+
+    $existingContainersQuery = $conn->prepare("
+        SELECT id, container_no
+        FROM portal_shipment_containers
+        WHERE shipment_id = :shipment_id
+    ");
+
+    $existingContainersQuery->execute([
+        ":shipment_id" => $shipmentId
+    ]);
+
+    $existingContainers = $existingContainersQuery->fetchAll(PDO::FETCH_ASSOC);
+    $existingContainerNumbers = [];
+
+    foreach ($existingContainers as $existingContainer) {
+        $existingContainerNumbers[
+            strtoupper(trim((string) $existingContainer["container_no"]))
+        ] = $existingContainer["id"];
+    }
 
     $containerInsert = $conn->prepare("
         INSERT INTO portal_shipment_containers (
-            id, shipment_id, container_no, size, seal_no, package_count, gross_weight
+            id,
+            shipment_id,
+            container_no,
+            size,
+            seal_no,
+            package_count,
+            gross_weight,
+            customs_tariff_id,
+            cargo_description,
+            package_type,
+            hs_code,
+            item_quantity,
+            unit_of_measure,
+            unit_value,
+            currency,
+            total_value
         ) VALUES (
-            :id, :shipment_id, :container_no, :size, :seal_no, :package_count, :gross_weight
+            :id,
+            :shipment_id,
+            :container_no,
+            :size,
+            :seal_no,
+            :package_count,
+            :gross_weight,
+            :customs_tariff_id,
+            :cargo_description,
+            :package_type,
+            :hs_code,
+            :item_quantity,
+            :unit_of_measure,
+            :unit_value,
+            :currency,
+            :total_value
         )
     ");
 
-    $seenContainers = [];
+    $containerUpdate = $conn->prepare("
+        UPDATE portal_shipment_containers SET
+            container_no = :container_no,
+            size = :size,
+            seal_no = :seal_no,
+            package_count = :package_count,
+            gross_weight = :gross_weight,
+            customs_tariff_id = :customs_tariff_id,
+            cargo_description = :cargo_description,
+            package_type = :package_type,
+            hs_code = :hs_code,
+            item_quantity = :item_quantity,
+            unit_of_measure = :unit_of_measure,
+            unit_value = :unit_value,
+            currency = :currency,
+            total_value = :total_value
+        WHERE id = :id
+          AND shipment_id = :shipment_id
+    ");
+
+    $tariffByIdQuery = $conn->prepare("
+        SELECT id, hs_code, description
+        FROM customs_tariffs
+        WHERE id = :id
+          AND status = 'ACTIVE'
+          AND effective_from <= CURDATE()
+          AND (effective_to IS NULL OR effective_to >= CURDATE())
+        LIMIT 1
+    ");
+
+    $tariffByHsCodeQuery = $conn->prepare("
+        SELECT id, hs_code, description
+        FROM customs_tariffs
+        WHERE hs_code = :hs_code
+          AND status = 'ACTIVE'
+          AND effective_from <= CURDATE()
+          AND (effective_to IS NULL OR effective_to >= CURDATE())
+        ORDER BY effective_from DESC
+        LIMIT 1
+    ");
+
+    $containerNumbers = [];
+    $processedContainerIds = [];
 
     foreach ($validContainers as $container) {
-        $containerNo = strtoupper(trim(
+        $containerNo = strtoupper(trim((string) (
             $container["containerNo"] ?? $container["container_no"] ?? ""
-        ));
+        )));
 
-        if (isset($seenContainers[$containerNo])) {
+        if (isset($containerNumbers[$containerNo])) {
             throw new InvalidArgumentException("Duplicate container number.");
         }
 
-        $seenContainers[$containerNo] = true;
+        $containerNumbers[$containerNo] = true;
 
-        $containerSize = trim($container["size"] ?? "") ?: null;
+        $containerSize = trim((string) (
+            $container["size"] ?? $container["containerSize"] ?? ""
+        )) ?: null;
 
         if ($containerSize !== null) {
             $sizeCheck = $conn->prepare("
                 SELECT label
                 FROM terminal_container_sizes
-                WHERE label = :label AND is_active = 1
+                WHERE label = :label
+                  AND is_active = 1
                 LIMIT 1
             ");
-            $sizeCheck->bindValue(":label", $containerSize);
-            $sizeCheck->execute();
+
+            $sizeCheck->execute([
+                ":label" => $containerSize
+            ]);
 
             if (!$sizeCheck->fetchColumn()) {
                 throw new InvalidArgumentException(
@@ -453,52 +664,259 @@ try {
             ?? "";
 
         foreach ([$containerCount, $containerWeight] as $number) {
-            if ($number !== "" && (!is_numeric($number) || (float) $number < 0)) {
+            if (
+                $number !== "" &&
+                (!is_numeric($number) || (float) $number < 0)
+            ) {
                 throw new InvalidArgumentException(
                     "Invalid container quantity or weight."
                 );
             }
         }
 
-        $sealNo = trim((string) ($container["sealNo"] ?? $container["seal_no"] ?? "")) ?: null;
+        $sealNo = trim((string) (
+            $container["sealNo"] ?? $container["seal_no"] ?? ""
+        )) ?: null;
 
-        $containerInsert->bindValue(":id", generateId());
-        $containerInsert->bindValue(":shipment_id", $shipmentId);
-        $containerInsert->bindValue(":container_no", $containerNo);
-        $containerInsert->bindValue(":size", $containerSize);
-        $containerInsert->bindValue(":seal_no", $sealNo);
-        $containerInsert->bindValue(
-            ":package_count",
-            $containerCount === "" ? null : $containerCount
+        $cargoDescription = trim((string) (
+            $container["cargoDescription"]
+            ?? $container["cargo_description"]
+            ?? ""
+        ));
+
+        $containerPackageType = trim((string) (
+            $container["packageType"]
+            ?? $container["package_type"]
+            ?? $packageType
+        ));
+
+        $hsCode = trim((string) (
+            $container["hsCode"] ?? $container["hs_code"] ?? ""
+        ));
+
+        $tariffId = trim((string) (
+            $container["customsTariffId"]
+            ?? $container["customs_tariff_id"]
+            ?? ""
+        ));
+
+        $itemQuantity = $container["itemQuantity"]
+            ?? $container["item_quantity"]
+            ?? $containerCount;
+
+        $unitOfMeasure = trim((string) (
+            $container["unitOfMeasure"]
+            ?? $container["unit_of_measure"]
+            ?? $containerPackageType
+        ));
+
+        $unitValue = $container["unitValue"]
+            ?? $container["unit_value"]
+            ?? 0;
+
+        $currency = strtoupper(trim((string) (
+            $container["currency"] ?? "NGN"
+        )));
+
+        if (
+            $itemQuantity !== "" &&
+            (!is_numeric($itemQuantity) || (float) $itemQuantity < 0)
+        ) {
+            throw new InvalidArgumentException(
+                "Invalid cargo quantity for container " . $containerNo . "."
+            );
+        }
+
+        if (!is_numeric($unitValue) || (float) $unitValue < 0) {
+            throw new InvalidArgumentException(
+                "Invalid cargo unit value for container " . $containerNo . "."
+            );
+        }
+
+        if (!preg_match('/^[A-Z]{3}$/', $currency)) {
+            throw new InvalidArgumentException(
+                "Use a valid three-letter currency code for container " .
+                $containerNo . "."
+            );
+        }
+
+        $tariff = null;
+
+        if ($tariffId !== "") {
+            $tariffByIdQuery->execute([
+                ":id" => $tariffId
+            ]);
+
+            $tariff = $tariffByIdQuery->fetch(PDO::FETCH_ASSOC) ?: null;
+        } elseif ($hsCode !== "") {
+            $tariffByHsCodeQuery->execute([
+                ":hs_code" => $hsCode
+            ]);
+
+            $tariff = $tariffByHsCodeQuery->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+
+        if ($tariffId !== "" && !$tariff) {
+            throw new InvalidArgumentException(
+                "The selected customs tariff is invalid, inactive, or outside its effective dates for container " .
+                $containerNo . "."
+            );
+        }
+
+        if (
+            $status === "pending_review" &&
+            $cargoCategory === "Containerised Cargo"
+        ) {
+            if ($cargoDescription === "") {
+                throw new InvalidArgumentException(
+                    "Cargo description is required for container " .
+                    $containerNo . "."
+                );
+            }
+
+            if (!$tariff) {
+                throw new InvalidArgumentException(
+                    "Select a valid customs tariff for container " .
+                    $containerNo . "."
+                );
+            }
+
+            if (
+                $hsCode !== "" &&
+                strcasecmp($hsCode, (string) $tariff["hs_code"]) !== 0
+            ) {
+                throw new InvalidArgumentException(
+                    "The HS code does not match the selected customs tariff for container " .
+                    $containerNo . "."
+                );
+            }
+        }
+
+        if ($tariff) {
+            $tariffId = (string) $tariff["id"];
+            $hsCode = (string) $tariff["hs_code"];
+
+            if ($cargoDescription === "") {
+                $cargoDescription = (string) $tariff["description"];
+            }
+        } else {
+            $tariffId = "";
+        }
+
+        $itemQuantityValue = $itemQuantity === ""
+            ? null
+            : (float) $itemQuantity;
+
+        $unitValueNumber = (float) $unitValue;
+
+        $totalValue = round(
+            ($itemQuantityValue ?? 0) * $unitValueNumber,
+            2
         );
-        $containerInsert->bindValue(
-            ":gross_weight",
-            $containerWeight === "" ? null : $containerWeight
-        );
-        $containerInsert->execute();
+
+        $containerData = [
+            ":shipment_id" => $shipmentId,
+            ":container_no" => $containerNo,
+            ":size" => $containerSize,
+            ":seal_no" => $sealNo,
+            ":package_count" => $containerCount === "" ? null : $containerCount,
+            ":gross_weight" => $containerWeight === "" ? null : $containerWeight,
+            ":customs_tariff_id" => $tariffId !== "" ? $tariffId : null,
+            ":cargo_description" => $cargoDescription !== "" ? $cargoDescription : null,
+            ":package_type" => $containerPackageType !== "" ? $containerPackageType : null,
+            ":hs_code" => $hsCode !== "" ? $hsCode : null,
+            ":item_quantity" => $itemQuantityValue,
+            ":unit_of_measure" => $unitOfMeasure !== "" ? $unitOfMeasure : null,
+            ":unit_value" => $unitValueNumber,
+            ":currency" => $currency,
+            ":total_value" => $totalValue
+        ];
+
+        if (isset($existingContainerNumbers[$containerNo])) {
+            $containerId = $existingContainerNumbers[$containerNo];
+
+            $containerData[":id"] = $containerId;
+
+            $containerUpdate->execute($containerData);
+
+            $processedContainerIds[] = $containerId;
+        } else {
+            $containerId = generateId();
+
+            $containerData[":id"] = $containerId;
+
+            $containerInsert->execute($containerData);
+
+            $processedContainerIds[] = $containerId;
+        }
+    }
+
+    $deleteRemovedContainers = $conn->prepare("
+        DELETE FROM portal_shipment_containers
+        WHERE shipment_id = :shipment_id
+          AND id NOT IN (" .
+            (count($processedContainerIds) > 0
+                ? implode(",", array_fill(0, count($processedContainerIds), "?"))
+                : "SELECT id FROM portal_shipment_containers WHERE shipment_id = ? AND 1 = 0"
+            ) .
+        ")
+    ");
+
+    if (count($processedContainerIds) > 0) {
+        $deleteRemovedContainers->execute([
+            $shipmentId,
+            ...$processedContainerIds
+        ]);
+    } else {
+        $deleteRemovedContainers->execute([$shipmentId, $shipmentId]);
     }
 
     $documentInsert = $conn->prepare("
         INSERT INTO portal_shipment_documents (
-            id, shipment_id, document_type, original_name,
-            stored_name, file_path, mime_type, file_size
+            id,
+            shipment_id,
+            document_type,
+            original_name,
+            stored_name,
+            file_path,
+            mime_type,
+            file_size
         ) VALUES (
-            :id, :shipment_id, :document_type, :original_name,
-            :stored_name, :file_path, :mime_type, :file_size
+            :id,
+            :shipment_id,
+            :document_type,
+            :original_name,
+            :stored_name,
+            :file_path,
+            :mime_type,
+            :file_size
         )
     ");
 
     $finfo = new finfo(FILEINFO_MIME_TYPE);
+
     $allowedMimeTypes = [
         "application/pdf",
         "image/jpeg",
         "image/png"
     ];
+
     $maxFileSize = 10 * 1024 * 1024;
 
     foreach ($documents as $document) {
-        $index = (int) $document["index"];
-        $documentKey = trim($document["type"]);
+        if (
+            !empty($document["existing"]) ||
+            (!empty($document["id"]) && !array_key_exists("index", $document))
+        ) {
+            continue;
+        }
+
+        $index = (int) ($document["index"] ?? -1);
+
+        $documentKey = trim((string) (
+            $document["type"] ?? $document["document_key"] ?? ""
+        ));
+
         $uploadKey = "document_file_" . $index;
 
         if (!isset($_FILES[$uploadKey])) {
@@ -533,8 +951,10 @@ try {
             );
         }
 
-        $documentRuleQuery->bindValue(":document_key", $documentKey);
-        $documentRuleQuery->execute();
+        $documentRuleQuery->execute([
+            ":document_key" => $documentKey
+        ]);
+
         $rule = $documentRuleQuery->fetch(PDO::FETCH_ASSOC);
 
         if (!$rule) {
@@ -545,6 +965,7 @@ try {
 
         $documentLabel = $rule["label"];
         $originalName = basename($file["name"]);
+
         $upload = upload_files($file, $allowedMimeTypes);
 
         if (!is_array($upload) || !empty($upload["error"])) {
@@ -556,27 +977,31 @@ try {
         $targetPath = $upload["data"] ?? "";
 
         if (!is_string($targetPath) || $targetPath === "") {
-            throw new RuntimeException("The uploaded file path was not returned.");
+            throw new RuntimeException(
+                "The uploaded file path was not returned."
+            );
         }
 
         $createdFiles[] = $targetPath;
         $storedName = basename($targetPath);
 
-        $documentInsert->bindValue(":id", generateId());
-        $documentInsert->bindValue(":shipment_id", $shipmentId);
-        $documentInsert->bindValue(":document_type", $documentLabel);
-        $documentInsert->bindValue(":original_name", $originalName);
-        $documentInsert->bindValue(":stored_name", $storedName);
-        $documentInsert->bindValue(":file_path", $targetPath);
-        $documentInsert->bindValue(":mime_type", $mimeType);
-        $documentInsert->bindValue(":file_size", $file["size"], PDO::PARAM_INT);
-        $documentInsert->execute();
+        $documentInsert->execute([
+            ":id" => generateId(),
+            ":shipment_id" => $shipmentId,
+            ":document_type" => $documentLabel,
+            ":original_name" => $originalName,
+            ":stored_name" => $storedName,
+            ":file_path" => $targetPath,
+            ":mime_type" => $mimeType,
+            ":file_size" => $file["size"]
+        ]);
     }
+
     $reviewStmt = $conn->prepare("
         UPDATE operation_manifests
         SET status = 'Review required'
         WHERE matched_shipment_id = :shipment_id
-        AND status = 'Discrepancy'
+          AND status = 'Discrepancy'
     ");
 
     $reviewStmt->execute([
@@ -590,6 +1015,7 @@ try {
         "error" => false,
         "data" => "Shipment updated successfully.",
         "code" => [
+            "id" => $shipmentId,
             "shipment_id" => $shipmentId,
             "shipment_reference" => $existingShipment["shipment_reference"] ?? null,
             "status" => $status

@@ -210,7 +210,7 @@ export default function OperationsManifestIntakePage() {
 		const timer = window.setTimeout(async () => {
 			setSearchingShipments(true);
 			try {
-				const res = await http.post("operations/manifests/shipments/", { q });
+				const res = await http.post("/operations/manifests/shipments/", { q });
 				const payload: any = res.data;
 				const results = Array.isArray(payload)
 					? payload

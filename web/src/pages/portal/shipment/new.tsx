@@ -164,6 +164,22 @@ type ContainerItem = {
 	sealNo: string;
 	packageCount: string;
 	grossWeight: string;
+	
+	// Cargo / Tariff details per container
+	cargoDescription: string;
+	packageType: string;
+	packageCountCargo: string;
+	grossWeightCargo: string;
+	hsCode: string;
+	customsTariffId: string | null;
+	
+	// UI state for tariff search
+	tariffQuery: string;
+	tariffResults: CustomsTariff[];
+	selectedTariff: CustomsTariff | null;
+	searchingTariffs: boolean;
+	tariffSearchError: string;
+	showTariffDropdown: boolean;
 };
 
 type ShipmentDocument =
@@ -235,6 +251,10 @@ interface ExistingShipment {
 		seal_no?: string;
 		package_count?: number | string;
 		gross_weight?: number | string;
+		cargo_description?: string;
+		package_type?: string;
+		hs_code?: string;
+		customs_tariff_id?: string;
 	}>;
 	documents?: ExistingDocument[];
 }
@@ -260,6 +280,18 @@ const emptyContainer = (): ContainerItem => ({
 	sealNo: "",
 	packageCount: "",
 	grossWeight: "",
+	cargoDescription: "",
+	packageType: "",
+	packageCountCargo: "",
+	grossWeightCargo: "",
+	hsCode: "",
+	customsTariffId: null,
+	tariffQuery: "",
+	tariffResults: [],
+	selectedTariff: null,
+	searchingTariffs: false,
+	tariffSearchError: "",
+	showTariffDropdown: false,
 });
 
 const ALLOWED_EXTENSIONS = /\.(pdf|png|jpe?g)$/i;
@@ -344,12 +376,6 @@ export default function NewPortalShipmentPage() {
 	});
 
 	const [consignee, setConsignee] = useState<ConsigneeValue>(emptyConsignee);
-	const [tariffQuery, setTariffQuery] = useState("");
-	const [tariffResults, setTariffResults] = useState<CustomsTariff[]>([]);
-	const [selectedTariff, setSelectedTariff] = useState<CustomsTariff | null>(null);
-	const [searchingTariffs, setSearchingTariffs] = useState(false);
-	const [tariffSearchError, setTariffSearchError] = useState("");
-	const [showTariffDropdown, setShowTariffDropdown] = useState(false);
 
 	const [containers, setContainers] = useState<ContainerItem[]>([
 		emptyContainer(),
@@ -507,6 +533,18 @@ export default function NewPortalShipmentPage() {
 							container.gross_weight != null
 								? String(container.gross_weight)
 								: "",
+						cargoDescription: String(container.cargo_description ?? ""),
+						packageType: String(container.package_type ?? ""),
+						packageCountCargo: "",
+						grossWeightCargo: "",
+						hsCode: String(container.hs_code ?? ""),
+						customsTariffId: container.customs_tariff_id ?? null,
+						tariffQuery: "",
+						tariffResults: [],
+						selectedTariff: null,
+						searchingTariffs: false,
+						tariffSearchError: "",
+						showTariffDropdown: false,
 					}))
 				);
 			}
@@ -565,15 +603,16 @@ export default function NewPortalShipmentPage() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [routeId]);
 
-	const searchCustomsTariffs = async (value: string) => {
-		setTariffQuery(value);
-		setTariffSearchError("");
+	const searchCustomsTariffs = async (containerIndex: number, value: string) => {
+		setContainers(current => current.map((c, i) => i === containerIndex ? { ...c, tariffQuery: value, tariffSearchError: "", selectedTariff: null, hsCode: value } : c));
+		
 		if (value.trim().length < 2) {
-			setTariffResults([]);
+			setContainers(current => current.map((c, i) => i === containerIndex ? { ...c, tariffResults: [] } : c));
 			return;
 		}
 
-		setSearchingTariffs(true);
+		setContainers(current => current.map((c, i) => i === containerIndex ? { ...c, searchingTariffs: true } : c));
+		
 		try {
 			const res = await http.post(
 				"/admin/config/customs-tariffs/search/",
@@ -586,49 +625,43 @@ export default function NewPortalShipmentPage() {
 			);
 			const resp: Resp = res.data;
 			if (resp.error) {
-				setTariffResults([]);
-				setTariffSearchError(
-					typeof resp.data === "string"
-						? resp.data
-						: "Could not search customs tariff classifications."
-				);
+				setContainers(current => current.map((c, i) => i === containerIndex ? { ...c, tariffResults: [], tariffSearchError: typeof resp.data === "string" ? resp.data : "Could not search customs tariff classifications." } : c));
 				return;
 			}
 
 			const payload: any = resp.code ?? {};
-			const records = Array.isArray(payload.tariffs)
-				? payload.tariffs
-				: Array.isArray(payload.data)
-					? payload.data
-					: [];
-			setTariffResults(records);
-			setShowTariffDropdown(true);
+			const records = Array.isArray(payload.tariffs) ? payload.tariffs : Array.isArray(payload.data) ? payload.data : [];
+			
+			setContainers(current => current.map((c, i) => i === containerIndex ? { ...c, tariffResults: records, showTariffDropdown: true } : c));
 		} catch (error: any) {
-			setTariffResults([]);
-			setTariffSearchError(
-				error?.response?.data?.data ||
-					error?.response?.data?.message ||
-					"Could not search customs tariff classifications."
-			);
+			setContainers(current => current.map((c, i) => i === containerIndex ? { ...c, tariffResults: [], tariffSearchError: error?.response?.data?.data || error?.response?.data?.message || "Could not search customs tariff classifications." } : c));
 		} finally {
-			setSearchingTariffs(false);
+			setContainers(current => current.map((c, i) => i === containerIndex ? { ...c, searchingTariffs: false } : c));
 		}
 	};
 
-	const chooseCustomsTariff = (tariff: CustomsTariff) => {
-		setSelectedTariff(tariff);
-		setTariffQuery(`${tariff.hs_code} — ${tariff.description}`);
-		setTariffResults([]);
-		setShowTariffDropdown(false);
-		updateField("hsCode", tariff.hs_code);
+	const chooseCustomsTariff = (containerIndex: number, tariff: CustomsTariff) => {
+		setContainers(current => current.map((c, i) => i === containerIndex ? { 
+			...c, 
+			selectedTariff: tariff, 
+			tariffQuery: `${tariff.hs_code} — ${tariff.description}`,
+			tariffResults: [],
+			showTariffDropdown: false,
+			hsCode: tariff.hs_code,
+			customsTariffId: tariff.id
+		} : c));
 	};
 
-	const clearCustomsTariff = () => {
-		setSelectedTariff(null);
-		setTariffQuery("");
-		setTariffResults([]);
-		setShowTariffDropdown(false);
-		updateField("hsCode", "");
+	const clearCustomsTariff = (containerIndex: number) => {
+		setContainers(current => current.map((c, i) => i === containerIndex ? { 
+			...c, 
+			selectedTariff: null, 
+			tariffQuery: "",
+			tariffResults: [],
+			showTariffDropdown: false,
+			hsCode: "",
+			customsTariffId: null
+		} : c));
 	};
 
 	const updateField = (name: string, value: string) => {
@@ -943,11 +976,10 @@ export default function NewPortalShipmentPage() {
 			cargo_description: form.cargoDescription.trim(),
 			cargo_category: form.cargoCategory,
 			package_type: form.packageType,
-			package_count: form.packageCount,
+			package_count: form.packageCount, 
 			gross_weight: form.grossWeight,
 			volume: form.volume,
 			hs_code: form.hsCode.trim(),
-			customs_tariff_id: selectedTariff?.id ?? "",
 			dangerous_goods: form.dangerousGoods,
 			temperature_controlled: form.temperatureControlled,
 			temperature: form.temperature.trim(),
@@ -969,6 +1001,10 @@ export default function NewPortalShipmentPage() {
 					sealNo: container.sealNo.trim(),
 					packageCount: container.packageCount,
 					grossWeight: container.grossWeight,
+					cargoDescription: container.cargoDescription.trim(),
+					packageType: container.packageType,
+					hsCode: container.hsCode.trim(),
+					customsTariffId: container.customsTariffId,
 				}))
 			)
 		);
@@ -1644,125 +1680,6 @@ export default function NewPortalShipmentPage() {
 								</div>
 
 								<div className="rounded-2xl bg-paper ring-1 ring-line">
-									<div className="border-b border-line p-5 sm:p-6">
-										<div className="flex items-center gap-2">
-											<ShieldCheck className="size-4 text-orange" />
-											<h2 className="font-display text-sm font-bold text-ink">
-												Customs Tariff / HS Classification
-											</h2>
-										</div>
-										<p className="mt-1 text-xs leading-5 text-ink-soft">
-											Search and link the official HS commodity classification for this shipment.
-										</p>
-									</div>
-
-									<div className="p-5 sm:p-6">
-										<div className="relative">
-											<div className="relative">
-												<Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
-												<Input
-													value={tariffQuery || form.hsCode}
-													onChange={(event) => {
-														setSelectedTariff(null);
-														updateField("hsCode", event.target.value);
-														void searchCustomsTariffs(event.target.value);
-													}}
-													onFocus={() => {
-														if (tariffQuery.length >= 2) {
-															setShowTariffDropdown(true);
-														}
-													}}
-													placeholder="Search HS code or commodity description (e.g. 0403201000)"
-													className="h-12 w-full rounded-xl border-line bg-sand pl-10 pr-10 font-mono text-sm text-ink transition focus:ring-2 focus:ring-orange/30"
-												/>
-												{searchingTariffs && (
-													<Loader2 className="absolute right-3.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-ink-soft" />
-												)}
-											</div>
-											
-											{tariffSearchError && (
-												<p role="alert" className="mt-2 text-xs text-carmine">{tariffSearchError}</p>
-											)}
-
-											{showTariffDropdown && tariffResults.length > 0 && (
-												<div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-80 overflow-y-auto rounded-xl bg-paper p-1.5 shadow-2xl ring-1 ring-line">
-													{tariffResults.map((tariff) => (
-														<button
-															key={tariff.id}
-															type="button"
-															onClick={() => chooseCustomsTariff(tariff)}
-															className="flex w-full flex-col rounded-lg px-3 py-3 text-left transition-colors hover:bg-sand focus:bg-sand focus:outline-none"
-														>
-															<div className="flex w-full items-start justify-between gap-4">
-																<div className="min-w-0 flex-1">
-																	<span className="block font-mono text-[13px] font-semibold text-ink">{tariff.hs_code}</span>
-																	<span className="mt-1 block text-[13px] leading-5 text-ink-soft">{tariff.description}</span>
-																</div>
-																<span className="shrink-0 rounded-md bg-sand-2 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-ink-soft ring-1 ring-line">
-																	{tariff.category || "General"}
-																</span>
-															</div>
-															<div className="mt-2 flex gap-4 font-mono text-[10px] text-ink-soft">
-																<span>Rate: {tariff.rate ?? "—"}{tariff.rate_type === "PERCENTAGE" ? "%" : ""}</span>
-																{tariff.import_duty && <span>Duty: {tariff.import_duty}%</span>}
-																{tariff.vat && <span>VAT: {tariff.vat}%</span>}
-															</div>
-														</button>
-													))}
-												</div>
-											)}
-
-											{selectedTariff && (
-												<div className="mt-3 flex flex-col gap-3 rounded-xl border border-teal/25 bg-teal/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-													<div className="min-w-0 flex-1">
-														<div className="flex items-center gap-2">
-															<CheckCircle2 className="size-4 text-teal-deep" />
-															<p className="text-[13px] font-semibold text-teal-deep">
-																{selectedTariff.hs_code}
-															</p>
-														</div>
-														<p className="mt-1 truncate text-[13px] text-ink">
-															{selectedTariff.description}
-														</p>
-													</div>
-													
-													<div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-														<div>
-															<p className="font-mono text-[9px] uppercase tracking-wider text-teal-deep/70">Import duty</p>
-															<p className="font-mono text-[13px] font-semibold text-teal-deep">{formatTariffRate(selectedTariff.import_duty)}</p>
-														</div>
-														<div>
-															<p className="font-mono text-[9px] uppercase tracking-wider text-teal-deep/70">VAT</p>
-															<p className="font-mono text-[13px] font-semibold text-teal-deep">{formatTariffRate(selectedTariff.vat)}</p>
-														</div>
-														{selectedTariff.levy && (
-															<div>
-																<p className="font-mono text-[9px] uppercase tracking-wider text-teal-deep/70">Levy</p>
-																<p className="font-mono text-[13px] font-semibold text-teal-deep">{selectedTariff.levy}%</p>
-															</div>
-														)}
-														
-														<Button
-															type="button"
-															variant="ghost"
-															size="sm"
-															onClick={clearCustomsTariff}
-															className="ml-2 h-8 px-2 text-xs text-teal-deep hover:bg-teal/10 hover:text-teal-deep"
-														>
-															Clear
-														</Button>
-													</div>
-												</div>
-											)}
-											
-											<p className="mt-3 text-[11px] leading-5 text-ink-soft">
-												Select a result to link the tariff record to this shipment. Classification should be verified before customs assessment.
-											</p>
-										</div>
-									</div>
-								</div>
-
-								<div className="rounded-2xl bg-paper ring-1 ring-line">
 									<ConsigneeDetails
 										value={consignee}
 										onChange={setConsignee}
@@ -1952,6 +1869,126 @@ export default function NewPortalShipmentPage() {
 																className="mt-1.5 h-11 border-line bg-paper font-mono text-ink"
 															/>
 														</label>
+														
+														<label className={cn(labelClass, "sm:col-span-2")}>
+															Cargo Description (Items in this container)
+															<Input
+																value={container.cargoDescription}
+																onChange={(event) => updateContainer(index, "cargoDescription", event.target.value)}
+																placeholder="e.g. Electronics, textiles..."
+																className="mt-1.5 h-11 border-line bg-paper text-ink"
+															/>
+														</label>
+													</div>
+													
+													<div className="mt-4 border-t border-line pt-4">
+														<div className="flex items-center gap-2 mb-3">
+															<ShieldCheck className="size-4 text-orange" />
+															<h3 className="font-display text-sm font-bold text-ink">
+																Customs Tariff / HS Classification
+															</h3>
+														</div>
+														
+														<div className="relative">
+															<div className="relative">
+																<Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
+																<Input
+																	value={container.tariffQuery || container.hsCode}
+																	onChange={(event) => {
+																		void searchCustomsTariffs(index, event.target.value);
+																	}}
+																	onFocus={() => {
+																		if (container.tariffQuery.length >= 2) {
+																			setContainers(current => current.map((c, i) => i === index ? { ...c, showTariffDropdown: true } : c));
+																		}
+																	}}
+																	placeholder="Search HS code or commodity description (e.g. 0403201000)"
+																	className="h-12 w-full rounded-xl border-line bg-paper pl-10 pr-10 font-mono text-sm text-ink transition focus:ring-2 focus:ring-orange/30"
+																/>
+																{container.searchingTariffs && (
+																	<Loader2 className="absolute right-3.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-ink-soft" />
+																)}
+															</div>
+															
+															{container.tariffSearchError && (
+																<p role="alert" className="mt-2 text-xs text-carmine">{container.tariffSearchError}</p>
+															)}
+
+															{container.showTariffDropdown && container.tariffResults.length > 0 && (
+																<div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-80 overflow-y-auto rounded-xl bg-paper p-1.5 shadow-2xl ring-1 ring-line">
+																	{container.tariffResults.map((tariff) => (
+																		<button
+																			key={tariff.id}
+																			type="button"
+																			onClick={() => chooseCustomsTariff(index, tariff)}
+																			className="flex w-full flex-col rounded-lg px-3 py-3 text-left transition-colors hover:bg-sand focus:bg-sand focus:outline-none"
+																		>
+																			<div className="flex w-full items-start justify-between gap-4">
+																				<div className="min-w-0 flex-1">
+																					<span className="block font-mono text-[13px] font-semibold text-ink">{tariff.hs_code}</span>
+																					<span className="mt-1 block text-[13px] leading-5 text-ink-soft">{tariff.description}</span>
+																				</div>
+																				<span className="shrink-0 rounded-md bg-sand-2 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-ink-soft ring-1 ring-line">
+																					{tariff.category || "General"}
+																				</span>
+																			</div>
+																			<div className="mt-2 flex gap-4 font-mono text-[10px] text-ink-soft">
+																				<span>Rate: {tariff.rate ?? "—"}{tariff.rate_type === "PERCENTAGE" ? "%" : ""}</span>
+																				{tariff.import_duty && <span>Duty: {tariff.import_duty}%</span>}
+																				{tariff.vat && <span>VAT: {tariff.vat}%</span>}
+																			</div>
+																		</button>
+																	))}
+																</div>
+															)}
+
+															{container.selectedTariff && (
+																<div className="mt-3 flex flex-col gap-3 rounded-xl border border-teal/25 bg-teal/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+																	<div className="min-w-0 flex-1">
+																		<div className="flex items-center gap-2">
+																			<CheckCircle2 className="size-4 text-teal-deep" />
+																			<p className="text-[13px] font-semibold text-teal-deep">
+																				{container.selectedTariff.hs_code}
+																			</p>
+																		</div>
+																		<p className="mt-1 truncate text-[13px] text-ink">
+																			{container.selectedTariff.description}
+																		</p>
+																	</div>
+																	
+																	<div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+																		<div>
+																			<p className="font-mono text-[9px] uppercase tracking-wider text-teal-deep/70">Import duty</p>
+																			<p className="font-mono text-[13px] font-semibold text-teal-deep">{formatTariffRate(container.selectedTariff.import_duty)}</p>
+																		</div>
+																		<div>
+																			<p className="font-mono text-[9px] uppercase tracking-wider text-teal-deep/70">VAT</p>
+																			<p className="font-mono text-[13px] font-semibold text-teal-deep">{formatTariffRate(container.selectedTariff.vat)}</p>
+																		</div>
+																		{container.selectedTariff.levy && (
+																			<div>
+																				<p className="font-mono text-[9px] uppercase tracking-wider text-teal-deep/70">Levy</p>
+																				<p className="font-mono text-[13px] font-semibold text-teal-deep">{container.selectedTariff.levy}%</p>
+																			</div>
+																		)}
+																		
+																		<Button
+																			type="button"
+																			variant="ghost"
+																			size="sm"
+																			onClick={() => clearCustomsTariff(index)}
+																			className="ml-2 h-8 px-2 text-xs text-teal-deep hover:bg-teal/10 hover:text-teal-deep"
+																		>
+																			Clear
+																		</Button>
+																	</div>
+																</div>
+															)}
+															
+															<p className="mt-3 text-[11px] leading-5 text-ink-soft">
+																Select a result to link the tariff record to this container. Classification should be verified before customs assessment.
+															</p>
+														</div>
 													</div>
 												</div>
 											))
@@ -2312,6 +2349,16 @@ export default function NewPortalShipmentPage() {
 															{container.grossWeight && (
 																<span className="font-mono text-[11px] text-ink-soft">
 																	· {container.grossWeight} kg
+																</span>
+															)}
+															{container.cargoDescription && (
+																<span className="font-mono text-[11px] text-ink-soft">
+																	· {container.cargoDescription}
+																</span>
+															)}
+															{container.hsCode && (
+																<span className="font-mono text-[11px] text-ink-soft">
+																	· HS: {container.hsCode}
 																</span>
 															)}
 														</li>

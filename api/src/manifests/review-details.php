@@ -69,6 +69,8 @@ try {
         exit;
     }
 
+    unset($shipment["hs_code"]);
+
     $consigneeType = $shipment["consignee_type"] ?? "organisation";
 
     $consigneeDetails = [
@@ -128,23 +130,36 @@ try {
 
     $containerStmt = $conn->prepare("
         SELECT
-            id,
-            shipment_id,
-            container_no,
-            size,
-            seal_no,
-            package_count,
-            gross_weight,
-            status,
-            gate_in_at,
-            received_at,
-            stored_at,
-            gate_out_at,
-            created_at,
-            updated_at
-        FROM portal_shipment_containers
-        WHERE shipment_id = :shipment_id
-        ORDER BY container_no ASC
+            c.id,
+            c.shipment_id,
+            c.container_no,
+            c.size,
+            c.seal_no,
+            c.package_count,
+            c.gross_weight,
+            c.cargo_description,
+            c.package_type,
+            c.hs_code,
+            c.customs_tariff_id,
+            ct.hs_code AS tariff_hs_code,
+            ct.description AS customs_tariff_description,
+            c.item_quantity,
+            c.unit_of_measure,
+            c.unit_value,
+            c.currency,
+            c.total_value,
+            c.status,
+            c.gate_in_at,
+            c.received_at,
+            c.stored_at,
+            c.gate_out_at,
+            c.created_at,
+            c.updated_at
+        FROM portal_shipment_containers c
+        LEFT JOIN customs_tariffs ct
+            ON ct.id = c.customs_tariff_id
+        WHERE c.shipment_id = :shipment_id
+        ORDER BY c.container_no ASC, c.created_at ASC
     ");
 
     $containerStmt->execute([":shipment_id" => $id]);
@@ -172,6 +187,7 @@ try {
         $document["url"] = $document["file_path"];
         $document["file_url"] = $document["file_path"];
     }
+
     unset($document);
 
     $shipment["consignee_details"] = $consigneeDetails;
@@ -180,6 +196,8 @@ try {
     $shipment["agent_id"] = $shipment["licensed_agent_id"] ?? null;
     $shipment["agent_name"] =
         $agent["name"] ?? $shipment["licensed_agent_name"] ?? null;
+    $shipment["agent_licence_number"] =
+        $agent["licence_number"] ?? null;
     $shipment["containers"] = $containers;
     $shipment["documents"] = $documents;
     $shipment["container_count"] = count($containers);
@@ -191,14 +209,14 @@ try {
         "code" => [
             "shipment" => $shipment
         ]
-    ], JSON_INVALID_UTF8_SUBSTITUTE);
+    ], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-} catch (PDOException $e) {
+} catch (Throwable $e) {
     http_response_code(500);
 
     echo json_encode([
         "error" => true,
         "data" => "Could not load shipment details.",
-        "code" => null
-    ]);
+        "code" => $e->getMessage()
+    ], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }

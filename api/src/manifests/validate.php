@@ -57,7 +57,7 @@
                 ':confirmed_by' => (string) $my_details->id
             ]);
         }
-        $up = $conn->prepare("UPDATE operation_manifests SET status='Validated', validated_by=:actor, validated_at=NOW(), matched_shipment_id=:shipment WHERE id=:id");
+        $up = $conn->prepare("UPDATE operation_manifests SET `status`='Validated', validated_by=:actor, validated_at=NOW(), matched_shipment_id=:shipment WHERE id=:id");
         $up->execute([':actor'=>(string)$my_details->id,':shipment'=>$shipmentId,':id'=>$id]);
         $details = $shipmentId ? 'Validated and linked to shipment '.$candidates[0]['shipment_reference'].' by exact bill of lading.' : (count($candidates)>1 ? 'Validated; multiple shipment declarations share this bill of lading. Operator confirmation is required.' : 'Validated; no shipment declaration matched. Operator can link a shipment later.');
         $event = $conn->prepare('INSERT INTO operation_manifest_events (id,manifest_id,actor_id,action,from_status,to_status,details) VALUES (:event_id,:id,:actor,\'VALIDATED\',\'Pre-advice\',\'Validated\',:details)');

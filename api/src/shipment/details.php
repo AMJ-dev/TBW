@@ -1,9 +1,15 @@
+
 <?php
 
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
-if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-    echo json_encode(["error" => true, "data" => "Method not allowed", "code" => null]);
+if (($_SERVER["REQUEST_METHOD"] ?? "") !== "GET") {
+    header("Allow: GET");
+    echo json_encode([
+        "error" => true,
+        "data" => "Method not allowed.",
+        "code" => null
+    ]);
     exit;
 }
 
@@ -13,17 +19,29 @@ try {
     $shipmentId = trim((string) ($_GET["id"] ?? ""));
 
     if ($userId === "") {
-        echo json_encode(["error" => true, "data" => "Authentication required.", "code" => null]);
+        echo json_encode([
+            "error" => true,
+            "data" => "Authentication required.",
+            "code" => null
+        ]);
         exit;
     }
 
     if ($organizationId === "") {
-        echo json_encode(["error" => true, "data" => "Organisation access is required.", "code" => null]);
+        echo json_encode([
+            "error" => true,
+            "data" => "Organisation access is required.",
+            "code" => null
+        ]);
         exit;
     }
 
     if ($shipmentId === "") {
-        echo json_encode(["error" => true, "data" => "Shipment id is required.", "code" => null]);
+        echo json_encode([
+            "error" => true,
+            "data" => "Shipment id is required.",
+            "code" => null
+        ]);
         exit;
     }
 
@@ -33,6 +51,7 @@ try {
             s.user_id,
             s.shipment_reference,
             s.organisation_id,
+            o.organisation_name,
             s.shipment_type,
             s.bill_of_lading,
             s.booking_number,
@@ -52,15 +71,20 @@ try {
             s.consignee_phone,
             s.consignee_address,
             s.consignee_country,
+            consignee_org.organisation_name AS consignee_organisation_name,
             s.licensed_agent_id,
             s.licensed_agent_name,
+            agent_org.organisation_name AS registered_agent_name,
+            agent_org.rc_number AS agent_licence_number,
+            agent_org.contact_email AS agent_contact_email,
+            agent_org.contact_phone AS agent_contact_phone,
+            agent_org.verification_status AS agent_verification_status,
             s.cargo_description,
             s.cargo_category,
             s.package_type,
             s.package_count,
             s.gross_weight,
             s.volume,
-            s.hs_code,
             s.dangerous_goods,
             s.temperature_controlled,
             s.temperature,
@@ -70,18 +94,30 @@ try {
             s.created_at,
             s.updated_at
         FROM portal_shipments s
+        LEFT JOIN organisations o
+            ON o.id = s.organisation_id
+        LEFT JOIN organisations consignee_org
+            ON consignee_org.id = s.consignee_organisation_id
+        LEFT JOIN organisations agent_org
+            ON agent_org.id = s.licensed_agent_id
         WHERE s.id = :id
           AND s.organisation_id = :organisation_id
         LIMIT 1
     ");
+
     $q->execute([
         ":id" => $shipmentId,
         ":organisation_id" => $organizationId
     ]);
+
     $shipment = $q->fetch(PDO::FETCH_ASSOC);
 
     if (!$shipment) {
-        echo json_encode(["error" => true, "data" => "Shipment not found.", "code" => null]);
+        echo json_encode([
+            "error" => true,
+            "data" => "Shipment not found.",
+            "code" => null
+        ]);
         exit;
     }
 
@@ -96,7 +132,8 @@ try {
             om.flagged_at,
             om.notes,
             om.received_at,
-            om.updated_at
+            om.updated_at,
+            om.matched_shipment_id
         FROM operation_manifests om
         WHERE om.matched_shipment_id = :matched_shipment_id
            OR EXISTS (
@@ -108,16 +145,19 @@ try {
         ORDER BY
             CASE
                 WHEN om.status = 'Discrepancy' THEN 0
-                WHEN om.review_reason IS NOT NULL AND om.review_reason <> '' THEN 1
+                WHEN om.review_reason IS NOT NULL
+                     AND om.review_reason <> '' THEN 1
                 ELSE 2
             END,
             COALESCE(om.flagged_at, om.updated_at, om.received_at) DESC
         LIMIT 1
     ");
+
     $q->execute([
         ":matched_shipment_id" => $shipmentId,
         ":linked_shipment_id" => $shipmentId
     ]);
+
     $manifest = $q->fetch(PDO::FETCH_ASSOC);
 
     $shipment["manifest"] = $manifest ? [
@@ -130,30 +170,47 @@ try {
         "flagged_at" => $manifest["flagged_at"],
         "notes" => $manifest["notes"],
         "received_at" => $manifest["received_at"],
-        "updated_at" => $manifest["updated_at"]
+        "updated_at" => $manifest["updated_at"],
+        "matched_shipment_id" => $manifest["matched_shipment_id"]
     ] : null;
 
     $q = $conn->prepare("
         SELECT
-            id,
-            shipment_id,
-            container_no,
-            size,
-            seal_no,
-            package_count,
-            gross_weight,
-            status,
-            gate_in_at,
-            received_at,
-            stored_at,
-            gate_out_at,
-            created_at,
-            updated_at
-        FROM portal_shipment_containers
-        WHERE shipment_id = :shipment_id
-        ORDER BY created_at ASC, id ASC
+            c.id,
+            c.shipment_id,
+            c.container_no,
+            c.size,
+            c.seal_no,
+            c.package_count,
+            c.gross_weight,
+            c.cargo_description,
+            c.package_type,
+            c.hs_code,
+            c.customs_tariff_id,
+            c.item_quantity,
+            c.unit_of_measure,
+            c.unit_value,
+            c.currency,
+            c.total_value,
+            ct.description AS customs_tariff_description,
+            c.status,
+            c.gate_in_at,
+            c.received_at,
+            c.stored_at,
+            c.gate_out_at,
+            c.created_at,
+            c.updated_at
+        FROM portal_shipment_containers c
+        LEFT JOIN customs_tariffs ct
+            ON ct.id = c.customs_tariff_id
+        WHERE c.shipment_id = :shipment_id
+        ORDER BY c.created_at ASC, c.id ASC
     ");
-    $q->execute([":shipment_id" => $shipmentId]);
+
+    $q->execute([
+        ":shipment_id" => $shipmentId
+    ]);
+
     $containers = $q->fetchAll(PDO::FETCH_ASSOC);
 
     $q = $conn->prepare("
@@ -172,7 +229,11 @@ try {
         WHERE shipment_id = :shipment_id
         ORDER BY uploaded_at ASC, id ASC
     ");
-    $q->execute([":shipment_id" => $shipmentId]);
+
+    $q->execute([
+        ":shipment_id" => $shipmentId
+    ]);
+
     $documents = $q->fetchAll(PDO::FETCH_ASSOC);
 
     $q = $conn->prepare("
@@ -190,19 +251,27 @@ try {
             sdr.reason,
             sdr.created_at
         FROM shipment_declaration_reviews sdr
-        LEFT JOIN users reviewer ON reviewer.id = sdr.reviewer_id
+        LEFT JOIN users reviewer
+            ON reviewer.id = sdr.reviewer_id
         WHERE sdr.shipment_id = :shipment_id
         ORDER BY sdr.created_at DESC, sdr.id DESC
     ");
-    $q->execute([":shipment_id" => $shipmentId]);
+
+    $q->execute([
+        ":shipment_id" => $shipmentId
+    ]);
+
     $reviewRows = $q->fetchAll(PDO::FETCH_ASSOC);
 
     $reviews = [];
+
     foreach ($reviewRows as $review) {
         $reviews[] = [
             "id" => (string) $review["id"],
             "shipment_id" => (string) $review["shipment_id"],
-            "reviewer_id" => $review["reviewer_id"] !== null ? (string) $review["reviewer_id"] : null,
+            "reviewer_id" => $review["reviewer_id"] !== null
+                ? (string) $review["reviewer_id"]
+                : null,
             "reviewer" => $review["reviewer_id"] !== null ? [
                 "id" => (string) $review["reviewer_id"],
                 "full_name" => $review["reviewer_name"],
@@ -219,7 +288,9 @@ try {
     }
 
     $latestReview = $reviews[0] ?? null;
+
     $shipment["container_count"] = count($containers);
+    $shipment["containers_count"] = count($containers);
     $shipment["document_count"] = count($documents);
     $shipment["containers"] = $containers;
     $shipment["documents"] = $documents;
@@ -230,6 +301,7 @@ try {
     $shipment["consignee_details"] = [
         "type" => $shipment["consignee_type"] ?? "organisation",
         "organisation_id" => $shipment["consignee_organisation_id"] ?? null,
+        "organisation_name" => $shipment["consignee_organisation_name"] ?? $shipment["consignee"] ?? "",
         "status" => $shipment["consignee_status"] ?? "unregistered",
         "name" => $shipment["consignee"] ?? "",
         "contact_person" => $shipment["consignee_contact_person"] ?? "",
@@ -241,18 +313,29 @@ try {
 
     $shipment["licensed_agent"] = [
         "id" => $shipment["licensed_agent_id"] ?? null,
-        "name" => $shipment["licensed_agent_name"] ?? ""
+        "name" => $shipment["registered_agent_name"] ?? $shipment["licensed_agent_name"] ?? "",
+        "licence_number" => $shipment["agent_licence_number"] ?? "",
+        "contact_email" => $shipment["agent_contact_email"] ?? "",
+        "contact_phone" => $shipment["agent_contact_phone"] ?? "",
+        "verification_status" => $shipment["agent_verification_status"] ?? null
     ];
+
+    $shipment["agent_id"] = $shipment["licensed_agent_id"] ?? null;
+    $shipment["agent_name"] = $shipment["registered_agent_name"] ?? $shipment["licensed_agent_name"] ?? "";
+    $shipment["agent_licence_number"] = $shipment["agent_licence_number"] ?? "";
 
     echo json_encode([
         "error" => false,
         "data" => "Shipment loaded.",
-        "code" => ["shipment" => $shipment]
+        "code" => [
+            "shipment" => $shipment
+        ]
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
 } catch (Throwable $e) {
     echo json_encode([
         "error" => true,
         "data" => "Could not load this shipment.",
-        "code" => null
+        "code" => $e->getMessage()
     ]);
 }

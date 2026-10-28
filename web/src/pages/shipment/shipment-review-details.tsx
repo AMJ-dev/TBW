@@ -40,14 +40,34 @@ import { AppShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { http, type Resp } from "@/lib/httpClient";
+import { resolveSrc } from "@/lib/functions";
 
 type ShipmentContainer = {
   id: string;
+  shipment_id: string;
   container_no: string;
   size: string | null;
   seal_no: string | null;
   package_count: number | null;
   gross_weight: number | null;
+  status: string | null;
+  gate_in_at: string | null;
+  received_at: string | null;
+  stored_at: string | null;
+  gate_out_at: string | null;
+  cargo_description: string | null;
+  package_type: string | null;
+  hs_code: string | null;
+  customs_tariff_id: string | null;
+  tariff_hs_code: string | null;
+  customs_tariff_description: string | null;
+  item_quantity: number | null;
+  unit_of_measure: string | null;
+  unit_value: number | null;
+  currency: string | null;
+  total_value: number | null;
+  created_at: string;
+  updated_at: string;
 };
 
 type ShipmentDocument = {
@@ -372,6 +392,34 @@ const normaliseAction = (raw: any): PermittedAction => ({
   reason: raw?.reason ?? null,
 });
 
+const normaliseContainer = (raw: any): ShipmentContainer => ({
+  id: String(raw?.id ?? ""),
+  shipment_id: String(raw?.shipment_id ?? ""),
+  container_no: String(raw?.container_no ?? ""),
+  size: raw?.size ?? null,
+  seal_no: raw?.seal_no ?? null,
+  package_count: raw?.package_count == null ? null : Number(raw.package_count),
+  gross_weight: raw?.gross_weight == null ? null : Number(raw.gross_weight),
+  status: raw?.status ?? null,
+  gate_in_at: raw?.gate_in_at ?? null,
+  received_at: raw?.received_at ?? null,
+  stored_at: raw?.stored_at ?? null,
+  gate_out_at: raw?.gate_out_at ?? null,
+  cargo_description: raw?.cargo_description ?? null,
+  package_type: raw?.package_type ?? null,
+  hs_code: raw?.hs_code ?? null,
+  customs_tariff_id: raw?.customs_tariff_id ?? null,
+  tariff_hs_code: raw?.tariff_hs_code ?? null,
+  customs_tariff_description: raw?.customs_tariff_description ?? null,
+  item_quantity: raw?.item_quantity == null ? null : Number(raw.item_quantity),
+  unit_of_measure: raw?.unit_of_measure ?? null,
+  unit_value: raw?.unit_value == null ? null : Number(raw.unit_value),
+  currency: raw?.currency ?? null,
+  total_value: raw?.total_value == null ? null : Number(raw.total_value),
+  created_at: String(raw?.created_at ?? ""),
+  updated_at: String(raw?.updated_at ?? ""),
+});
+
 const normaliseShipment = (raw: any): Shipment => ({
   id: String(raw?.id ?? ""),
   shipment_reference: raw?.shipment_reference ?? null,
@@ -407,16 +455,7 @@ const normaliseShipment = (raw: any): Shipment => ({
   created_at: String(raw?.created_at ?? ""),
   updated_at: String(raw?.updated_at ?? ""),
   containers: Array.isArray(raw?.containers)
-    ? raw.containers.map((c: any) => ({
-        id: String(c?.id ?? ""),
-        container_no: String(c?.container_no ?? ""),
-        size: c?.size ?? null,
-        seal_no: c?.seal_no ?? null,
-        package_count:
-          c?.package_count == null ? null : Number(c.package_count),
-        gross_weight:
-          c?.gross_weight == null ? null : Number(c.gross_weight),
-      }))
+    ? raw.containers.map(normaliseContainer)
     : [],
   documents: Array.isArray(raw?.documents)
     ? raw.documents.map((d: any) => ({
@@ -960,7 +999,7 @@ function ReviewerAvatar({ reviewer }: { reviewer: Reviewer | null }) {
   if (hasPhoto) {
     return (
       <img
-        src={reviewer.pics ?? ""}
+        src={resolveSrc(reviewer.pics ?? "")}
         alt={reviewer.full_name}
         className="size-8 shrink-0 rounded-full object-cover ring-1 ring-line"
       />
@@ -1319,50 +1358,101 @@ export default function OperationsShipmentReviewPage() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-hidden rounded-xl border border-line">
-                  <table className="w-full min-w-[600px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-line bg-sand/50 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-                        <th className="px-4 py-3 font-medium">
-                          Container number
-                        </th>
-                        <th className="px-4 py-3 font-medium">Size</th>
-                        <th className="px-4 py-3 font-medium">Seal number</th>
-                        <th className="px-4 py-3 font-medium text-right">
-                          Packages
-                        </th>
-                        <th className="px-4 py-3 font-medium text-right">
-                          Gross weight (KG)
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-line">
-                      {shipment.containers.map((item) => (
-                        <tr
-                          key={item.id}
-                          className="transition-colors hover:bg-sand/40"
-                        >
-                          <td className="px-4 py-3.5 font-mono text-xs font-semibold text-ink">
-                            {item.container_no || "—"}
-                          </td>
-                          <td className="px-4 py-3.5 text-xs text-ink-soft">
-                            {item.size || "—"}
-                          </td>
-                          <td className="px-4 py-3.5 font-mono text-xs text-ink-soft">
-                            {item.seal_no || "—"}
-                          </td>
-                          <td className="px-4 py-3.5 text-right text-xs text-ink-soft">
-                            {item.package_count ?? "—"}
-                          </td>
-                          <td className="px-4 py-3.5 text-right font-mono text-xs text-ink-soft">
-                            {item.gross_weight == null
-                              ? "—"
-                              : `${item.gross_weight} kg`}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="grid gap-4">
+                  {shipment.containers.map((container, index) => (
+                    <div
+                      key={container.id}
+                      className="overflow-hidden rounded-xl border border-line bg-paper shadow-sm"
+                    >
+                      {/* Container Header */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-sand/50 px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <span className="grid size-8 place-items-center rounded-lg bg-orange/10 text-orange-deep ring-1 ring-orange/20">
+                            <Container className="size-4" />
+                          </span>
+                          <div>
+                            <p className="font-mono text-[14px] font-bold text-ink">
+                              {container.container_no || "—"}
+                            </p>
+                            <p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">
+                              Container {index + 1}
+                            </p>
+                          </div>
+                        </div>
+                        {container.status && (
+                          <StatusPill status={container.status} />
+                        )}
+                      </div>
+
+                      {/* Container Details */}
+                      <div className="grid gap-6 p-5 sm:grid-cols-2">
+                        <div className="space-y-4">
+                          <Field
+                            label="Cargo Description"
+                            value={container.cargo_description || container.customs_tariff_description}
+                          />
+                          <div className="rounded-xl border border-teal/20 bg-teal/5 p-3.5">
+                            <div className="flex items-start gap-2.5">
+                              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-teal-deep" />
+                              <div>
+                                <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-teal-deep">
+                                  Customs / HS Classification
+                                </p>
+                                <p className="mt-1 font-mono text-[13px] font-bold text-ink">
+                                  {container.hs_code || container.tariff_hs_code || "—"}
+                                </p>
+                                {container.customs_tariff_id && (
+                                  <p className="mt-1 font-mono text-[9px] text-ink-soft">
+                                    Tariff ID: {container.customs_tariff_id}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                          <Field label="Size" value={container.size} />
+                          <Field label="Seal Number" value={container.seal_no} mono />
+                          <Field label="Packages" value={container.package_count} mono />
+                          <Field
+                            label="Gross Weight"
+                            value={container.gross_weight == null ? null : `${container.gross_weight} kg`}
+                            mono
+                          />
+                          <Field label="Unit Value" value={formatMoney(container.unit_value, container.currency || "NGN")} mono />
+                          <Field label="Total Value" value={formatMoney(container.total_value, container.currency || "NGN")} mono />
+                        </div>
+                      </div>
+
+                      {/* Container Timeline */}
+                      {(container.gate_in_at || container.received_at || container.stored_at || container.gate_out_at) && (
+                        <div className="border-t border-line bg-sand/20 px-5 py-3">
+                          <p className="mb-2.5 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">
+                            Container Movement
+                          </p>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+                            <div>
+                              <p className="font-mono text-[8px] uppercase text-ink-soft">Gate In</p>
+                              <p className="mt-0.5 text-[11px] text-ink">{formatDateTime(container.gate_in_at)}</p>
+                            </div>
+                            <div>
+                              <p className="font-mono text-[8px] uppercase text-ink-soft">Received</p>
+                              <p className="mt-0.5 text-[11px] text-ink">{formatDateTime(container.received_at)}</p>
+                            </div>
+                            <div>
+                              <p className="font-mono text-[8px] uppercase text-ink-soft">Stored</p>
+                              <p className="mt-0.5 text-[11px] text-ink">{formatDateTime(container.stored_at)}</p>
+                            </div>
+                            <div>
+                              <p className="font-mono text-[8px] uppercase text-ink-soft">Gate Out</p>
+                              <p className="mt-0.5 text-[11px] text-ink">{formatDateTime(container.gate_out_at)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </Block>
@@ -1411,7 +1501,7 @@ export default function OperationsShipmentReviewPage() {
                       </div>
                       {document.file_path && (
                         <a
-                          href={document.file_path}
+                          href={resolveSrc(document.file_path)}
                           target="_blank"
                           rel="noreferrer"
                           className="shrink-0 rounded-md px-2.5 py-1.5 text-xs font-semibold text-orange-deep transition-colors hover:bg-orange/10"

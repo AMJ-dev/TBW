@@ -11,6 +11,12 @@ import {
 	Mail,
 	Send,
 	X,
+	Hash,
+	Container as ContainerIcon,
+	ShieldCheck,
+	Clock3,
+	CalendarDays,
+	Package,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, StatusBadge, statusTone } from "@/components/auth-shell";
@@ -149,7 +155,7 @@ export default function OperationsManifestDetailsPage() {
 	const fetchManifest = async () => {
 		if (!id) return;
 		setLoading(true);
-		setError("");
+		setError(""); 
 		try {
 			const res = await http.get(`operations/manifests/details/${id}/`);
 			const resp: Resp = res.data;
@@ -609,57 +615,108 @@ export default function OperationsManifestDetailsPage() {
 													</div>
 												))}
 										</dl>
+										
 										<div>
-											<h5 className="mb-2 text-xs font-bold text-ink">
-												Containers and seal numbers
+											<h5 className="mb-3 text-sm font-bold text-ink">
+												Containers & Cargo Details
 											</h5>
 											{(linkedShipment.containers || []).length ? (
-												<div className="overflow-x-auto rounded-lg border border-line">
-													<table className="w-full text-left text-xs">
-														<thead className="bg-sand text-ink-soft">
-															<tr>
-																<th className="p-2.5">Container</th>
-																<th className="p-2.5">Size</th>
-																<th className="p-2.5">Seal no.</th>
-																<th className="p-2.5">Packages</th>
-																<th className="p-2.5">Gross weight</th>
-															</tr>
-														</thead>
-														<tbody>
-															{linkedShipment.containers.map(
-																(c: any, i: number) => (
-																	<tr
-																		key={c.id || c.container_no || i}
-																		className="border-t border-line"
-																	>
-																		<td className="p-2.5 font-mono">
+												<div className="space-y-4">
+													{linkedShipment.containers.map((c: any, i: number) => (
+														<div key={c.id || c.container_no || i} className="overflow-hidden rounded-xl border border-line bg-sand/30 shadow-sm">
+															{/* Container Header */}
+															<div className="flex items-center justify-between border-b border-line bg-sand px-4 py-3">
+																<div className="flex items-center gap-3">
+																	<div className="grid size-9 place-items-center rounded-lg bg-orange/10 text-orange-deep">
+																		<ContainerIcon className="size-4" />
+																	</div>
+																	<div>
+																		<p className="font-mono text-[13px] font-bold text-ink">
 																			{c.container_no || "—"}
-																		</td>
-																		<td className="p-2.5">
-																			{c.size || c.container_size || "—"}
-																		</td>
-																		<td className="p-2.5">
-																			{c.seal_no || "Not provided"}
-																		</td>
-																		<td className="p-2.5">
-																			{c.package_count ?? "—"}
-																		</td>
-																		<td className="p-2.5">
-																			{c.gross_weight ?? "—"}
-																		</td>
-																	</tr>
-																)
+																		</p>
+																		<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">
+																			Container {i + 1}
+																		</p>
+																	</div>
+																</div>
+																{c.status && (
+																	<StatusBadge label={formatStatus(c.status)} tone={statusTone(c.status)} />
+																)}
+															</div>
+															
+															{/* Container Body */}
+															<div className="grid gap-5 p-4 sm:grid-cols-2">
+																<div className="space-y-4">
+																	<div>
+																		<p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+																			Cargo Description
+																		</p>
+																		<p className="mt-1 text-[12px] leading-relaxed text-ink">
+																			{c.cargo_description || "—"}
+																		</p>
+																	</div>
+																	
+																	<div className="rounded-lg border border-teal/20 bg-teal/5 p-3">
+																		<div className="flex items-start gap-2">
+																			<ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-teal-deep" />
+																			<div>
+																				<p className="font-mono text-[9px] uppercase tracking-[0.12em] text-teal-deep">
+																					Customs / HS Classification
+																				</p>
+																				<p className="mt-1 font-mono text-sm font-bold text-ink">
+																					{c.hs_code || c.tariff_hs_code || "—"}
+																				</p>
+																				{c.customs_tariff_id && (
+																					<p className="mt-1 font-mono text-[9px] text-ink-soft">
+																						Tariff ID: {c.customs_tariff_id}
+																					</p>
+																				)}
+																			</div>
+																		</div>
+																	</div>
+																</div>
+																
+																<div className="grid grid-cols-2 gap-3">
+																	<div>
+																		<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Size</p>
+																		<p className="mt-1 text-[12px] font-medium text-ink">{c.size || c.container_size || "—"}</p>
+																	</div>
+																	<div>
+																		<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Seal No.</p>
+																		<p className="mt-1 font-mono text-[12px] text-ink">{c.seal_no || "Not provided"}</p>
+																	</div>
+																	<div>
+																		<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Packages</p>
+																		<p className="mt-1 font-mono text-[12px] text-ink">{c.package_count ?? "—"}</p>
+																	</div>
+																	<div>
+																		<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Gross Weight</p>
+																		<p className="mt-1 font-mono text-[12px] text-ink">{c.gross_weight ?? "—"}</p>
+																	</div>
+																</div>
+															</div>
+															
+															{/* Container Timeline */}
+															{(c.gate_in_at || c.received_at || c.stored_at || c.gate_out_at) && (
+																<div className="border-t border-line bg-paper px-4 py-3">
+																	<div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[10px] text-ink-soft">
+																		{c.gate_in_at && <span className="flex items-center gap-1"><Clock3 className="size-3" /> Gate In: {c.gate_in_at}</span>}
+																		{c.received_at && <span className="flex items-center gap-1"><CalendarDays className="size-3" /> Received: {c.received_at}</span>}
+																		{c.stored_at && <span className="flex items-center gap-1"><Package className="size-3" /> Stored: {c.stored_at}</span>}
+																		{c.gate_out_at && <span className="flex items-center gap-1"><Check className="size-3" /> Gate Out: {c.gate_out_at}</span>}
+																	</div>
+																</div>
 															)}
-														</tbody>
-													</table>
+														</div>
+													))}
 												</div>
 											) : (
 												<p className="rounded-lg bg-sand p-3 text-xs text-ink-soft">
-													No container rows were returned for this
-													declaration.
+													No container rows were returned for this declaration.
 												</p>
 											)}
 										</div>
+										
 										<div>
 											<h5 className="mb-2 text-xs font-bold text-ink">
 												Uploaded documents
@@ -816,7 +873,6 @@ export default function OperationsManifestDetailsPage() {
 							</div>
 						)}
 
-						{/* Removed linking section entirely */}
 						<section className="rounded-xl border border-line bg-sand p-4">
 							<div className="flex items-start gap-3">
 								<span className="grid size-9 shrink-0 place-items-center rounded-lg bg-ink/5 text-ink-soft">
