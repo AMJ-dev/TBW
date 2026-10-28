@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
+import { statusLabel } from "@/lib/functions";
 
 type ManifestStatus =
 	| "Pre-advice"
@@ -65,14 +66,9 @@ interface ManifestRecord {
 	matchedShipmentId?: string | null;
 }
 
-const labelClass =
-	"block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft";
+const labelClass = "block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft";
 
-const textareaClass =
-	"mt-1.5 w-full resize-y rounded-md border border-line bg-sand px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-soft/60 focus:ring-2 focus:ring-orange/30";
-
-const formatStatus = (status: string) =>
-	status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+const textareaClass = "mt-1.5 w-full resize-y rounded-md border border-line bg-sand px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-soft/60 focus:ring-2 focus:ring-orange/30";
 
 const displayText = (value: any): string => {
 	if (value === null || value === undefined || value === "") return "—";
@@ -90,13 +86,6 @@ const displayText = (value: any): string => {
 		);
 	}
 	return String(value);
-};
-
-const extractList = <T,>(payload: any): T[] => {
-	if (Array.isArray(payload)) return payload as T[];
-	if (Array.isArray(payload?.results)) return payload.results as T[];
-	if (Array.isArray(payload?.data)) return payload.data as T[];
-	return [];
 };
 
 const normalizeRecord = (m: any): ManifestRecord => ({
@@ -549,7 +538,7 @@ export default function OperationsManifestDetailsPage() {
 													linkedShipment.organisation_name ||
 														linkedShipment.organisation?.name,
 												],
-												["Shipment status", formatStatus(linkedShipment.status)],
+												["Shipment status", statusLabel(linkedShipment.status)],
 												[
 													"Bill of lading",
 													linkedShipment.bill_of_lading || linkedShipment.bl,
@@ -640,7 +629,7 @@ export default function OperationsManifestDetailsPage() {
 																	</div>
 																</div>
 																{c.status && (
-																	<StatusBadge label={formatStatus(c.status)} tone={statusTone(c.status)} />
+																	<StatusBadge label={statusLabel(c.status)} tone={statusTone(c.status)} />
 																)}
 															</div>
 															

@@ -14,12 +14,14 @@ import {
 	Search,
 	Ship,
 	SlidersHorizontal,
+	Pencil,
 } from "lucide-react";
 import { AppShell, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { http, type Resp } from "@/lib/httpClient";
+import { statusLabel } from "@/lib/functions";
 
 
 type UnknownRecord = Record<string, unknown>;
@@ -494,7 +496,7 @@ export default function PortalShipmentsPage() {
 									<option value="All">All statuses</option>
 									{statuses.map((status) => (
 										<option key={status} value={status}>
-											{status}
+											{statusLabel(status)}
 										</option>
 									))}
 								</select>
@@ -539,7 +541,7 @@ export default function PortalShipmentsPage() {
 												: "border-border bg-background text-muted-foreground hover:bg-muted"
 										)}
 									>
-										{status}
+										{statusLabel(status)}
 									</button>
 								))}
 							</div>
@@ -625,9 +627,9 @@ export default function PortalShipmentsPage() {
 											</th>
 											<th className="px-5 py-3.5 text-right font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-soft">
 												Manifest / next step
-							</th>
-							<th className="px-5 py-3.5 text-right font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-soft">
-								Action
+											</th>
+											<th className="px-5 py-3.5 text-right font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-soft">
+												Action
 											</th>
 										</tr>
 									</thead>
@@ -638,31 +640,18 @@ export default function PortalShipmentsPage() {
 											const containerCount = getContainerCount(item);
 											const documentCount = getDocumentCount(item);
 											const createdAt = getDate(item);
-											const cargoLine = String(
-												item.cargo_description ?? ""
-											).trim();
-											const cargoCategory = String(
-												item.cargo_category ?? ""
-											).trim();
-											const routeFrom = String(
-												item.origin_port ?? ""
-											).trim();
-											const routeTo = String(
-												item.destination_port ?? ""
-											).trim();
-											const originCountry = String(
-												item.origin_country ?? ""
-											).trim();
-											const vessel = String(
-												item.vessel_name ?? ""
-											).trim();
-											const consigneeName = String(
-												item.consignee ?? ""
-											).trim();
-											const consigneeEmail = String(
-												item.consignee_email ?? ""
-											).trim();
+											const cargoLine = String(item.cargo_description ?? "").trim();
+											const cargoCategory = String(item.cargo_category ?? "").trim();
+											const routeFrom = String(item.origin_port ?? "").trim();
+											const routeTo = String(item.destination_port ?? "").trim();
+											const originCountry = String(item.origin_country ?? "").trim();
+											const vessel = String(item.vessel_name ?? "").trim();
+											const consigneeName = String(item.consignee ?? "").trim();
+											const consigneeEmail = String(item.consignee_email ?? "").trim();
 
+											const manifestNeedsAction = item?.status === "CHANGES_REQUESTED" && item?.manifest_review_responsible_party == 'Organisation';
+											const isDraft = item?.status === 'draft';
+											
 											return (
 												<motion.tr
 													key={item.id}
@@ -774,13 +763,11 @@ export default function PortalShipmentsPage() {
 													<td className="px-5 py-4">
 														<span
 															className={cn(
-																"inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em]",
+																"inline-flex whitespace-nowrap rounded-full border px-2.5 py-1 font-mono text-[10px] tracking-[0.08em]",
 																statusTone(status)
 															)}
 														>
-															{status
-																? status.replace(/_/g, " ")
-																: "—"}
+															{statusLabel(status)}
 														</span>
 													</td>
 
@@ -790,22 +777,46 @@ export default function PortalShipmentsPage() {
 																{String(item.manifest_action_status ?? (item.manifest_linked ? "Manifest linked" : "No manifest linked"))}
 															</span>
 															{item.manifest_reference && <p className="font-mono text-[10px] text-muted-foreground">Manifest: {String(item.manifest_reference)}</p>}
-															{item.manifest_requires_action && item.manifest_review_reason && <p className="max-w-[260px] whitespace-normal text-xs text-rose-700">{String(item.manifest_review_reason)}</p>}
-															{item.manifest_requires_action && <Button variant="outline" size="sm" className="mt-1 h-7 text-xs" onClick={() => navigate(`/portal/shipment/edit/${item.id}`)}>Review shipment</Button>}
+															{manifestNeedsAction && item.manifest_review_reason && <p className="max-w-[260px] whitespace-normal text-xs text-rose-700">{String(item.manifest_review_reason)}</p>}
 														</div>
 													</td>
 													<td className="px-5 py-4 text-right">
-														<Button
-															variant="ghost"
-															size="sm"
-															onClick={() =>
-																navigate(`/portal/shipments/${item.id}`)
-															}
-															className="gap-1 text-muted-foreground hover:text-primary"
-														>
-															View
-															<ArrowUpRight className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-														</Button>
+														<div className="flex flex-col items-end gap-2">
+															{isDraft && (
+																<Button
+																	variant="outline"
+																	size="sm"
+																	onClick={() =>
+																		navigate(`/portal/shipment/edit/${item.id}`)
+																	}
+																	className="h-7 gap-1 text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+																>
+																	<Pencil className="size-3" />
+																	Edit
+																</Button>
+															)}
+															{manifestNeedsAction && (
+																<Button 
+																	variant="outline" 
+																	size="sm" 
+																	className="h-7 text-xs" 
+																	onClick={() => navigate(`/portal/shipment/edit/${item.id}`)}
+																>
+																	Resolve Issue
+																</Button>
+															)}
+															<Button
+																variant="ghost"
+																size="sm"
+																onClick={() =>
+																	navigate(`/portal/shipments/${item.id}`)
+																}
+																className="gap-1 text-muted-foreground hover:text-primary"
+															>
+																View
+																<ArrowUpRight className="size-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+															</Button>
+														</div>
 													</td>
 												</motion.tr>
 											);
@@ -884,7 +895,7 @@ export default function PortalShipmentsPage() {
 												)}
 												aria-current={isActive ? "page" : undefined}
 											>
-												{token}
+													{token}
 											</Button>
 										);
 									})}

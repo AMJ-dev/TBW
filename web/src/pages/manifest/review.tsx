@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
+import {statusLabel} from "@/lib/functions"
 
 type ShipmentContainer = {
 	id: string;
@@ -197,16 +198,9 @@ const pageAnimations = `
 
 type View = "list" | "detail";
 
-const labelClass =
-	"block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft";
+const labelClass = "block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft";
 
-const textareaClass =
-	"mt-1.5 w-full resize-y rounded-md border border-line bg-sand px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-soft/60 focus:ring-2 focus:ring-orange/30";
-
-const formatStatus = (status: string | null) => {
-	if (!status) return "Unknown";
-	return status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-};
+const textareaClass = "mt-1.5 w-full resize-y rounded-md border border-line bg-sand px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-soft/60 focus:ring-2 focus:ring-orange/30";
 
 const formatDate = (value: string | null) => {
 	if (!value) return "—";
@@ -809,7 +803,7 @@ export default function ManifestSupervisorReviewPage() {
 											</div>
 										</div>
 										<StatusBadge
-											label={formatStatus(selected.shipment_status)}
+											label={statusLabel(selected.shipment_status)}
 											tone={statusTone(selected.shipment_status || "")}
 										/>
 									</div>
@@ -938,7 +932,7 @@ export default function ManifestSupervisorReviewPage() {
 																	{container.container_no}
 																</p>
 															</div>
-															<StatusBadge label={formatStatus(container.status)} tone={statusTone(container.status)} />
+															<StatusBadge label={statusLabel(container.status)} tone={statusTone(container.status)} />
 														</div>
 														
 														{/* Container Stats */}

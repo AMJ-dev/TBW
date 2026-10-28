@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
 	ArrowLeft,
-	ArrowRight,
+	ArrowRight, 
 	Check,
 	CheckCircle2,
 	ClipboardList,

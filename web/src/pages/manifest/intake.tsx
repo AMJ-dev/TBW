@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
+import {statusLabel} from "@/lib/functions"
 
 type IntakeSource = "EDI" | "CSV" | "XLSX" | "Manual";
 type ConsigneeType = "organisation" | "individual";
@@ -86,9 +87,6 @@ const extractList = <T,>(payload: any): T[] => {
 	if (Array.isArray(payload?.data)) return payload.data as T[];
 	return [];
 };
-
-const formatStatus = (status: string) =>
-	status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 
 export default function OperationsManifestIntakePage() {
 	const navigate = useNavigate();
@@ -626,7 +624,7 @@ export default function OperationsManifestIntakePage() {
 													</p>
 													<p className="mt-1 text-xs text-ink-soft">
 														Status:{" "}
-														{formatStatus(
+														{statusLabel(
 															String(
 																matchedShipment.status ?? "Unknown"
 															)
@@ -680,7 +678,7 @@ export default function OperationsManifestIntakePage() {
 																shipment.id}
 														</span>
 														<span className="rounded bg-sand px-2 py-0.5 text-[10px] text-ink-soft">
-															{formatStatus(
+															{statusLabel(
 																String(shipment.status ?? "Unknown")
 															)}
 														</span>

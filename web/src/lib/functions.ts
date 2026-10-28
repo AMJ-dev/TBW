@@ -82,3 +82,11 @@ export function short_numbers(num: number): string {
 
     return num.toString();
 }
+export const statusLabel = (status?: string | null): string => {
+    if (!status) return "Unknown";
+    return status
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2") 
+        .replace(/[_-]+/g, " ")                
+        .toLowerCase()                         
+        .replace(/\b\w/g, (value) => value.toUpperCase()); 
+};

@@ -113,8 +113,6 @@ RewriteRule ^operator/shipment/([0-9a-zA-Z-]+)/$ src/shipment/op-details.php?id=
 RewriteRule ^operations/manifests/$ src/manifests/index.php [NC]
 RewriteRule ^operations/manifests/save/$ src/manifests/save.php [NC]
 RewriteRule ^operations/manifests/match/$ src/manifests/match.php [NC]
-RewriteRule ^operations/manifests/approve/$ src/manifests/approve.php [NC]
-RewriteRule ^operations/manifests/return/$ src/manifests/return.php [NC]
 RewriteRule ^operations/manifests/review/$ src/manifests/review.php [NC]
 RewriteRule ^operations/manifests/agents/$ src/manifests/agents.php [NC]
 RewriteRule ^operations/manifests/export/$ src/manifests/export.php [NC]

@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
+import { statusLabel } from "@/lib/functions"
 
 type ManifestStatus =
 	| "Pre-advice"
@@ -63,9 +64,6 @@ const statusFilters: (ManifestStatus | "all")[] = [
 	"Discrepancy",
 	"Duplicate",
 ];
-
-const formatStatus = (status: string) =>
-	status.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 
 const extractList = <T,>(payload: any): T[] => {
 	if (Array.isArray(payload)) return payload as T[];
@@ -379,13 +377,13 @@ export default function OperationsManifestRoute() {
 												</p>
 											</td>
 											<td className="px-4 py-3.5">
-												<span className="rounded bg-sand px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-soft">
+												<span className="rounded bg-sand px-1.5 py-0.5 font-mono text-[10px] tracking-[0.1em] text-ink-soft">
 													{m.source}
 												</span>
 											</td>
 											<td className="px-4 py-3.5">
 												<StatusBadge
-													label={formatStatus(m.status)}
+													label={statusLabel(m.status)}
 													tone={statusTone(m.status)}
 												/>
 											</td>

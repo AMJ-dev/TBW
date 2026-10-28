@@ -20,6 +20,7 @@ import {
 	Mail,
 	MapPin,
 	Package,
+	Pencil,
 	Phone,
 	Ship,
 	ShieldCheck,
@@ -31,7 +32,7 @@ import { AppShell, StatusBadge, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
-import { resolveSrc } from "@/lib/functions";
+import { resolveSrc, statusLabel } from "@/lib/functions";
 
 type ShipmentContainer = {
 	id: string;
@@ -195,11 +196,6 @@ type ShipmentRecord = {
 	manifest?: ManifestReview | null;
 	consignee_details?: ConsigneeDetails | null;
 	licensed_agent?: LicensedAgent | null;
-};
-
-const statusLabel = (status?: string | null): string => {
-	if (!status) return "Unknown";
-	return status.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 };
 
 const formatDate = (value?: string | null): string => {
@@ -411,9 +407,8 @@ export default function PortalShipmentDetailsPage() {
 	
 	const agent = shipment.licensed_agent || {};
 
-	const manifestNeedsAction =
-		manifest?.manifest_requires_action === true ||
-		manifest?.requires_action === true;
+	const manifestNeedsAction = shipment?.status === "CHANGES_REQUESTED" && manifest?.review_responsible_party == 'Organisation';
+	const isDraft = shipment?.status === 'draft';
 
 	return (
 		<AppShell
@@ -453,7 +448,16 @@ export default function PortalShipmentDetailsPage() {
 						</p>
 					</div>
 					
-					<div className="flex shrink-0 gap-2">
+					<div className="flex flex-wrap items-center gap-2 shrink-0">
+						{isDraft && (
+							<Button
+								onClick={() => navigate(`/portal/shipment/edit/${shipment.id}`)}
+								className="gap-2 bg-orange text-white hover:bg-orange-deep"
+							>
+								<Pencil className="size-4" />
+								Edit Declaration
+							</Button>
+						)}
 						<Button
 							variant="outline"
 							onClick={() => navigate("/portal/shipments")}
