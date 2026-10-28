@@ -1999,6 +1999,7 @@ export default function OperationsShipmentReviewPage() {
                                       <ArrowRight className="size-2.5" />
                                       {humanise(event.to_status)}
                                     </span>
+                                    
                                   )}
                                 </div>
                                 {event.reviewer?.email && (

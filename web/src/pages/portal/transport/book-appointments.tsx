@@ -7,9 +7,7 @@ import {
 	Check,
 	ChevronDown,
 	LoaderCircle,
-	Plus,
 	Search,
-	Trash2,
 	Truck,
 	UserRound,
 } from "lucide-react";
@@ -58,6 +56,26 @@ interface Vehicle {
 	assigned_drivers?: Driver[];
 }
 
+interface EligibleContainer {
+	container_no: string;
+	container_id?: string;
+	container_size?: string | null;
+	seal_no?: string | null;
+	packages?: number | string | null;
+	gross_weight?: number | string | null;
+}
+
+interface EligibleShipment {
+	id: string;
+	shipment_id?: string;
+	shipment_reference?: string | null;
+	bill_of_lading: string;
+	status: string;
+	manifest_ref?: string | null;
+	manifest_status: string;
+	containers: EligibleContainer[];
+}
+
 function extractList<T>(response: Resp): T[] {
 	const result = response as {
 		error?: boolean;
@@ -74,7 +92,7 @@ function extractList<T>(response: Resp): T[] {
 	if (value && typeof value === "object") {
 		const obj = value as Record<string, unknown>;
 
-		for (const key of ["vehicles", "results", "items", "data"]) {
+		for (const key of ["vehicles", "shipments", "results", "items", "data"]) {
 			if (Array.isArray(obj[key])) {
 				return obj[key] as T[];
 			}
@@ -98,11 +116,17 @@ export default function GateBookAppointmentsPage() {
 	const [searchingVehicles, setSearchingVehicles] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 
-	const [containerNos, setContainerNos] = useState([""]);
+	const [billOfLadingQuery, setBillOfLadingQuery] = useState("");
+	const [eligibleShipments, setEligibleShipments] = useState<EligibleShipment[]>([]);
+	const [selectedShipment, setSelectedShipment] = useState<EligibleShipment | null>(null);
+	const [selectedContainerNos, setSelectedContainerNos] = useState<string[]>([]);
+	const [shipmentDropdown, setShipmentDropdown] = useState(false);
+	const [searchingShipments, setSearchingShipments] = useState(false);
 	const [slotTime, setSlotTime] = useState("10:00 – 11:00");
 	const [appointmentDate, setAppointmentDate] = useState("");
 
 	const vehicleRequest = useRef(0);
+	const shipmentRequest = useRef(0);
 
 	useEffect(() => {
 		const query = vehicleQuery.trim();
@@ -147,6 +171,73 @@ export default function GateBookAppointmentsPage() {
 		return () => clearTimeout(timer);
 	}, [vehicleQuery, selectedVehicle]);
 
+	useEffect(() => {
+		const query = billOfLadingQuery.trim();
+		const requestId = ++shipmentRequest.current;
+
+		if (selectedShipment || query.length < 2) {
+			setEligibleShipments([]);
+			setSearchingShipments(false);
+			return;
+		}
+
+		const timer = setTimeout(async () => {
+			setSearchingShipments(true);
+
+			try {
+				const response = await http.post("appointments/eligible-shipments/search/", {
+					q: query,
+				});
+				const resp: Resp = response.data;
+
+				if (requestId !== shipmentRequest.current) return;
+
+				if (resp.error) {
+					setEligibleShipments([]);
+					return;
+				}
+
+				setEligibleShipments(extractList<EligibleShipment>(resp));
+			} catch {
+				if (requestId === shipmentRequest.current) {
+					setEligibleShipments([]);
+				}
+			} finally {
+				if (requestId === shipmentRequest.current) {
+					setSearchingShipments(false);
+				}
+			}
+		}, 300);
+
+		return () => clearTimeout(timer);
+	}, [billOfLadingQuery, selectedShipment]);
+
+	const handleSelectShipment = (shipment: EligibleShipment) => {
+		shipmentRequest.current++;
+		setSelectedShipment(shipment);
+		setBillOfLadingQuery(shipment.bill_of_lading);
+		setEligibleShipments([]);
+		setShipmentDropdown(false);
+		setSelectedContainerNos([]);
+	};
+
+	const handleClearShipment = () => {
+		shipmentRequest.current++;
+		setSelectedShipment(null);
+		setBillOfLadingQuery("");
+		setEligibleShipments([]);
+		setSelectedContainerNos([]);
+		setShipmentDropdown(false);
+	};
+
+	const toggleContainer = (containerNo: string) => {
+		setSelectedContainerNos((current) =>
+			current.includes(containerNo)
+				? current.filter((value) => value !== containerNo)
+				: [...current, containerNo],
+		);
+	};
+
 	const vehicleDrivers =
 		selectedVehicle?.drivers ??
 		selectedVehicle?.assigned_drivers ??
@@ -187,24 +278,6 @@ export default function GateBookAppointmentsPage() {
 		setVehicleDropdown(false);
 	};
 
-	const handleContainerChange = (index: number, value: string) => {
-		setContainerNos((current) =>
-			current.map((container, i) =>
-				i === index ? value : container,
-			),
-		);
-	};
-
-	const handleAddContainer = () => {
-		setContainerNos((current) => [...current, ""]);
-	};
-
-	const handleRemoveContainer = (index: number) => {
-		setContainerNos((current) =>
-			current.filter((_, i) => i !== index),
-		);
-	};
-
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 
@@ -215,17 +288,17 @@ export default function GateBookAppointmentsPage() {
 			return;
 		}
 
-		const normalizedContainers = containerNos.map((container) =>
-			container.trim().toUpperCase(),
-		);
-
-		if (normalizedContainers.some((container) => !container)) {
-			toast.error("Enter a container number in every field.");
+		if (!selectedShipment) {
+			toast.error("Search for and select an eligible bill of lading.");
 			return;
 		}
 
-		if (new Set(normalizedContainers).size !== normalizedContainers.length) {
-			toast.error("Remove duplicate container numbers.");
+		const normalizedContainers = selectedContainerNos.map((container) =>
+			container.trim().toUpperCase(),
+		);
+
+		if (normalizedContainers.length === 0) {
+			toast.error("Select at least one container from the shipment.");
 			return;
 		}
 
@@ -252,6 +325,8 @@ export default function GateBookAppointmentsPage() {
 			const response = await http.post("/appointments/add/", {
 				vehicle_id: selectedVehicle.id,
 				driver_id: selectedDriver.id,
+				shipment_id: selectedShipment.shipment_id ?? selectedShipment.id,
+				bill_of_lading: selectedShipment.bill_of_lading,
 				container_nos: normalizedContainers,
 				appointment_date: appointmentDate,
 				slot_time: slotTime,
@@ -535,70 +610,76 @@ export default function GateBookAppointmentsPage() {
 
 					<section className="space-y-5 rounded-2xl bg-paper p-5 ring-1 ring-line sm:p-6">
 						<div>
-							<h3 className="font-display text-sm font-bold text-ink">
-								Cargo and arrival slot
-							</h3>
-
-							<p className="mt-2 text-xs leading-5 text-ink-soft">
-								Add all containers travelling on this truck.
-							</p>
+							<h3 className="font-display text-sm font-bold text-ink">Shipment containers and arrival slot</h3>
+							<p className="mt-2 text-xs leading-5 text-ink-soft">Search by bill of lading and select containers from a validated manifest linked to an EXPECTED shipment.</p>
 						</div>
 
-						<div className="space-y-3">
-							<div className="flex items-center justify-between gap-3">
-								<label className={labelClass}>
-									Container numbers ({containerNos.length})
-								</label>
-
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									onClick={handleAddContainer}
-									className="gap-1.5"
-								>
-									<Plus className="size-4" />
-									Add Container
-								</Button>
+						<div className="relative">
+							<label className={labelClass}>Bill of lading</label>
+							<div className="relative mt-2">
+								<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
+								<Input
+									value={billOfLadingQuery}
+									onChange={(event) => {
+										setBillOfLadingQuery(event.target.value);
+										setSelectedShipment(null);
+										setSelectedContainerNos([]);
+										setEligibleShipments([]);
+										setShipmentDropdown(true);
+									}}
+									onFocus={() => setShipmentDropdown(true)}
+									autoComplete="off"
+									placeholder="Search bill of lading..."
+									className="h-11 border-line bg-sand pl-9 pr-10 text-ink"
+								/>
+								{searchingShipments && <LoaderCircle className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-ink-soft" />}
 							</div>
-
-							{containerNos.map((container, index) => (
-								<div
-									key={index}
-									className="flex items-center gap-2"
-								>
-									<div className="min-w-0 flex-1">
-										<Input
-											value={container}
-											onChange={(event) =>
-												handleContainerChange(
-													index,
-													event.target.value,
-												)
-											}
-											placeholder={`Container ${index + 1} number`}
-											autoComplete="off"
-											required
-											className="h-11 border-line bg-sand text-ink"
-										/>
-									</div>
-
-									<Button
-										type="button"
-										variant="outline"
-										size="icon"
-										disabled={containerNos.length === 1}
-										onClick={() =>
-											handleRemoveContainer(index)
-										}
-										aria-label={`Remove container ${index + 1}`}
-									>
-										<Trash2 className="size-4" />
-									</Button>
+							{shipmentDropdown && !selectedShipment && billOfLadingQuery.trim().length >= 2 && (
+								<div className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-line bg-paper shadow-xl">
+									{searchingShipments ? (
+										<div className="p-4 text-sm text-ink-soft">Searching eligible shipments...</div>
+									) : eligibleShipments.length ? eligibleShipments.map((shipment) => (
+										<button key={shipment.shipment_id ?? shipment.id} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => handleSelectShipment(shipment)} className="w-full border-b border-line p-3 text-left last:border-0 hover:bg-sand">
+											<span className="block font-mono text-sm font-bold text-ink">{shipment.bill_of_lading}</span>
+											<span className="mt-1 block text-xs text-ink-soft">{shipment.shipment_reference ?? "Shipment"} · {shipment.status} · Manifest: {shipment.manifest_status}</span>
+											<span className="mt-1 block text-xs text-ink-soft">{shipment.containers?.length ?? 0} eligible container(s)</span>
+										</button>
+									)) : <p className="p-4 text-sm text-ink-soft">No eligible shipment found. The manifest must be validated and the shipment status must be EXPECTED.</p>}
 								</div>
-							))}
+							)}
 						</div>
 
+						{selectedShipment && (
+							<div className="space-y-4 rounded-xl border border-line bg-sand p-4">
+								<div className="flex flex-wrap items-start justify-between gap-3">
+									<div>
+										<p className="font-mono text-sm font-bold text-ink">{selectedShipment.bill_of_lading}</p>
+										<p className="mt-1 text-xs text-ink-soft">{selectedShipment.shipment_reference ?? "Shipment"} · {selectedShipment.status} · {selectedShipment.manifest_ref ?? "Manifest"} ({selectedShipment.manifest_status})</p>
+									</div>
+									<Button type="button" variant="outline" size="sm" onClick={handleClearShipment}>Change</Button>
+								</div>
+								<div className="flex items-center justify-between gap-3">
+									<p className={labelClass}>Select containers</p>
+									<p className="text-xs font-semibold text-ink">{selectedContainerNos.length} selected</p>
+								</div>
+								{selectedShipment.containers?.length ? (
+									<div className="space-y-2">
+										{selectedShipment.containers.map((container) => {
+											const checked = selectedContainerNos.includes(container.container_no);
+											return (
+												<label key={container.container_no} className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-colors ${checked ? "border-orange bg-orange/5" : "border-line bg-paper hover:bg-paper/70"}`}>
+													<input type="checkbox" checked={checked} onChange={() => toggleContainer(container.container_no)} className="mt-1 size-4 accent-orange" />
+													<span className="min-w-0 flex-1">
+														<span className="block font-mono text-sm font-bold text-ink">{container.container_no}</span>
+														<span className="mt-1 block text-xs text-ink-soft">{[container.container_size, container.seal_no ? `Seal ${container.seal_no}` : null, container.packages != null ? `${container.packages} packages` : null, container.gross_weight != null ? `${container.gross_weight} gross weight` : null].filter(Boolean).join(" · ") || "Container details"}</span>
+													</span>
+												</label>
+												);
+										})}
+									</div>
+								) : <p className="rounded-lg border border-line bg-paper p-4 text-sm text-ink-soft">No eligible containers were returned for this shipment.</p>}
+							</div>
+						)}
 						<div className="grid gap-4 sm:grid-cols-2">
 							<label className="block">
 								<span className={labelClass}>
@@ -673,12 +754,8 @@ export default function GateBookAppointmentsPage() {
 								submitting ||
 								!selectedVehicle ||
 								!selectedDriver ||
-								containerNos.some((container) => !container.trim()) ||
-								new Set(
-									containerNos.map((container) =>
-										container.trim().toUpperCase(),
-									),
-								).size !== containerNos.length ||
+								!selectedShipment ||
+								selectedContainerNos.length === 0 ||
 								!appointmentDate
 							}
 							className="gap-2 bg-orange text-white hover:bg-orange-deep"

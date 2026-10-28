@@ -519,16 +519,21 @@ export default function GateAppointmentsRoute() {
 											/>
 										</td>
 										
-									<td className="px-4 py-3.5 text-right">
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => navigate(`/portal/passes/${appointment.pass_id}`)}
-											className="text-xs font-semibold text-orange-deep hover:bg-orange/10"
-										>
-											Gate QR Pass
-										</Button>
-									</td>
+										<td className="px-4 py-3.5 text-right">
+											{
+												appointment.pass_id && (
+													<Button
+														variant="ghost"
+														size="sm"
+														onClick={() => navigate(`/portal/passes/${appointment.pass_id}`)}
+														className="text-xs font-semibold text-orange-deep hover:bg-orange/10"
+													>
+														Gate QR Pass
+													</Button>
+												)
+											}
+											
+										</td>
 									</tr>
 								))
 							)}

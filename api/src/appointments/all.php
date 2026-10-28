@@ -25,6 +25,7 @@ try {
             v.plate AS vehicle_plate,
             d.name AS driver_name,
             d.phone AS driver_phone,
+            p.id AS pass_id,
             (
                 SELECT GROUP_CONCAT(
                     c.container_no
@@ -36,7 +37,9 @@ try {
             ) AS container_nos
         FROM gate_appointments a
         INNER JOIN gate_vehicles v ON v.id = a.vehicle_id
-        INNER JOIN gate_drivers d ON d.id = a.driver_id
+        INNER JOIN gate_drivers d ON d.id = a.driver_id        
+        LEFT JOIN gate_passes p ON p.appointment_id = a.id
+
         WHERE a.organisation_id = :organisation_id
         ORDER BY
             a.appointment_date DESC,

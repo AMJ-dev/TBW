@@ -17,8 +17,10 @@ import {
   UserRound,
   CalendarCheck,
   FileText,
-  Phone,
   BadgeCheck,
+  Hash,
+  Ship,
+  Package,
 } from "lucide-react";
 import { toast } from "sonner";
 import { QRCodeSVG } from "qrcode.react";
@@ -29,6 +31,7 @@ import {
 } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { http, type Resp } from "@/lib/httpClient";
+import { cn } from "@/lib/utils";
 
 type ContainerDetail = {
   id: string;
@@ -36,6 +39,7 @@ type ContainerDetail = {
   number: string;
   size: string | null;
   seal_no: string | null;
+  hs_code: string | null;
   package_count: number | string | null;
   gross_weight: number | string | null;
   status: string | null;
@@ -44,6 +48,12 @@ type ContainerDetail = {
   stored_at: string | null;
   gate_out_at: string | null;
   updated_at: string | null;
+  shipment_id: string;
+  shipment_reference: string;
+  bill_of_lading: string;
+  shipment_status: string;
+  container_created_at: string;
+  container_updated_at: string;
 };
 
 type VehicleDetail = {
@@ -127,9 +137,11 @@ type GatePass = {
 function DetailField({
   label,
   value,
+  icon: Icon,
 }: {
   label: string;
   value?: string | number | null | undefined;
+  icon?: typeof Truck;
 }) {
   const displayValue =
     value !== null && value !== undefined && String(value).trim() !== ""
@@ -138,7 +150,8 @@ function DetailField({
 
   return (
     <div className="min-w-0">
-      <p className="text-[10px] font-medium uppercase tracking-wider text-ink-soft">
+      <p className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wider text-ink-soft">
+        {Icon && <Icon className="size-3" />}
         {label}
       </p>
       <p className="mt-1 break-words text-sm font-semibold text-ink">
@@ -271,6 +284,12 @@ export default function GatePassDetailsPage() {
           hour: "2-digit",
           minute: "2-digit",
         });
+  };
+
+  const formatNumber = (value?: number | string | null) => {
+    if (value === null || value === undefined || value === "") return "—";
+    const num = Number(value);
+    return Number.isNaN(num) ? String(value) : num.toLocaleString("en-NG");
   };
 
   const handlePrint = () => {
@@ -545,9 +564,10 @@ export default function GatePassDetailsPage() {
                   {pass.containers.map((container, index) => (
                     <div
                       key={`${container.id || container.container_no}-${index}`}
-                      className="rounded-xl border border-line bg-paper p-4 shadow-sm"
+                      className="overflow-hidden rounded-xl border border-line bg-paper shadow-sm"
                     >
-                      <div className="flex items-start justify-between gap-3 border-b border-dashed border-line pb-3">
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-3 border-b border-line bg-sand/50 p-4">
                         <div className="flex min-w-0 items-center gap-2">
                           <div className="grid size-8 shrink-0 place-items-center rounded-md bg-ink text-sand">
                             <Box className="size-4" />
@@ -556,11 +576,9 @@ export default function GatePassDetailsPage() {
                             <p className="break-all font-mono text-base font-bold text-ink">
                               {container.container_no || container.number}
                             </p>
-                            {container.size && (
-                              <p className="text-[10px] uppercase tracking-wider text-ink-soft">
-                                Size: {container.size}
-                              </p>
-                            )}
+                            <p className="text-[10px] uppercase tracking-wider text-ink-soft">
+                              {container.size || "Size not specified"}
+                            </p>
                           </div>
                         </div>
 
@@ -572,104 +590,93 @@ export default function GatePassDetailsPage() {
                         )}
                       </div>
 
-                      <div className="mt-4 grid grid-cols-2 gap-4">
-                        <div className="flex items-start gap-2">
-                          <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-ink-soft" />
-                          <div className="min-w-0">
-                            <p className="text-[10px] uppercase tracking-wider text-ink-soft">
-                              Seal Number
-                            </p>
-                            <p className="break-all font-mono text-xs font-semibold text-ink">
-                              {container.seal_no || "—"}
-                            </p>
-                          </div>
+                      {/* Shipment Context */}
+                      <div className="border-b border-line bg-orange/5 px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <FileText className="size-3.5 text-orange-deep" />
+                          <p className="font-mono text-[11px] font-semibold text-ink">
+                            B/L: {container.bill_of_lading || "—"}
+                          </p>
                         </div>
-
-                        <div className="flex items-start gap-2">
-                          <Scale className="mt-0.5 size-3.5 shrink-0 text-ink-soft" />
-                          <div className="min-w-0">
-                            <p className="text-[10px] uppercase tracking-wider text-ink-soft">
-                              Gross Weight
-                            </p>
-                            <p className="font-mono text-xs font-semibold text-ink">
-                              {container.gross_weight !== null &&
-                              container.gross_weight !== undefined &&
-                              container.gross_weight !== ""
-                                ? `${Number(container.gross_weight).toLocaleString()} kg`
-                                : "—"}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start gap-2">
-                          <Box className="mt-0.5 size-3.5 shrink-0 text-ink-soft" />
-                          <div className="min-w-0">
-                            <p className="text-[10px] uppercase tracking-wider text-ink-soft">
-                              Packages
-                            </p>
-                            <p className="font-mono text-xs font-semibold text-ink">
-                              {container.package_count !== null &&
-                              container.package_count !== undefined &&
-                              container.package_count !== ""
-                                ? Number(container.package_count).toLocaleString()
-                                : "—"}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start gap-2">
-                          <CalendarDays className="mt-0.5 size-3.5 shrink-0 text-ink-soft" />
-                          <div className="min-w-0">
-                            <p className="text-[10px] uppercase tracking-wider text-ink-soft">
-                              Gate In
-                            </p>
-                            <p className="font-mono text-[10px] font-semibold text-ink">
-                              {formatDate(container.gate_in_at)}
-                            </p>
-                          </div>
+                        <div className="mt-1 flex items-center gap-2 pl-5">
+                          <p className="font-mono text-[10px] text-ink-soft">
+                            Ref: {container.shipment_reference || "—"}
+                          </p>
                         </div>
                       </div>
 
-                      {(container.received_at ||
-                        container.stored_at ||
-                        container.gate_out_at ||
-                        container.updated_at) && (
-                        <div className="mt-4 space-y-2 border-t border-line pt-3">
-                          {container.received_at && (
-                            <div className="flex items-start gap-2 text-xs text-ink-soft">
-                              <BadgeCheck className="mt-0.5 size-3.5 shrink-0" />
-                              <span>
-                                Received: {formatDate(container.received_at)}
-                              </span>
-                            </div>
-                          )}
+                      {/* Technical Details */}
+                      <div className="grid grid-cols-2 gap-4 p-4">
+                        <div>
+                          <p className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-ink-soft">
+                            <ShieldCheck className="size-3" />
+                            Seal Number
+                          </p>
+                          <p className="mt-1 break-all font-mono text-xs font-semibold text-ink">
+                            {container.seal_no || "—"}
+                          </p>
+                        </div>
 
-                          {container.stored_at && (
-                            <div className="flex items-start gap-2 text-xs text-ink-soft">
-                              <Clock className="mt-0.5 size-3.5 shrink-0" />
-                              <span>
-                                Stored: {formatDate(container.stored_at)}
-                              </span>
-                            </div>
-                          )}
+                        <div>
+                          <p className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-ink-soft">
+                            <Hash className="size-3" />
+                            HS Code
+                          </p>
+                          <p className="mt-1 font-mono text-xs font-semibold text-ink">
+                            {container.hs_code || "—"}
+                          </p>
+                        </div>
 
-                          {container.gate_out_at && (
-                            <div className="flex items-start gap-2 text-xs text-ink-soft">
-                              <Truck className="mt-0.5 size-3.5 shrink-0" />
-                              <span>
-                                Gate Out: {formatDate(container.gate_out_at)}
-                              </span>
-                            </div>
-                          )}
+                        <div>
+                          <p className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-ink-soft">
+                            <Scale className="size-3" />
+                            Gross Weight
+                          </p>
+                          <p className="mt-1 font-mono text-xs font-semibold text-ink">
+                            {container.gross_weight ? `${formatNumber(container.gross_weight)} kg` : "—"}
+                          </p>
+                        </div>
 
-                          {container.updated_at && (
-                            <div className="flex items-start gap-2 text-xs text-ink-soft">
-                              <Clock className="mt-0.5 size-3.5 shrink-0" />
-                              <span>
-                                Last Updated: {formatDate(container.updated_at)}
-                              </span>
-                            </div>
-                          )}
+                        <div>
+                          <p className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-ink-soft">
+                            <Package className="size-3" />
+                            Packages
+                          </p>
+                          <p className="mt-1 font-mono text-xs font-semibold text-ink">
+                            {formatNumber(container.package_count)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Timeline */}
+                      {(container.gate_in_at || container.received_at || container.stored_at || container.gate_out_at) && (
+                        <div className="border-t border-line px-4 py-3">
+                          <div className="space-y-2">
+                            {container.gate_in_at && (
+                              <div className="flex items-start gap-2 text-[11px] text-ink-soft">
+                                <CalendarDays className="mt-0.5 size-3 shrink-0" />
+                                <span>Gate In: {formatDate(container.gate_in_at)}</span>
+                              </div>
+                            )}
+                            {container.received_at && (
+                              <div className="flex items-start gap-2 text-[11px] text-ink-soft">
+                                <BadgeCheck className="mt-0.5 size-3 shrink-0" />
+                                <span>Received: {formatDate(container.received_at)}</span>
+                              </div>
+                            )}
+                            {container.stored_at && (
+                              <div className="flex items-start gap-2 text-[11px] text-ink-soft">
+                                <Clock className="mt-0.5 size-3 shrink-0" />
+                                <span>Stored: {formatDate(container.stored_at)}</span>
+                              </div>
+                            )}
+                            {container.gate_out_at && (
+                              <div className="flex items-start gap-2 text-[11px] text-ink-soft">
+                                <Truck className="mt-0.5 size-3 shrink-0" />
+                                <span>Gate Out: {formatDate(container.gate_out_at)}</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
