@@ -1134,7 +1134,7 @@ export default function OperationsShipmentReviewPage() {
           </div>
           <Button
             className={cn("mt-5", primaryBtn)}
-            onClick={() => navigate("/operations/shipments")}
+            onClick={() => navigate("/operations/shipments/review")}
           >
             Back to shipments
           </Button>
@@ -1168,7 +1168,7 @@ export default function OperationsShipmentReviewPage() {
                 variant="outline"
                 size="sm"
                 className={cn("h-8", softBtn)}
-                onClick={() => navigate("/operations/shipments")}
+                onClick={() => navigate("/operations/shipments/review")}
               >
                 <ArrowLeft className="mr-1.5 size-3.5" />
                 Shipments

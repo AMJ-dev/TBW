@@ -105,7 +105,6 @@ const OperationsStuffingPage = lazy(() => import("@/pages/operations/stuffing"))
 const OperationsCycleCountPage = lazy(() => import("@/pages/operations/cycle-count"));
 const OperationsValueAddedPage = lazy(() => import("@/pages/operations/value-added"));
 const OperationsOverridesPage = lazy(() => import("@/pages/operations/overrides"));
-const OperationsShipmentsPage = lazy(() => import("@/pages/shipment"));
 const OperationsReviewPage = lazy(() => import("@/pages/shipment/review"));
 const OperationsShipmentReviewPage = lazy(() => import("@/pages/shipment/shipment-review-details"));
 
@@ -242,7 +241,6 @@ export default function Routers() {
 						<Route path="/operations/cycle-count" element={<OperationsCycleCountPage />} />
 						<Route path="/operations/value-added" element={<OperationsValueAddedPage />} />
 						<Route path="/operations/overrides" element={<OperationsOverridesPage />} />
-						<Route path="/operations/shipments" element={<OperationsShipmentsPage />} />
 						<Route path="/operations/shipments/review" element={<OperationsReviewPage />} />
 						<Route path="/operations/shipments/:id" element={<OperationsShipmentReviewPage />} />
 
