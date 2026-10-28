@@ -264,20 +264,12 @@ function extractQueue(resp: Resp): QueuedTruck[] {
   if (Array.isArray(payload)) return payload.map((item) => normalizeTruck(item as Record<string, unknown>));
 
   if (payload && typeof payload === "object") {
-    const list = (payload as Record<string, unknown>).items ?? 
-      (payload as Record<string, unknown>).queue ?? 
-      (payload as Record<string, unknown>).results;
+    const list = (payload as Record<string, unknown>)["items"] ?? 
+      (payload as Record<string, unknown>)["queue"] ?? 
+      (payload as Record<string, unknown>)["results"];
     if (Array.isArray(list)) return list.map((item) => normalizeTruck(item as Record<string, unknown>));
   }
   return [];
-}
-
-function formatDate(value: string): string {
-  if (!value) return "—";
-  const date = new Date(value.replace(" ", "T"));
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
 export default function GateConsolePage({ direction }: { direction?: GateDirection } = {}) {
