@@ -92,7 +92,8 @@ const TransportVehicleDetailsPage = lazy(() => import("@/pages/portal/transport/
 const OperationsDashboardPage = lazy(() => import("@/pages/operations/dashboard"));
 const OperationsExaminationPage = lazy(() => import("@/pages/operations/examination"));
 const OperationsHoldsPage = lazy(() => import("@/pages/operations/holds"));
-const OperationsReceivingPage = lazy(() => import("@/pages/operations/receiving"));
+const OperationsReceivingPage = lazy(() => import("@/pages/operations/receiving/index"));
+const OperationsReceivingNewPage = lazy(() => import("@/pages/operations/receiving/new"));
 const OperationsWarehousePage = lazy(() => import("@/pages/operations/warehouse"));
 const OperationsYardPage = lazy(() => import("@/pages/operations/yard"));
 const OperationsManifestPage = lazy(() => import("@/pages/manifest"));
@@ -229,6 +230,7 @@ export default function Routers() {
 						<Route path="/operations/examination" element={<OperationsExaminationPage />} />
 						<Route path="/operations/holds" element={<OperationsHoldsPage />} />
 						<Route path="/operations/receiving" element={<OperationsReceivingPage />} />
+						<Route path="/operations/receiving/new" element={<OperationsReceivingNewPage />} />					
 						<Route path="/operations/warehouse" element={<OperationsWarehousePage />} />
 						<Route path="/operations/yard" element={<OperationsYardPage />} />
 						<Route path="/operations/manifest" element={<OperationsManifestPage />} />

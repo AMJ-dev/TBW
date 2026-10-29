@@ -170,3 +170,7 @@ RewriteRule ^gate/out/queue/$ src/gate/out.php [NC]
 RewriteRule ^gate/passes/verify/$ src/gate/verify.php [NC]
 RewriteRule ^gate/decision/$ src/gate/decision.php [NC]
 
+RewriteRule ^operator/receiving/$ src/receiving/all.php [NC]
+RewriteRule ^operator/receiving/save/$ src/receiving/save.php [NC]
+RewriteRule ^operator/receiving/search/$ src/receiving/search.php [NC]
+
