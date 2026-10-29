@@ -16,25 +16,12 @@ try {
         SELECT
             tl.id,
             tl.parent_location_id,
-            tl.code,
-            tl.name,
+            tl.code AS location_code,
+            tl.name AS location_name,
             tl.description,
-            tl.kind,
-            tl.bonded,
-            tl.status,
+            tl.kind AS location_type,
             tl.capacity,
-            tl.capacity_unit,
-            tl.cargo_types,
-            tl.security,
-            tl.equipment,
-            tl.zone_code,
-            tl.block_code,
-            tl.row_code,
-            tl.slot_code,
-            tl.tier_code,
-            tl.aisle_code,
-            tl.rack_code,
-            tl.bin_code,
+            tl.status = 'active' AS is_active,
             tl.created_at,
             tl.updated_at,
             parent.name AS parent_location_name,
@@ -55,47 +42,25 @@ try {
     $q->execute();
     $locations = $q->fetchAll(PDO::FETCH_ASSOC);
 
-    $locationTypes = [
-        "terminal" => "TERMINAL",
-        "receiving_area" => "RECEIVING_AREA",
-        "yard" => "YARD",
-        "block" => "BLOCK",
-        "slot" => "SLOT",
-        "warehouse" => "WAREHOUSE",
-        "warehouse_zone" => "WAREHOUSE_ZONE",
-        "inspection_bay" => "INSPECTION_BAY",
-        "discrepancy_holding_area" => "DISCREPANCY_HOLDING_AREA",
-        "other" => "OTHER"
-    ];
-
     foreach ($locations as &$location) {
-        $location["bonded"] = (bool) $location["bonded"];
-        $location["is_active"] = $location["status"] === "active";
+        $location["is_active"] = (bool) $location["is_active"];
+
         $location["capacity"] = $location["capacity"] === null
             ? null
             : (float) $location["capacity"];
 
         $location["children_count"] = (int) $location["children_count"];
 
-        $location["location_name"] = $location["name"];
-        $location["location_code"] = $location["code"];
+        $location["parent_location_id"] =
+            $location["parent_location_id"] ?? "";
 
-        $kind = strtolower((string) $location["kind"]);
+        $location["parent_location_name"] =
+            $location["parent_location_name"] ?? "";
 
-        $location["location_type"] = $locationTypes[$kind] ?? strtoupper($kind);
+        $location["parent_location_code"] =
+            $location["parent_location_code"] ?? "";
 
-        $location["parent_location_id"] = $location["parent_location_id"] ?? "";
-        $location["parent_location_name"] = $location["parent_location_name"] ?? "";
-        $location["parent_location_code"] = $location["parent_location_code"] ?? "";
         $location["description"] = $location["description"] ?? "";
-
-        $location["footprint_section"] = $location["zone_code"] !== ""
-            ? $location["zone_code"]
-            : (
-                $location["block_code"] !== ""
-                    ? $location["block_code"]
-                    : $location["code"]
-            );
     }
 
     unset($location);
