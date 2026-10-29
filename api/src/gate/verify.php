@@ -341,7 +341,7 @@
             "release" => null
         ];
 
-        $holds = [];
+        $holds = []; 
 
         if (!$vehicleEligible) {
             if ($vehicleStatus !== "approved") {

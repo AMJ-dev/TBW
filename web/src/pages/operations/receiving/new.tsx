@@ -1,9 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  ClipboardCheck,
   Container,
   FileSearch,
   Info,
@@ -15,12 +14,22 @@ import {
   Truck,
   Weight,
   X,
+  Upload,
+  Image as ImageIcon,
+  AlertTriangle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { AppShell, StatusBadge } from "@/components/auth-shell";
 import { http, type Resp } from "@/lib/httpClient";
+import { cn } from "@/lib/utils";
 
 type LookupType = "gate_pass" | "bill_of_lading" | "shipment_reference";
+
+type ReceivingLocation = {
+  id: string;
+  code: string;
+  name: string;
+};
 
 type ContainerRecord = {
   id: string;
@@ -32,6 +41,7 @@ type ContainerRecord = {
   condition: string;
   actual_weight: string;
   receiving_location: string;
+  receiving_location_id: string;
   remarks: string;
   selected: boolean;
 };
@@ -76,7 +86,7 @@ const inputClass =
 const labelClass = "mb-1.5 block text-xs font-semibold text-ink-soft";
 
 function formatStatus(status: string) {
-  return status
+  return (status || "PENDING")
     .replace(/_/g, " ")
     .toLowerCase()
     .replace(/\b\w/g, (char) => char.toUpperCase());
@@ -84,15 +94,15 @@ function formatStatus(status: string) {
 
 function getProgress(containers: ContainerRecord[]) {
   const entered = containers.filter(
-    (container) => container.gate_status === "ENTERED",
+    (container) => container.gate_status === "ENTERED"
   );
 
   const received = containers.filter(
-    (container) => container.receiving_status === "RECEIVED",
+    (container) => container.receiving_status === "RECEIVED"
   );
 
   const discrepancies = containers.filter(
-    (container) => container.receiving_status === "DISCREPANCY",
+    (container) => container.receiving_status === "DISCREPANCY"
   );
 
   return {
@@ -100,12 +110,12 @@ function getProgress(containers: ContainerRecord[]) {
     received: received.length,
     discrepancies: discrepancies.length,
     outstanding: containers.filter(
-      (container) => container.gate_status !== "ENTERED",
+      (container) => container.gate_status !== "ENTERED"
     ).length,
     pending: entered.filter(
       (container) =>
         container.receiving_status !== "RECEIVED" &&
-        container.receiving_status !== "DISCREPANCY",
+        container.receiving_status !== "DISCREPANCY"
     ).length,
   };
 }
@@ -122,7 +132,7 @@ function SummaryCard({
   icon: typeof Package;
 }) {
   return (
-    <div className="rounded-2xl border border-line bg-paper p-4">
+    <div className="rounded-2xl border border-line bg-paper p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-ink-soft">{label}</p>
@@ -130,13 +140,69 @@ function SummaryCard({
             {value}
           </p>
         </div>
+
         <div className="rounded-xl bg-sand p-2.5 text-ink-soft">
           <Icon size={19} />
         </div>
       </div>
+
       <p className="mt-2 text-xs text-ink-soft">{detail}</p>
     </div>
   );
+}
+
+function getLocationsFromResponse(data: unknown): ReceivingLocation[] {
+  let rows: unknown[] = [];
+
+  if (Array.isArray(data)) {
+    rows = data;
+  } else if (data && typeof data === "object") {
+    const result = data as {
+      locations?: unknown[];
+      results?: unknown[];
+      items?: unknown[];
+      code?: { locations?: unknown[] } | null;
+    };
+
+    if (Array.isArray(result.locations)) rows = result.locations;
+    else if (Array.isArray(result.results)) rows = result.results;
+    else if (Array.isArray(result.items)) rows = result.items;
+    else if (Array.isArray(result.code?.locations)) rows = result.code.locations;
+  }
+
+  return rows
+    .filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
+    .map((row: any) => ({
+      id: String(row.id ?? ""),
+      code: String(row.location_code ?? row.code ?? ""),
+      name: String(row.location_name ?? row.name ?? ""),
+    }))
+    .filter((location) => location.id !== "" && location.name !== "");
+}
+
+function normalizeContainer(
+  container: Partial<ContainerRecord> & {
+    container_condition?: string | null;
+    actual_weight?: string | number | null;
+  }
+): ContainerRecord {
+  return {
+    id: container.id || "",
+    container_no: container.container_no || "",
+    gate_status: container.gate_status || "NOT_ENTERED",
+    receiving_status: container.receiving_status || "PENDING",
+    expected_seal_no: container.expected_seal_no || "",
+    actual_seal_no: container.actual_seal_no || "",
+    condition: container.condition || container.container_condition || "",
+    actual_weight:
+      container.actual_weight === null || container.actual_weight === undefined
+        ? ""
+        : String(container.actual_weight),
+    receiving_location: container.receiving_location || "",
+    receiving_location_id: container.receiving_location_id || "",
+    remarks: container.remarks || "",
+    selected: false,
+  };
 }
 
 export default function OperationsReceivingNewPage() {
@@ -145,21 +211,34 @@ export default function OperationsReceivingNewPage() {
   const [lookupType, setLookupType] = useState<LookupType>("gate_pass");
   const [lookupValue, setLookupValue] = useState("");
   const [shipment, setShipment] = useState<Shipment | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+
   const [loadError, setLoadError] = useState("");
   const [saveError, setSaveError] = useState("");
   const [notice, setNotice] = useState("");
+
   const [step, setStep] = useState<1 | 2>(1);
   const [saved, setSaved] = useState(false);
 
+  const [receivingLocations, setReceivingLocations] = useState<
+    ReceivingLocation[]
+  >([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
+  const [locationsError, setLocationsError] = useState("");
+
+  const [damageProofs, setDamageProofs] = useState<
+    Record<string, File | null>
+  >({});
+
   const selectedLookup = lookupOptions.find(
-    (option) => option.value === lookupType,
+    (option) => option.value === lookupType
   )!;
 
   const progress = useMemo(
     () => getProgress(shipment?.containers ?? []),
-    [shipment],
+    [shipment]
   );
 
   const eligibleContainers = useMemo(
@@ -167,19 +246,66 @@ export default function OperationsReceivingNewPage() {
       shipment?.containers.filter(
         (container) =>
           container.gate_status === "ENTERED" &&
-          container.receiving_status !== "RECEIVED",
+          container.receiving_status !== "RECEIVED"
       ) ?? [],
-    [shipment],
+    [shipment]
   );
 
   const selectedContainers = useMemo(
     () => eligibleContainers.filter((container) => container.selected),
-    [eligibleContainers],
+    [eligibleContainers]
   );
+
+  useEffect(() => {
+    let active = true;
+
+    const loadReceivingLocations = async () => {
+      setLocationsLoading(true);
+      setLocationsError("");
+
+      try {
+        const response = await http.post("/admin/config/search-location/", {
+          q: "RECEIVING",
+        });
+
+        const resp: Resp = response.data;
+
+        if (resp.error) {
+          throw new Error(
+            String(resp.data || "Could not load receiving locations.")
+          );
+        }
+
+        const locations = getLocationsFromResponse(resp.code ?? resp.data);
+
+        if (active) {
+          setReceivingLocations(locations);
+        }
+      } catch (error: unknown) {
+        if (active) {
+          setLocationsError(
+            error instanceof Error
+              ? error.message
+              : "Could not load receiving locations."
+          );
+        }
+      } finally {
+        if (active) {
+          setLocationsLoading(false);
+        }
+      }
+    };
+
+    loadReceivingLocations();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const updateContainer = (
     containerId: string,
-    updates: Partial<ContainerRecord>,
+    updates: Partial<ContainerRecord>
   ) => {
     setShipment((current) => {
       if (!current) return current;
@@ -189,7 +315,7 @@ export default function OperationsReceivingNewPage() {
         containers: current.containers.map((container) =>
           container.id === containerId
             ? { ...container, ...updates }
-            : container,
+            : container
         ),
       };
     });
@@ -210,6 +336,7 @@ export default function OperationsReceivingNewPage() {
     setShipment(null);
     setSaved(false);
     setStep(1);
+    setDamageProofs({});
 
     try {
       const response = await http.post("/operator/receiving/search/", {
@@ -225,36 +352,39 @@ export default function OperationsReceivingNewPage() {
 
       const result = resp.data as Shipment | null;
 
-      if (
-        !result ||
-        !result.id ||
-        !Array.isArray(result.containers)
-      ) {
+      if (!result || !result.id || !Array.isArray(result.containers)) {
         throw new Error(
-          "The receiving API did not return the expected shipment and container data.",
+          "The receiving API did not return the expected shipment and container data."
         );
       }
 
-      setShipment(result);
+      const normalizedShipment: Shipment = {
+        ...result,
+        containers: result.containers.map((container) =>
+          normalizeContainer(container as Partial<ContainerRecord>)
+        ),
+      };
+
+      setShipment(normalizedShipment);
 
       if (
-        !result.containers.some(
-          (container) => container.gate_status === "ENTERED",
+        !normalizedShipment.containers.some(
+          (container) => container.gate_status === "ENTERED"
         )
       ) {
         setNotice(
-          "No containers have been recorded as entering the gate. Gate Management must record gate entry before receiving can proceed.",
+          "No containers have been recorded as entering the gate. Gate Management must record gate entry before receiving can proceed."
         );
-      } else if (!result.gate_pass_number) {
+      } else if (!normalizedShipment.gate_pass_number) {
         setNotice(
-          "No gate pass number was returned for this shipment. Verify the gate-entry details before proceeding.",
+          "No gate pass number was returned for this shipment. Verify the gate-entry details before proceeding."
         );
       }
     } catch (error: unknown) {
       setLoadError(
         error instanceof Error
           ? error.message
-          : "Could not find the shipment. Please try again.",
+          : "Could not find the shipment. Please try again."
       );
     } finally {
       setLoading(false);
@@ -293,23 +423,80 @@ export default function OperationsReceivingNewPage() {
   const saveReceiving = async () => {
     if (!shipment || !selectedContainers.length) return;
 
-    setSaving(true);
     setSaveError("");
 
+    const invalidContainer = selectedContainers.find((container) => {
+      if (!container.condition) return true;
+      if (!container.receiving_location_id) return true;
+      if (
+        container.condition === "SEAL_MISMATCH" &&
+        !container.actual_seal_no.trim()
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    if (invalidContainer) {
+      setSaveError(
+        `Complete the condition, receiving location, and required seal details for ${invalidContainer.container_no}.`
+      );
+      return;
+    }
+
+    const sealMismatchWithoutCondition = selectedContainers.find(
+      (container) => {
+        const expected = container.expected_seal_no.trim().toUpperCase();
+        const actual = container.actual_seal_no.trim().toUpperCase();
+
+        return (
+          expected !== "" &&
+          actual !== "" &&
+          expected !== actual &&
+          container.condition !== "SEAL_MISMATCH"
+        );
+      }
+    );
+
+    if (sealMismatchWithoutCondition) {
+      setSaveError(
+        `The actual seal for ${sealMismatchWithoutCondition.container_no} differs from the expected seal. Select Seal mismatch and verify the observed seal number.`
+      );
+      return;
+    }
+
+    setSaving(true);
+
     try {
-      const response = await http.post("/operator/receiving/save/", {
-        shipment_id: shipment.id,
-        containers: selectedContainers.map((container) => ({
-          container_id: container.id,
-          container_no: container.container_no,
-          expected_seal_no: container.expected_seal_no,
-          actual_seal_no: container.actual_seal_no,
-          condition: container.condition,
-          actual_weight: container.actual_weight,
-          receiving_location: container.receiving_location,
-          remarks: container.remarks,
-        })),
+      const formData = new FormData();
+
+      formData.append("shipment_id", shipment.id);
+
+      formData.append(
+        "containers",
+        JSON.stringify(
+          selectedContainers.map((container) => ({
+            container_id: container.id,
+            container_no: container.container_no,
+            expected_seal_no: container.expected_seal_no,
+            actual_seal_no: container.actual_seal_no.trim(),
+            condition: container.condition,
+            actual_weight: container.actual_weight,
+            receiving_location_id: container.receiving_location_id,
+            remarks: container.remarks,
+          }))
+        )
+      );
+
+      selectedContainers.forEach((container) => {
+        const file = damageProofs[container.id];
+
+        if (container.condition === "DAMAGED" && file) {
+          formData.append(`damage_proof[${container.id}]`, file);
+        }
       });
+
+      const response = await http.post("/operator/receiving/save/", formData);
 
       const resp: Resp = response.data;
 
@@ -319,33 +506,35 @@ export default function OperationsReceivingNewPage() {
 
       setSaved(true);
       setNotice(
-        "Receiving was saved successfully. Reload the shipment to view its latest receiving progress.",
+        "Receiving was saved successfully. The shipment has been refreshed with its latest receiving progress."
       );
       setStep(1);
+      setDamageProofs({});
 
-      const refreshResponse = await http.post("/operator/receiving/", {
+      const refreshResponse = await http.post("/operator/receiving/search/", {
         type: lookupType,
         q: lookupValue.trim(),
       });
 
       const refreshResp: Resp = refreshResponse.data;
 
-      if (!refreshResp.error) {
-        const refreshed = refreshResp.data as Shipment | null;
+      if (!refreshResp.error && refreshResp.data) {
+        const refreshed = refreshResp.data as Shipment;
 
-        if (
-          refreshed &&
-          refreshed.id &&
-          Array.isArray(refreshed.containers)
-        ) {
-          setShipment(refreshed);
+        if (refreshed.id && Array.isArray(refreshed.containers)) {
+          setShipment({
+            ...refreshed,
+            containers: refreshed.containers.map((container) =>
+              normalizeContainer(container as Partial<ContainerRecord>)
+            ),
+          });
         }
       }
     } catch (error: unknown) {
       setSaveError(
         error instanceof Error
           ? error.message
-          : "Could not save receiving. Please try again.",
+          : "Could not save receiving. Please try again."
       );
     } finally {
       setSaving(false);
@@ -360,20 +549,18 @@ export default function OperationsReceivingNewPage() {
     setNotice("");
     setSaved(false);
     setStep(1);
+    setDamageProofs({});
   };
 
   return (
-    <AppShell
-      title="New Receiving"
-      eyebrow="Terminal Operations"
-    >
+    <AppShell title="New Receiving" eyebrow="Terminal Operations">
       <main className="space-y-5 p-4 sm:p-6">
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
             <button
               type="button"
               onClick={() => navigate("/operations/receiving")}
-              className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-ink-soft transition hover:text-ink"
+              className="mb-4 inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-ink-soft transition hover:text-ink"
             >
               <ArrowLeft size={16} />
               Back to Receiving
@@ -384,8 +571,7 @@ export default function OperationsReceivingNewPage() {
             </h1>
 
             <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-              Find an existing shipment, verify containers recorded at the
-              gate, and confirm the cargo physically received at the terminal.
+              Find an existing shipment, verify containers recorded at the gate, and confirm the cargo physically received at the terminal.
             </p>
           </div>
 
@@ -397,27 +583,14 @@ export default function OperationsReceivingNewPage() {
 
         <div className="grid gap-3 md:grid-cols-3">
           {[
-            {
-              number: 1,
-              title: "Find shipment",
-              description: "Locate the declaration",
-            },
-            {
-              number: 2,
-              title: "Verify containers",
-              description: "Inspect actual arrivals",
-            },
-            {
-              number: 3,
-              title: "Confirm receiving",
-              description: "Record physical receipt",
-            },
+            { number: 1, title: "Find shipment", description: "Locate the declaration" },
+            { number: 2, title: "Verify containers", description: "Inspect actual arrivals" },
+            { number: 3, title: "Confirm receiving", description: "Record physical receipt" },
           ].map((item) => (
             <div
               key={item.number}
               className={`flex items-center gap-3 rounded-2xl border p-4 ${
-                step === item.number ||
-                (step === 2 && item.number === 3)
+                step === item.number
                   ? "border-teal/30 bg-teal/5"
                   : "border-line bg-paper"
               }`}
@@ -431,48 +604,37 @@ export default function OperationsReceivingNewPage() {
                       : "bg-sand text-ink-soft"
                 }`}
               >
-                {saved && item.number === 3 ? (
-                  <CheckCircle2 size={17} />
-                ) : (
-                  item.number
-                )}
+                {saved && item.number === 3 ? <CheckCircle2 size={17} /> : item.number}
               </div>
+
               <div>
                 <p className="text-sm font-semibold text-ink">{item.title}</p>
-                <p className="mt-0.5 text-xs text-ink-soft">
-                  {item.description}
-                </p>
+                <p className="mt-0.5 text-xs text-ink-soft">{item.description}</p>
               </div>
             </div>
           ))}
         </div>
 
-        <section className="overflow-hidden rounded-2xl border border-line bg-paper">
+        <section className="overflow-hidden rounded-2xl border border-line bg-paper shadow-sm">
           <div className="border-b border-line px-5 py-4 sm:px-6">
             <div className="flex items-center gap-2">
               <FileSearch size={18} className="text-ink-soft" />
-              <h2 className="text-sm font-semibold text-ink">
-                Find Shipment to Receive
-              </h2>
+              <h2 className="text-sm font-semibold text-ink">Find Shipment to Receive</h2>
             </div>
+
             <p className="mt-1 text-xs text-ink-soft">
-              Search existing shipment records. Receiving does not create
-              shipments or gate passes.
+              Search existing shipment records. Receiving does not create shipments or gate passes.
             </p>
           </div>
 
           <form onSubmit={findShipment} className="space-y-4 p-5 sm:p-6">
             <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)_auto] md:items-end">
               <div>
-                <label htmlFor="lookup-type" className={labelClass}>
-                  Search by
-                </label>
+                <label htmlFor="lookup-type" className={labelClass}>Search by</label>
                 <select
                   id="lookup-type"
                   value={lookupType}
-                  onChange={(event) =>
-                    setLookupType(event.target.value as LookupType)
-                  }
+                  onChange={(event) => setLookupType(event.target.value as LookupType)}
                   className={inputClass}
                 >
                   {lookupOptions.map((option) => (
@@ -500,13 +662,9 @@ export default function OperationsReceivingNewPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loading ? (
-                  <LoaderCircle size={17} className="animate-spin" />
-                ) : (
-                  <Search size={17} />
-                )}
+                {loading ? <LoaderCircle size={17} className="animate-spin" /> : <Search size={17} />}
                 {loading ? "Searching..." : "Find Shipment"}
               </button>
             </div>
@@ -538,14 +696,12 @@ export default function OperationsReceivingNewPage() {
 
         {shipment && (
           <>
-            <section className="overflow-hidden rounded-2xl border border-line bg-paper">
+            <section className="overflow-hidden rounded-2xl border border-line bg-paper shadow-sm">
               <div className="flex flex-col justify-between gap-3 border-b border-line p-5 sm:flex-row sm:items-start sm:px-6">
                 <div>
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <StatusBadge label="completed" />
-                    <span className="text-xs text-ink-soft">
-                      Shipment found
-                    </span>
+                    <span className="text-xs text-ink-soft">Shipment found</span>
                   </div>
 
                   <h2 className="text-lg font-semibold text-ink">
@@ -560,7 +716,7 @@ export default function OperationsReceivingNewPage() {
                 <button
                   type="button"
                   onClick={resetSearch}
-                  className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-line px-3 py-2 text-xs font-semibold text-ink transition hover:bg-sand"
+                  className="inline-flex cursor-pointer items-center justify-center gap-2 self-start rounded-xl border border-line px-3 py-2 text-xs font-semibold text-ink transition hover:bg-sand"
                 >
                   <Search size={14} />
                   Search another
@@ -586,9 +742,7 @@ export default function OperationsReceivingNewPage() {
                   <p className={labelClass}>Vessel / Voyage</p>
                   <p className="text-sm font-semibold text-ink">
                     {shipment.vessel_name || "—"}
-                    {shipment.voyage_number
-                      ? ` / ${shipment.voyage_number}`
-                      : ""}
+                    {shipment.voyage_number ? ` / ${shipment.voyage_number}` : ""}
                   </p>
                 </div>
 
@@ -602,45 +756,19 @@ export default function OperationsReceivingNewPage() {
             </section>
 
             <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <SummaryCard
-                label="Expected containers"
-                value={shipment.containers.length}
-                icon={Container}
-                detail="Linked to this shipment"
-              />
-
-              <SummaryCard
-                label="Gate entered"
-                value={progress.entered}
-                icon={Truck}
-                detail="Recorded by Gate Management"
-              />
-
-              <SummaryCard
-                label="Received"
-                value={progress.received}
-                icon={CheckCircle2}
-                detail="Physical receipt confirmed"
-              />
-
-              <SummaryCard
-                label="Outstanding"
-                value={progress.outstanding}
-                icon={Package}
-                detail="Not yet recorded as gate-in"
-              />
+              <SummaryCard label="Expected containers" value={shipment.containers.length} icon={Container} detail="Linked to this shipment" />
+              <SummaryCard label="Gate entered" value={progress.entered} icon={Truck} detail="Recorded by Gate Management" />
+              <SummaryCard label="Received" value={progress.received} icon={CheckCircle2} detail="Physical receipt confirmed" />
+              <SummaryCard label="Outstanding" value={progress.outstanding} icon={Package} detail="Not yet recorded as gate-in" />
             </section>
 
             {step === 1 && (
-              <section className="overflow-hidden rounded-2xl border border-line bg-paper">
+              <section className="overflow-hidden rounded-2xl border border-line bg-paper shadow-sm">
                 <div className="flex flex-col justify-between gap-3 border-b border-line p-5 sm:flex-row sm:items-center sm:px-6">
                   <div>
-                    <h2 className="text-sm font-semibold text-ink">
-                      Verify Arrived Containers
-                    </h2>
+                    <h2 className="text-sm font-semibold text-ink">Verify Arrived Containers</h2>
                     <p className="mt-1 text-xs text-ink-soft">
-                      Only containers recorded as entered by Gate Management
-                      can be selected.
+                      Only containers recorded as entered by Gate Management can be selected.
                     </p>
                   </div>
 
@@ -651,13 +779,8 @@ export default function OperationsReceivingNewPage() {
 
                 {shipment.containers.length === 0 ? (
                   <div className="p-10 text-center">
-                    <Container
-                      size={30}
-                      className="mx-auto text-ink-soft"
-                    />
-                    <h3 className="mt-3 text-sm font-semibold text-ink">
-                      No containers found
-                    </h3>
+                    <Container size={30} className="mx-auto text-ink-soft" />
+                    <h3 className="mt-3 text-sm font-semibold text-ink">No containers found</h3>
                     <p className="mt-1 text-xs text-ink-soft">
                       This shipment has no linked containers to receive.
                     </p>
@@ -694,7 +817,7 @@ export default function OperationsReceivingNewPage() {
                                     });
                                     setSaveError("");
                                   }}
-                                  className="h-4 w-4 accent-teal disabled:cursor-not-allowed"
+                                  className="h-4 w-4 cursor-pointer accent-teal disabled:cursor-not-allowed"
                                   aria-label={`Select ${container.container_no}`}
                                 />
                               </td>
@@ -723,7 +846,7 @@ export default function OperationsReceivingNewPage() {
                                 </span>
                               </td>
 
-                              <td className="px-5 py-4 text-sm text-ink-soft">
+                              <td className="px-5 py-4 font-mono text-sm text-ink-soft">
                                 {container.expected_seal_no || "—"}
                               </td>
                             </tr>
@@ -738,31 +861,25 @@ export default function OperationsReceivingNewPage() {
                   <div className="border-t border-line bg-sand/30 p-5 sm:px-6">
                     <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                       <p className="text-sm text-ink-soft">
-                        <span className="font-semibold text-ink">
-                          {selectedContainers.length}
-                        </span>{" "}
-                        of {eligibleContainers.length} eligible containers
-                        selected
+                        <span className="font-semibold text-ink">{selectedContainers.length}</span> of {eligibleContainers.length} eligible containers selected
                       </p>
 
                       <button
                         type="button"
                         onClick={() => toggleAllEligible(true)}
-                        className="self-start text-xs font-semibold text-ink underline-offset-4 hover:underline sm:self-auto"
+                        className="cursor-pointer self-start text-xs font-semibold text-ink underline-offset-4 hover:underline sm:self-auto"
                       >
                         Select all eligible
                       </button>
                     </div>
 
-                    {saveError && (
-                      <p className="mt-3 text-sm text-coral">{saveError}</p>
-                    )}
+                    {saveError && <p className="mt-3 text-sm text-coral">{saveError}</p>}
 
                     <div className="mt-4 flex justify-end">
                       <button
                         type="button"
                         onClick={continueToVerification}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink/90"
+                        className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink/90"
                       >
                         Enter Container Conditions
                         <ArrowRight size={16} />
@@ -774,227 +891,214 @@ export default function OperationsReceivingNewPage() {
             )}
 
             {step === 2 && (
-              <section className="overflow-hidden rounded-2xl border border-line bg-paper">
-                <div className="border-b border-line p-5 sm:px-6">
-                  <h2 className="text-sm font-semibold text-ink">
-                    Physical Receiving Verification
-                  </h2>
+              <section className="overflow-hidden rounded-2xl border border-line bg-paper shadow-sm">
+                <div className="border-b border-line p-5 sm:px-6 bg-sand/20">
+                  <h2 className="text-sm font-semibold text-ink">Physical Receiving Verification</h2>
                   <p className="mt-1 text-xs text-ink-soft">
-                    Record the actual condition and receiving details for each
-                    selected container.
+                    Verify the physical condition and seal numbers for the selected containers.
                   </p>
                 </div>
 
-                <div className="space-y-5 p-5 sm:p-6">
-                  {selectedContainers.map((container) => (
-                    <div
-                      key={container.id}
-                      className="rounded-2xl border border-line p-4 sm:p-5"
-                    >
-                      <div className="mb-5 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-                        <div className="flex items-center gap-3">
-                          <div className="rounded-xl bg-sand p-2.5 text-ink-soft">
+                <div className="space-y-6 p-5 sm:p-6">
+                  {selectedContainers.map((container) => {
+                    const expectedSeal = container.expected_seal_no.trim().toUpperCase();
+                    const actualSeal = container.actual_seal_no.trim().toUpperCase();
+                    const sealDiffers = expectedSeal !== "" && actualSeal !== "" && expectedSeal !== actualSeal;
+
+                    return (
+                      <div key={container.id} className="overflow-hidden rounded-2xl border border-line shadow-sm">
+                        
+                        {/* Container Header */}
+                        <div className="flex items-center gap-3 border-b border-line bg-sand/50 p-4">
+                          <div className="grid size-10 place-items-center rounded-xl bg-ink text-white">
                             <Container size={20} />
                           </div>
                           <div>
-                            <h3 className="text-sm font-semibold text-ink">
-                              {container.container_no}
-                            </h3>
-                            <p className="mt-1 text-xs text-ink-soft">
-                              Gate status: Entered
-                            </p>
+                            <h3 className="font-mono text-base font-bold text-ink">{container.container_no}</h3>
+                          </div>
+                        </div>
+
+                        <div className="p-4 sm:p-5 space-y-6">
+                          {/* SEAL COMPARISON SECTION */}
+                          <div>
+                            <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-ink-soft flex items-center gap-2">
+                              <ShieldCheck size={14} /> Seal Verification
+                            </h4>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <div>
+                                <label className={labelClass}>Expected Seal Number (System)</label>
+                                <input
+                                  value={container.expected_seal_no}
+                                  readOnly
+                                  className={`${inputClass} bg-sand/50 font-mono font-bold text-ink-soft`}
+                                />
+                              </div>
+                              <div>
+                                <label className={labelClass}>Actual Seal Number Found</label>
+                                <input
+                                  value={container.actual_seal_no}
+                                  onChange={(event) =>
+                                    updateContainer(container.id, { actual_seal_no: event.target.value })
+                                  }
+                                  placeholder="Enter physical seal number"
+                                  className={cn(
+                                    inputClass,
+                                    "font-mono",
+                                    sealDiffers && "border-coral/50 focus:border-coral focus:ring-coral/20"
+                                  )}
+                                />
+                              </div>
+                            </div>
+
+                            {sealDiffers && (
+                              <div className="mt-3 flex items-start gap-2 rounded-lg border border-coral/20 bg-coral/5 p-3 text-sm text-coral">
+                                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                                <p>
+                                  <strong>Warning:</strong> The actual seal differs from the expected seal. Make sure you select "Seal mismatch" in the condition dropdown below.
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* CONDITION SECTION */}
+                          <div className="border-t border-line pt-5">
+                            <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-ink-soft flex items-center gap-2">
+                              <ImageIcon size={14} /> Condition & Evidence
+                            </h4>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              <div>
+                                <label className={labelClass}>Container Condition *</label>
+                                <select
+                                  value={container.condition}
+                                  onChange={(event) => {
+                                    updateContainer(container.id, { condition: event.target.value });
+                                    setSaveError("");
+                                  }}
+                                  className={inputClass}
+                                >
+                                  <option value="">Select condition</option>
+                                  <option value="GOOD">Good / Intact</option>
+                                  <option value="SEAL_MISMATCH">Seal Mismatch</option>
+                                  <option value="DAMAGED">Damaged</option>
+                                  <option value="OTHER_DISCREPANCY">Other Discrepancy</option>
+                                </select>
+                              </div>
+
+                              {container.condition === "DAMAGED" && (
+                                <div>
+                                  <label className={labelClass}>Upload Damage Proof (Optional)</label>
+                                  <div className="relative">
+                                    <input
+                                      type="file"
+                                      accept="image/jpeg,image/png,image/webp,application/pdf"
+                                      onChange={(event) => {
+                                        const file = event.target.files?.[0] ?? null;
+                                        if (file && file.size > 10 * 1024 * 1024) {
+                                          setSaveError("File size must not exceed 10 MB.");
+                                          event.target.value = "";
+                                          return;
+                                        }
+                                        setDamageProofs((current) => ({
+                                          ...current,
+                                          [container.id]: file,
+                                        }));
+                                        setSaveError("");
+                                      }}
+                                      className="absolute inset-0 cursor-pointer opacity-0"
+                                    />
+                                    <div className="flex h-[46px] w-full items-center justify-between rounded-xl border border-dashed border-line bg-sand px-3 text-sm text-ink-soft">
+                                      {damageProofs[container.id] ? (
+                                        <span className="truncate text-ink font-medium">{damageProofs[container.id]?.name}</span>
+                                      ) : (
+                                        <span className="flex items-center gap-2"><Upload size={16} /> Attach photo or PDF</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {damageProofs[container.id] && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setDamageProofs((c) => ({ ...c, [container.id]: null }))}
+                                      className="mt-1.5 text-xs text-coral hover:underline"
+                                    >
+                                      Remove file
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* LOCATION & WEIGHT SECTION */}
+                          <div className="border-t border-line pt-5">
+                            <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-ink-soft flex items-center gap-2">
+                              <MapPin size={14} /> Storage & Details
+                            </h4>
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                              <div>
+                                <label className={labelClass}>Receiving Location *</label>
+                                <select
+                                  value={container.receiving_location_id}
+                                  onChange={(event) => {
+                                    const location = receivingLocations.find((item) => item.id === event.target.value);
+                                    updateContainer(container.id, {
+                                      receiving_location_id: location?.id || "",
+                                      receiving_location: location?.name || "",
+                                    });
+                                    setSaveError("");
+                                  }}
+                                  disabled={locationsLoading || receivingLocations.length === 0}
+                                  className={inputClass}
+                                >
+                                  <option value="">
+                                    {locationsLoading ? "Loading locations..." : receivingLocations.length === 0 ? "No locations available" : "Select receiving location"}
+                                  </option>
+                                  {receivingLocations.map((location) => (
+                                    <option key={location.id} value={location.id}>
+                                      {location.name} {location.code ? `(${location.code})` : ""}
+                                    </option>
+                                  ))}
+                                </select>
+                                {locationsError && <p className="mt-1.5 text-xs text-coral">{locationsError}</p>}
+                              </div>
+
+                              <div>
+                                <label className={labelClass}>Actual Weight (kg)</label>
+                                <div className="relative">
+                                  <Weight size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-soft" />
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={container.actual_weight}
+                                    onChange={(event) =>
+                                      updateContainer(container.id, { actual_weight: event.target.value })
+                                    }
+                                    placeholder="Enter weight"
+                                    className={`${inputClass} pl-10`}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="sm:col-span-2 lg:col-span-1">
+                                <label className={labelClass}>Remarks</label>
+                                <input
+                                  value={container.remarks}
+                                  onChange={(event) =>
+                                    updateContainer(container.id, { remarks: event.target.value })
+                                  }
+                                  placeholder="Optional notes..."
+                                  className={inputClass}
+                                />
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        <div>
-                          <label
-                            htmlFor={`expected-seal-${container.id}`}
-                            className={labelClass}
-                          >
-                            Expected Seal Number
-                          </label>
-                          <input
-                            id={`expected-seal-${container.id}`}
-                            value={container.expected_seal_no}
-                            readOnly
-                            className={`${inputClass} bg-sand/50`}
-                          />
-                        </div>
-
-                        <div>
-                          <label
-                            htmlFor={`actual-seal-${container.id}`}
-                            className={labelClass}
-                          >
-                            Actual Seal Number
-                          </label>
-                          <input
-                            id={`actual-seal-${container.id}`}
-                            value={container.actual_seal_no}
-                            onChange={(event) =>
-                              updateContainer(container.id, {
-                                actual_seal_no: event.target.value,
-                              })
-                            }
-                            placeholder="Enter observed seal"
-                            className={inputClass}
-                          />
-                        </div>
-
-                        <div>
-                          <label
-                            htmlFor={`condition-${container.id}`}
-                            className={labelClass}
-                          >
-                            Container Condition
-                          </label>
-                          <select
-                            id={`condition-${container.id}`}
-                            value={container.condition}
-                            onChange={(event) =>
-                              updateContainer(container.id, {
-                                condition: event.target.value,
-                              })
-                            }
-                            className={inputClass}
-                          >
-                            <option value="">Select condition</option>
-                            <option value="GOOD">Good</option>
-                            <option value="DAMAGED">Damaged</option>
-                            <option value="SEAL_MISMATCH">Seal mismatch</option>
-                            <option value="OTHER_DISCREPANCY">
-                              Other discrepancy
-                            </option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label
-                            htmlFor={`weight-${container.id}`}
-                            className={labelClass}
-                          >
-                            Actual Weight (optional)
-                          </label>
-                          <div className="relative">
-                            <Weight
-                              size={16}
-                              className="absolute left-3 top-3.5 text-ink-soft"
-                            />
-                            <input
-                              id={`weight-${container.id}`}
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={container.actual_weight}
-                              onChange={(event) =>
-                                updateContainer(container.id, {
-                                  actual_weight: event.target.value,
-                                })
-                              }
-                              placeholder="Enter weight"
-                              className={`${inputClass} pl-9`}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label
-                            htmlFor={`location-${container.id}`}
-                            className={labelClass}
-                          >
-                            Receiving Location
-                          </label>
-                          <div className="relative">
-                            <MapPin
-                              size={16}
-                              className="absolute left-3 top-3.5 text-ink-soft"
-                            />
-                            <input
-                              id={`location-${container.id}`}
-                              value={container.receiving_location}
-                              onChange={(event) =>
-                                updateContainer(container.id, {
-                                  receiving_location: event.target.value,
-                                })
-                              }
-                              placeholder="e.g. Receiving Bay 02"
-                              className={`${inputClass} pl-9`}
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label
-                            htmlFor={`remarks-${container.id}`}
-                            className={labelClass}
-                          >
-                            Remarks / Discrepancies
-                          </label>
-                          <input
-                            id={`remarks-${container.id}`}
-                            value={container.remarks}
-                            onChange={(event) =>
-                              updateContainer(container.id, {
-                                remarks: event.target.value,
-                              })
-                            }
-                            placeholder="Optional inspection notes"
-                            className={inputClass}
-                          />
-                        </div>
-                      </div>
-
-                      {container.expected_seal_no.trim() !== "" &&
-                        container.actual_seal_no.trim() !== "" &&
-                        container.expected_seal_no.trim().toUpperCase() !==
-                          container.actual_seal_no.trim().toUpperCase() && (
-                          <div className="mt-4 flex items-start gap-2 rounded-xl border border-coral/20 bg-coral/5 p-3 text-xs text-coral">
-                            <Info size={15} className="mt-0.5 shrink-0" />
-                            The actual seal does not match the expected seal.
-                            Record the discrepancy and follow the terminal's
-                            inspection procedure.
-                          </div>
-                        )}
-
-                      {(container.condition === "DAMAGED" ||
-                        container.condition === "SEAL_MISMATCH" ||
-                        container.condition === "OTHER_DISCREPANCY") && (
-                        <div className="mt-4 flex items-start gap-2 rounded-xl border border-orange/20 bg-orange/5 p-3 text-xs text-ink">
-                          <Info
-                            size={15}
-                            className="mt-0.5 shrink-0 text-orange"
-                          />
-                          A discrepancy has been identified. Record the
-                          inspection findings in the remarks.
-                        </div>
-                      )}
-                    </div>
-                  ))}
-
-                  <div className="rounded-xl border border-line bg-sand/40 p-4">
-                    <div className="flex items-start gap-2">
-                      <ShieldCheck
-                        size={18}
-                        className="mt-0.5 shrink-0 text-teal"
-                      />
-                      <div>
-                        <p className="text-sm font-semibold text-ink">
-                          Partial receiving is supported
-                        </p>
-                        <p className="mt-1 text-xs leading-5 text-ink-soft">
-                          Only selected containers are submitted. Containers
-                          that have not entered the gate remain outstanding.
-                          Shipment progress must be recalculated by the
-                          backend from the recorded container statuses.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })}
 
                   {saveError && (
-                    <div className="rounded-xl border border-coral/20 bg-coral/5 p-3 text-sm text-coral">
+                    <div className="rounded-xl border border-coral/20 bg-coral/5 p-4 text-sm text-coral">
                       {saveError}
                     </div>
                   )}
@@ -1006,7 +1110,7 @@ export default function OperationsReceivingNewPage() {
                         setStep(1);
                         setSaveError("");
                       }}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-line px-4 py-3 text-sm font-semibold text-ink transition hover:bg-sand"
+                      className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-line px-4 py-3 text-sm font-semibold text-ink transition hover:bg-sand"
                     >
                       <ArrowLeft size={16} />
                       Back to Containers
@@ -1015,29 +1119,16 @@ export default function OperationsReceivingNewPage() {
                     <button
                       type="button"
                       onClick={saveReceiving}
-                      disabled={saving || selectedContainers.length === 0}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={saving || selectedContainers.length === 0 || locationsLoading}
+                      className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {saving ? (
-                        <LoaderCircle size={17} className="animate-spin" />
-                      ) : (
-                        <CheckCircle2 size={17} />
-                      )}
+                      {saving ? <LoaderCircle size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}
                       {saving ? "Saving..." : "Confirm Receiving"}
                     </button>
                   </div>
                 </div>
               </section>
             )}
-
-            <div className="flex items-start gap-2 text-xs leading-5 text-ink-soft">
-              <Info size={15} className="mt-0.5 shrink-0" />
-              <p>
-                Gate Management records entry. Receiving confirms physical
-                receipt. The backend must validate container eligibility,
-                prevent duplicate receiving, and update shipment progress.
-              </p>
-            </div>
           </>
         )}
 
@@ -1046,13 +1137,11 @@ export default function OperationsReceivingNewPage() {
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sand text-ink-soft">
               <Package size={25} />
             </div>
-            <h2 className="mt-4 text-sm font-semibold text-ink">
-              Ready to receive cargo?
-            </h2>
+
+            <h2 className="mt-4 text-sm font-semibold text-ink">Ready to receive cargo?</h2>
+
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-soft">
-              Search using a gate pass number, bill of lading, or shipment
-              reference to load an existing shipment and check its arrived
-              containers.
+              Search using a gate pass number, bill of lading, or shipment reference to load an existing shipment and check its arrived containers.
             </p>
           </div>
         )}
