@@ -119,6 +119,19 @@
                 "enabled" => true
             ],
             [
+                "key" => "locations",
+                "title" => "Terminal Locations",
+                "desc" => "Manage receiving areas, yards, blocks, slots, warehouses, inspection bays and designated holding areas.",
+                "href" => "/admin/configuration/locations",
+                "icon" => "MapPin",
+                "group" => "identity",
+                "state" => "Available",
+                "stateTone" => "info",
+                "lastChanged" => "Not configured",
+                "featured" => false,
+                "enabled" => true
+            ],
+            [
                 "key" => "cargo",
                 "title" => "Cargo & Lifecycle",
                 "desc" => "Configure cargo states, customer labels, permitted lifecycle transitions, holds and operational reasons.",

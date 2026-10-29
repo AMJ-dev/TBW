@@ -6,15 +6,12 @@ import {
 	Boxes,
 	Building2,
 	Layers,
-	MapPin,
 	Package,
 	Plus,
 	Save,
 	ShieldCheck,
 	Tag,
 	Trash2,
-	Warehouse,
-	Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, StatusBadge } from "@/components/auth-shell";
@@ -22,52 +19,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { http, type Resp } from "@/lib/httpClient";
-
-type LocationKind = "yard" | "warehouse";
-type LocationStatus = "active" | "inactive" | "maintenance";
-type CapacityUnit = "TEU" | "sqm" | "pallets" | "positions" | "tonnes";
-
-interface EquipmentEntry {
-	id: string;
-	label: string;
-}
-
-interface LocationRow {
-	id: string;
-	code: string;
-	name: string;
-	kind: LocationKind;
-	bonded: boolean;
-	status: LocationStatus;
-	capacity: string;
-	capacityUnit: CapacityUnit;
-	cargoTypes: string;
-	security: string;
-	equipment: EquipmentEntry[];
-	zone: string;
-	block: string;
-	row: string;
-	slot: string;
-	tier: string;
-	aisle: string;
-	rack: string;
-	bin: string;
-}
-
-interface CargoService {
-	id: string;
-	label: string;
-}
-
-interface HoldReason {
-	id: string;
-	label: string;
-}
-
-interface OperationalArea {
-	id: string;
-	label: string;
-}
 
 interface LabelRow {
 	id: string;
@@ -78,10 +29,7 @@ interface TerminalConfig {
 	terminalName: string;
 	terminalCode: string;
 	operatingHours: string;
-	locations: LocationRow[];
-	cargoServices: CargoService[];
-	holdReasons: HoldReason[];
-	operationalAreas: OperationalArea[];
+	holdReasons: LabelRow[];
 	cargoCategories: LabelRow[];
 	packagingTypes: LabelRow[];
 	shipmentTypes: LabelRow[];
@@ -91,87 +39,11 @@ const emptyConfig: TerminalConfig = {
 	terminalName: "",
 	terminalCode: "",
 	operatingHours: "",
-	locations: [],
-	cargoServices: [],
 	holdReasons: [],
-	operationalAreas: [],
 	cargoCategories: [],
 	packagingTypes: [],
 	shipmentTypes: [],
 };
-
-const capacityUnits: { value: CapacityUnit; label: string }[] = [
-	{ value: "TEU", label: "TEU" },
-	{ value: "sqm", label: "Square metres" },
-	{ value: "pallets", label: "Pallets" },
-	{ value: "positions", label: "Positions" },
-	{ value: "tonnes", label: "Tonnes" },
-];
-
-const EQUIPMENT_SUGGESTIONS = [
-	"Reach stacker",
-	"Forklift",
-	"Terminal tractor",
-	"Container handler",
-	"Pallet jack",
-	"Platform weighing scale",
-	"Crane",
-	"Loading dock equipment",
-];
-
-const normaliseEquipment = (raw: any): EquipmentEntry[] => {
-	if (!Array.isArray(raw)) {
-		if (typeof raw === "string" && raw.trim()) {
-			return raw
-				.split(",")
-				.map((label: string) => label.trim())
-				.filter(Boolean)
-				.map((label: string) => ({
-					id: crypto.randomUUID(),
-					label,
-				}));
-		}
-		return [];
-	}
-	return raw
-		.map((item: any) => {
-			if (typeof item === "string") {
-				return { id: crypto.randomUUID(), label: item };
-			}
-			return {
-				id: String(item?.id ?? crypto.randomUUID()),
-				label: item?.label ?? item?.name ?? "",
-			};
-		})
-		.filter((item) => item.label.trim());
-};
-
-const normaliseLocation = (raw: any): LocationRow => ({
-	id: String(raw?.id ?? crypto.randomUUID()),
-	code: raw?.code ?? "",
-	name: raw?.name ?? "",
-	kind: (raw?.kind ?? "yard") as LocationKind,
-	bonded: Boolean(raw?.bonded ?? true),
-	status: (raw?.status ?? "active") as LocationStatus,
-	capacity:
-		raw?.capacity === null || raw?.capacity === undefined
-			? ""
-			: String(raw.capacity),
-	capacityUnit: (raw?.capacity_unit ??
-		raw?.capacityUnit ??
-		"TEU") as CapacityUnit,
-	cargoTypes: raw?.cargo_types ?? raw?.cargoTypes ?? "",
-	security: raw?.security ?? "",
-	equipment: normaliseEquipment(raw?.equipment),
-	zone: raw?.zone ?? "",
-	block: raw?.block ?? "",
-	row: raw?.row ?? "",
-	slot: raw?.slot ?? "",
-	tier: raw?.tier ?? "",
-	aisle: raw?.aisle ?? "",
-	rack: raw?.rack ?? "",
-	bin: raw?.bin ?? "",
-});
 
 const normaliseLabelRow = (raw: any): LabelRow => ({
 	id: String(raw?.id ?? crypto.randomUUID()),
@@ -185,9 +57,6 @@ export default function AdminTerminalConfigurationPage() {
 	const [error, setError] = useState("");
 	const [dirty, setDirty] = useState(false);
 	const [changeReason, setChangeReason] = useState("");
-	const [equipmentDrafts, setEquipmentDrafts] = useState<
-		Record<string, string>
-	>({});
 
 	const fetchAll = async () => {
 		setLoading(true);
@@ -203,23 +72,10 @@ export default function AdminTerminalConfigurationPage() {
 			const rawShipmentTypes: any[] = Array.isArray(payload.shipment_types)
 				? payload.shipment_types
 				: [];
-			const rawLocations: any[] = Array.isArray(payload.locations)
-				? payload.locations
-				: [];
-			const rawServices: any[] = Array.isArray(payload.cargo_services)
-				? payload.cargo_services
-				: Array.isArray(payload.cargoServices)
-					? payload.cargoServices
-					: [];
 			const rawHolds: any[] = Array.isArray(payload.hold_reasons)
 				? payload.hold_reasons
 				: Array.isArray(payload.holdReasons)
 					? payload.holdReasons
-					: [];
-			const rawAreas: any[] = Array.isArray(payload.operational_areas)
-				? payload.operational_areas
-				: Array.isArray(payload.operationalAreas)
-					? payload.operationalAreas
 					: [];
 			const rawCategories: any[] = Array.isArray(
 				payload.cargo_categories
@@ -243,16 +99,12 @@ export default function AdminTerminalConfigurationPage() {
 					payload.terminal_code ?? payload.terminalCode ?? "",
 				operatingHours:
 					payload.operating_hours ?? payload.operatingHours ?? "",
-				locations: rawLocations.map(normaliseLocation),
-				cargoServices: rawServices.map(normaliseLabelRow),
 				holdReasons: rawHolds.map(normaliseLabelRow),
-				operationalAreas: rawAreas.map(normaliseLabelRow),
 				cargoCategories: rawCategories.map(normaliseLabelRow),
 				packagingTypes: rawPackaging.map(normaliseLabelRow),
 				shipmentTypes: rawShipmentTypes.map(normaliseLabelRow),
 			});
 			setChangeReason("");
-			setEquipmentDrafts({});
 			setDirty(false);
 		} catch (err: any) {
 			setError(
@@ -277,134 +129,8 @@ export default function AdminTerminalConfigurationPage() {
 		setDirty(true);
 	};
 
-	const addLocation = () => {
-		setConfig((prev) => ({
-			...prev,
-			locations: [
-				...prev.locations,
-				{
-					id: `loc-${Date.now()}`,
-					code: "",
-					name: "",
-					kind: "yard",
-					bonded: true,
-					status: "active",
-					capacity: "",
-					capacityUnit: "TEU",
-					cargoTypes: "",
-					security: "",
-					equipment: [],
-					zone: "",
-					block: "",
-					row: "",
-					slot: "",
-					tier: "",
-					aisle: "",
-					rack: "",
-					bin: "",
-				},
-			],
-		}));
-		setDirty(true);
-	};
-
-	const updateLocation = (id: string, patch: Partial<LocationRow>) => {
-		setConfig((prev) => ({
-			...prev,
-			locations: prev.locations.map((location) =>
-				location.id === id ? { ...location, ...patch } : location
-			),
-		}));
-		setDirty(true);
-	};
-
-	const removeLocation = (id: string) => {
-		setConfig((prev) => ({
-			...prev,
-			locations: prev.locations.filter((location) => location.id !== id),
-		}));
-		setDirty(true);
-	};
-
-	const addEquipmentFromSuggestion = (
-		locationId: string,
-		label: string
-	) => {
-		const trimmed = label.trim();
-		if (!trimmed) return;
-		setConfig((prev) => ({
-			...prev,
-			locations: prev.locations.map((location) => {
-				if (location.id !== locationId) return location;
-				const exists = location.equipment.some(
-					(e) => e.label.toLowerCase() === trimmed.toLowerCase()
-				);
-				if (exists) return location;
-				return {
-					...location,
-					equipment: [
-						...location.equipment,
-						{ id: crypto.randomUUID(), label: trimmed },
-					],
-				};
-			}),
-		}));
-		setDirty(true);
-	};
-
-	const addEquipmentFromDraft = (locationId: string) => {
-		const draft = (equipmentDrafts[locationId] ?? "").trim();
-		if (!draft) {
-			toast.error("Type an equipment name first.");
-			return;
-		}
-		addEquipmentFromSuggestion(locationId, draft);
-		setEquipmentDrafts((prev) => ({ ...prev, [locationId]: "" }));
-	};
-
-	const updateEquipmentEntry = (
-		locationId: string,
-		equipmentId: string,
-		label: string
-	) => {
-		setConfig((prev) => ({
-			...prev,
-			locations: prev.locations.map((location) => {
-				if (location.id !== locationId) return location;
-				return {
-					...location,
-					equipment: location.equipment.map((entry) =>
-						entry.id === equipmentId ? { ...entry, label } : entry
-					),
-				};
-			}),
-		}));
-		setDirty(true);
-	};
-
-	const removeEquipmentEntry = (
-		locationId: string,
-		equipmentId: string
-	) => {
-		setConfig((prev) => ({
-			...prev,
-			locations: prev.locations.map((location) => {
-				if (location.id !== locationId) return location;
-				return {
-					...location,
-					equipment: location.equipment.filter(
-						(entry) => entry.id !== equipmentId
-					),
-				};
-			}),
-		}));
-		setDirty(true);
-	};
-
 	type ListKey =
-		| "cargoServices"
 		| "holdReasons"
-		| "operationalAreas"
 		| "cargoCategories"
 		| "shipmentTypes"
 		| "packagingTypes";
@@ -465,51 +191,7 @@ export default function AdminTerminalConfigurationPage() {
 			return false;
 		}
 
-		const invalidLocation = config.locations.some(
-			(location) =>
-				!location.code.trim() ||
-				!location.name.trim() ||
-				!location.zone.trim() ||
-				(location.capacity !== "" &&
-					(!Number.isFinite(Number(location.capacity)) ||
-						Number(location.capacity) < 0))
-		);
-		if (invalidLocation) {
-			toast.error(
-				"Each location needs a code, name, and zone, and a valid capacity."
-			);
-			return false;
-		}
-
-		const emptyEquipment = config.locations.find((location) =>
-			location.equipment.some((entry) => !entry.label.trim())
-		);
-		if (emptyEquipment) {
-			toast.error(
-				"Remove empty equipment entries or fill them in before saving."
-			);
-			return false;
-		}
-
-		const duplicateEquipment = config.locations.find((location) => {
-			const labels = location.equipment.map((entry) =>
-				entry.label.trim().toLowerCase()
-			);
-			return new Set(labels).size !== labels.length;
-		});
-		if (duplicateEquipment) {
-			toast.error(
-				`Duplicate equipment listed on "${duplicateEquipment.name}".`
-			);
-			return false;
-		}
-
 		const listChecks: [LabelRow[], string, string][] = [
-			[
-				config.cargoServices,
-				"Every cargo service needs a label, or remove the empty row.",
-				"Duplicate cargo service",
-			],
 			[
 				config.shipmentTypes,
 				"Every shipment type needs a name, or remove the empty row.",
@@ -519,11 +201,6 @@ export default function AdminTerminalConfigurationPage() {
 				config.holdReasons,
 				"Every hold reason needs a label, or remove the empty row.",
 				"Duplicate hold reason",
-			],
-			[
-				config.operationalAreas,
-				"Every operational area needs a label, or remove the empty row.",
-				"Duplicate operational area",
 			],
 			[
 				config.cargoCategories,
@@ -558,46 +235,11 @@ export default function AdminTerminalConfigurationPage() {
 				terminal_name: config.terminalName.trim(),
 				terminal_code: config.terminalCode.trim(),
 				operating_hours: config.operatingHours.trim(),
-				locations: config.locations.map((location) => ({
-					id: location.id,
-					code: location.code.trim(),
-					name: location.name.trim(),
-					kind: location.kind,
-					bonded: location.bonded,
-					status: location.status,
-					capacity:
-						location.capacity === ""
-							? null
-							: Number(location.capacity),
-					capacity_unit: location.capacityUnit,
-					cargo_types: location.cargoTypes.trim(),
-					security: location.security.trim(),
-					equipment: location.equipment.map((entry) => ({
-						id: entry.id,
-						label: entry.label.trim(),
-					})),
-					zone: location.zone.trim(),
-					block: location.block.trim(),
-					row: location.row.trim(),
-					slot: location.slot.trim(),
-					tier: location.tier.trim(),
-					aisle: location.aisle.trim(),
-					rack: location.rack.trim(),
-					bin: location.bin.trim(),
-				})),
 				shipment_types: config.shipmentTypes.map((row) => ({
 					id: row.id,
 					label: row.label.trim(),
 				})),
-				cargo_services: config.cargoServices.map((row) => ({
-					id: row.id,
-					label: row.label.trim(),
-				})),
 				hold_reasons: config.holdReasons.map((row) => ({
-					id: row.id,
-					label: row.label.trim(),
-				})),
-				operational_areas: config.operationalAreas.map((row) => ({
 					id: row.id,
 					label: row.label.trim(),
 				})),
@@ -639,7 +281,6 @@ export default function AdminTerminalConfigurationPage() {
 
 	const handleDiscard = async () => {
 		setChangeReason("");
-		setEquipmentDrafts({});
 		await fetchAll();
 		toast.message("Changes discarded.");
 	};
@@ -710,10 +351,9 @@ export default function AdminTerminalConfigurationPage() {
 						</h2>
 						<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
 							Configure terminal identity, operating hours, cargo
-							services, cargo categories, packaging types, storage
-							locations, operational areas, and hold reasons. Changes
-							apply to new operational events; historical records retain
-							their original configuration.
+							categories, packaging types, and hold reasons. Changes apply to new operational
+							events; historical records retain their original
+							configuration.
 						</p>
 					</div>
 					{dirty && (
@@ -731,11 +371,10 @@ export default function AdminTerminalConfigurationPage() {
 								Operational rules
 							</p>
 							<p className="mt-1 text-xs leading-5 text-ink-soft">
-								Location hierarchy, bonded segregation, cargo
-								services, cargo categories, packaging types,
-								operational areas, and hold reasons are configurable.
-								Operational movements and holds retain their own event
-								history and audit trail.
+								Bonded segregation, cargo categories,
+								packaging types, and hold reasons
+								are configurable. Operational movements and holds
+								retain their own event history and audit trail.
 							</p>
 						</div>
 					</div>
@@ -780,473 +419,6 @@ export default function AdminTerminalConfigurationPage() {
 					</div>
 				</section>
 
-				<section className="rounded-2xl bg-paper ring-1 ring-line">
-					<div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-5">
-						<div>
-							<h3 className="font-display text-sm font-bold text-ink">
-								Zones &amp; Locations
-							</h3>
-							<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-								Configure yard zones with blocks, rows, slots and
-								tiers, or warehouse zones with aisles, racks and
-								bins. Add the equipment assigned to each location.
-							</p>
-						</div>
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							onClick={addLocation}
-							className="border-line bg-paper text-ink hover:bg-sand"
-						>
-							<Plus className="size-3.5" />
-							Add location
-						</Button>
-					</div>
-
-					{config.locations.length === 0 ? (
-						<div className="p-6 text-center text-sm text-ink-soft">
-							No locations configured.
-						</div>
-					) : (
-						<ul className="divide-y divide-line">
-							{config.locations.map((location) => (
-								<li key={location.id} className="p-5">
-									<div className="flex flex-wrap items-start gap-4">
-										<div
-											className={cn(
-												"grid size-10 shrink-0 place-items-center rounded-lg text-white",
-												location.kind === "warehouse"
-													? "bg-orange"
-													: "bg-slate"
-											)}
-										>
-											{location.kind === "warehouse" ? (
-												<Warehouse className="size-5" />
-											) : (
-												<Boxes className="size-5" />
-											)}
-										</div>
-
-										<div className="min-w-[220px] flex-1 space-y-5">
-											<div className="rounded-lg border border-line p-3">
-												<p className="mb-3 flex items-center gap-2 text-xs font-semibold text-ink">
-													<Layers className="size-3.5 text-orange" />
-													Zone
-												</p>
-												<div className="grid gap-3 sm:grid-cols-3">
-													<SmallField
-														label="Zone name"
-														value={location.zone}
-														onChange={(value) =>
-															updateLocation(location.id, {
-																zone: value,
-															})
-														}
-														placeholder="e.g. Container Yard A"
-													/>
-													<label className="block">
-														<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-															Zone type
-														</span>
-														<select
-															value={location.kind}
-															onChange={(event) => {
-																const kind = event.target
-																	.value as LocationKind;
-																updateLocation(location.id, {
-																	kind,
-																	capacityUnit:
-																		kind === "yard"
-																			? "TEU"
-																			: "sqm",
-																});
-															}}
-															className="mt-1 h-9 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25"
-														>
-															<option value="yard">Yard</option>
-															<option value="warehouse">
-																Warehouse
-															</option>
-														</select>
-													</label>
-													<label className="block">
-														<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-															Status
-														</span>
-														<select
-															value={location.status}
-															onChange={(event) =>
-																updateLocation(location.id, {
-																	status: event.target
-																		.value as LocationStatus,
-																})
-															}
-															className="mt-1 h-9 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25"
-														>
-															<option value="active">Active</option>
-															<option value="inactive">
-																Inactive
-															</option>
-															<option value="maintenance">
-																Maintenance
-															</option>
-														</select>
-													</label>
-												</div>
-											</div>
-
-											<div className="grid gap-3 sm:grid-cols-3">
-												<SmallField
-													label="Location code"
-													value={location.code}
-													onChange={(value) =>
-														updateLocation(location.id, {
-															code: value,
-														})
-													}
-													placeholder="CY-A"
-													mono
-												/>
-												<SmallField
-													label="Location name"
-													value={location.name}
-													onChange={(value) =>
-														updateLocation(location.id, {
-															name: value,
-														})
-													}
-													placeholder="Container Yard A"
-												/>
-												<label className="flex items-end pb-2">
-													<label className="inline-flex items-center gap-2 text-[12px] text-ink">
-														<input
-															type="checkbox"
-															checked={location.bonded}
-															onChange={(event) =>
-																updateLocation(location.id, {
-																	bonded:
-																		event.target.checked,
-																})
-															}
-															className="size-4 accent-orange"
-														/>
-														Bonded location
-													</label>
-												</label>
-											</div>
-
-											<div className="grid gap-3 sm:grid-cols-[1fr_1fr_1.5fr]">
-												<SmallField
-													label="Capacity"
-													value={location.capacity}
-													onChange={(value) =>
-														updateLocation(location.id, {
-															capacity: value,
-														})
-													}
-													placeholder="120"
-												/>
-												<label className="block">
-													<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-														Capacity unit
-													</span>
-													<select
-														value={location.capacityUnit}
-														onChange={(event) =>
-															updateLocation(location.id, {
-																capacityUnit: event.target
-																	.value as CapacityUnit,
-															})
-														}
-														className="mt-1 h-9 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25"
-													>
-														{capacityUnits.map((unit) => (
-															<option
-																key={unit.value}
-																value={unit.value}
-															>
-																{unit.label}
-															</option>
-														))}
-													</select>
-												</label>
-												<SmallField
-													label="Cargo types supported"
-													value={location.cargoTypes}
-													onChange={(value) =>
-														updateLocation(location.id, {
-															cargoTypes: value,
-														})
-													}
-													placeholder="Containerised cargo, general cargo"
-												/>
-											</div>
-
-											{location.kind === "yard" ? (
-												<div className="rounded-lg border border-line p-3">
-													<p className="mb-3 flex items-center gap-2 text-xs font-semibold text-ink">
-														<MapPin className="size-3.5 text-orange" />
-														Yard hierarchy
-													</p>
-													<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-														<SmallField
-															label="Block"
-															value={location.block}
-															onChange={(value) =>
-																updateLocation(location.id, {
-																	block: value,
-																})
-															}
-															placeholder="A"
-														/>
-														<SmallField
-															label="Row"
-															value={location.row}
-															onChange={(value) =>
-																updateLocation(location.id, {
-																	row: value,
-																})
-															}
-															placeholder="01"
-														/>
-														<SmallField
-															label="Slot"
-															value={location.slot}
-															onChange={(value) =>
-																updateLocation(location.id, {
-																	slot: value,
-																})
-															}
-															placeholder="01"
-														/>
-														<SmallField
-															label="Tier"
-															value={location.tier}
-															onChange={(value) =>
-																updateLocation(location.id, {
-																	tier: value,
-																})
-															}
-															placeholder="Ground or 1"
-														/>
-													</div>
-												</div>
-											) : (
-												<div className="rounded-lg border border-line p-3">
-													<p className="mb-3 flex items-center gap-2 text-xs font-semibold text-ink">
-														<Warehouse className="size-3.5 text-orange" />
-														Warehouse hierarchy
-													</p>
-													<div className="grid gap-3 sm:grid-cols-3">
-														<SmallField
-															label="Aisle"
-															value={location.aisle}
-															onChange={(value) =>
-																updateLocation(location.id, {
-																	aisle: value,
-																})
-															}
-															placeholder="A"
-														/>
-														<SmallField
-															label="Rack"
-															value={location.rack}
-															onChange={(value) =>
-																updateLocation(location.id, {
-																	rack: value,
-																})
-															}
-															placeholder="R01"
-														/>
-														<SmallField
-															label="Bin"
-															value={location.bin}
-															onChange={(value) =>
-																updateLocation(location.id, {
-																	bin: value,
-																})
-															}
-															placeholder="B01"
-														/>
-													</div>
-												</div>
-											)}
-
-											<div className="rounded-lg border border-line p-3">
-												<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-													<p className="flex items-center gap-2 text-xs font-semibold text-ink">
-														<Wrench className="size-3.5 text-orange" />
-														Equipment assigned
-													</p>
-													<span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-														{location.equipment.length}{" "}
-														{location.equipment.length === 1
-															? "item"
-															: "items"}
-													</span>
-												</div>
-
-												{location.equipment.length > 0 && (
-													<ul className="space-y-2">
-														{location.equipment.map(
-															(entry) => (
-																<li
-																	key={entry.id}
-																	className="flex items-center gap-2"
-																>
-																	<Input
-																		value={
-																			entry.label
-																		}
-																		onChange={(
-																			event
-																		) =>
-																			updateEquipmentEntry(
-																				location.id,
-																				entry.id,
-																				event
-																					.target
-																					.value
-																			)
-																		}
-																		placeholder="Equipment name"
-																		className="h-9 border-line bg-paper text-xs text-ink"
-																	/>
-																	<button
-																		type="button"
-																		onClick={() =>
-																			removeEquipmentEntry(
-																				location.id,
-																				entry.id
-																			)
-																		}
-																		aria-label={`Remove ${entry.label}`}
-																		className="grid size-9 shrink-0 place-items-center rounded-md text-carmine transition-colors hover:bg-carmine/10"
-																	>
-																		<Trash2 className="size-3.5" />
-																	</button>
-																</li>
-															)
-														)}
-													</ul>
-												)}
-
-												<div className="mt-3 flex flex-wrap items-center gap-2">
-													<Input
-														value={
-															equipmentDrafts[
-																location.id
-															] ?? ""
-														}
-														onChange={(event) =>
-															setEquipmentDrafts(
-																(prev) => ({
-																	...prev,
-																	[location.id]:
-																		event.target
-																			.value,
-																})
-															)
-														}
-														onKeyDown={(event) => {
-															if (
-																event.key ===
-																"Enter"
-															) {
-																event.preventDefault();
-																addEquipmentFromDraft(
-																	location.id
-																);
-															}
-														}}
-														placeholder="Type equipment and press Enter"
-														className="h-9 min-w-[220px] flex-1 border-line bg-paper text-xs text-ink"
-													/>
-													<Button
-														type="button"
-														variant="outline"
-														size="sm"
-														onClick={() =>
-															addEquipmentFromDraft(
-																location.id
-															)
-														}
-														className="h-9 border-line bg-paper text-ink hover:bg-sand"
-													>
-														<Plus className="size-3.5" />
-														Add
-													</Button>
-												</div>
-
-												<div className="mt-3 border-t border-line pt-3">
-													<p className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-														Quick add
-													</p>
-													<div className="flex flex-wrap gap-1.5">
-														{EQUIPMENT_SUGGESTIONS.map(
-															(item) => {
-																const already =
-																	location.equipment.some(
-																		(e) =>
-																			e.label.toLowerCase() ===
-																			item.toLowerCase()
-																	);
-																return (
-																	<button
-																		key={item}
-																		type="button"
-																		disabled={already}
-																		onClick={() =>
-																			addEquipmentFromSuggestion(
-																				location.id,
-																				item
-																			)
-																		}
-																		className={cn(
-																			"rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors",
-																			already
-																				? "cursor-not-allowed border-line bg-sand text-ink-soft/60"
-																				: "border-line bg-paper text-ink-soft hover:border-orange hover:bg-orange/5 hover:text-orange"
-																		)}
-																	>
-																		+ {item}
-																	</button>
-																);
-															}
-														)}
-													</div>
-												</div>
-											</div>
-
-											<SmallField
-												label="Security provisions"
-												value={location.security}
-												onChange={(value) =>
-													updateLocation(location.id, {
-														security: value,
-													})
-												}
-												placeholder="e.g. Controlled access, CCTV, patrols"
-											/>
-										</div>
-
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											onClick={() => removeLocation(location.id)}
-											className="text-carmine hover:bg-carmine/10"
-										>
-											<Trash2 className="size-3.5" />
-											Remove
-										</Button>
-									</div>
-								</li>
-							))}
-						</ul>
-					)}
-				</section>
 				<ListSection
 					title="Shipment types"
 					description="Shipment types available to users when creating a shipment. Only active types should appear in shipment forms."
@@ -1259,33 +431,6 @@ export default function AdminTerminalConfigurationPage() {
 						updateListRow("shipmentTypes", id, label)
 					}
 					onRemove={(id) => removeListRow("shipmentTypes", id)}
-				/>
-				<ListSection
-					title="Operational areas"
-					description="Non-storage destinations used in operational workflows. The yard page uses these as movement targets alongside storage positions."
-					icon={MapPin}
-					addLabel="Add area"
-					rows={config.operationalAreas}
-					placeholder="e.g. Examination Bay 01"
-					onAdd={() => addListRow("operationalAreas", "area")}
-					onUpdate={(id, label) =>
-						updateListRow("operationalAreas", id, label)
-					}
-					onRemove={(id) => removeListRow("operationalAreas", id)}
-				/>
-
-				<ListSection
-					title="Cargo services"
-					description="Cargo categories the terminal is licensed and equipped to handle. These appear in intake forms and public service listings."
-					icon={Package}
-					addLabel="Add service"
-					rows={config.cargoServices}
-					placeholder="e.g. Containerised cargo"
-					onAdd={() => addListRow("cargoServices", "service")}
-					onUpdate={(id, label) =>
-						updateListRow("cargoServices", id, label)
-					}
-					onRemove={(id) => removeListRow("cargoServices", id)}
 				/>
 
 				<ListSection
@@ -1359,14 +504,10 @@ export default function AdminTerminalConfigurationPage() {
 						<AlertTriangle className="mt-0.5 size-4 shrink-0 text-orange-deep" />
 						<div className="min-w-0">
 							<p className="text-[13px] font-semibold text-ink">
-								Location capacity and allocation
+								Configuration scope
 							</p>
 							<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-								Capacity is stored as a numeric value with a unit.
-								Operational allocation logic prevents double
-								allocation of occupied positions and retains an
-								auditable movement history. Current occupancy comes
-								from operational records, not from configuration.
+								Changes to terminal identity, categories, packaging, and areas apply to future operational events. Existing manifests, shipments, and terminal records keep their original configuration.
 							</p>
 						</div>
 					</div>
@@ -1380,7 +521,7 @@ export default function AdminTerminalConfigurationPage() {
 							</p>
 							<p className="mt-0.5 text-[12px] leading-5 text-sand/75">
 								{dirty
-									? "Save to apply terminal, location, equipment, category, packaging, service, area, and hold changes."
+									? "Save to apply terminal, category, packaging, and hold changes."
 									: "No pending changes."}
 							</p>
 						</div>
@@ -1526,37 +667,6 @@ function Field({
 				placeholder={placeholder}
 				className={cn(
 					"mt-1.5 h-11 border-line bg-sand text-ink",
-					mono && "font-mono"
-				)}
-			/>
-		</label>
-	);
-}
-
-function SmallField({
-	label,
-	value,
-	onChange,
-	placeholder,
-	mono,
-}: {
-	label: string;
-	value: string;
-	onChange: (value: string) => void;
-	placeholder?: string;
-	mono?: boolean;
-}) {
-	return (
-		<label className="block">
-			<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-				{label}
-			</span>
-			<Input
-				value={value}
-				onChange={(event) => onChange(event.target.value)}
-				placeholder={placeholder}
-				className={cn(
-					"mt-1 h-9 border-line bg-paper text-[13px] text-ink",
 					mono && "font-mono"
 				)}
 			/>

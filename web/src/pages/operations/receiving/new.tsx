@@ -286,21 +286,6 @@ export default function OperationsReceivingNewPage() {
       return;
     }
 
-    const incomplete = selectedContainers.some(
-      (container) =>
-        !container.condition ||
-        !container.receiving_location.trim() ||
-        (container.expected_seal_no.trim() !== "" &&
-          !container.actual_seal_no.trim()),
-    );
-
-    if (incomplete) {
-      setSaveError(
-        "Complete the condition, receiving location and applicable seal details for every selected container.",
-      );
-      return;
-    }
-
     setSaveError("");
     setStep(2);
   };
@@ -557,7 +542,7 @@ export default function OperationsReceivingNewPage() {
               <div className="flex flex-col justify-between gap-3 border-b border-line p-5 sm:flex-row sm:items-start sm:px-6">
                 <div>
                   <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <StatusBadge status="success" />
+                    <StatusBadge label="completed" />
                     <span className="text-xs text-ink-soft">
                       Shipment found
                     </span>
@@ -779,7 +764,7 @@ export default function OperationsReceivingNewPage() {
                         onClick={continueToVerification}
                         className="inline-flex items-center justify-center gap-2 rounded-xl bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-ink/90"
                       >
-                        Verify Selected Containers
+                        Enter Container Conditions
                         <ArrowRight size={16} />
                       </button>
                     </div>
