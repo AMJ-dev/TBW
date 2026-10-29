@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { http, type Resp } from "@/lib/httpClient";
 
-type LocationType = "YARD" | "WAREHOUSE" | "INSPECTION_BAY";
+type LocationType = "YARD" | "WAREHOUSE" | "INSPECTION_BAY" | "RECEIVING";
 
 interface TerminalLocation {
   id: string;
@@ -64,15 +64,17 @@ const emptyLocation: TerminalLocation = {
 };
 
 const locationTypes: { value: LocationType; label: string }[] = [
-  { value: "YARD", label: "Yard" },
-  { value: "WAREHOUSE", label: "Warehouse" },
-  { value: "INSPECTION_BAY", label: "Inspection Bay" },
+    { value: "YARD", label: "Yard" },
+    { value: "WAREHOUSE", label: "Warehouse" },
+    { value: "INSPECTION_BAY", label: "Inspection Bay" },
+    {value:"RECEIVING", label:"Receiving"}
 ];
 
 const locationTypeLabels: Record<LocationType, string> = {
   YARD: "Yard",
   WAREHOUSE: "Warehouse",
   INSPECTION_BAY: "Inspection Bay",
+  RECEIVING: "Receiving"
 };
 
 const normaliseLocationType = (value: unknown): LocationType => {
@@ -137,6 +139,8 @@ const getTypeIcon = (type: LocationType) => {
       return Warehouse;
     case "INSPECTION_BAY":
       return ShieldCheck;
+    case "RECEIVING":
+      return Clock3     
     default:
       return MapPin;
   }
