@@ -127,7 +127,7 @@
                 "group" => "identity",
                 "state" => "Available",
                 "stateTone" => "info",
-                "lastChanged" => "Not configured",
+                "lastChanged" => "Configured",
                 "featured" => false,
                 "enabled" => true
             ],
@@ -153,7 +153,7 @@
                 "group" => "commercial",
                 "state" => "Available",
                 "stateTone" => "info",
-                "lastChanged" => "Not configured",
+                "lastChanged" => "Configured",
                 "featured" => false,
                 "enabled" => true
             ],
@@ -166,6 +166,19 @@
                 "group" => "commercial",
                 "state" => "Available",
                 "stateTone" => "success",
+                "lastChanged" => "Configured",
+                "featured" => false,
+                "enabled" => true
+            ],
+            [
+                "key" => "gate-lanes",
+                "title" => "Gate Lane Management",
+                "desc" => "Manage physical gate lanes, lane codes, entry and exit directions, lane assignments, and operational availability.",
+                "href" => "/admin/configuration/gate-lanes",
+                "icon" => "GitBranch",
+                "group" => "commercial",
+                "state" => "Available",
+                "stateTone" => "info",
                 "lastChanged" => "Configured",
                 "featured" => false,
                 "enabled" => true

@@ -50,6 +50,7 @@ const AdminCargoConfigurationPage = lazy(() => import("@/pages/admin/configurati
 const AdminDocumentsConfigurationPage = lazy(() => import("@/pages/admin/configuration/documents"));
 const AdminFinancialConfigurationPage = lazy(() => import("@/pages/admin/configuration/financial"));
 const AdminGateConfigurationPage = lazy(() => import("@/pages/admin/configuration/gate"));
+const AdminGatelaneConfigurationPage = lazy(() => import("@/pages/admin/configuration/gate-lanes"));
 const AdminIntegrationsConfigurationPage = lazy(() => import("@/pages/admin/configuration/integrations"));
 const AdminMaintenanceConfigurationPage = lazy(() => import("@/pages/admin/configuration/maintenance"));
 const AdminNotificationsConfigurationPage = lazy(() => import("@/pages/admin/configuration/notifications"));
@@ -95,6 +96,8 @@ const OperationsExaminationPage = lazy(() => import("@/pages/operations/examinat
 const OperationsHoldsPage = lazy(() => import("@/pages/operations/holds"));
 const OperationsReceivingPage = lazy(() => import("@/pages/operations/receiving/index"));
 const OperationsReceivingNewPage = lazy(() => import("@/pages/operations/receiving/new"));
+const OperationsReceivingDetailsPage = lazy(() => import("@/pages/operations/receiving/details"));
+
 const OperationsWarehousePage = lazy(() => import("@/pages/operations/warehouse"));
 const OperationsYardPage = lazy(() => import("@/pages/operations/yard"));
 const OperationsManifestPage = lazy(() => import("@/pages/manifest"));
@@ -191,11 +194,13 @@ export default function Routers() {
 						<Route path="/admin/users" element={<AdminUsersPage />} />
 						<Route path="/admin/user/add" element={<AdminAddUsersPage />} />
 						<Route path="/admin/users/:id" element={<AdminUserDetailsPage />} />
+
 						<Route path="/admin/configuration/organisation" element={<AdminOrganisationConfigurationPage />} />
 						<Route path="/admin/configuration/terminal" element={<AdminTerminalConfigurationPage />} />
 						<Route path="/admin/configuration/cargo" element={<AdminCargoConfigurationPage />} />
 						<Route path="/admin/configuration/documents" element={<AdminDocumentsConfigurationPage />} />
 						<Route path="/admin/configuration/gate" element={<AdminGateConfigurationPage />} />
+						<Route path="/admin/configuration/gate-lanes" element={<AdminGatelaneConfigurationPage />} />
 						<Route path="/admin/configuration/locations" element={<AdminLocationsConfigurationPage />} />
 						<Route path="/admin/configuration/integrations" element={<AdminIntegrationsConfigurationPage />} />
 						<Route path="/admin/configuration/maintenance" element={<AdminMaintenanceConfigurationPage />} />
@@ -232,7 +237,9 @@ export default function Routers() {
 						<Route path="/operations/examination" element={<OperationsExaminationPage />} />
 						<Route path="/operations/holds" element={<OperationsHoldsPage />} />
 						<Route path="/operations/receiving" element={<OperationsReceivingPage />} />
-						<Route path="/operations/receiving/new" element={<OperationsReceivingNewPage />} />					
+						<Route path="/operations/receiving/new" element={<OperationsReceivingNewPage />} />		
+						<Route path="/operations/receiving/details/:id" element={<OperationsReceivingDetailsPage />} />		
+									
 						<Route path="/operations/warehouse" element={<OperationsWarehousePage />} />
 						<Route path="/operations/yard" element={<OperationsYardPage />} />
 						<Route path="/operations/manifest" element={<OperationsManifestPage />} />

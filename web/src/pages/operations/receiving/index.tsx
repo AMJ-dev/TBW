@@ -824,7 +824,25 @@ export default function OperationsReceivingRoute() {
                             record.receiving_reference ||
                             `${record.container_no}-${index}`
                           }
-                          className="transition-colors hover:bg-sand/40"
+                          onClick={() => {
+                            if (record.id) {
+                              navigate(`/operations/receiving/details/${record.id}`);
+                            }
+                          }}
+                          onKeyDown={(event) => {
+                            if (
+                              record.id &&
+                              (event.key === "Enter" || event.key === " ")
+                            ) {
+                              event.preventDefault();
+                              navigate(`/operations/receiving/details/${record.id}`);
+                            }
+                          }}
+                          tabIndex={record.id ? 0 : undefined}
+                          role={record.id ? "link" : undefined}
+                          className={`transition-colors hover:bg-sand/40 ${
+                            record.id ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ink/20" : ""
+                          }`}
                         >
                           <td className="px-4 py-4">
                             <p className="font-mono text-xs font-semibold text-ink">

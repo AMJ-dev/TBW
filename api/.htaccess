@@ -67,6 +67,8 @@ RewriteRule ^admin/config/terminal/$ src/admin-config/terminal.php [NC]
 RewriteRule ^admin/config/terminal/update/$ src/admin-config/update-terminal.php [NC]
 RewriteRule ^admin/config/gate/$ src/admin-config/gate.php [NC]
 RewriteRule ^admin/config/gate/update/$ src/admin-config/update-gate.php [NC]
+RewriteRule ^admin/config/gate-lanes/$ src/admin-config/gate-lanes.php [NC]
+RewriteRule ^admin/config/gate-lane/update/$ src/admin-config/update-gate-lane.php [NC]
 RewriteRule ^admin/config/financial/$ src/admin-config/financial.php [NC]
 RewriteRule ^admin/config/financial/update/$ src/admin-config/update-financial.php [NC]
 RewriteRule ^admin/config/storage/$ src/admin-config/storage.php [NC]
@@ -83,9 +85,6 @@ RewriteRule ^admin/config/customs-tariffs/$ src/admin-config/customs-tariffs.php
 RewriteRule ^admin/config/customs-tariffs/search/$ src/admin-config/search-customs-tariffs.php [NC]
 RewriteRule ^admin/config/customs-tariffs/update/$ src/admin-config/update-customs-tariffs.php [NC]
 RewriteRule ^admin/config/search-location/$ src/admin-config/search-location.php [NC]
-
-
-
 RewriteRule ^admin/config/maintenance/$ src/admin-config/maintenance.php [NC]
 RewriteRule ^admin/config/maintenance/update/$ src/admin-config/update-maintenance.php [NC]
 RewriteRule ^admin/config/integrations/$ src/admin-config/integrations.php [NC]
@@ -177,4 +176,5 @@ RewriteRule ^gate/decision/$ src/gate/decision.php [NC]
 RewriteRule ^operator/receiving/$ src/receiving/all.php [NC]
 RewriteRule ^operator/receiving/save/$ src/receiving/save.php [NC]
 RewriteRule ^operator/receiving/search/$ src/receiving/search.php [NC]
+RewriteRule ^operator/receiving/details/([0-9a-zA-Z-]+)/$ src/receiving/details.php?id=$1 [NC]
 
