@@ -219,7 +219,7 @@ function extractDetails(response: unknown): DataRecord | null {
 
     const object = current as DataRecord;
 
-    if (object.error === true) {
+    if (object["error"] === true) {
       return null;
     }
 

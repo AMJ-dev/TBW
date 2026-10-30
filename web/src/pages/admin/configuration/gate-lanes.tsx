@@ -38,12 +38,9 @@ interface GateLane {
   status: LaneStatus;
 }
 
-interface GateLaneForm extends GateLane {
-  id?: string;
-}
-
 interface GateLanePayload {
   gate_lanes: GateLane[];
+  deleted_ids?: string[];
   change_reason?: string;
 }
 
@@ -64,7 +61,7 @@ interface ApiPayload {
   [key: string]: unknown;
 }
 
-const emptyLane: GateLaneForm = {
+const emptyLane: GateLane = {
   code: "",
   name: "",
   direction: "BOTH",
@@ -73,42 +70,51 @@ const emptyLane: GateLaneForm = {
   status: "active",
 };
 
+interface RawLane {
+  id?: unknown;
+  code?: unknown;
+  lane_code?: unknown;
+  name?: unknown;
+  lane_name?: unknown;
+  direction?: unknown;
+  lane_direction?: unknown;
+  gate_name?: unknown;
+  gate?: unknown;
+  description?: unknown;
+  status?: unknown;
+}
+
 const normaliseLane = (raw: unknown): GateLane => {
-  const lane: Record<string, unknown> =
+  const lane: RawLane =
     raw !== null && typeof raw === "object"
-      ? (raw as Record<string, unknown>)
+      ? (raw as RawLane)
       : {};
 
-  const getString = (...values: unknown[]): string => {
-    const value = values.find(
-      (item) => item !== undefined && item !== null && String(item).trim() !== ""
-    );
-
-    return value === undefined ? "" : String(value).trim();
-  };
-
-  const rawDirection = getString(
-    lane.direction,
-    lane.lane_direction,
-    "BOTH"
+  const rawDirection = String(
+    lane["direction"] ?? lane["lane_direction"] ?? "BOTH",
   ).toUpperCase();
 
-  const rawStatus = getString(lane.status, "active").toLowerCase();
+  const rawStatus = String(lane["status"] ?? "active").toLowerCase();
 
-  const id = getString(lane.id);
+  const id =
+    lane["id"] !== undefined &&
+    lane["id"] !== null &&
+    String(lane["id"]).trim()
+      ? String(lane["id"])
+      : undefined;
 
   return {
     ...(id ? { id } : {}),
-    code: getString(lane.code, lane.lane_code),
-    name: getString(lane.name, lane.lane_name),
+    code: String(lane.code ?? lane.lane_code ?? ""),
+    name: String(lane.name ?? lane.lane_name ?? ""),
     direction:
       rawDirection === "IN" ||
       rawDirection === "OUT" ||
       rawDirection === "BOTH"
         ? rawDirection
         : "BOTH",
-    gate_name: getString(lane.gate_name, lane.gate),
-    description: getString(lane.description),
+    gate_name: String(lane.gate_name ?? lane.gate ?? ""),
+    description: String(lane.description ?? ""),
     status: rawStatus === "inactive" ? "inactive" : "active",
   };
 };
@@ -176,7 +182,7 @@ const formatCount = (count: number): string =>
 
 export default function AdminGatelaneConfigurationPage() {
   const [lanes, setLanes] = useState<GateLane[]>([]);
-  const [form, setForm] = useState<GateLaneForm>(emptyLane);
+  const [form, setForm] = useState<GateLane>({ ...emptyLane });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [changeReason, setChangeReason] = useState("");
   const [search, setSearch] = useState("");
@@ -196,16 +202,15 @@ export default function AdminGatelaneConfigurationPage() {
     setError("");
 
     try {
-      const res = await http.get("/admin/config/cargo/");
+      const res = await http.get("/admin/config/gate-lanes/");
       const resp: Resp = res.data;
 
       if (resp.error) {
-        const message =
+        setError(
           typeof resp.data === "string"
             ? resp.data
-            : "Could not load gate lane configuration.";
-
-        setError(message);
+            : "Could not load gate lane configuration.",
+        );
         return;
       }
 
@@ -299,9 +304,9 @@ export default function AdminGatelaneConfigurationPage() {
     setFormOpen(true);
   };
 
-  const updateForm = <K extends keyof GateLaneForm>(
+  const updateForm = <K extends keyof GateLane>(
     key: K,
-    value: GateLaneForm[K],
+    value: GateLane[K],
   ) => {
     setForm((previous) => ({
       ...previous,
@@ -338,7 +343,7 @@ export default function AdminGatelaneConfigurationPage() {
       return false;
     }
 
-    if (editingId && changeReason.trim().length > 500) {
+    if (changeReason.trim().length > 500) {
       toast.error("The change reason cannot exceed 500 characters.");
       return false;
     }
@@ -349,29 +354,28 @@ export default function AdminGatelaneConfigurationPage() {
   const saveConfiguration = async (
     nextLanes: GateLane[],
     reason?: string,
+    deletedIds: string[] = [],
   ): Promise<boolean> => {
     setSaving(true);
 
     try {
-      const payload: GateLanePayload = {
-        gate_lanes: nextLanes.map((lane) => ({
-          ...(lane.id ? { id: lane.id } : {}),
-          code: lane.code.trim().toUpperCase(),
-          name: lane.name.trim(),
-          direction: lane.direction,
-          gate_name: lane.gate_name.trim(),
-          description: lane.description.trim(),
-          status: lane.status,
-        })),
-        ...(reason?.trim()
-          ? { change_reason: reason.trim() }
-          : {}),
-      };
+      const formData = new FormData();
 
-      const res = await http.post(
-        "/admin/config/gate-lane/update/",
-        payload,
-      );
+      const mappedLanes = nextLanes.map((lane) => ({
+        ...(lane.id ? { id: lane.id } : {}),
+        code: lane.code.trim().toUpperCase(),
+        name: lane.name.trim(),
+        direction: lane.direction,
+        gate_name: lane.gate_name.trim(),
+        description: lane.description.trim(),
+        status: lane.status,
+        ...(reason?.trim() && lane.id === editingId ? { change_reason: reason.trim() } : {}),
+      }));
+
+      formData.append("gate_lanes", JSON.stringify(mappedLanes));
+      formData.append("deleted_ids", JSON.stringify(deletedIds));
+
+      const res = await http.post("/admin/config/gate-lane/update/", formData);
 
       const resp: Resp = res.data;
 
@@ -438,45 +442,6 @@ export default function AdminGatelaneConfigurationPage() {
     await fetchAll();
   };
 
-  const handleToggleStatus = async (lane: GateLane) => {
-    if (saving) return;
-
-    if (!lane.id) {
-      toast.error(
-        "This lane has no database ID. Refresh the list before changing its status.",
-      );
-      return;
-    }
-
-    const nextStatus: LaneStatus =
-      lane.status === "active" ? "inactive" : "active";
-
-    const reason = window.prompt(
-      `Enter a reason for ${nextStatus === "active" ? "activating" : "deactivating"} lane ${lane.code}:`,
-    );
-
-    if (!reason?.trim()) return;
-
-    const nextLanes = lanes.map((item) =>
-      item.id === lane.id
-        ? { ...item, status: nextStatus }
-        : item,
-    );
-
-    const saved = await saveConfiguration(
-      nextLanes,
-      reason.trim(),
-    );
-
-    if (!saved) return;
-
-    toast.success(
-      `Lane ${lane.code} ${nextStatus === "active" ? "activated" : "deactivated"}.`,
-    );
-
-    await fetchAll();
-  };
-
   const handleDeleteLane = async (lane: GateLane) => {
     if (saving) return;
 
@@ -499,6 +464,11 @@ export default function AdminGatelaneConfigurationPage() {
 
     if (!reason?.trim()) return;
 
+    if (reason.trim().length > 500) {
+      toast.error("The change reason cannot exceed 500 characters.");
+      return;
+    }
+
     const nextLanes = lanes.filter(
       (item) => item.id !== lane.id,
     );
@@ -506,6 +476,7 @@ export default function AdminGatelaneConfigurationPage() {
     const saved = await saveConfiguration(
       nextLanes,
       reason.trim(),
+      [lane.id],
     );
 
     if (!saved) return;
@@ -597,12 +568,7 @@ export default function AdminGatelaneConfigurationPage() {
               disabled={loading || saving}
               className="border-line text-ink hover:bg-sand"
             >
-              <RefreshCw
-                className={cn(
-                  "mr-2 size-4",
-                  loading && "animate-spin",
-                )}
-              />
+              <RefreshCw className="mr-2 size-4" />
               Refresh
             </Button>
 
@@ -642,7 +608,9 @@ export default function AdminGatelaneConfigurationPage() {
           <MetricCard
             title="Exit-capable"
             value={exitCount}
-            description={`${formatCount(inactiveCount)} inactive lane${inactiveCount === 1 ? "" : "s"}`}
+            description={`${formatCount(inactiveCount)} inactive lane${
+              inactiveCount === 1 ? "" : "s"
+            }`}
             icon={ArrowUpFromLine}
           />
         </div>
@@ -843,7 +811,6 @@ export default function AdminGatelaneConfigurationPage() {
             <div className="grid gap-2 sm:grid-cols-3">
               <div className="relative sm:col-span-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
-
                 <Input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
@@ -947,11 +914,9 @@ export default function AdminGatelaneConfigurationPage() {
                           <p className="font-semibold text-ink">
                             {lane.name}
                           </p>
-
                           <p className="mt-1 font-mono text-[11px] tracking-wide text-ink-soft">
                             {lane.code}
                           </p>
-
                           {lane.description && (
                             <p className="mt-1 max-w-sm text-xs leading-5 text-ink-soft">
                               {lane.description}
@@ -968,18 +933,7 @@ export default function AdminGatelaneConfigurationPage() {
                         </td>
 
                         <td className="px-5 py-4">
-                          <StatusBadge
-                            label={
-                              lane.status === "active"
-                                ? "Active"
-                                : "Inactive"
-                            }
-                            tone={
-                              lane.status === "active"
-                                ? "success"
-                                : "warning"
-                            }
-                          />
+                          <LaneStatusBadge status={lane.status} />
                         </td>
 
                         <td className="px-5 py-4 sm:px-6">
@@ -990,20 +944,6 @@ export default function AdminGatelaneConfigurationPage() {
                               disabled={saving || !lane.id}
                             >
                               <Pencil className="size-4" />
-                            </ActionButton>
-
-                            <ActionButton
-                              label={
-                                lane.status === "active"
-                                  ? "Deactivate lane"
-                                  : "Activate lane"
-                              }
-                              onClick={() =>
-                                void handleToggleStatus(lane)
-                              }
-                              disabled={saving || !lane.id}
-                            >
-                              <ShieldCheck className="size-4" />
                             </ActionButton>
 
                             <ActionButton
@@ -1035,28 +975,15 @@ export default function AdminGatelaneConfigurationPage() {
                         <h4 className="font-semibold text-ink">
                           {lane.name}
                         </h4>
-
                         <p className="mt-1 font-mono text-[11px] text-ink-soft">
                           {lane.code}
                         </p>
-
                         <p className="mt-2 text-sm text-ink-soft">
                           {lane.gate_name || "Not assigned"}
                         </p>
                       </div>
 
-                      <StatusBadge
-                        label={
-                          lane.status === "active"
-                            ? "Active"
-                            : "Inactive"
-                        }
-                        tone={
-                          lane.status === "active"
-                            ? "success"
-                            : "warning"
-                        }
-                      />
+                      <LaneStatusBadge status={lane.status} />
                     </div>
 
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1069,20 +996,6 @@ export default function AdminGatelaneConfigurationPage() {
                           disabled={saving || !lane.id}
                         >
                           <Pencil className="size-4" />
-                        </ActionButton>
-
-                        <ActionButton
-                          label={
-                            lane.status === "active"
-                              ? "Deactivate lane"
-                              : "Activate lane"
-                          }
-                          onClick={() =>
-                            void handleToggleStatus(lane)
-                          }
-                          disabled={saving || !lane.id}
-                        >
-                          <ShieldCheck className="size-4" />
                         </ActionButton>
 
                         <ActionButton
@@ -1139,7 +1052,6 @@ function MetricCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-ink-soft">{title}</p>
-
           <p className="mt-2 font-display text-3xl font-bold tracking-tight text-ink">
             {formatCount(value)}
           </p>
@@ -1172,7 +1084,6 @@ function FormField({
         {label}
         {required && <span className="ml-1 text-carmine">*</span>}
       </span>
-
       {children}
     </label>
   );
@@ -1198,6 +1109,19 @@ function DirectionBadge({
     >
       {directionLabel(direction)}
     </span>
+  );
+}
+
+function LaneStatusBadge({
+  status,
+}: {
+  status: LaneStatus;
+}) {
+  return (
+    <StatusBadge
+      label={status === "active" ? "Active" : "Inactive"}
+      tone={status === "active" ? "success" : "warning"}
+    />
   );
 }
 
