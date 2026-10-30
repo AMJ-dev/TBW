@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import {
@@ -13,7 +14,6 @@ import {
   RefreshCw,
   Save,
   Search,
-  ShieldCheck,
   Trash2,
   X,
 } from "lucide-react";
@@ -36,12 +36,6 @@ interface GateLane {
   gate_name: string;
   description: string;
   status: LaneStatus;
-}
-
-interface GateLanePayload {
-  gate_lanes: GateLane[];
-  deleted_ids?: string[];
-  change_reason?: string;
 }
 
 interface ApiError {
@@ -90,17 +84,17 @@ const normaliseLane = (raw: unknown): GateLane => {
       ? (raw as RawLane)
       : {};
 
-  const rawDirection = String(
-    lane["direction"] ?? lane["lane_direction"] ?? "BOTH",
+  const direction = String(
+    lane.direction ?? lane.lane_direction ?? "BOTH",
   ).toUpperCase();
 
-  const rawStatus = String(lane["status"] ?? "active").toLowerCase();
+  const status = String(lane.status ?? "active").toLowerCase();
 
   const id =
-    lane["id"] !== undefined &&
-    lane["id"] !== null &&
-    String(lane["id"]).trim()
-      ? String(lane["id"])
+    lane.id !== undefined &&
+    lane.id !== null &&
+    String(lane.id).trim()
+      ? String(lane.id)
       : undefined;
 
   return {
@@ -108,14 +102,12 @@ const normaliseLane = (raw: unknown): GateLane => {
     code: String(lane.code ?? lane.lane_code ?? ""),
     name: String(lane.name ?? lane.lane_name ?? ""),
     direction:
-      rawDirection === "IN" ||
-      rawDirection === "OUT" ||
-      rawDirection === "BOTH"
-        ? rawDirection
+      direction === "IN" || direction === "OUT" || direction === "BOTH"
+        ? direction
         : "BOTH",
     gate_name: String(lane.gate_name ?? lane.gate ?? ""),
     description: String(lane.description ?? ""),
-    status: rawStatus === "inactive" ? "inactive" : "active",
+    status: status === "inactive" ? "inactive" : "active",
   };
 };
 
@@ -134,7 +126,7 @@ const extractLanes = (resp: Resp): GateLane[] => {
       ? (resp.data as ApiPayload)
       : {};
 
-  const candidates: unknown[] = [
+  const candidates = [
     responseCode.gate_lanes,
     responseCode.gateLanes,
     responseCode.lanes,
@@ -167,17 +159,12 @@ const getErrorMessage = (
 };
 
 const directionLabel = (direction: LaneDirection): string => {
-  switch (direction) {
-    case "IN":
-      return "Entry only";
-    case "OUT":
-      return "Exit only";
-    default:
-      return "Entry & Exit";
-  }
+  if (direction === "IN") return "Entry only";
+  if (direction === "OUT") return "Exit only";
+  return "Entry & Exit";
 };
 
-const formatCount = (count: number): string =>
+const formatCount = (count: number) =>
   count.toLocaleString("en-NG");
 
 export default function AdminGatelaneConfigurationPage() {
@@ -196,6 +183,12 @@ export default function AdminGatelaneConfigurationPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+
+  const [pendingDeleteLane, setPendingDeleteLane] =
+    useState<GateLane | null>(null);
+  const [deleteNameConfirmation, setDeleteNameConfirmation] =
+    useState("");
+  const [deleteReason, setDeleteReason] = useState("");
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -243,18 +236,13 @@ export default function AdminGatelaneConfigurationPage() {
         lane.description.toLowerCase().includes(query);
 
       const matchesStatus =
-        statusFilter === "all" ||
-        lane.status === statusFilter;
+        statusFilter === "all" || lane.status === statusFilter;
 
       const matchesDirection =
         directionFilter === "all" ||
         lane.direction === directionFilter;
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesDirection
-      );
+      return matchesSearch && matchesStatus && matchesDirection;
     });
   }, [lanes, search, statusFilter, directionFilter]);
 
@@ -265,15 +253,11 @@ export default function AdminGatelaneConfigurationPage() {
   const inactiveCount = lanes.length - activeCount;
 
   const entryCount = lanes.filter(
-    (lane) =>
-      lane.direction === "IN" ||
-      lane.direction === "BOTH",
+    (lane) => lane.direction === "IN" || lane.direction === "BOTH",
   ).length;
 
   const exitCount = lanes.filter(
-    (lane) =>
-      lane.direction === "OUT" ||
-      lane.direction === "BOTH",
+    (lane) => lane.direction === "OUT" || lane.direction === "BOTH",
   ).length;
 
   const resetForm = () => {
@@ -369,13 +353,22 @@ export default function AdminGatelaneConfigurationPage() {
         gate_name: lane.gate_name.trim(),
         description: lane.description.trim(),
         status: lane.status,
-        ...(reason?.trim() && lane.id === editingId ? { change_reason: reason.trim() } : {}),
+        ...(reason?.trim() && lane.id === editingId
+          ? { change_reason: reason.trim() }
+          : {}),
       }));
 
       formData.append("gate_lanes", JSON.stringify(mappedLanes));
       formData.append("deleted_ids", JSON.stringify(deletedIds));
 
-      const res = await http.post("/admin/config/gate-lane/update/", formData);
+      if (reason?.trim()) {
+        formData.append("change_reason", reason.trim());
+      }
+
+      const res = await http.post(
+        "/admin/config/gate-lane/update/",
+        formData,
+      );
 
       const resp: Resp = res.data;
 
@@ -442,7 +435,7 @@ export default function AdminGatelaneConfigurationPage() {
     await fetchAll();
   };
 
-  const handleDeleteLane = async (lane: GateLane) => {
+  const openDeleteDialog = (lane: GateLane) => {
     if (saving) return;
 
     if (!lane.id) {
@@ -452,20 +445,43 @@ export default function AdminGatelaneConfigurationPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      `Remove gate lane "${lane.code}"?`,
-    );
+    setPendingDeleteLane(lane);
+    setDeleteNameConfirmation("");
+    setDeleteReason("");
+  };
 
-    if (!confirmed) return;
+  const closeDeleteDialog = () => {
+    if (saving) return;
 
-    const reason = window.prompt(
-      `Enter a reason for removing lane ${lane.code}:`,
-    );
+    setPendingDeleteLane(null);
+    setDeleteNameConfirmation("");
+    setDeleteReason("");
+  };
 
-    if (!reason?.trim()) return;
+  const handleDeleteLane = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
 
-    if (reason.trim().length > 500) {
-      toast.error("The change reason cannot exceed 500 characters.");
+    const lane = pendingDeleteLane;
+
+    if (!lane?.id || saving) return;
+
+    const enteredName = deleteNameConfirmation.trim().toLowerCase();
+    const expectedName = lane.name.trim().toLowerCase();
+
+    if (enteredName !== expectedName) {
+      toast.error("The lane name does not match.");
+      return;
+    }
+
+    if (!deleteReason.trim()) {
+      toast.error("Enter a reason for removing this lane.");
+      return;
+    }
+
+    if (deleteReason.trim().length > 500) {
+      toast.error("The removal reason cannot exceed 500 characters.");
       return;
     }
 
@@ -475,13 +491,18 @@ export default function AdminGatelaneConfigurationPage() {
 
     const saved = await saveConfiguration(
       nextLanes,
-      reason.trim(),
+      deleteReason.trim(),
       [lane.id],
     );
 
     if (!saved) return;
 
-    toast.success(`Lane ${lane.code} removed.`);
+    toast.success(`Lane ${lane.code} removed successfully.`);
+
+    setPendingDeleteLane(null);
+    setDeleteNameConfirmation("");
+    setDeleteReason("");
+
     await fetchAll();
   };
 
@@ -644,7 +665,8 @@ export default function AdminGatelaneConfigurationPage() {
                 type="button"
                 aria-label="Close form"
                 onClick={resetForm}
-                className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-soft transition hover:bg-sand hover:text-ink"
+                disabled={saving}
+                className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-soft transition hover:bg-sand hover:text-ink disabled:opacity-50"
               >
                 <X className="size-4" />
               </button>
@@ -948,9 +970,7 @@ export default function AdminGatelaneConfigurationPage() {
 
                             <ActionButton
                               label="Remove lane"
-                              onClick={() =>
-                                void handleDeleteLane(lane)
-                              }
+                              onClick={() => openDeleteDialog(lane)}
                               disabled={saving || !lane.id}
                               danger
                             >
@@ -1000,7 +1020,7 @@ export default function AdminGatelaneConfigurationPage() {
 
                         <ActionButton
                           label="Remove lane"
-                          onClick={() => void handleDeleteLane(lane)}
+                          onClick={() => openDeleteDialog(lane)}
                           disabled={saving || !lane.id}
                           danger
                         >
@@ -1032,6 +1052,175 @@ export default function AdminGatelaneConfigurationPage() {
           </div>
         </section>
       </div>
+
+      {pendingDeleteLane && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-ink/60 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              closeDeleteDialog();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-lane-title"
+            className="my-auto w-full max-w-lg overflow-hidden rounded-2xl bg-paper shadow-2xl ring-1 ring-black/10"
+          >
+            <div className="flex items-start gap-4 border-b border-line p-5 sm:p-6">
+              <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-carmine/10 text-carmine">
+                <Trash2 className="size-6" />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <h2
+                  id="delete-lane-title"
+                  className="font-display text-xl font-bold text-ink"
+                >
+                  Remove gate lane
+                </h2>
+
+                <p className="mt-1 text-sm leading-6 text-ink-soft">
+                  This action will permanently remove this lane from the
+                  configuration. Confirm the lane details before continuing.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeDeleteDialog}
+                disabled={saving}
+                aria-label="Close confirmation dialog"
+                className="grid size-9 shrink-0 place-items-center rounded-lg text-ink-soft transition hover:bg-sand hover:text-ink disabled:opacity-50"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(event) => void handleDeleteLane(event)}
+              className="space-y-5 p-5 sm:p-6"
+            >
+              <div className="rounded-xl border border-carmine/20 bg-carmine/[0.04] p-4">
+                <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-carmine">
+                  Lane to be removed
+                </p>
+
+                <p className="mt-2 break-words font-display text-lg font-bold text-ink">
+                  {pendingDeleteLane.name}
+                </p>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span className="rounded-md border border-line bg-paper px-2.5 py-1 font-mono text-xs text-ink">
+                    {pendingDeleteLane.code}
+                  </span>
+
+                  <DirectionBadge direction={pendingDeleteLane.direction} />
+
+                  <LaneStatusBadge status={pendingDeleteLane.status} />
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="delete-lane-name"
+                  className="block text-sm font-semibold text-ink"
+                >
+                  Confirm lane name
+                  <span className="ml-1 text-carmine">*</span>
+                </label>
+
+                <p className="mt-1 text-xs leading-5 text-ink-soft">
+                  Type{" "}
+                  <span className="font-semibold text-ink">
+                    {pendingDeleteLane.name}
+                  </span>{" "}
+                  to confirm removal.
+                </p>
+
+                <Input
+                  id="delete-lane-name"
+                  autoComplete="off"
+                  autoFocus
+                  value={deleteNameConfirmation}
+                  onChange={(event) =>
+                    setDeleteNameConfirmation(event.target.value)
+                  }
+                  placeholder="Enter the gate lane name"
+                  disabled={saving}
+                  className="mt-2 border-line focus-visible:ring-carmine"
+                />
+
+                {deleteNameConfirmation.length > 0 &&
+                  deleteNameConfirmation.trim().toLowerCase() !==
+                    pendingDeleteLane.name.trim().toLowerCase() && (
+                    <p className="mt-1.5 text-xs text-carmine">
+                      The entered name does not match.
+                    </p>
+                  )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="delete-lane-reason"
+                  className="block text-sm font-semibold text-ink"
+                >
+                  Reason for removal
+                  <span className="ml-1 text-carmine">*</span>
+                </label>
+
+                <textarea
+                  id="delete-lane-reason"
+                  value={deleteReason}
+                  onChange={(event) => setDeleteReason(event.target.value)}
+                  placeholder="Explain why this gate lane is being removed."
+                  maxLength={500}
+                  rows={3}
+                  required
+                  disabled={saving}
+                  className="mt-2 w-full resize-y rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus-visible:ring-2 focus-visible:ring-orange disabled:opacity-50"
+                />
+
+                <p className="mt-1 text-right font-mono text-[10px] text-ink-soft">
+                  {deleteReason.length}/500
+                </p>
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeDeleteDialog}
+                  disabled={saving}
+                  className="border-line text-ink hover:bg-sand"
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  type="submit"
+                  disabled={
+                    saving ||
+                    deleteNameConfirmation.trim().toLowerCase() !==
+                      pendingDeleteLane.name.trim().toLowerCase() ||
+                    !deleteReason.trim()
+                  }
+                  className="bg-carmine text-white hover:bg-carmine/90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving ? (
+                    <LoaderCircle className="mr-2 size-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-2 size-4" />
+                  )}
+
+                  {saving ? "Removing lane..." : "Confirm removal"}
+                </Button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </AppShell>
   );
 }
