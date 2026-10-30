@@ -26,12 +26,12 @@ try {
         exit;
     }
 
-    $requestedStatus = trim($_POST["status"] ?? "pending_review");
-    $status = in_array($requestedStatus, ["draft", "pending_review"], true)
+    $requestedStatus = trim($_POST["status"] ?? "PENDING_REVIEW");
+    $status = in_array($requestedStatus, ["DRAFT", "PENDING_REVIEW"], true)
         ? $requestedStatus
-        : "pending_review";
+        : "PENDING_REVIEW";
 
-    if ($status === "pending_review" && ($_POST["declaration_accepted"] ?? "0") !== "1") {
+    if ($status === "PENDING_REVIEW" && ($_POST["declaration_accepted"] ?? "0") !== "1") {
         throw new InvalidArgumentException("Please accept the shipment declaration before submitting.");
     }
 
@@ -70,13 +70,13 @@ try {
         throw new InvalidArgumentException("Invalid consignee email.");
     }
 
-    if ($status === "pending_review" && trim($_POST["consignee"] ?? "") === "") {
+    if ($status === "PENDING_REVIEW" && trim($_POST["consignee"] ?? "") === "") {
         throw new InvalidArgumentException("Consignee name is required.");
     }
 
     if ($consigneeType === "organisation" && $consigneeOrganisationId === "") {
         if ($consigneeEmail === "" && trim($_POST["consignee_phone"] ?? "") === "") {
-            if ($status === "pending_review") {
+            if ($status === "PENDING_REVIEW") {
                 throw new InvalidArgumentException("For an unregistered consignee, provide an email address or phone number.");
             }
         }
@@ -248,7 +248,7 @@ try {
         }
     }
 
-    if ($status === "pending_review") {
+    if ($status === "PENDING_REVIEW") {
         foreach ($requiredDocuments as $requiredDocument) {
             $key = $requiredDocument["document_key"];
 
@@ -557,7 +557,7 @@ try {
             throw new InvalidArgumentException("The selected customs tariff is invalid, inactive, or outside its effective dates for container " . $containerNo . ".");
         }
 
-        if ($status === "pending_review" && $cargoCategory === "Containerised Cargo") {
+        if ($status === "PENDING_REVIEW" && $cargoCategory === "Containerised Cargo") {
             if ($cargoDescription === "") {
                 throw new InvalidArgumentException("Cargo description is required for container " . $containerNo . ".");
             }
@@ -736,7 +736,7 @@ try {
 
     echo json_encode([
         "error" => false,
-        "data" => $status === "draft" ? "Shipment draft saved." : "Shipment declaration submitted for review.",
+        "data" => $status === "DRAFT" ? "Shipment draft saved." : "Shipment declaration submitted for review.",
         "code" => [
             "id" => $shipmentId,
             "shipment_id" => $shipmentId,

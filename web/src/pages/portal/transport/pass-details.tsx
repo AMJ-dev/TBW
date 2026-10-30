@@ -127,7 +127,6 @@ type GatePass = {
   type: string;
   issued_by?: string | null;
   issued_at: string | null;
-  valid_until: string | null;
   status: string;
   updated_at?: string | null;
   container_nos: string[];
@@ -508,10 +507,6 @@ export default function GatePassDetailsPage() {
                   <DetailField
                     label="Issued At"
                     value={formatDate(pass.issued_at)}
-                  />
-                  <DetailField
-                    label="Valid Until"
-                    value={formatDate(pass.valid_until)}
                   />
                   <DetailField label="Pass ID" value={pass.id} />
                   <DetailField label="Issued By" value={pass.issued_by} />

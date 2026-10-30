@@ -26,6 +26,19 @@ import { Input } from "@/components/ui/input";
 import {http, type Resp} from "@/lib/httpClient";
 
 type ReceivingStatus = string;
+interface ReceivingContainer {
+  id: string;
+  container_id: string;
+  container_no: string;
+  expected_seal_no: string;
+  actual_seal_no: string;
+  condition_status: string;
+  actual_weight: string | number | null;
+  receiving_location: string;
+  receiving_status: string;
+  remarks: string;
+  received_at: string | null;
+}
 
 interface ReceivingRecord {
   id: string;
@@ -48,6 +61,10 @@ interface ReceivingRecord {
   status: ReceivingStatus;
   received_at: string | null;
   created_at: string | null;
+  total_containers: number;
+  received_containers: number;
+  discrepancy_containers: number;
+  containers: ReceivingContainer[];
 }
 
 type StatusFilter =
@@ -105,6 +122,56 @@ function normalizeRecord(value: unknown): ReceivingRecord {
       ? (value as Record<string, unknown>)
       : {};
 
+  const rawContainers = Array.isArray(record["containers"])
+    ? record["containers"]
+    : [];
+
+  const containers: ReceivingContainer[] = rawContainers.map((value) => {
+    const container: Record<string, unknown> =
+      value !== null && typeof value === "object"
+        ? (value as Record<string, unknown>)
+        : {};
+
+    return {
+      id: getValue(container, "id"),
+      container_id: getValue(container, "container_id"),
+      container_no: getValue(
+        container,
+        "container_no",
+        "container_number",
+      ),
+      expected_seal_no: getValue(
+        container,
+        "expected_seal_no",
+        "seal_number",
+      ),
+      actual_seal_no: getValue(
+        container,
+        "actual_seal_no",
+        "observed_seal_number",
+      ),
+      condition_status: getValue(
+        container,
+        "condition_status",
+        "cargo_condition",
+      ),
+      actual_weight:
+        (container["actual_weight"] as string | number | null) ?? null,
+      receiving_location: getValue(
+        container,
+        "receiving_location",
+        "receiving_bay",
+      ),
+      receiving_status: getValue(
+        container,
+        "receiving_status",
+        "status",
+      ),
+      remarks: getValue(container, "remarks"),
+      received_at: getValue(container, "received_at") || null,
+    };
+  });
+
   return {
     id: getValue(record, "id", "receiving_id"),
     receiving_reference: getValue(
@@ -135,9 +202,12 @@ function normalizeRecord(value: unknown): ReceivingRecord {
       record,
       "container_no",
       "container_number",
-      "containerNo",
     ),
-    seal_number: getValue(record, "seal_number", "seal_no", "sealNo"),
+    seal_number: getValue(
+      record,
+      "seal_number",
+      "seal_no",
+    ),
     observed_seal_number: getValue(
       record,
       "observed_seal_number",
@@ -147,47 +217,32 @@ function normalizeRecord(value: unknown): ReceivingRecord {
       record,
       "shipping_line",
       "carrier_name",
-      "shippingLine",
     ),
     vessel_name: getValue(record, "vessel_name", "vessel"),
     origin_port: getValue(
       record,
       "origin_port",
       "port_of_origin",
-      "originPort",
     ),
     expected_weight:
-      (record["expected_weight"] as
-        | string
-        | number
-        | null
-        | undefined) ??
-      (record["gross_weight"] as
-        | string
-        | number
-        | null
-        | undefined) ??
+      (record["expected_weight"] as string | number | null) ??
+      (record["gross_weight"] as string | number | null) ??
       null,
     actual_weight:
-      (record["actual_weight"] as
-        | string
-        | number
-        | null
-        | undefined) ??
-      (record["verified_weight"] as
-        | string
-        | number
-        | null
-        | undefined) ??
+      (record["actual_weight"] as string | number | null) ??
+      (record["verified_weight"] as string | number | null) ??
       null,
     receiving_location: getValue(
       record,
       "receiving_location",
       "receiving_bay",
       "received_bay",
-      "receivedBay",
     ),
-    cargo_condition: getValue(record, "cargo_condition", "condition"),
+    cargo_condition: getValue(
+      record,
+      "cargo_condition",
+      "condition",
+    ),
     discrepancy_notes: getValue(
       record,
       "discrepancy_notes",
@@ -195,8 +250,14 @@ function normalizeRecord(value: unknown): ReceivingRecord {
     ),
     status: normalizeStatus(record["status"]),
     received_at:
-      getValue(record, "received_at", "received_on", "timestamp") || null,
+      getValue(record, "received_at", "received_on") || null,
     created_at: getValue(record, "created_at") || null,
+    total_containers: Number(record["total_containers"] ?? 0),
+    received_containers: Number(record["received_containers"] ?? 0),
+    discrepancy_containers: Number(
+      record["discrepancy_containers"] ?? 0,
+    ),
+    containers,
   };
 }
 

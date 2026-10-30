@@ -31,7 +31,7 @@ type GatePass = {
   driverPhone: string;
   type: string;
   issuedAt: string;
-  validUntil: string;
+  appointmentDate: string;
   status: string;
   containerNos: string[];
 };
@@ -110,7 +110,7 @@ function normalizePass(item: Record<string, unknown>): GatePass {
       item["created_at"],
       item["issuedAt"],
     ),
-    validUntil: getString(item["valid_until"], item["validUntil"]),
+    appointmentDate: getString(item["appointment_date"], item["appointmentDate"]),
     status: getString(item["status"]) || "Unknown",
     containerNos,
   };
@@ -127,7 +127,7 @@ function formatDate(value: string) {
         dateStyle: "medium",
         timeStyle: "short",
       });
-}
+} 
 
 export default function GatePassesRoute() {
   const navigate = useNavigate();
@@ -226,7 +226,7 @@ export default function GatePassesRoute() {
         "Containers",
         "Type",
         "Issued At",
-        "Valid Until",
+        "Appointment Date",
         "Status",
       ],
       ...filteredPasses.map((pass) => [
@@ -237,7 +237,7 @@ export default function GatePassesRoute() {
         pass.containerNos.join("; "),
         pass.type,
         pass.issuedAt,
-        pass.validUntil,
+        pass.appointmentDate,
         pass.status,
       ]),
     ];
@@ -402,7 +402,7 @@ export default function GatePassesRoute() {
                   <th className="px-4 py-3 font-medium">Driver</th>
                   <th className="px-4 py-3 font-medium">Containers</th>
                   <th className="px-4 py-3 font-medium">Type</th>
-                  <th className="px-4 py-3 font-medium">Valid Until</th>
+                  <th className="px-4 py-3 font-medium">Appointment Date</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Action</th>
                 </tr>
@@ -480,7 +480,7 @@ export default function GatePassesRoute() {
                         {pass.type}
                       </td>
                       <td className="px-4 py-3.5 text-xs text-ink-soft">
-                        {formatDate(pass.validUntil)}
+                        {formatDate(pass.appointmentDate)}
                       </td>
                       <td className="px-4 py-3.5">
                         <StatusBadge

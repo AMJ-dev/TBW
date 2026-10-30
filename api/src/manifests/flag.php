@@ -71,7 +71,7 @@
             $shipment->execute([$shipmentId]);
             $shipmentRecord = $shipment->fetch(PDO::FETCH_ASSOC);
 
-            if ($shipmentRecord && in_array($shipmentRecord['status'], ['EXPECTED', 'PENDING_REVIEW', 'pending_review'], true)) {
+            if ($shipmentRecord && in_array($shipmentRecord['status'], ['EXPECTED', 'PENDING_REVIEW'], true)) {
                 $updateShipment = $conn->prepare("
                     UPDATE portal_shipments
                     SET status = 'CHANGES_REQUESTED',

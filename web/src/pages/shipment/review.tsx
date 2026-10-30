@@ -160,7 +160,7 @@ export default function OperationsReviewPage() {
 	const stats = useMemo(
 		() => ({
 			total: shipments.length,
-			pending: shipments.filter((shipment) => shipment.status === "pending_review")
+			pending: shipments.filter((shipment) => shipment.status === "PENDING_REVIEW")
 				.length,
 			changes: shipments.filter(
 				(shipment) => shipment.status === "CHANGES_REQUESTED"
@@ -329,7 +329,7 @@ export default function OperationsReviewPage() {
 
 							{[
 								{ key: "all", label: "All" },
-								{ key: "pending_review", label: "Pending review" },
+								{ key: "PENDING_REVIEW", label: "Pending review" },
 								{ key: "CHANGES_REQUESTED", label: "Changes requested" },
 								{ key: "EXPECTED", label: "Approved" },
 								{ key: "REJECTED", label: "Rejected" },

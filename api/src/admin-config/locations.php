@@ -3,7 +3,6 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 try {
     if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-        http_response_code(405);
         echo json_encode([
             "error" => true,
             "data" => "Method not allowed.",
@@ -88,7 +87,6 @@ try {
         ]
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } catch (Throwable $e) {
-    http_response_code(500);
     echo json_encode([
         "error" => true,
         "data" => "Could not load terminal locations.",

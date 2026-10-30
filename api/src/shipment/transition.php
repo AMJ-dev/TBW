@@ -70,7 +70,7 @@ try {
         if (!in_array($action, ["approve", "reject", "return"], true)) {
             respond(422, true, "Invalid declaration review decision.");
         }
-        if (!in_array($currentStatus, ["pending_review", "CHANGES_REQUESTED"], true)) {
+        if (!in_array($currentStatus, ["PENDING_REVIEW", "CHANGES_REQUESTED"], true)) {
             respond(422, true, "Only declarations awaiting review can be reviewed.");
         }
         if ($action !== "approve" && mb_strlen($note) < 5) {
@@ -93,7 +93,7 @@ try {
             $lockStmt->execute([":id" => $shipmentId]);
             $lockedStatus = (string) $lockStmt->fetchColumn();
 
-            if (!in_array($lockedStatus, ["pending_review", "CHANGES_REQUESTED"], true)) {
+            if (!in_array($lockedStatus, ["PENDING_REVIEW", "CHANGES_REQUESTED"], true)) {
                 throw new RuntimeException("This declaration has already been reviewed.");
             }
 

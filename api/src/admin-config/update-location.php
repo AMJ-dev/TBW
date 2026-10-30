@@ -5,7 +5,6 @@ header("Content-Type: application/json; charset=utf-8");
 
 try {
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
         echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
         exit;
     }
@@ -21,25 +20,21 @@ try {
     $changeReason = trim((string) ($_POST["change_reason"] ?? ""));
 
     if ($name === "" || $code === "") {
-        http_response_code(422);
         echo json_encode(["error" => true, "data" => "Location name and location code are required.", "code" => null]);
         exit;
     }
 
     if (strlen($name) > 255 || strlen($code) > 80 || strlen($description) > 1000) {
-        http_response_code(422);
         echo json_encode(["error" => true, "data" => "Location name, code or description exceeds the permitted length.", "code" => null]);
         exit;
     }
 
     if (!preg_match('/^[A-Z0-9_-]+$/', $code)) {
-        http_response_code(422);
         echo json_encode(["error" => true, "data" => "Location code may contain only letters, numbers, hyphens and underscores.", "code" => null]);
         exit;
     }
 
     if (!in_array($kind, ["YARD", "WAREHOUSE", "INSPECTION_BAY". "RECEIVING"], true)) {
-        http_response_code(422);
         echo json_encode(["error" => true, "data" => "Invalid location type.", "code" => null]);
         exit;
     }
@@ -47,7 +42,6 @@ try {
     if ($capacityInput === "" || $capacityInput === null) {
         $capacity = null;
     } elseif (!is_numeric($capacityInput) || !is_finite((float) $capacityInput) || (float) $capacityInput < 0 || floor((float) $capacityInput) !== (float) $capacityInput) {
-        http_response_code(422);
         echo json_encode(["error" => true, "data" => "Capacity (TEU) must be a non-negative whole number.", "code" => null]);
         exit;
     } else {
@@ -55,14 +49,12 @@ try {
     }
 
     if ($changeReason === "" || strlen($changeReason) > 500) {
-        http_response_code(422);
         echo json_encode(["error" => true, "data" => "A reason of 1 to 500 characters is required.", "code" => null]);
         exit;
     }
 
     if ($parentLocationId !== null) {
         if ($parentLocationId === $id && $id !== "") {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "A location cannot be its own parent.", "code" => null]);
             exit;
         }
@@ -72,13 +64,11 @@ try {
         $parent = $parentQuery->fetch(PDO::FETCH_ASSOC);
 
         if (!$parent) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The selected parent location does not exist.", "code" => null]);
             exit;
         }
 
         if ($parent["kind"] !== $kind) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The parent location must have the same location type.", "code" => null]);
             exit;
         }
@@ -88,7 +78,6 @@ try {
     $duplicateQuery->execute([":code" => $code, ":id" => $id]);
 
     if ($duplicateQuery->fetch(PDO::FETCH_ASSOC)) {
-        http_response_code(409);
         echo json_encode(["error" => true, "data" => "A location with this code already exists.", "code" => null]);
         exit;
     }
@@ -100,7 +89,6 @@ try {
         $existsQuery->execute([":id" => $id]);
 
         if (!$existsQuery->fetch(PDO::FETCH_ASSOC)) {
-            http_response_code(404);
             echo json_encode(["error" => true, "data" => "Location not found.", "code" => null]);
             exit;
         }
@@ -138,9 +126,7 @@ try {
 
     echo json_encode(["error" => false, "data" => "Location created successfully.", "code" => ["id" => $id, "location_code" => $code]], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } catch (PDOException $e) {
-    http_response_code(500);
     echo json_encode(["error" => true, "data" => "Could not save the location. Check the supplied values and database constraints.", "code" => null]);
 } catch (Throwable $e) {
-    http_response_code(500);
     echo json_encode(["error" => true, "data" => "An unexpected error occurred while saving the location.", "code" => null]);
 }

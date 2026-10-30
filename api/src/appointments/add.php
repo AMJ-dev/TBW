@@ -238,10 +238,10 @@
         $insert_pass = $conn->prepare("
             INSERT INTO gate_passes (
                 id, organisation_id, pass_code, appointment_id, vehicle_id, driver_id, 
-                type, valid_until, status, issued_by
+                type, status, issued_by
             ) VALUES (
                 :id, :organisation_id, :pass_code, :appointment_id, :vehicle_id, :driver_id, 
-                :type, :valid_until, 'Active', :issued_by
+                :type, 'Active', :issued_by
             )
         ");
         $insert_pass->execute([
@@ -252,9 +252,76 @@
             ":vehicle_id" => $vehicle_id,
             ":driver_id" => $driver_id,
             ":type" => $type,
-            ":valid_until" => $appointment_date,
             ":issued_by" => $my_details->id
         ]);
+
+        $shipment_status_updates = [];
+
+        $shipment_lookup_stmt = $conn->prepare("
+            SELECT DISTINCT psc.shipment_id
+            FROM portal_shipment_containers psc
+            INNER JOIN portal_shipments ps ON ps.id = psc.shipment_id
+            WHERE psc.container_no IN ($in_clause)
+            AND ps.organisation_id = :organisation_id
+        ");
+
+        $shipment_lookup_params = [];
+        foreach ($container_nos as $index => $c_no) {
+            $shipment_lookup_params[":c_" . $index] = $c_no;
+        }
+        $shipment_lookup_params[":organisation_id"] = $organisation_id;
+        $shipment_lookup_stmt->execute($shipment_lookup_params);
+        $shipment_ids = $shipment_lookup_stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        foreach ($shipment_ids as $shipment_id) {
+            $shipment_progress_stmt = $conn->prepare("
+                SELECT
+                    COUNT(DISTINCT psc.id) AS total_containers,
+                    COUNT(DISTINCT CASE
+                        WHEN EXISTS (
+                            SELECT 1
+                            FROM gate_appointment_containers gac
+                            INNER JOIN gate_appointments ga ON ga.id = gac.appointment_id
+                            WHERE UPPER(TRIM(gac.container_no)) = UPPER(TRIM(psc.container_no))
+                            AND ga.status IN ('Confirmed', 'Arrived', 'In Terminal')
+                        )
+                        THEN psc.id
+                    END) AS scheduled_containers
+                FROM portal_shipment_containers psc
+                WHERE psc.shipment_id = :shipment_id
+            ");
+            $shipment_progress_stmt->execute([":shipment_id" => $shipment_id]);
+            $shipment_progress = $shipment_progress_stmt->fetch(PDO::FETCH_ASSOC);
+
+            $total_containers = (int)($shipment_progress["total_containers"] ?? 0);
+            $scheduled_containers = (int)($shipment_progress["scheduled_containers"] ?? 0);
+
+            if ($total_containers < 1 || $scheduled_containers < 1) {
+                continue;
+            }
+
+            $next_shipment_status = $scheduled_containers >= $total_containers
+                ? "SCHEDULED"
+                : "PARTIALLY_SCHEDULED";
+
+            $update_shipment_status = $conn->prepare("
+                UPDATE portal_shipments
+                SET status = :status
+                WHERE id = :shipment_id
+                AND status IN ('EXPECTED', 'SCHEDULED', 'PARTIALLY_SCHEDULED')
+            ");
+            $update_shipment_status->execute([
+                ":status" => $next_shipment_status,
+                ":shipment_id" => $shipment_id
+            ]);
+
+            $shipment_status_updates[] = [
+                "shipment_id" => $shipment_id,
+                "total_containers" => $total_containers,
+                "scheduled_containers" => $scheduled_containers,
+                "status" => $next_shipment_status
+            ];
+        }
 
         $conn->commit();
 
@@ -271,7 +338,8 @@
                 "slot_time" => $slot_time,
                 "status" => "Confirmed",
                 "container_nos" => $container_nos,
-                "container_count" => count($container_nos)
+                "container_count" => count($container_nos),
+                "shipment_statuses" => $shipment_status_updates
             ]
         ]);
     } catch (Throwable $e) {

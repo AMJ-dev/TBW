@@ -80,7 +80,7 @@ const normalizeStatus = (raw: unknown): VehicleStatus => {
 		case "approved":
 			return "Approved";
 		case "pending":
-		case "pending_review":
+		case "PENDING_REVIEW":
 		case "pending review":
 			return "Pending review";
 		case "suspended":

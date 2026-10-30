@@ -41,22 +41,21 @@
                 AND m.bill_of_lading = s.bill_of_lading
             WHERE m.status = 'Validated'
                 AND s.status = 'EXPECTED'
-                AND UPPER(s.bill_of_lading) LIKE :q
+                AND s.organisation_id = :organisation_id
+                AND UPPER(s.bill_of_lading) = :q
             GROUP BY
                 s.id,
                 s.shipment_reference,
                 s.bill_of_lading,
                 s.status,
-                m.id,
+                m.id, 
                 m.manifest_ref,
                 m.status
             ORDER BY s.bill_of_lading ASC
             LIMIT 20
         ");
 
-        $shipment_stmt->execute([
-            ":q" => "%" . $q . "%"
-        ]);
+        $shipment_stmt->execute([":q" => $q, ":organisation_id" => $my_details->organisation_id ]);
 
         $shipments = $shipment_stmt->fetchAll(PDO::FETCH_ASSOC);
 

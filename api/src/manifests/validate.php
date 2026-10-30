@@ -87,7 +87,7 @@
                 SET status = 'EXPECTED',
                     updated_at = NOW()
                 WHERE id = :shipment_id
-                AND status IN ('PENDING_REVIEW', 'pending_review', 'CHANGES_REQUESTED')
+                AND status IN ('PENDING_REVIEW', 'CHANGES_REQUESTED')
             ");
 
             $updateShipment->execute([

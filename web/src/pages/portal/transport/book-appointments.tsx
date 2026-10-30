@@ -1,11 +1,10 @@
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import {
 	ArrowLeft,
 	Calendar,
 	Check,
-	ChevronDown,
 	LoaderCircle,
 	Search,
 	Truck,
@@ -128,89 +127,94 @@ export default function GateBookAppointmentsPage() {
 	const vehicleRequest = useRef(0);
 	const shipmentRequest = useRef(0);
 
-	useEffect(() => {
+	const searchVehicles = async () => {
 		const query = vehicleQuery.trim();
+
+		if (query.length < 2) {
+			toast.error("Enter at least two characters to search vehicles.");
+			return;
+		}
+
 		const requestId = ++vehicleRequest.current;
+		setVehicleDropdown(true);
+		setSearchingVehicles(true);
+		setVehicles([]);
 
-		if (selectedVehicle || query.length < 2) {
-			setVehicles([]);
-			setSearchingVehicles(false);
-			return;
-		}
+		try {
+			const response = await http.post("vehicles/search/", {
+				q: query,
+				include_assigned: 1,
+			});
+			const resp: Resp = response.data;
 
-		const timer = setTimeout(async () => {
-			setSearchingVehicles(true);
+			if (requestId !== vehicleRequest.current) return;
 
-			try {
-				const response = await http.post("vehicles/search/", {
-					q: query,
-					include_assigned: 1,
-				});
-
-				const resp: Resp = response.data;
-
-				if (requestId !== vehicleRequest.current) return;
-
-				if (resp.error) {
-					setVehicles([]);
-					return;
-				}
-
-				setVehicles(extractList<Vehicle>(resp));
-			} catch {
-				if (requestId === vehicleRequest.current) {
-					setVehicles([]);
-				}
-			} finally {
-				if (requestId === vehicleRequest.current) {
-					setSearchingVehicles(false);
-				}
+			if (resp.error) {
+				setVehicles([]);
+				toast.error(
+					typeof resp.data === "string"
+						? resp.data
+						: "Could not search registered vehicles.",
+				);
+				return;
 			}
-		}, 300);
 
-		return () => clearTimeout(timer);
-	}, [vehicleQuery, selectedVehicle]);
+			setVehicles(extractList<Vehicle>(resp));
+		} catch {
+			if (requestId === vehicleRequest.current) {
+				setVehicles([]);
+				toast.error("Could not search registered vehicles.");
+			}
+		} finally {
+			if (requestId === vehicleRequest.current) {
+				setSearchingVehicles(false);
+			}
+		}
+	};
 
-	useEffect(() => {
+	const searchShipments = async () => {
 		const query = billOfLadingQuery.trim();
-		const requestId = ++shipmentRequest.current;
 
-		if (selectedShipment || query.length < 2) {
-			setEligibleShipments([]);
-			setSearchingShipments(false);
+		if (query.length < 2) {
+			toast.error("Enter at least two characters to search bills of lading.");
 			return;
 		}
 
-		const timer = setTimeout(async () => {
-			setSearchingShipments(true);
+		const requestId = ++shipmentRequest.current;
+		setShipmentDropdown(true);
+		setSearchingShipments(true);
+		setEligibleShipments([]);
 
-			try {
-				const response = await http.post("appointments/eligible-shipments/search/", {
-					q: query,
-				});
-				const resp: Resp = response.data;
+		try {
+			const response = await http.post("appointments/eligible-shipments/search/", {
+				q: query,
+			});
+			const resp: Resp = response.data;
 
-				if (requestId !== shipmentRequest.current) return;
+			if (requestId !== shipmentRequest.current) return;
 
-				if (resp.error) {
-					setEligibleShipments([]);
-					return;
-				}
-
-				setEligibleShipments(extractList<EligibleShipment>(resp));
-			} catch {
-				if (requestId === shipmentRequest.current) {
-					setEligibleShipments([]);
-				}
-			} finally {
-				if (requestId === shipmentRequest.current) {
-					setSearchingShipments(false);
-				}
+			if (resp.error) {
+				setEligibleShipments([]);
+				toast.error(
+					typeof resp.data === "string"
+						? resp.data
+						: "Could not search eligible shipments.",
+				);
+				return;
 			}
-		}, 300);
 
-		return () => clearTimeout(timer);
-	}, [billOfLadingQuery, selectedShipment]);
+			setEligibleShipments(extractList<EligibleShipment>(resp));
+		} catch {
+			if (requestId === shipmentRequest.current) {
+				setEligibleShipments([]);
+				toast.error("Could not search eligible shipments.");
+			}
+		} finally {
+			if (requestId === shipmentRequest.current) {
+				setSearchingShipments(false);
+			}
+		}
+	};
 
 	const handleSelectShipment = (shipment: EligibleShipment) => {
 		shipmentRequest.current++;
@@ -410,27 +414,28 @@ export default function GateBookAppointmentsPage() {
 								<Input
 									value={vehicleQuery}
 									onChange={(event) => {
+										vehicleRequest.current++;
 										setVehicleQuery(event.target.value);
 										setSelectedVehicle(null);
 										setSelectedDriver(null);
 										setVehicles([]);
-										setVehicleDropdown(true);
-									}}
-									onFocus={() => setVehicleDropdown(true)}
-									onBlur={() => {
-										setTimeout(() => setVehicleDropdown(false), 150);
+										setVehicleDropdown(false);
 									}}
 									placeholder="Type a vehicle plate, make, or model..."
 									autoComplete="off"
 									required
-									className="h-11 border-line bg-sand pl-9 pr-10 text-ink"
+									className="h-11 border-line bg-sand pl-9 pr-24 text-ink"
 								/>
 
-								{searchingVehicles ? (
-									<LoaderCircle className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-ink-soft" />
-								) : (
-									<ChevronDown className="absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
-								)}
+								<Button
+									type="button"
+									onClick={() => void searchVehicles()}
+									disabled={searchingVehicles || vehicleQuery.trim().length < 2}
+									className="absolute right-1 top-1/2 h-9 -translate-y-1/2 gap-2 px-3"
+								>
+									{searchingVehicles ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
+									Search
+								</Button>
 							</div>
 
 							{vehicleDropdown &&
@@ -621,18 +626,26 @@ export default function GateBookAppointmentsPage() {
 								<Input
 									value={billOfLadingQuery}
 									onChange={(event) => {
+										shipmentRequest.current++;
 										setBillOfLadingQuery(event.target.value);
 										setSelectedShipment(null);
 										setSelectedContainerNos([]);
 										setEligibleShipments([]);
-										setShipmentDropdown(true);
+										setShipmentDropdown(false);
 									}}
-									onFocus={() => setShipmentDropdown(true)}
 									autoComplete="off"
 									placeholder="Search bill of lading..."
-									className="h-11 border-line bg-sand pl-9 pr-10 text-ink"
+									className="h-11 border-line bg-sand pl-9 pr-24 text-ink"
 								/>
-								{searchingShipments && <LoaderCircle className="absolute right-3 top-1/2 size-4 -translate-y-1/2 animate-spin text-ink-soft" />}
+								<Button
+									type="button"
+									onClick={() => void searchShipments()}
+									disabled={searchingShipments || billOfLadingQuery.trim().length < 2}
+									className="absolute right-1 top-1/2 h-9 -translate-y-1/2 gap-2 px-3"
+								>
+									{searchingShipments ? <LoaderCircle className="size-4 animate-spin" /> : <Search className="size-4" />}
+									Search
+								</Button>
 							</div>
 							{shipmentDropdown && !selectedShipment && billOfLadingQuery.trim().length >= 2 && (
 								<div className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-line bg-paper shadow-xl">

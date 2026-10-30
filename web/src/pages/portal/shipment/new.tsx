@@ -941,7 +941,7 @@ export default function NewPortalShipmentPage() {
 	const validContainersForSubmit = () =>
 		containers.filter((container) => container.containerNo.trim());
 
-	const buildFormData = (status: "draft" | "pending_review") => {
+	const buildFormData = (status: "DRAFT" | "PENDING_REVIEW") => {
 		const formData = new FormData();
 
 		const consigneeName =
@@ -1051,7 +1051,7 @@ export default function NewPortalShipmentPage() {
 	};
 
 	const persistShipment = async (
-		status: "draft" | "pending_review"
+		status: "DRAFT" | "PENDING_REVIEW"
 	): Promise<string | null> => {
 		const endpoint = shipmentId
 			? `/portal/shipments/update/${shipmentId}/`
@@ -1078,7 +1078,7 @@ export default function NewPortalShipmentPage() {
 	const saveDraft = async () => {
 		setSaving(true);
 		try {
-			const nextId = await persistShipment("draft");
+			const nextId = await persistShipment("DRAFT");
 			if (!nextId) return;
 
 			if (!shipmentId) {
@@ -1110,7 +1110,7 @@ export default function NewPortalShipmentPage() {
 
 		setSubmitting(true);
 		try {
-			const nextId = await persistShipment("pending_review");
+			const nextId = await persistShipment("PENDING_REVIEW");
 			if (!nextId) return;
 
 			setShipmentId(nextId);

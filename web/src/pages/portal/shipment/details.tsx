@@ -408,7 +408,7 @@ export default function PortalShipmentDetailsPage() {
 	const agent = shipment.licensed_agent || {};
 
 	const manifestNeedsAction = shipment?.status === "CHANGES_REQUESTED" && manifest?.review_responsible_party == 'Organisation';
-	const isDraft = shipment?.status === 'draft';
+	const isDraft = shipment?.status === 'DRAFT';
 
 	return (
 		<AppShell

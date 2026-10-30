@@ -46,7 +46,6 @@
                 gp.status,
                 gp.issued_by,
                 gp.issued_at,
-                gp.valid_until,
                 gp.updated_at,
 
                 a.booking_ref,
@@ -125,10 +124,9 @@
             LIMIT 1
         ");
 
-        $stmt->execute([
-            ":id" => $id,
-            ":organisation_id" => $organisation_id
-        ]);
+        $stmt->bindValue(":id", $id, PDO::PARAM_STR);
+        $stmt->bindValue(":organisation_id", $organisation_id, PDO::PARAM_STR);
+        $stmt->execute();
 
         $pass = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -300,12 +298,11 @@
             ORDER BY c.container_no ASC
         ");
 
-        $containerStmt->execute([
-            ":appointment_id" => $appointment_id
-        ]);
+        $containerStmt->bindValue(":appointment_id", $appointment_id, PDO::PARAM_STR);
+        $containerStmt->execute();
 
         $containers = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
-
+ 
         $pass["vehicle"] = [
             "id" => $pass["vehicle_detail_id"],
             "plate" => $pass["vehicle_plate"],

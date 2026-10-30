@@ -61,7 +61,7 @@
             exit;
         }
 
-        if (!in_array($existingShipment["status"], ["draft", "pending_review", "CHANGES_REQUESTED"], true)) {
+        if (!in_array($existingShipment["status"], ["DRAFT", "PENDING_REVIEW", "CHANGES_REQUESTED"], true)) {
             echo json_encode([
                 "error" => true,
                 "data" => "This shipment can no longer be edited.",
@@ -70,18 +70,18 @@
             exit;
         }
 
-        $requestedStatus = trim((string) ($_POST["status"] ?? "pending_review"));
+        $requestedStatus = trim((string) ($_POST["status"] ?? "PENDING_REVIEW"));
 
-        $status = in_array($requestedStatus, ["draft", "pending_review"], true)
+        $status = in_array($requestedStatus, ["DRAFT", "PENDING_REVIEW"], true)
             ? $requestedStatus
-            : "pending_review";
+            : "PENDING_REVIEW";
 
         $declarationAccepted = strtolower(trim((string) (
             $_POST["declaration_accepted"] ?? $_POST["declarationAccepted"] ?? "0"
         )));
 
         if (
-            $status === "pending_review" &&
+            $status === "PENDING_REVIEW" &&
             !in_array($declarationAccepted, ["1", "true", "yes", "on"], true)
         ) {
             throw new InvalidArgumentException(
@@ -159,7 +159,7 @@
             throw new InvalidArgumentException("Invalid consignee email.");
         }
 
-        if ($status === "pending_review" && $consignee === "") {
+        if ($status === "PENDING_REVIEW" && $consignee === "") {
             throw new InvalidArgumentException("Consignee name is required.");
         }
 
@@ -178,7 +178,7 @@
         ));
 
         if (
-            $status === "pending_review" &&
+            $status === "PENDING_REVIEW" &&
             $consigneeType === "organisation" &&
             $consigneeOrganisationId === "" &&
             $consigneeEmail === "" &&
@@ -382,7 +382,7 @@
             }
         }
 
-        if ($status === "pending_review") {
+        if ($status === "PENDING_REVIEW") {
             foreach ($requiredDocuments as $requiredDocument) {
                 $key = $requiredDocument["document_key"];
                 $alreadyUploaded = false;
@@ -743,7 +743,7 @@
             }
 
             if (
-                $status === "pending_review" &&
+                $status === "PENDING_REVIEW" &&
                 $cargoCategory === "Containerised Cargo"
             ) {
                 if ($cargoDescription === "") {

@@ -3,7 +3,6 @@
 
     try {
         if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-            http_response_code(405);
             echo json_encode([
                 "error" => true,
                 "data" => "Method not allowed.",
@@ -17,7 +16,6 @@
         $kind = strtoupper(trim($_POST["q"] ?? ""));
 
         if (!in_array($kind, $allowed_types, true)) {
-            http_response_code(400);
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid location type. Allowed types are RECEIVING, WAREHOUSE, and INSPECTION.",
@@ -40,7 +38,6 @@
             ]
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     } catch (Throwable $e) {
-        http_response_code(500);
         echo json_encode([
             "error" => true,
             "data" => "Could not load terminal locations.",

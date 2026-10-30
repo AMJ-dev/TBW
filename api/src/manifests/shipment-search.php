@@ -4,7 +4,6 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    http_response_code(405);
     echo json_encode([
         "error" => true,
         "data" => "Method not allowed.",
@@ -132,9 +131,6 @@ try {
 
 } catch (Throwable $e) {
     error_log("Shipment search error: " . $e->getMessage());
-
-    http_response_code(500);
-
     echo json_encode([
         "error" => true,
         "data" => "Could not search for the shipment.",

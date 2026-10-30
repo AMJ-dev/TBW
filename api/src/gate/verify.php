@@ -37,7 +37,6 @@
                 p.organisation_id,
                 p.type AS pass_type,
                 p.status AS pass_status,
-                p.valid_until,
                 p.issued_at,
                 p.issued_by,
                 p.updated_at AS pass_updated_at,
@@ -248,8 +247,15 @@
 
         $containers = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
 
+        foreach ($containers as &$container) {
+            $container["seal_number"] = $container["seal_no"] ?? null;
+            $container["container_size"] = $container["size"] ?? null;
+            $container["weight"] = $container["gross_weight"] ?? null;
+            $container["number"] = $container["container_no"] ?? null;
+        }
+        unset($container);
+
         $today = date("Y-m-d");
-        $now = time();
 
         $vehicleStatus = strtolower(trim((string) ($pass["vehicle_status"] ?? "")));
         $driverStatus = strtolower(trim((string) ($pass["driver_status"] ?? "")));
@@ -268,21 +274,17 @@
             !empty($pass["licence_expiry"]) &&
             $pass["licence_expiry"] >= $today;
 
-        $passExpiry = !empty($pass["valid_until"])
-            ? strtotime((string) $pass["valid_until"])
-            : false;
+        $appointmentDate = !empty($pass["appointment_date"])
+            ? date("Y-m-d", strtotime((string) $pass["appointment_date"]))
+            : null;
 
-        $passExpired = $passExpiry === false || $passExpiry <= $now;
+        $passExpired = $appointmentDate !== null && $appointmentDate < $today;
         $used = (bool) $pass["used"];
 
         $passEligible =
             $passStatus === "active" &&
-            !$passExpired &&
+            $appointmentDate === $today &&
             !$used;
-
-        $appointmentDate = !empty($pass["appointment_date"])
-            ? date("Y-m-d", strtotime((string) $pass["appointment_date"]))
-            : null;
 
         $appointmentEligible =
             $appointmentDate === $today &&
@@ -412,7 +414,7 @@
         } elseif ($passStatus === "revoked") {
             $holds[] = "Gate pass has been revoked";
         } elseif ($passExpired) {
-            $holds[] = "Gate pass has expired or has no valid expiry date";
+            $holds[] = "Gate pass appointment date has passed";
         } elseif ($passStatus !== "active") {
             $holds[] = "Gate pass is not active";
         }
@@ -594,6 +596,6 @@
         echo json_encode([
             "error" => true,
             "data" => "Could not verify gate pass.",
-            "code" => null
+            "code" => $e->getMessage()
         ]);
     }

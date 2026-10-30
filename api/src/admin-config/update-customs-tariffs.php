@@ -51,7 +51,6 @@
             $rateInput === "" ||
             !is_numeric($rateInput)
         ) {
-            http_response_code(422);
             echo json_encode([
                 "error" => true,
                 "data" => "Complete all required tariff fields.",
@@ -61,7 +60,6 @@
         }
 
         if (strlen($hsCode) > 20 || strlen($category) > 150 || strlen($unit) > 100) {
-            http_response_code(422);
             echo json_encode([
                 "error" => true,
                 "data" => "One or more fields exceed the allowed length.",
@@ -71,7 +69,6 @@
         }
 
         if (!in_array($rateType, $allowedRateTypes, true)) {
-            http_response_code(422);
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid tariff rate type.",
@@ -81,7 +78,6 @@
         }
 
         if (!in_array($status, $allowedStatuses, true)) {
-            http_response_code(422);
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid tariff status.",
@@ -93,7 +89,6 @@
         $rate = (float) $rateInput;
 
         if (!is_finite($rate) || $rate < 0) {
-            http_response_code(422);
             echo json_encode([
                 "error" => true,
                 "data" => "The tariff rate must be a valid non-negative number.",
@@ -110,7 +105,6 @@
             ($fromErrors !== false && ($fromErrors["warning_count"] > 0 || $fromErrors["error_count"] > 0)) ||
             $fromDate->format("Y-m-d") !== $effectiveFrom
         ) {
-            http_response_code(422);
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid effective-from date.",
@@ -131,7 +125,6 @@
                 $toDate->format("Y-m-d") !== $effectiveTo ||
                 $toDate < $fromDate
             ) {
-                http_response_code(422);
                 echo json_encode([
                     "error" => true,
                     "data" => "The effective-to date must be valid and cannot precede the effective-from date.",
@@ -150,7 +143,6 @@
             $versionDate = DateTimeImmutable::createFromFormat("!Y-m-d", $dateOfVersion);
             $versionErrors = DateTimeImmutable::getLastErrors();
             if (!$versionDate || ($versionErrors !== false && ($versionErrors["warning_count"] > 0 || $versionErrors["error_count"] > 0)) || $versionDate->format("Y-m-d") !== $dateOfVersion) {
-                http_response_code(422);
                 echo json_encode(["error" => true, "data" => "Invalid date of version.", "code" => null]);
                 exit;
             }
@@ -158,139 +150,116 @@
 
         $extraValues = [];
         if ($import_dutyInput !== "" && (!is_numeric($import_dutyInput) || !is_finite((float) $import_dutyInput) || (float) $import_dutyInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The import duty value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["import_duty"] = $import_dutyInput === "" ? null : (float) $import_dutyInput;
         if ($vatInput !== "" && (!is_numeric($vatInput) || !is_finite((float) $vatInput) || (float) $vatInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The vat value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["vat"] = $vatInput === "" ? null : (float) $vatInput;
         if ($levyInput !== "" && (!is_numeric($levyInput) || !is_finite((float) $levyInput) || (float) $levyInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The levy value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["levy"] = $levyInput === "" ? null : (float) $levyInput;
         if ($excInput !== "" && (!is_numeric($excInput) || !is_finite((float) $excInput) || (float) $excInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The exc value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["exc"] = $excInput === "" ? null : (float) $excInput;
         if ($wglInput !== "" && (!is_numeric($wglInput) || !is_finite((float) $wglInput) || (float) $wglInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The wgl value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["wgl"] = $wglInput === "" ? null : (float) $wglInput;
         if ($ricInput !== "" && (!is_numeric($ricInput) || !is_finite((float) $ricInput) || (float) $ricInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The ric value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["ric"] = $ricInput === "" ? null : (float) $ricInput;
         if ($brlInput !== "" && (!is_numeric($brlInput) || !is_finite((float) $brlInput) || (float) $brlInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The brl value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["brl"] = $brlInput === "" ? null : (float) $brlInput;
         if ($wflInput !== "" && (!is_numeric($wflInput) || !is_finite((float) $wflInput) || (float) $wflInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The wfl value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["wfl"] = $wflInput === "" ? null : (float) $wflInput;
         if ($sugInput !== "" && (!is_numeric($sugInput) || !is_finite((float) $sugInput) || (float) $sugInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The sug value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["sug"] = $sugInput === "" ? null : (float) $sugInput;
         if ($cemInput !== "" && (!is_numeric($cemInput) || !is_finite((float) $cemInput) || (float) $cemInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The cem value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["cem"] = $cemInput === "" ? null : (float) $cemInput;
         if ($cigInput !== "" && (!is_numeric($cigInput) || !is_finite((float) $cigInput) || (float) $cigInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The cig value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["cig"] = $cigInput === "" ? null : (float) $cigInput;
         if ($iroInput !== "" && (!is_numeric($iroInput) || !is_finite((float) $iroInput) || (float) $iroInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The iro value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["iro"] = $iroInput === "" ? null : (float) $iroInput;
         if ($crlInput !== "" && (!is_numeric($crlInput) || !is_finite((float) $crlInput) || (float) $crlInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The crl value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["crl"] = $crlInput === "" ? null : (float) $crlInput;
         if ($tplInput !== "" && (!is_numeric($tplInput) || !is_finite((float) $tplInput) || (float) $tplInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The tpl value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["tpl"] = $tplInput === "" ? null : (float) $tplInput;
         if ($nauInput !== "" && (!is_numeric($nauInput) || !is_finite((float) $nauInput) || (float) $nauInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The nau value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["nau"] = $nauInput === "" ? null : (float) $nauInput;
         if ($nanInput !== "" && (!is_numeric($nanInput) || !is_finite((float) $nanInput) || (float) $nanInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The nan value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["nan"] = $nanInput === "" ? null : (float) $nanInput;
         if ($gtsInput !== "" && (!is_numeric($gtsInput) || !is_finite((float) $gtsInput) || (float) $gtsInput < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The gts value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["gts"] = $gtsInput === "" ? null : (float) $gtsInput;
         if ($t5Input !== "" && (!is_numeric($t5Input) || !is_finite((float) $t5Input) || (float) $t5Input < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The t5 value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["t5"] = $t5Input === "" ? null : (float) $t5Input;
         if ($t6Input !== "" && (!is_numeric($t6Input) || !is_finite((float) $t6Input) || (float) $t6Input < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The t6 value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["t6"] = $t6Input === "" ? null : (float) $t6Input;
         if ($t7Input !== "" && (!is_numeric($t7Input) || !is_finite((float) $t7Input) || (float) $t7Input < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The t7 value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["t7"] = $t7Input === "" ? null : (float) $t7Input;
         if ($t8Input !== "" && (!is_numeric($t8Input) || !is_finite((float) $t8Input) || (float) $t8Input < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The t8 value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["t8"] = $t8Input === "" ? null : (float) $t8Input;
         if ($t9Input !== "" && (!is_numeric($t9Input) || !is_finite((float) $t9Input) || (float) $t9Input < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The t9 value must be a non-negative number.", "code" => null]);
             exit;
         }
         $extraValues["t9"] = $t9Input === "" ? null : (float) $t9Input;
         if ($t10Input !== "" && (!is_numeric($t10Input) || !is_finite((float) $t10Input) || (float) $t10Input < 0)) {
-            http_response_code(422);
             echo json_encode(["error" => true, "data" => "The t10 value must be a non-negative number.", "code" => null]);
             exit;
         }
@@ -302,7 +271,6 @@
             $q->execute([":id" => $id]);
 
             if (!$q->fetch(PDO::FETCH_ASSOC)) {
-                http_response_code(404);
                 echo json_encode([
                     "error" => true,
                     "data" => "Tariff record not found.",
@@ -331,7 +299,6 @@
         ]);
 
         if ($q->fetch(PDO::FETCH_ASSOC)) {
-            http_response_code(409);
             echo json_encode([
                 "error" => true,
                 "data" => "A tariff with this HS code and effective-from date already exists.",
@@ -630,14 +597,12 @@
         error_log("Customs tariff save database error: " . $e->getMessage());
 
         if ($e->getCode() === "23000") {
-            http_response_code(409);
             echo json_encode([
                 "error" => true,
                 "data" => "A tariff record conflicts with an existing record.",
                 "code" => null
             ]);
         } else {
-            http_response_code(500);
             echo json_encode([
                 "error" => true,
                 "data" => "Could not save customs tariff.",
@@ -646,7 +611,6 @@
         }
     } catch (Throwable $e) {
         error_log("Customs tariff save error: " . $e->getMessage());
-        http_response_code(500);
 
         echo json_encode([
             "error" => true,

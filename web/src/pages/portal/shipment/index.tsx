@@ -650,7 +650,7 @@ export default function PortalShipmentsPage() {
 											const consigneeEmail = String(item.consignee_email ?? "").trim();
 
 											const manifestNeedsAction = item?.status === "CHANGES_REQUESTED" && item?.manifest_review_responsible_party == 'Organisation';
-											const isDraft = item?.status === 'draft';
+											const isDraft = item?.status === 'DRAFT';
 											
 											return (
 												<motion.tr

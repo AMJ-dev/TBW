@@ -163,7 +163,6 @@ RewriteRule ^driver/([0-9a-zA-Z-]+)/$ src/drivers/get.php?id=$1 [NC]
 RewriteRule ^driver/update/([0-9a-zA-Z-]+)/$ src/drivers/update.php?id=$1 [NC]
 
 RewriteRule ^gate-passes/$ src/gate-passes/all.php [NC]
-RewriteRule ^gate-passes/add/$ src/gate-passes/add.php [NC]
 
 RewriteRule ^appointments/$ src/appointments/all.php [NC]
 RewriteRule ^appointments/add/$ src/appointments/add.php [NC]

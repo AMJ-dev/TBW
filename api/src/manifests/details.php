@@ -4,7 +4,6 @@
     header("Content-Type: application/json; charset=UTF-8");
 
     if (($my_details->account_type ?? "") !== "system" || empty($my_details->id)) {
-        http_response_code(403);
         echo json_encode([
             "error" => true,
             "data" => "Access denied.",
@@ -14,7 +13,6 @@
     }
 
     if (($_SERVER["REQUEST_METHOD"] ?? "") !== "GET") {
-        http_response_code(405);
         header("Allow: GET");
         echo json_encode([
             "error" => true,
@@ -38,7 +36,6 @@
     }
 
     if ($id === "" || strlen($id) > 100) {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "A valid manifest ID is required.",
@@ -70,7 +67,6 @@
         $manifest = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$manifest) {
-            http_response_code(404);
             echo json_encode([
                 "error" => true,
                 "data" => "Manifest not found.",
@@ -268,7 +264,6 @@
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
 
     } catch (Throwable $e) {
-        http_response_code(500);
 
         echo json_encode([
             "error" => true,

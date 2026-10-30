@@ -249,7 +249,7 @@ const PHASES: { key: string; label: string; codes: string[] }[] = [
   {
     key: "declaration",
     label: "Declaration",
-    codes: ["pending_review", "CHANGES_REQUESTED", "REJECTED", "EXPECTED"],
+    codes: ["PENDING_REVIEW", "CHANGES_REQUESTED", "REJECTED", "EXPECTED"],
   },
   {
     key: "transit",
@@ -451,7 +451,7 @@ const normaliseShipment = (raw: any): Shipment => ({
   temperature: raw?.temperature ?? null,
   special_instructions: raw?.special_instructions ?? null,
   customs_reference: raw?.customs_reference ?? null,
-  status: String(raw?.status ?? "pending_review"),
+  status: String(raw?.status ?? "PENDING_REVIEW"),
   created_at: String(raw?.created_at ?? ""),
   updated_at: String(raw?.updated_at ?? ""),
   containers: Array.isArray(raw?.containers)
@@ -496,7 +496,7 @@ const statusTone: Record<
   string,
   { bg: string; text: string; ring: string; dot: string; label: string }
 > = {
-  pending_review: {
+  PENDING_REVIEW: {
     bg: "bg-orange/10",
     text: "text-orange-deep",
     ring: "ring-orange/30",

@@ -53,7 +53,6 @@ interface QueuedTruck {
   passCode: string;
   passType: string;
   passStatus: string;
-  validUntil: string;
   issuedAt: string;
   issuedBy: string;
   passUpdatedAt: string;
@@ -167,15 +166,44 @@ function getStringArray(value: unknown): string[] {
 
 function normalizeTruck(item: Record<string, unknown>): QueuedTruck {
   const rawChecks = getObject(item["checks"]);
-  const organisation = getObject(item["organisation"]);
-  const vehicleDetails = getObject(item["vehicle"]);
-  const driverDetails = getObject(item["driver"]);
+  const organisation = {
+    ...getObject(item["organisation"]),
+    organisation_name: getString(getObject(item["organisation"]), "organisation_name", "name") || getString(item, "organisation_name", "organization_name"),
+    rc_number: getString(getObject(item["organisation"]), "rc_number") || getString(item, "rc_number"),
+    tin: getString(getObject(item["organisation"]), "tin") || getString(item, "tin"),
+    verification_status: getString(getObject(item["organisation"]), "verification_status") || getString(item, "organisation_verification_status"),
+  };
+  const vehicleDetails = {
+    ...getObject(item["vehicle"]),
+    id: getString(getObject(item["vehicle"]), "id") || getString(item, "vehicle_id"),
+    plate: getString(getObject(item["vehicle"]), "plate", "vehicle_plate") || getString(item, "vehicle_plate", "plate"),
+    make: getString(getObject(item["vehicle"]), "make") || getString(item, "vehicle_make", "make"),
+    model: getString(getObject(item["vehicle"]), "model") || getString(item, "vehicle_model", "model"),
+    capacity: getString(getObject(item["vehicle"]), "capacity") || getString(item, "vehicle_capacity", "capacity"),
+    transporter: getString(getObject(item["vehicle"]), "transporter") || getString(item, "transporter"),
+    status: getString(getObject(item["vehicle"]), "status") || getString(item, "vehicle_status"),
+    insurance_expiry: getString(getObject(item["vehicle"]), "insurance_expiry") || getString(item, "insurance_expiry"),
+    roadworthiness_expiry: getString(getObject(item["vehicle"]), "roadworthiness_expiry") || getString(item, "roadworthiness_expiry"),
+  };
+  const driverDetails = {
+    ...getObject(item["driver"]),
+    id: getString(getObject(item["driver"]), "id") || getString(item, "driver_id"),
+    name: getString(getObject(item["driver"]), "name") || getString(item, "driver_name"),
+    phone: getString(getObject(item["driver"]), "phone") || getString(item, "driver_phone"),
+    licence_number: getString(getObject(item["driver"]), "licence_number", "license_number") || getString(item, "licence_number", "license_number", "driver_licence_number"),
+    licence_class: getString(getObject(item["driver"]), "licence_class", "license_class") || getString(item, "licence_class", "license_class"),
+    licence_expiry: getString(getObject(item["driver"]), "licence_expiry", "license_expiry") || getString(item, "licence_expiry", "license_expiry"),
+    status: getString(getObject(item["driver"]), "status") || getString(item, "driver_status"),
+  };
   const appointmentDetails = getObject(item["appointment"]);
-  const containerDetails = getObjectArray(item["containers"]);
-  
+  const receivedContainers = getObjectArray(item["containers"]);
+  const containerDetails = receivedContainers.length
+    ? receivedContainers
+    : getStringArray(item["container_nos"] ?? item["containerNos"]).map((container_no) => ({ container_no }));
+
   const containers = getStringArray(item["container_nos"] ?? item["containerNos"] ?? item["containers"]);
   const actualContainerNos = containerDetails
-    .map((c) => getString(c, "container_no", "number", "shipment_container_no"))
+    .map((c) => getString(c, "container_no", "containerNo", "number", "shipment_container_no"))
     .filter(Boolean);
   const containerNos = containers.length ? containers : actualContainerNos;
 
@@ -185,10 +213,10 @@ function normalizeTruck(item: Record<string, unknown>): QueuedTruck {
   else if (readinessValue === "not ready") readiness = "Not ready";
   else if (readinessValue === "active") readiness = "Active";
 
-  const passStatus = getString(item, "pass_status", "passStatus");
+  const passStatus = getString(item, "pass_status", "passStatus", "status");
   const latestDecision = getString(item, "latest_decision", "latest_gate_in_decision").toUpperCase();
   const used = getBoolean(item, "used");
-  
+
   const statusLabel = getString(item, "status_label", "statusLabel") || (() => {
     const normalizedStatus = passStatus.trim().toLowerCase();
     if (normalizedStatus === "redeemed") return "Redeemed";
@@ -201,49 +229,48 @@ function normalizeTruck(item: Record<string, unknown>): QueuedTruck {
   })();
 
   const rawHolds = getStringArray(item["holds"] ?? item["hold_reasons"]);
-  const driverName = getString(driverDetails, "name") || getString(item, "driver_name") || "—";
-  const driverPhone = getString(driverDetails, "phone") || getString(item, "driver_phone") || "—";
-  const plate = getString(vehicleDetails, "plate") || getString(item, "vehicle_plate") || "—";
-  const orgName = getString(organisation, "organisation_name") || getString(item, "organisation_name") || "—";
+  const driverName = getString(driverDetails, "name") || "—";
+  const driverPhone = getString(driverDetails, "phone") || "—";
+  const plate = getString(vehicleDetails, "plate") || "—";
+  const orgName = getString(organisation, "organisation_name") || "—";
 
   return {
     id: getString(item, "id", "gate_pass_id"),
     gatePassId: getString(item, "gate_pass_id", "id"),
     passCode: getString(item, "pass_code", "passCode"),
-    passType: getString(item, "pass_type", "purpose"),
+    passType: getString(item, "pass_type", "passType", "purpose", "type"),
     passStatus,
-    validUntil: getString(item, "valid_until"),
     issuedAt: getString(item, "issued_at"),
     issuedBy: getString(item, "issued_by"),
     passUpdatedAt: getString(item, "pass_updated_at"),
-    
+
     appointmentId: getString(item, "appointment_id") || getString(appointmentDetails, "id"),
     appointmentRef: getString(appointmentDetails, "booking_ref") || getString(item, "appointment_reference", "appointment_ref"),
     appointmentDate: getString(appointmentDetails, "appointment_date") || getString(item, "appointment_date"),
     slotTime: getString(appointmentDetails, "slot_time") || getString(item, "slot_time"),
-    appointmentStatus: getString(appointmentDetails, "status"),
-    
+    appointmentStatus: getString(appointmentDetails, "status") || getString(item, "appointment_status"),
+
     plate,
     vehicleDetails,
-    
-    driverId: getString(driverDetails, "id") || getString(item, "driver_id"),
+
+    driverId: getString(driverDetails, "id"),
     driverName,
     driverPhone,
     driverDetails,
-    
+
     organizationName: orgName,
     organizationDetails: organisation,
-    
+
     containerNos,
     containerDetails,
     containerCount: Number(item["container_count"] ?? containerNos.length),
-    
+
     used,
     readiness,
     statusLabel,
     latestDecision,
     notes: getString(item, "readiness_notes", "notes"),
-    
+
     checks: {
       vehicle: getBoolean(rawChecks, "vehicle", "vehicle_eligible"),
       driver: getBoolean(rawChecks, "driver", "driver_eligible"),
@@ -252,7 +279,7 @@ function normalizeTruck(item: Record<string, unknown>): QueuedTruck {
       financial: getBoolean(rawChecks, "financial", "financial_clearance"),
       release: getBoolean(rawChecks, "release", "release_authorised"),
     },
-    
+
     holds: rawHolds,
     directionLabel: getString(item, "direction"),
     consignment: getString(item, "shipment_reference", "consignment_reference"),
@@ -571,6 +598,9 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                         <Detail label="Make & Model" value={`${getString(active.vehicleDetails, "make")} ${getString(active.vehicleDetails, "model")}`} />
                         <Detail label="Capacity" value={getString(active.vehicleDetails, "capacity")} />
                         <Detail label="Transporter" value={getString(active.vehicleDetails, "transporter")} />
+                        <Detail label="Vehicle Status" value={getString(active.vehicleDetails, "status")} />
+                        <Detail label="Insurance Expiry" value={getString(active.vehicleDetails, "insurance_expiry")} />
+                        <Detail label="Roadworthiness Expiry" value={getString(active.vehicleDetails, "roadworthiness_expiry")} />
                       </div>
                     </div>
 
@@ -584,6 +614,8 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                         <Detail label="Phone" value={getString(active.driverDetails, "phone")} mono />
                         <Detail label="Licence No." value={getString(active.driverDetails, "licence_number")} mono />
                         <Detail label="Licence Class" value={getString(active.driverDetails, "licence_class")} />
+                        <Detail label="Licence Expiry" value={getString(active.driverDetails, "licence_expiry")} />
+                        <Detail label="Driver Status" value={getString(active.driverDetails, "status")} />
                       </div>
                     </div>
                   </div>
@@ -612,16 +644,16 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                         {active.containerDetails.map((c, i) => (
                           <div key={i} className="rounded-xl border border-line bg-paper p-4 shadow-sm">
                             <div className="flex items-center justify-between border-b border-line pb-2 mb-3">
-                              <p className="font-mono text-sm font-bold text-ink">{getString(c, "container_no")}</p>
-                              <StatusBadge label={getString(c, "container_status") || "Unknown"} tone={statusTone(getString(c, "container_status"))} />
+                              <p className="font-mono text-sm font-bold text-ink">{getString(c, "container_no", "containerNo", "number", "shipment_container_no")}</p>
+                              <StatusBadge label={getString(c, "container_status", "status") || "Unknown"} tone={statusTone(getString(c, "container_status", "status"))} />
                             </div>
                             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                              <Detail label="Size" value={getString(c, "size")} />
-                              <Detail label="Seal No." value={getString(c, "seal_no")} mono />
-                              <Detail label="HS Code" value={getString(c, "hs_code")} mono />
-                              <Detail label="Packages" value={getString(c, "package_count")} mono />
-                              <Detail label="Gross Wt." value={`${getString(c, "gross_weight")} kg`} mono />
-                              <Detail label="B/L" value={getString(c, "bill_of_lading")} mono />
+                              <Detail label="Size" value={getString(c, "size", "container_size", "containerSize")} />
+                              <Detail label="Seal No." value={getString(c, "seal_no", "seal_number", "sealNo", "seal")} mono />
+                              <Detail label="HS Code" value={getString(c, "hs_code", "hsCode")} mono />
+                              <Detail label="Packages" value={getString(c, "package_count", "packages", "packageCount")} mono />
+                              <Detail label="Gross Wt." value={`${getString(c, "gross_weight", "weight", "grossWeight")} kg`} mono />
+                              <Detail label="B/L" value={getString(c, "bill_of_lading", "billOfLading", "bl_number")} mono />
                             </div>
                           </div>
                         ))}

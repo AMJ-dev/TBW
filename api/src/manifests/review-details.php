@@ -5,7 +5,6 @@ header("Content-Type: application/json; charset=utf-8");
 
 if (($_SERVER["REQUEST_METHOD"] ?? "") !== "GET") {
     header("Allow: GET");
-    http_response_code(405);
     echo json_encode([
         "error" => true,
         "data" => "Method not allowed.",
@@ -27,7 +26,6 @@ if ($id === "" && count($segments) > 0) {
 }
 
 if ($id === "" || strlen($id) > 36) {
-    http_response_code(400);
     echo json_encode([
         "error" => true,
         "data" => "A valid shipment ID is required.",
@@ -60,7 +58,6 @@ try {
     $shipment = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$shipment) {
-        http_response_code(404);
         echo json_encode([
             "error" => true,
             "data" => "Shipment not found.",
@@ -212,7 +209,6 @@ try {
     ], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 } catch (Throwable $e) {
-    http_response_code(500);
 
     echo json_encode([
         "error" => true,

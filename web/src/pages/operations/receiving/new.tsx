@@ -18,6 +18,7 @@ import {
   Image as ImageIcon,
   AlertTriangle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { AppShell, StatusBadge } from "@/components/auth-shell";
 import { http, type Resp } from "@/lib/httpClient";
@@ -372,13 +373,9 @@ export default function OperationsReceivingNewPage() {
           (container) => container.gate_status === "ENTERED"
         )
       ) {
-        setNotice(
-          "No containers have been recorded as entering the gate. Gate Management must record gate entry before receiving can proceed."
-        );
+        toast.error("No containers have been recorded as entering the gate. Gate Management must record gate entry before receiving can proceed.");
       } else if (!normalizedShipment.gate_pass_number) {
-        setNotice(
-          "No gate pass number was returned for this shipment. Verify the gate-entry details before proceeding."
-        );
+        toast.error("No gate pass number was returned for this shipment. Verify the gate-entry details before proceeding.");
       }
     } catch (error: unknown) {
       setLoadError(
@@ -501,13 +498,12 @@ export default function OperationsReceivingNewPage() {
       const resp: Resp = response.data;
 
       if (resp.error) {
+        console.log(resp.data)
         throw new Error(String(resp.data || "Could not save receiving."));
       }
 
       setSaved(true);
-      setNotice(
-        "Receiving was saved successfully. The shipment has been refreshed with its latest receiving progress."
-      );
+      toast.success("Receiving was saved successfully. The shipment has been refreshed with its latest receiving progress.");
       setStep(1);
       setDamageProofs({});
 

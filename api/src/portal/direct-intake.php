@@ -5,7 +5,6 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-    http_response_code(405);
     echo json_encode([
         "error" => true,
         "data" => "Method not allowed.",
@@ -22,7 +21,6 @@ try {
     $organisationId = trim((string) ($my_details->organisation_id ?? ""));
 
     if ($userId === "" || $organisationId === "") {
-        http_response_code(401);
         echo json_encode([
             "error" => true,
             "data" => "An authenticated organisation account is required.",
@@ -479,7 +477,7 @@ try {
         ":package_count" => $hasPackages ? $totalPackages : null,
         ":gross_weight" => $hasWeight ? $totalWeight : null,
         ":special_instructions" => $specialInstructions,
-        ":status" => "pending_review"
+        ":status" => "PENDING_REVIEW"
     ]);
 
     $containerInsert = $conn->prepare("
@@ -648,7 +646,6 @@ try {
     $conn->commit();
     $transactionStarted = false;
 
-    http_response_code(201);
 
     echo json_encode([
         "error" => false,
@@ -657,7 +654,7 @@ try {
             "id" => $shipmentId,
             "shipment_id" => $shipmentId,
             "shipment_reference" => $shipmentReference,
-            "status" => "pending_review",
+            "status" => "PENDING_REVIEW",
             "manifest_id" => $manifest["id"] ?? null,
             "manifest_reference" => $manifest["manifest_ref"] ?? null,
             "manifest_linked" => $manifest !== false,
@@ -677,7 +674,6 @@ try {
         }
     }
 
-    http_response_code(422);
 
     echo json_encode([
         "error" => true,
@@ -697,8 +693,6 @@ try {
     }
 
     error_log("Direct intake submission error: " . $e->getMessage());
-
-    http_response_code(500);
 
     echo json_encode([
         "error" => true,
