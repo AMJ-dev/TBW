@@ -1,6 +1,4 @@
-
 <?php
-
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 if (($_SERVER["REQUEST_METHOD"] ?? "") !== "GET") {
@@ -101,7 +99,7 @@ try {
         LEFT JOIN organisations agent_org
             ON agent_org.id = s.licensed_agent_id
         WHERE s.id = :id
-          AND s.organisation_id = :organisation_id
+        AND s.organisation_id = :organisation_id
         LIMIT 1
     ");
 
@@ -133,23 +131,36 @@ try {
             om.notes,
             om.received_at,
             om.updated_at,
-            om.matched_shipment_id
+            om.matched_shipment_id,
+            om.vessel,
+            om.shipping_line,
+            om.origin_port,
+            om.eta,
+            om.gross_weight,
+            om.consignee,
+            om.consignee_type,
+            om.agent,
+            om.source
         FROM operation_manifests om
         WHERE om.matched_shipment_id = :matched_shipment_id
-           OR EXISTS (
-                SELECT 1
-                FROM operation_manifest_shipment_matches omsm
-                WHERE omsm.manifest_id = om.id
-                  AND omsm.shipment_id = :linked_shipment_id
-           )
+        OR EXISTS (
+            SELECT 1
+            FROM operation_manifest_shipment_matches omsm
+            WHERE omsm.manifest_id = om.id
+            AND omsm.shipment_id = :linked_shipment_id
+        )
         ORDER BY
             CASE
                 WHEN om.status = 'Discrepancy' THEN 0
                 WHEN om.review_reason IS NOT NULL
-                     AND om.review_reason <> '' THEN 1
+                    AND om.review_reason <> '' THEN 1
                 ELSE 2
             END,
-            COALESCE(om.flagged_at, om.updated_at, om.received_at) DESC
+            COALESCE(
+                om.flagged_at,
+                om.updated_at,
+                om.received_at
+            ) DESC
         LIMIT 1
     ");
 
@@ -159,7 +170,11 @@ try {
     ]);
 
     $manifest = $q->fetch(PDO::FETCH_ASSOC);
-
+    
+    $q = $conn->prepare("SELECT COUNT(*) as cnt FROM operation_manifest_containers WHERE manifest_id = :manifest_id");
+    $q->execute([":manifest_id" => $manifest["id"]]);
+    $containersCount = $q->fetch(PDO::FETCH_ASSOC);
+    
     $shipment["manifest"] = $manifest ? [
         "id" => (string) $manifest["id"],
         "manifest_ref" => $manifest["manifest_ref"],
@@ -171,9 +186,19 @@ try {
         "notes" => $manifest["notes"],
         "received_at" => $manifest["received_at"],
         "updated_at" => $manifest["updated_at"],
-        "matched_shipment_id" => $manifest["matched_shipment_id"]
+        "matched_shipment_id" => $manifest["matched_shipment_id"],
+        "vessel" => $manifest["vessel"],
+        "shipping_line" => $manifest["shipping_line"],
+        "origin_port" => $manifest["origin_port"],
+        "eta" => $manifest["eta"],
+        "containers" => (int) $containersCount["cnt"],
+        "gross_weight" => (float) $manifest["gross_weight"],
+        "consignee" => $manifest["consignee"],
+        "consignee_type" => $manifest["consignee_type"],
+        "agent" => $manifest["agent"],
+        "source" => $manifest["source"]
     ] : null;
-
+    // operation_manifest_containers
     $q = $conn->prepare("
         SELECT
             c.id,

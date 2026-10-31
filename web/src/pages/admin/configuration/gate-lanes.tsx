@@ -66,6 +66,7 @@ const emptyLane: GateLane = {
 
 interface RawLane {
   id?: unknown;
+  
   code?: unknown;
   lane_code?: unknown;
   name?: unknown;

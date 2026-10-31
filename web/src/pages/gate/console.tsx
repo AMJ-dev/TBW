@@ -47,6 +47,16 @@ type GateDirection = "in" | "out";
 type GateDecision = "ADMIT" | "REFER" | "REJECT";
 type Readiness = "Ready" | "Needs verification" | "Not ready" | "Active";
 
+interface GateLane {
+  id: string;
+  code: string;
+  name: string;
+  direction: "IN" | "OUT" | "BOTH";
+  gate_name: string;
+  description: string;
+  status: string;
+}
+
 interface QueuedTruck {
   id: string;
   gatePassId: string;
@@ -162,6 +172,39 @@ function getStringArray(value: unknown): string[] {
     return value.split(",").map((e) => e.trim()).filter(Boolean);
   }
   return [];
+}
+
+function extractGateLanes(resp: Resp): GateLane[] {
+  const payload = resp.code ?? resp.data;
+
+  const list = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === "object"
+      ? (
+          (payload as Record<string, unknown>)["items"] ??
+          (payload as Record<string, unknown>)["gate_lanes"] ??
+          (payload as Record<string, unknown>)["results"] ??
+          (payload as Record<string, unknown>)["data"]
+        )
+      : [];
+
+  if (!Array.isArray(list)) return [];
+
+  return list
+    .filter(
+      (item): item is Record<string, unknown> =>
+        item !== null && typeof item === "object" && !Array.isArray(item),
+    )
+    .map((item) => ({
+      id: getString(item, "id"),
+      code: getString(item, "code"),
+      name: getString(item, "name"),
+      direction: getString(item, "direction").toUpperCase() as GateLane["direction"],
+      gate_name: getString(item, "gate_name"),
+      description: getString(item, "description"),
+      status: getString(item, "status"),
+    }))
+    .filter((lane) => lane.id && lane.status.toLowerCase() === "active");
 }
 
 function normalizeTruck(item: Record<string, unknown>): QueuedTruck {
@@ -330,9 +373,50 @@ function GateConsole({ direction }: { direction: GateDirection }) {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [filter, setFilter] = useState("ALL");
+  const [gateLanes, setGateLanes] = useState<GateLane[]>([]);
+  const [selectedGateLaneId, setSelectedGateLaneId] = useState("");
+  const [lanesLoading, setLanesLoading] = useState(false);
   
   const requestRef = useRef(0);
   const submitLock = useRef(false);
+
+  const loadGateLanes = useCallback(async () => {
+    setLanesLoading(true);
+
+    try {
+      const response = await http.post("/admin/config/gate-lanes/", {
+        where: isGateIn ? "in" : "out",
+      });
+
+      const resp: Resp = response.data;
+
+      if (resp.error) {
+        throw new Error(String(resp.data || "Could not load gate lanes."));
+      }
+
+      const lanes = extractGateLanes(resp).filter((lane) => {
+        const laneDirection = lane.direction.toUpperCase();
+        return laneDirection === "BOTH" || laneDirection === (isGateIn ? "IN" : "OUT");
+      });
+      console.log(lanes);
+      setGateLanes(lanes);
+      setSelectedGateLaneId((current) =>
+        lanes.some((lane) => lane.id === current) ? current : "",
+      );
+    } catch (error: unknown) {
+      setGateLanes([]);
+      setSelectedGateLaneId("");
+      toast.error(
+        error instanceof Error ? error.message : "Could not load gate lanes.",
+      );
+    } finally {
+      setLanesLoading(false);
+    }
+  }, [isGateIn]);
+
+  useEffect(() => {
+    void loadGateLanes();
+  }, [loadGateLanes]);
 
   const loadQueue = useCallback(async (manual = false) => {
     const requestId = ++requestRef.current;
@@ -432,6 +516,11 @@ function GateConsole({ direction }: { direction: GateDirection }) {
 
   const submitDecision = async () => {
     if (!active || !decision || submitLock.current) return;
+
+    if (!selectedGateLaneId) {
+      toast.error("Select a gate lane before recording the decision.");
+      return;
+    }
     if ((decision === "REFER" || decision === "REJECT") && decisionReason.trim().length < 5) {
       toast.error("Provide a reason of at least 5 characters.");
       return;
@@ -451,6 +540,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
         record_id: active.id,
         gate_pass_id: active.gatePassId,
         pass_code: active.passCode,
+        gate_lane_id: selectedGateLaneId,
         decision,
         reason: decisionReason.trim(),
         override_reason: overrideReason.trim(),
@@ -711,6 +801,44 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                 </div>
 
                 <div className="space-y-4">
+                  <div className="rounded-xl border border-line bg-sand/40 p-4">
+                    <label
+                      htmlFor="gate-lane"
+                      className="flex items-center gap-2 text-sm font-semibold text-ink"
+                    >
+                      <MapPin className="size-4 text-orange-deep" />
+                      Gate lane
+                    </label>
+
+                    <p className="mt-1 text-xs leading-5 text-ink-soft">
+                      Select the physical lane handling this {isGateIn ? "inbound" : "outbound"} movement.
+                    </p>
+
+                    <select
+                      id="gate-lane"
+                      value={selectedGateLaneId}
+                      onChange={(event) => setSelectedGateLaneId(event.target.value)}
+                      disabled={lanesLoading || submitting}
+                      className="mt-3 h-11 w-full rounded-lg border border-line bg-paper px-3 text-sm text-ink outline-none transition focus:border-orange focus:ring-2 focus:ring-orange/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <option value="">
+                        {lanesLoading ? "Loading gate lanes..." : "Select a gate lane"}
+                      </option>
+                      {gateLanes.map((lane) => (
+                        <option key={lane.id} value={lane.id}>
+                          {lane.code} — {lane.name}
+                          {lane.gate_name ? ` (${lane.gate_name})` : ""}
+                        </option>
+                      ))}
+                    </select>
+
+                    {!lanesLoading && gateLanes.length === 0 && (
+                      <p className="mt-2 text-xs text-red-600">
+                        No active lanes are available for this direction.
+                      </p>
+                    )}
+                  </div>
+
                   {active.used || active.passStatus.toLowerCase() === "redeemed" ? (
                     <div className="rounded-xl border border-line bg-sand p-4">
                       <p className="font-semibold text-ink">Gate pass already used</p>
@@ -756,7 +884,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                         </div>
                       )}
 
-                      <Button className={cn("h-11 w-full text-white", decision === "REJECT" ? "bg-coral hover:bg-coral/90" : decision === "REFER" ? "bg-orange hover:bg-orange-deep" : "bg-teal-deep hover:bg-teal-deep/90")} disabled={!decision || submitting || (decision === "REFER" && decisionReason.trim().length < 5) || (decision === "REJECT" && decisionReason.trim().length < 5) || (decision === "ADMIT" && active.readiness !== "Ready" && active.readiness !== "Active" && overrideReason.trim().length < 5)} onClick={() => void submitDecision()}>
+                      <Button className={cn("h-11 w-full text-white", decision === "REJECT" ? "bg-coral hover:bg-coral/90" : decision === "REFER" ? "bg-orange hover:bg-orange-deep" : "bg-teal-deep hover:bg-teal-deep/90")} disabled={!decision || !selectedGateLaneId || submitting || lanesLoading || (decision === "REFER" && decisionReason.trim().length < 5) || (decision === "REJECT" && decisionReason.trim().length < 5) || (decision === "ADMIT" && active.readiness !== "Ready" && active.readiness !== "Active" && overrideReason.trim().length < 5)} onClick={() => void submitDecision()}>
                         {submitting ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <ArrowRight className="mr-2 size-4" />}
                         {submitting ? "Recording decision..." : decision ? `Confirm ${decision}` : "Select a decision"}
                       </Button>

@@ -554,15 +554,13 @@ export default function PortalShipmentDetailsPage() {
 									</p>
 									
 									<dl className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-										<Field icon={Hash} label="Manifest reference" value={manifest.manifest_ref || "—"} mono />
-										<Field icon={Hash} label="Manifest bill of lading" value={manifest.bill_of_lading || "—"} mono />
+										<Field icon={Hash} label="Manifest reference" value={manifest.manifest_ref || "—"} />
+										<Field icon={Hash} label="Manifest bill of lading" value={manifest.bill_of_lading || "—"} />
 										<Field icon={User} label="Responsible party" value={manifest.review_responsible_party || "Not specified"} />
 										<Field icon={Ship} label="Vessel" value={manifest.vessel || "—"} />
 										<Field icon={Ship} label="Shipping line" value={manifest.shipping_line || "—"} />
 										<Field icon={MapPin} label="Manifest origin port" value={manifest.origin_port || "—"} />
 										<Field icon={CalendarDays} label="Manifest ETA" value={manifest.eta || "—"} />
-										<Field icon={ContainerIcon} label="Manifest containers" value={formatNumber(manifest.containers)} />
-										<Field icon={Package} label="Manifest packages" value={formatNumber(manifest.packages)} />
 										<Field icon={User} label="Manifest consignee" value={manifest.consignee || "—"} />
 										<Field icon={Info} label="Manifest source" value={manifest.source || "—"} />
 										<Field icon={CalendarDays} label="Last flagged" value={formatDateTime(manifest.flagged_at)} />
