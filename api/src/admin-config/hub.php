@@ -121,14 +121,27 @@
             [
                 "key" => "locations",
                 "title" => "Terminal Locations",
-                "desc" => "Manage receiving areas, yards, blocks, slots, warehouses, inspection bays and designated holding areas.",
+                "desc" => "Manage all terminal locations including yards, blocks, rows, slots, warehouse zones, racks, storage bins, examination bays, scanner lanes and quarantine areas.",
                 "href" => "/admin/configuration/locations",
                 "icon" => "MapPin",
                 "group" => "identity",
                 "state" => "Available",
-                "stateTone" => "info",
+                "stateTone" => "success",
                 "lastChanged" => "Configured",
-                "featured" => false,
+                "featured" => true,
+                "enabled" => true
+            ],
+            [
+                "key" => "equipment",
+                "title" => "Equipment Management",
+                "desc" => "Manage terminal equipment including reach stackers, forklifts, terminal tractors, cranes and other cargo handling equipment. Configure equipment codes, types, capacities, availability and operational status.",
+                "href" => "/admin/configuration/equipment",
+                "icon" => "Truck",
+                "group" => "identity",
+                "state" => "Available",
+                "stateTone" => "success",
+                "lastChanged" => "Configured",
+                "featured" => true,
                 "enabled" => true
             ],
             [

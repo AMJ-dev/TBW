@@ -34,12 +34,12 @@ try {
         exit;
     }
 
-    if (!in_array($kind, ["YARD", "WAREHOUSE", "INSPECTION_BAY". "RECEIVING"], true)) {
+    if (!in_array($kind, ["YARD", "WAREHOUSE", "EXAMINATION_BAY"], true)) {
         echo json_encode(["error" => true, "data" => "Invalid location type.", "code" => null]);
         exit;
     }
 
-    if ($capacityInput === "" || $capacityInput === null) {
+    if (($capacityInput === "" || $capacityInput === null)) {
         $capacity = null;
     } elseif (!is_numeric($capacityInput) || !is_finite((float) $capacityInput) || (float) $capacityInput < 0 || floor((float) $capacityInput) !== (float) $capacityInput) {
         echo json_encode(["error" => true, "data" => "Capacity (TEU) must be a non-negative whole number.", "code" => null]);
@@ -48,7 +48,7 @@ try {
         $capacity = (int) $capacityInput;
     }
 
-    if ($changeReason === "" || strlen($changeReason) > 500) {
+    if (!empty($id) && ($changeReason === "" || strlen($changeReason) > 500)) {
         echo json_encode(["error" => true, "data" => "A reason of 1 to 500 characters is required.", "code" => null]);
         exit;
     }
