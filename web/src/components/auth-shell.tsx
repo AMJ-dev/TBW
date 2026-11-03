@@ -6,7 +6,7 @@ import {
     Activity, AlertTriangle, ArrowRight, BarChart3, Bell, Boxes,
     ChevronLeft, ChevronRight, Check, ClipboardCheck, Clock3, Command,
     FileCheck2, FileText, FileSpreadsheet, Grid2X2,
-    HelpCircle, LayoutDashboard, LogOut, Menu,
+    HelpCircle, LayoutDashboard, LogOut, Menu, ClockAlert, ArrowLeftRight,
     PackageCheck, Package, QrCode, Search, Settings, ShieldCheck,
     Truck, User, UsersRound, Warehouse, X, Container,
     CarFront, CreditCard, ReceiptText, UserRoundCheck, Users, BookOpen,
@@ -74,10 +74,14 @@ export function Metric({
     icon?: typeof Activity;
 }) {
     const info = detail ?? subtext;
+
     return (
         <div className="rounded-xl bg-paper p-4 ring-1 ring-line transition-transform hover:-translate-y-0.5">
             <div className="flex items-center justify-between gap-2">
-                <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">{label}</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+                    {label}
+                </span>
+
                 <Icon className={cn(
                     "size-4",
                     tone === "critical" ? "text-coral" :
@@ -85,7 +89,11 @@ export function Metric({
                     tone === "success" ? "text-teal" : "text-ink-soft"
                 )} />
             </div>
-            <div className="mt-2 font-display text-2xl font-bold tracking-tight text-ink">{value}</div>
+
+            <div className="mt-2 font-display text-2xl font-bold tracking-tight text-ink">
+                {value}
+            </div>
+
             {info && (
                 <div className={cn(
                     "mt-1 text-[11px]",
@@ -111,6 +119,7 @@ export function Avatar({
     className?: string | undefined;
 }) {
     const trimmed = (pics ?? "").trim();
+
     const isPlaceholder =
         !trimmed ||
         trimmed.toLowerCase() === "avatar.png" ||
@@ -118,9 +127,11 @@ export function Avatar({
 
     const initials = (() => {
         const parts = fullName?.trim().split(/\s+/).filter(Boolean) || [];
+
         if (parts.length >= 2) {
             return ((parts[0]?.charAt(0) ?? "") + (parts[1]?.charAt(0) ?? "")).toUpperCase();
         }
+
         return (parts[0]?.slice(0, 2) ?? "").toUpperCase();
     })();
 
@@ -148,91 +159,110 @@ export function Avatar({
     );
 }
 
-const sections = [
+const systemMenu = [
     {
         title: "Administration",
-        access: ["system"],
         items: [
-            { label: "Overview", to: "/admin", icon: LayoutDashboard, exact: true, access: ["system"] },
-            { label: "Organisations", to: "/admin/organisations", icon: Boxes, access: ["system"] },
-            { label: "Users", to: "/admin/users", icon: UsersRound, access: ["system"] },
-            { label: "Roles & Permissions", to: "/admin/roles", icon: ShieldCheck, access: ["system"] },
-            { label: "Configuration", to: "/admin/configuration", icon: Settings, access: ["system"] },
-            { label: "Audit Log", to: "/admin/audit", icon: Activity, access: ["system"] },
+            { label: "Overview", to: "/admin", icon: LayoutDashboard, exact: true },
+            { label: "Organisations", to: "/admin/organisations", icon: Boxes },
+            { label: "Users", to: "/admin/users", icon: UsersRound },
+            { label: "Roles & Permissions", to: "/admin/roles", icon: ShieldCheck },
+            { label: "Configuration", to: "/admin/configuration", icon: Settings },
+            { label: "Audit Log", to: "/admin/audit", icon: Activity },
         ],
     },
     {
         title: "Operations",
-        access: ["system"],
         items: [
-            { label: "Dashboard", to: "/operations/dashboard", icon: LayoutDashboard, access: ["system"] },
-            { label: "Manifest Intake", to: "/operations/manifest", icon: FileSpreadsheet, access: ["system"] },
-            { label: "Manifest Review", to: "/operations/manifests/review", icon: ClipboardCheck, access: ["system"] },
-            { label: "Declaration Review", to: "/operations/shipments/review", icon: ClipboardCheck, access: ["system"] },
-            { label: "Direct Container Intake", to: "/operations/manifests/intake", icon: Container, access: ["system"] },
-            { label: "Receiving", to: "/operations/receiving", icon: PackageCheck, access: ["system"] },
-            { label: "Yard", to: "/operations/yard", icon: Grid2X2, access: ["system"] },
-            { label: "Warehouse", to: "/operations/warehouse", icon: Warehouse, access: ["system"] },
-            { label: "Documentation", to: "/operations/documentation", icon: BookOpen, access: ["system"] },
-            { label: "Examination", to: "/operations/examination", icon: ClipboardCheck, access: ["system"] },
-            { label: "Seal Events", to: "/operations/seals", icon: ShieldCheck, access: ["system"] },
-            { label: "Inventory", to: "/operations/inventory", icon: Boxes, access: ["system"] },
-            { label: "Value-added Services", to: "/operations/value-added", icon: Settings, access: ["system"] },
-            { label: "Holds & Exceptions", to: "/operations/holds", icon: AlertTriangle, access: ["system"] },
+            { label: "Dashboard", to: "/operations/dashboard", icon: LayoutDashboard },
+            { label: "Manifest Intake", to: "/operations/manifest", icon: FileSpreadsheet },
+            { label: "Manifest Review", to: "/operations/manifests/review", icon: ClipboardCheck },
+            { label: "Declaration Review", to: "/operations/shipments/review", icon: ClipboardCheck },
+            { label: "Direct Container Intake", to: "/operations/manifests/intake", icon: Container },
+            { label: "Receiving", to: "/operations/receiving", icon: PackageCheck },
+            { label: "Yard", to: "/operations/yard", icon: Grid2X2 },
+            { label: "Warehouse", to: "/operations/warehouse", icon: Warehouse },
+            { label: "Documentation", to: "/operations/documentation", icon: BookOpen },
+            { label: "Examination", to: "/operations/examination", icon: ClipboardCheck },
+            { label: "Seal Events", to: "/operations/seals", icon: ShieldCheck },
+            { label: "Inventory", to: "/operations/inventory", icon: Boxes },
+            { label: "Value-added Services", to: "/operations/value-added", icon: Settings },
+            { label: "Holds & Exceptions", to: "/operations/holds", icon: AlertTriangle },
+            { label: "Overstay", to: "/operations/overstay", icon: ClockAlert },
+            { label: "Transfer", to: "/operations/transfers", icon: ArrowLeftRight },
         ],
     },
     {
         title: "Gate Management",
-        access: ["system"],
         items: [
-            { label: "Dashboard", to: "/gate/dashboard", icon: LayoutDashboard, access: ["system"] },
-            { label: "Appointments", to: "/gate/appointments", icon: Clock3, access: ["system"] },
-            { label: "Gate-in", to: "/gate/in", icon: Truck, access: ["system"] },
-            { label: "Gate-out", to: "/gate/out", icon: Truck, access: ["system"] }
-        ],
-    },
-    {
-        title: "Stakeholder Portal",
-        access: ["organisation"],
-        items: [
-            { label: "Dashboard", to: "/portal/dashboard", icon: LayoutDashboard, access: ["organisation"] },
-            { label: "My Shipments", to: "/portal/shipments", icon: Package, access: ["organisation"] },
-            { label: "Direct Intake Requests", to: "/portal/direct-intake", icon: Container, access: ["organisation"] },
-            { label: "Gate Passes", to: "/portal/passes", icon: QrCode, access: ["organisation"] },
-            { label: "Appointments", to: "/portal/appointments", icon: Clock3, access: ["organisation"] },
-            { label: "Vehicles", to: "/portal/vehicles", icon: CarFront, access: ["organisation"] },
-            { label: "Drivers", to: "/portal/drivers", icon: Users, access: ["organisation"] },
-            { label: "Driver Assignments", to: "/portal/drivers/assignments", icon: UserRoundCheck, access: ["organisation"] },
-            { label: "Documents", to: "/portal/documents", icon: FileText, access: ["organisation"] },
-            { label: "Invoices", to: "/portal/invoices", icon: FileSpreadsheet, access: ["organisation"] },
-            { label: "Payments", to: "/portal/payments", icon: CreditCard, access: ["organisation"] },
-            { label: "Statement of Account", to: "/portal/statement", icon: ReceiptText, access: ["organisation"] },
-            { label: "KYC & Signatories", to: "/portal/kyc", icon: ShieldCheck, access: ["organisation"] },
-            { label: "Portal Users", to: "/portal/users", icon: UsersRound, access: ["organisation"] },
+            { label: "Dashboard", to: "/gate/dashboard", icon: LayoutDashboard },
+            { label: "Appointments", to: "/gate/appointments", icon: Clock3 },
+            { label: "Gate-in", to: "/gate/in", icon: Truck },
+            { label: "Gate-out", to: "/gate/out", icon: Truck },
         ],
     },
     {
         title: "Finance",
-        access: ["system"],
         items: [
-            { label: "Dashboard", to: "/finance/dashboard", icon: BarChart3, access: ["system"] },
-            { label: "Invoice Ledger", to: "/finance/invoices", icon: FileCheck2, access: ["system"] },
-            { label: "Payments & Receipts", to: "/finance/payments", icon: ReceiptText, access: ["system"] },
-            { label: "Tariffs", to: "/finance/tariffs", icon: FileSpreadsheet, access: ["system"] },
-            { label: "Credit Management", to: "/finance/credit", icon: ShieldCheck, access: ["system"] },
-            { label: "Collections", to: "/finance/collections", icon: Clock3, access: ["system"] },
-            { label: "Approvals", to: "/finance/approvals", icon: Check, access: ["system"] },
-            { label: "Tax Rules", to: "/finance/tax", icon: Settings, access: ["system"] },
-            { label: "Reconciliation", to: "/finance/reconciliation", icon: ClipboardCheck, access: ["system"] },
+            { label: "Dashboard", to: "/finance/dashboard", icon: BarChart3 },
+            { label: "Invoice Ledger", to: "/finance/invoices", icon: FileCheck2 },
+            { label: "Payments & Receipts", to: "/finance/payments", icon: ReceiptText },
+            { label: "Tariffs", to: "/finance/tariffs", icon: FileSpreadsheet },
+            { label: "Credit Management", to: "/finance/credit", icon: ShieldCheck },
+            { label: "Collections", to: "/finance/collections", icon: Clock3 },
+            { label: "Approvals", to: "/finance/approvals", icon: Check },
+            { label: "Tax Rules", to: "/finance/tax", icon: Settings },
+            { label: "Reconciliation", to: "/finance/reconciliation", icon: ClipboardCheck },
         ],
     },
     {
         title: "Reports",
-        access: ["system"],
         items: [
-            { label: "Operations Report", to: "/reports/operations", icon: Truck, access: ["system"] },
-            { label: "Financial Report", to: "/reports/financial", icon: FileSpreadsheet, access: ["system"] },
-            { label: "Compliance Report", to: "/reports/compliance", icon: ShieldCheck, access: ["system"] },
+            { label: "Operations Report", to: "/reports/operations", icon: Truck },
+            { label: "Financial Report", to: "/reports/financial", icon: FileSpreadsheet },
+            { label: "Compliance Report", to: "/reports/compliance", icon: ShieldCheck },
+        ],
+    },
+];
+
+const organisationMenu = [
+    {
+        title: "Overview",
+        items: [
+            { label: "Dashboard", to: "/portal/dashboard", icon: LayoutDashboard, exact: true },
+        ],
+    },
+    {
+        title: "Cargo Management",
+        items: [
+            { label: "My Shipments", to: "/portal/shipments", icon: Package },
+            { label: "Direct Intake Requests", to: "/portal/direct-intake", icon: Container },
+            { label: "Documents", to: "/portal/documents", icon: FileText },
+        ],
+    },
+    {
+        title: "Gate & Transport",
+        items: [
+            { label: "Appointments", to: "/portal/appointments", icon: Clock3 },
+            { label: "Gate Passes", to: "/portal/passes", icon: QrCode },
+            { label: "Vehicles", to: "/portal/vehicles", icon: CarFront },
+            { label: "Drivers", to: "/portal/drivers", icon: Users },
+            { label: "Driver Assignments", to: "/portal/drivers/assignments", icon: UserRoundCheck },
+        ],
+    },
+    {
+        title: "Financial Management",
+        items: [
+            { label: "Invoices", to: "/portal/invoices", icon: FileSpreadsheet },
+            { label: "Payments", to: "/portal/payments", icon: CreditCard },
+            { label: "Statement of Account", to: "/portal/statement", icon: ReceiptText },
+        ],
+    },
+    {
+        title: "Organisation Management",
+        items: [
+            { label: "KYC & Signatories", to: "/portal/kyc", icon: ShieldCheck },
+            { label: "Portal Users", to: "/portal/users", icon: UsersRound },
         ],
     },
 ];
@@ -244,16 +274,25 @@ function RejectedPanel() {
                 <AlertTriangle className="size-4 shrink-0 text-coral" />
                 <p className="font-display text-[13px] font-semibold text-coral">Account rejected</p>
             </div>
+
             <p className="text-[12px] leading-5 text-ink-soft">
                 Your registration was not approved. This usually means the details submitted during onboarding could not be verified, or a required document was missing or expired.
             </p>
+
             <div className="rounded-md bg-sand-2 px-3 py-2.5 ring-1 ring-line">
-                <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-soft">Next step</p>
+                <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-soft">
+                    Next step
+                </p>
+
                 <p className="mt-1 text-[12px] text-ink">
                     Contact the terminal operations team to correct your details and request a review.
                 </p>
             </div>
-            <a href={`mailto:operations@${client_url}`} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-orange-deep hover:underline">
+
+            <a
+                href={`mailto:operations@${client_url}`}
+                className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-orange-deep hover:underline"
+            >
                 Contact operations <ArrowRight className="size-3.5" />
             </a>
         </div>
@@ -265,28 +304,48 @@ function PendingPanel() {
         <div className="space-y-3 px-2 py-6">
             <div className="flex items-center gap-2 rounded-md bg-orange/10 px-3 py-2 ring-1 ring-orange/25">
                 <Clock3 className="size-4 shrink-0 text-orange-deep" />
-                <p className="font-display text-[13px] font-semibold text-orange-deep">Approval in progress</p>
+                <p className="font-display text-[13px] font-semibold text-orange-deep">
+                    Approval in progress
+                </p>
             </div>
+
             <p className="text-[12px] leading-5 text-ink-soft">
                 Your account is being reviewed. Access to portal and operations modules will unlock once your organisation and documents are verified.
             </p>
+
             <div className="rounded-md bg-sand-2 px-3 py-2.5 ring-1 ring-line">
-                <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-soft">Need it faster?</p>
+                <p className="font-mono text-[9px] uppercase tracking-[0.16em] text-ink-soft">
+                    Need it faster?
+                </p>
+
                 <p className="mt-1 text-[12px] text-ink">
                     Email your onboarding documents to the operations desk so we can complete verification.
                 </p>
             </div>
-            <a href={`mailto:operations@${client_url}`} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-orange-deep hover:underline">
+
+            <a
+                href={`mailto:operations@${client_url}`}
+                className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-orange-deep hover:underline"
+            >
                 Contact operations <ArrowRight className="size-3.5" />
             </a>
         </div>
     );
 }
 
-export function AppShell({ children, title, eyebrow }: { children: ReactNode; title: string; eyebrow?: string }) {
+export function AppShell({
+    children,
+    title,
+    eyebrow,
+}: {
+    children: ReactNode;
+    title: string;
+    eyebrow?: string;
+}) {
     const { pathname } = useLocation();
     const navigate = useNavigate();
     const { role, my_details } = useContext(UserContext);
+
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
@@ -317,13 +376,17 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 
     const handleLogout = async () => {
         if (loggingOut) return;
+
         setLoggingOut(true);
+
         try {
             sessionStorage.removeItem("jwt");
             sessionStorage.removeItem("remember");
             sessionStorage.removeItem("email");
+
             setUserMenuOpen(false);
             setMobileOpen(false);
+
             toast.success("Signed out.");
             navigate("/logout", { replace: true });
         } catch {
@@ -341,10 +404,18 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
 
     useEffect(() => {
         if (!userMenuOpen) return;
+
         const close = () => setUserMenuOpen(false);
+
         window.addEventListener("click", close);
+
         return () => window.removeEventListener("click", close);
     }, [userMenuOpen]);
+
+    const activeMenu =
+        my_details?.account_type === "organisation"
+            ? organisationMenu
+            : systemMenu;
 
     return (
         <div className="min-h-screen bg-sand font-sans text-ink">
@@ -356,6 +427,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                         aria-label="Close navigation"
                     />
                 )}
+
                 <aside className={cn(
                     "fixed inset-y-0 left-0 z-50 flex w-[248px] shrink-0 flex-col border-r border-line bg-paper/95 shadow-2xl backdrop-blur transition-[transform,width] duration-200 lg:sticky lg:top-0 lg:z-20 lg:h-screen lg:shadow-none",
                     collapsed ? "lg:w-[76px]" : "",
@@ -368,6 +440,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                         <Link to={"/operations"} onClick={() => setMobileOpen(false)}>
                             <TrinuMark compact={collapsed} />
                         </Link>
+
                         <Button
                             variant="ghost"
                             size="icon"
@@ -378,34 +451,40 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                             <X />
                         </Button>
                     </div>
+
                     {!collapsed && (
                         <div className="mx-4 mb-4 rounded-lg bg-sand-2 px-3 py-2.5 ring-1 ring-line">
-                            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-ink-soft">Sector</p>
-                            <p className="mt-0.5 font-display text-[13px] font-semibold text-ink">Abuja · Flagship Facility</p>
+                            <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-ink-soft">
+                                Sector
+                            </p>
+
+                            <p className="mt-0.5 font-display text-[13px] font-semibold text-ink">
+                                Abuja · Flagship Facility
+                            </p>
                         </div>
                     )}
-                    <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-4">
+
+                    <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4">
                         {my_details?.account_status === "active" ? (
-                            sections.map((section) => {
-                                const accountType = my_details?.account_type;
-                                if (!accountType || !section.access.includes(accountType)) return null;
-                                const visibleItems = section.items.filter((item) => item.access.includes(accountType));
-                                if (visibleItems.length === 0) return null;
-                                return (
-                                    <div key={section.title}>
-                                        <p className={cn(
-                                            "px-2 pb-1 font-mono text-[9px] uppercase tracking-[0.2em] text-ink-soft/70",
-                                            collapsed ? "lg:hidden" : ""
-                                        )}>
-                                            {section.title}
-                                        </p>
-                                        {visibleItems.map((item) => {
+                            activeMenu.map((section) => (
+                                <div key={section.title}>
+                                    <p className={cn(
+                                        "px-2 pb-2 font-mono text-[9px] uppercase tracking-[0.2em] text-ink-soft/70",
+                                        collapsed ? "lg:hidden" : ""
+                                    )}>
+                                        {section.title}
+                                    </p>
+
+                                    <div className="space-y-1">
+                                        {section.items.map((item) => {
                                             const { label, to, icon: Icon } = item;
-                                            const exact = "exact" in item && item.exact === true;
+
+                                            const exact =
+                                                "exact" in item && item.exact === true;
 
                                             const active =
                                                 isActive(to, exact) &&
-                                                !visibleItems.some((other) => {
+                                                !section.items.some((other) => {
                                                     if (other.to === to) return false;
 
                                                     const otherExact =
@@ -418,32 +497,40 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                                                         )
                                                     );
                                                 });
+
                                             return (
                                                 <Link
                                                     key={to}
                                                     to={to}
                                                     onClick={() => setMobileOpen(false)}
                                                     className={cn(
-                                                        "group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[12px] transition-colors",
-                                                        active ? "bg-ink text-sand shadow-sm" : "text-ink-soft hover:bg-sand-2 hover:text-ink",
+                                                        "group flex items-center gap-2.5 rounded-md px-2.5 py-2.5 text-[12px] transition-colors",
+                                                        active
+                                                            ? "bg-ink text-sand shadow-sm"
+                                                            : "text-ink-soft hover:bg-sand-2 hover:text-ink",
                                                         collapsed ? "lg:justify-center lg:px-0" : ""
                                                     )}
                                                     title={collapsed ? label : undefined}
                                                 >
                                                     <Icon className="size-4 shrink-0" />
-                                                    <span className={collapsed ? "lg:hidden" : ""}>{label}</span>
+
+                                                    <span className={collapsed ? "lg:hidden" : ""}>
+                                                        {label}
+                                                    </span>
                                                 </Link>
                                             );
                                         })}
                                     </div>
-                                );
-                            })
-                        ) : my_details?.account_type === "organisation" && my_details?.organisation_status === "rejected" ? (
+                                </div>
+                            ))
+                        ) : my_details?.account_type === "organisation" &&
+                            my_details?.organisation_status === "rejected" ? (
                             <RejectedPanel />
                         ) : (
                             <PendingPanel />
                         )}
                     </nav>
+
                     <div className="relative border-t border-line p-4">
                         <button
                             type="button"
@@ -458,11 +545,25 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                                 collapsed ? "lg:justify-center lg:px-0" : ""
                             )}
                         >
-                            <Avatar pics={my_details?.pics} fullName={my_details?.full_name} size={32} />
-                            <div className={cn("min-w-0 leading-tight", collapsed ? "lg:hidden" : "")}>
-                                <p className="truncate text-[12px] font-semibold text-ink">{my_details?.full_name ?? "Unknown user"}</p>
-                                <p className="truncate font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">{role?.name ?? "—"}</p>
+                            <Avatar
+                                pics={my_details?.pics}
+                                fullName={my_details?.full_name}
+                                size={32}
+                            />
+
+                            <div className={cn(
+                                "min-w-0 leading-tight",
+                                collapsed ? "lg:hidden" : ""
+                            )}>
+                                <p className="truncate text-[12px] font-semibold text-ink">
+                                    {my_details?.full_name ?? "Unknown user"}
+                                </p>
+
+                                <p className="truncate font-mono text-[9px] uppercase tracking-[0.14em] text-ink-soft">
+                                    {role?.name ?? "—"}
+                                </p>
                             </div>
+
                             {!collapsed && (
                                 <ChevronRight className={cn(
                                     "ml-auto size-3.5 shrink-0 text-ink-soft transition-transform",
@@ -470,6 +571,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                                 )} />
                             )}
                         </button>
+
                         {userMenuOpen && (
                             <div
                                 role="menu"
@@ -480,26 +582,52 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                                 )}
                             >
                                 <div className="border-b border-line px-3 py-2.5">
-                                    <p className="truncate text-[12px] font-semibold text-ink">{my_details?.full_name ?? "Unknown user"}</p>
-                                    <p className="truncate font-mono text-[10px] text-ink-soft">{my_details?.email ?? ""}</p>
+                                    <p className="truncate text-[12px] font-semibold text-ink">
+                                        {my_details?.full_name ?? "Unknown user"}
+                                    </p>
+
+                                    <p className="truncate font-mono text-[10px] text-ink-soft">
+                                        {my_details?.email ?? ""}
+                                    </p>
                                 </div>
+
                                 <button
                                     type="button"
                                     role="menuitem"
                                     onClick={goToProfile}
                                     className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-[12px] text-ink-soft transition-colors hover:bg-sand-2 hover:text-ink"
                                 >
-                                    <User className="size-3.5" /> View profile
+                                    <User className="size-3.5" />
+                                    View profile
                                 </button>
-                                <Link to="/change-password" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-2 px-3 py-2.5 text-[12px] text-ink-soft transition-colors hover:bg-sand-2 hover:text-ink">
-                                    <Settings className="size-3.5" /> Change password
+
+                                <Link
+                                    to="/change-password"
+                                    onClick={() => setUserMenuOpen(false)}
+                                    className="flex items-center gap-2 px-3 py-2.5 text-[12px] text-ink-soft transition-colors hover:bg-sand-2 hover:text-ink"
+                                >
+                                    <Settings className="size-3.5" />
+                                    Change password
                                 </Link>
-                                <Link to="/session-management" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-2 px-3 py-2.5 text-[12px] text-ink-soft transition-colors hover:bg-sand-2 hover:text-ink">
-                                    <ShieldCheck className="size-3.5" /> Account security
+
+                                <Link
+                                    to="/session-management"
+                                    onClick={() => setUserMenuOpen(false)}
+                                    className="flex items-center gap-2 px-3 py-2.5 text-[12px] text-ink-soft transition-colors hover:bg-sand-2 hover:text-ink"
+                                >
+                                    <ShieldCheck className="size-3.5" />
+                                    Account security
                                 </Link>
-                                <Link to="/faq" onClick={() => setUserMenuOpen(false)} className="flex items-center gap-2 px-3 py-2.5 text-[12px] text-ink-soft transition-colors hover:bg-sand-2 hover:text-ink">
-                                    <HelpCircle className="size-3.5" /> Help & FAQs
+
+                                <Link
+                                    to="/faq"
+                                    onClick={() => setUserMenuOpen(false)}
+                                    className="flex items-center gap-2 px-3 py-2.5 text-[12px] text-ink-soft transition-colors hover:bg-sand-2 hover:text-ink"
+                                >
+                                    <HelpCircle className="size-3.5" />
+                                    Help & FAQs
                                 </Link>
+
                                 <button
                                     type="button"
                                     role="menuitem"
@@ -507,17 +635,26 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                                     disabled={loggingOut}
                                     className="flex w-full items-center gap-2 border-t border-line px-3 py-2.5 text-left text-[12px] font-semibold text-carmine transition-colors hover:bg-carmine/10 disabled:opacity-60"
                                 >
-                                    <LogOut className="size-3.5" /> {loggingOut ? "Signing out…" : "Sign out"}
+                                    <LogOut className="size-3.5" />
+                                    {loggingOut ? "Signing out…" : "Sign out"}
                                 </button>
                             </div>
                         )}
                     </div>
                 </aside>
+
                 <div className="min-w-0 flex-1">
                     <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-line bg-sand/85 px-4 py-3 backdrop-blur-md sm:px-6">
-                        <Button variant="ghost" size="icon" className="min-h-10 min-w-10 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open navigation">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="min-h-10 min-w-10 lg:hidden"
+                            onClick={() => setMobileOpen(true)}
+                            aria-label="Open navigation"
+                        >
                             <Menu />
                         </Button>
+
                         <Button
                             variant="ghost"
                             size="icon"
@@ -527,12 +664,19 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                         >
                             {collapsed ? <ChevronRight /> : <ChevronLeft />}
                         </Button>
+
                         <div className="flex min-w-0 items-baseline gap-2">
-                            <h1 className="truncate font-display text-lg font-bold tracking-tight text-ink">{title}</h1>
+                            <h1 className="truncate font-display text-lg font-bold tracking-tight text-ink">
+                                {title}
+                            </h1>
+
                             {eyebrow && (
-                                <span className="hidden font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft sm:inline">{eyebrow}</span>
+                                <span className="hidden font-mono text-[10px] uppercase tracking-[0.18em] text-ink-soft sm:inline">
+                                    {eyebrow}
+                                </span>
                             )}
                         </div>
+
                         <div className="ml-auto flex items-center gap-2">
                             <Button
                                 variant="outline"
@@ -540,9 +684,13 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                                 className="hidden border-line bg-paper text-ink-soft sm:inline-flex"
                                 onClick={() => setSearchOpen(true)}
                             >
-                                <Search /> <span className="hidden md:inline">Search</span>
-                                <span className="rounded bg-sand-2 px-1.5 py-0.5 font-mono text-[9px]">⌘K</span>
+                                <Search />
+                                <span className="hidden md:inline">Search</span>
+                                <span className="rounded bg-sand-2 px-1.5 py-0.5 font-mono text-[9px]">
+                                    ⌘K
+                                </span>
                             </Button>
+
                             <Button
                                 variant="ghost"
                                 size="icon"
@@ -554,6 +702,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                                 <Bell />
                                 <span className="absolute right-2 top-2 size-1.5 rounded-full bg-coral" />
                             </Button>
+
                             <Button
                                 variant="ghost"
                                 size="icon"
@@ -564,9 +713,21 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                             >
                                 <HelpCircle />
                             </Button>
-                            <button type="button" onClick={goToProfile} title="View profile" aria-label="View profile" className="ml-1 rounded-full ring-2 ring-transparent transition-all hover:ring-orange/40">
-                                <Avatar pics={my_details?.pics} fullName={my_details?.full_name} size={36} />
+
+                            <button
+                                type="button"
+                                onClick={goToProfile}
+                                title="View profile"
+                                aria-label="View profile"
+                                className="ml-1 rounded-full ring-2 ring-transparent transition-all hover:ring-orange/40"
+                            >
+                                <Avatar
+                                    pics={my_details?.pics}
+                                    fullName={my_details?.full_name}
+                                    size={36}
+                                />
                             </button>
+
                             <Button
                                 variant="ghost"
                                 size="icon"
@@ -580,17 +741,31 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                             </Button>
                         </div>
                     </header>
+
                     {notificationsOpen && (
                         <div className="fixed right-4 top-[68px] z-50 w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line sm:right-6">
                             <div className="flex items-center justify-between border-b border-line px-4 py-3">
                                 <div>
-                                    <p className="font-display text-sm font-bold text-ink">Notifications</p>
-                                    <p className="mt-0.5 text-[11px] text-ink-soft">Local activity</p>
+                                    <p className="font-display text-sm font-bold text-ink">
+                                        Notifications
+                                    </p>
+
+                                    <p className="mt-0.5 text-[11px] text-ink-soft">
+                                        Local activity
+                                    </p>
                                 </div>
-                                <Button variant="ghost" size="icon" className="min-h-9 min-w-9" onClick={() => setNotificationsOpen(false)} aria-label="Close notifications">
+
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="min-h-9 min-w-9"
+                                    onClick={() => setNotificationsOpen(false)}
+                                    aria-label="Close notifications"
+                                >
                                     <X className="size-4" />
                                 </Button>
                             </div>
+
                             <div className="max-h-[60vh] overflow-y-auto px-4">
                                 {notifications.map((item) => {
                                     const destination =
@@ -598,6 +773,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                                         item.category === "Examination" ? "/operations/examination" :
                                         item.category === "Holds" ? "/operations/holds" :
                                         "/gate/passes";
+
                                     return (
                                         <Link
                                             key={item.title}
@@ -606,19 +782,31 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                                             className="block border-b border-line py-3 last:border-0 hover:bg-sand/60"
                                         >
                                             <div className="flex items-start justify-between gap-3">
-                                                <p className="text-sm font-semibold text-ink">{item.title}</p>
-                                                <span className="font-mono text-[9px] uppercase text-ink-soft">{item.time}</span>
+                                                <p className="text-sm font-semibold text-ink">
+                                                    {item.title}
+                                                </p>
+
+                                                <span className="font-mono text-[9px] uppercase text-ink-soft">
+                                                    {item.time}
+                                                </span>
                                             </div>
-                                            <p className="mt-1 text-[12px] leading-5 text-ink-soft">{item.detail}</p>
+
+                                            <p className="mt-1 text-[12px] leading-5 text-ink-soft">
+                                                {item.detail}
+                                            </p>
                                         </Link>
                                     );
                                 })}
                             </div>
                         </div>
                     )}
-                    <main className="space-y-5 p-4 sm:p-6">{children}</main>
+
+                    <main className="space-y-5 p-4 sm:p-6">
+                        {children}
+                    </main>
                 </div>
             </div>
+
             {searchOpen && (
                 <div
                     className="fixed inset-0 z-[60] flex items-start justify-center bg-ink/25 px-4 pt-[12vh]"
@@ -629,6 +817,7 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                     <div className="w-full max-w-xl overflow-hidden rounded-xl bg-paper shadow-2xl ring-1 ring-line">
                         <div className="flex items-center gap-3 border-b border-line px-4 py-4">
                             <Command className="size-5 text-orange" />
+
                             <Input
                                 autoFocus
                                 value={searchQuery}
@@ -636,12 +825,23 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                                 placeholder="Search cargo, containers, organisations, invoices..."
                                 className="border-0 bg-transparent p-0 text-ink shadow-none focus-visible:ring-0"
                             />
-                            <Button variant="ghost" size="icon" className="min-h-10 min-w-10" onClick={() => setSearchOpen(false)} aria-label="Close search">
+
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="min-h-10 min-w-10"
+                                onClick={() => setSearchOpen(false)}
+                                aria-label="Close search"
+                            >
                                 <X />
                             </Button>
                         </div>
+
                         <div className="p-3">
-                            <p className="px-2 pb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">Suggested records</p>
+                            <p className="px-2 pb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">
+                                Suggested records
+                            </p>
+
                             {matchingCargo.slice(0, 5).map((cargo) => (
                                 <Link
                                     key={cargo.id}
@@ -650,14 +850,23 @@ export function AppShell({ children, title, eyebrow }: { children: ReactNode; ti
                                     className="flex items-center justify-between rounded-md px-3 py-3 hover:bg-sand-2"
                                 >
                                     <div>
-                                        <p className="font-mono text-[12px] font-medium text-ink">{cargo.reference}</p>
-                                        <p className="text-[12px] text-ink-soft">{cargo.container} · {cargo.cargo}</p>
+                                        <p className="font-mono text-[12px] font-medium text-ink">
+                                            {cargo.reference}
+                                        </p>
+
+                                        <p className="text-[12px] text-ink-soft">
+                                            {cargo.container} · {cargo.cargo}
+                                        </p>
                                     </div>
+
                                     <ArrowRight className="size-4 text-ink-soft" />
                                 </Link>
                             ))}
+
                             {matchingCargo.length === 0 && (
-                                <p className="px-3 py-6 text-center text-sm text-ink-soft">No local records match that search.</p>
+                                <p className="px-3 py-6 text-center text-sm text-ink-soft">
+                                    No local records match that search.
+                                </p>
                             )}
                         </div>
                     </div>

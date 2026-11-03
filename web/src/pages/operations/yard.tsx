@@ -1,292 +1,903 @@
-import { useMemo, useState, type FormEvent } from "react";
-import type { LucideIcon } from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
-	AlertTriangle,
+	ArrowLeft,
 	ArrowRight,
-	Boxes,
-	Check,
-	ClipboardCheck,
+	CheckCircle2,
+	ChevronDown,
 	Download,
 	Filter,
-	MapPin,
-	Play,
+	Grid2X2,
 	Plus,
+	RefreshCw,
 	Search,
-	Warehouse,
-	X,
+	Truck,
 } from "lucide-react";
-import { toast } from "sonner";
-import { AppShell, Metric, StatusBadge, statusTone } from "@/components/auth-shell";
+import {
+	AppShell,
+	StatusBadge,
+	statusTone,
+	Metric,
+} from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-type CountArea = "Yard" | "Examination" | "Warehouse";
-type CountStatus = "Scheduled" | "In progress" | "Awaiting approval" | "Completed" | "Cancelled";
-type CountUnit = "container" | "cartons" | "pallets" | "crates" | "bags" | "packages";
+const YARD_POSITIONS = [
+	"Yard A · Block A · Row 01 · Slot 01 · Ground",
+	"Yard A · Block A · Row 01 · Slot 02 · Ground",
+	"Yard A · Block A · Row 02 · Slot 01 · Tier 1",
+	"Yard A · Block B · Row 01 · Slot 03 · Ground",
+	"Yard B · Block A · Row 03 · Slot 01 · Tier 2",
+	"Yard B · Block B · Row 02 · Slot 04 · Ground",
+	"Yard C · Block A · Row 01 · Slot 01 · Ground",
+	"Yard C · Block A · Row 02 · Slot 02 · Tier 1",
+];
 
-interface CountLine {
-	id: string;	reference: string;	description: string;	location: string;	expectedQty: number;	actualQty: number | null;	unit: CountUnit;	notes: string;
+const RECEIVING_LOCATIONS = ["Receiving Area", "Receiving Bay 01", "Receiving Bay 02"];
+
+const EXAMINATION_LOCATIONS = ["Examination Bay 01", "Examination Bay 02", "Quarantine Bay"];
+
+const WAREHOUSE_LOCATIONS = ["Warehouse Zone A · Rack 01", "Warehouse Zone A · Rack 02", "Warehouse Zone B · Rack 01"];
+
+const MOVEMENT_CONFIG = {
+	GATE_IN: { label: "Gate In / Receiving", origin: "Entry Gate", destination: YARD_POSITIONS[0] ?? "" },
+	YARD_TRANSFER: { label: "Yard Transfer", origin: YARD_POSITIONS[0] ?? "", destination: YARD_POSITIONS[1] ?? "" },
+	EXAMINATION_TO_YARD: { label: "Examination to Yard", origin: "Examination Bay 01", destination: YARD_POSITIONS[0] ?? "" },
+	WAREHOUSE_TO_YARD: { label: "Warehouse to Yard", origin: WAREHOUSE_LOCATIONS[0] ?? "", destination: YARD_POSITIONS[0] ?? "" },
+} as const;
+
+type MovementType = keyof typeof MOVEMENT_CONFIG;
+
+const MOVEMENT_TYPES = Object.keys(MOVEMENT_CONFIG) as MovementType[];
+
+const locationsForMovement = (type: MovementType) => {
+	switch (type) {
+		case "GATE_IN":
+			return { origins: ["Entry Gate"], destinations: YARD_POSITIONS };
+		case "YARD_TRANSFER":
+			return { origins: YARD_POSITIONS, destinations: YARD_POSITIONS };
+		case "EXAMINATION_TO_YARD":
+			return { origins: EXAMINATION_LOCATIONS, destinations: YARD_POSITIONS };
+		case "WAREHOUSE_TO_YARD":
+			return { origins: WAREHOUSE_LOCATIONS, destinations: YARD_POSITIONS };
+		default:
+			return { origins: RECEIVING_LOCATIONS, destinations: YARD_POSITIONS };
+	}
+};
+
+const EQUIPMENT_OPTIONS = [
+	"Reach stacker 01",
+	"Reach stacker 02",
+	"Forklift 03",
+	"Forklift 04",
+	"Terminal tractor 01",
+];
+
+const REASON_OPTIONS = [
+	"Inbound arrival and receiving check",
+	"Positioning for examination coordination",
+	"Yard restacking",
+	"Hold repositioning",
+	"Quarantine transfer",
+];
+
+type MovementStatus =
+	| "Positioned"
+	| "Moving"
+	| "Pending equipment"
+	| "Blocked";
+
+interface YardMovementItem {
+	id: string;
+	containerNo: string;
+	movementType: MovementType;
+	gateLane: string;
+	originSlot: string;
+	targetSlot: string;
+	equipment: string;
+	operator: string;
+	reason: string;
+	status: MovementStatus;
+	timestamp: string;
+	blockedBy?: string;
 }
 
-interface CycleCount {
-	id: string;	reference: string;	area: CountArea;	scope: string;	date: string;	assignedTo: string;	startedAt: string;	completedAt: string;	status: CountStatus;	approvedBy?: string;	notes: string;	lines: CountLine[];
-}
-
-const initialCounts: CycleCount[] = [
+const initialMovements: YardMovementItem[] = [
 	{
-		id: "cc-1", reference: "TRN-CC-2026-00412", area: "Yard", scope: "Block A · Rows 01–04", date: "2026-11-03", assignedTo: "S. Eze · Yard Officer", startedAt: "03 Nov 2026 · 09:15", completedAt: "—", status: "In progress", notes: "Verify container presence and recorded yard slots.",
-		lines: [
-			{ id: "yl-1", reference: "TRIU1234564", description: "40ft dry container", location: "A-01-03", expectedQty: 1, actualQty: 1, unit: "container", notes: "" },
-			{ id: "yl-2", reference: "MSCU7654321", description: "40ft high-cube container", location: "A-01-04", expectedQty: 1, actualQty: null, unit: "container", notes: "" },
-			{ id: "yl-3", reference: "CMAU9876543", description: "20ft dry container", location: "A-02-01", expectedQty: 1, actualQty: null, unit: "container", notes: "" },
-			{ id: "yl-4", reference: "TGHU4567890", description: "40ft reefer container", location: "A-03-02", expectedQty: 1, actualQty: null, unit: "container", notes: "" },
-		],
+		id: "yd-1",
+		containerNo: "TRIU1234564",
+		movementType: "GATE_IN",
+		gateLane: "Gate Lane 01",
+		originSlot: "Entry Gate",
+		targetSlot: YARD_POSITIONS[0] ?? "",
+		equipment: "Terminal tractor 01",
+		operator: "S. Adeleke",
+		reason: "Inbound arrival and receiving check",
+		status: "Positioned",
+		timestamp: "10 mins ago",
 	},
 	{
-		id: "cc-2", reference: "TRN-CC-2026-00413", area: "Warehouse", scope: "Cold Bay · All bins", date: "2026-11-04", assignedTo: "K. Lawal · Warehouse Officer", startedAt: "—", completedAt: "—", status: "Scheduled", notes: "Verify cold-chain cargo quantities by bin.",
-		lines: [
-			{ id: "wl-1", reference: "TRN-SKU-9022", description: "Pharmaceutical grade glucose", location: "CB-01-04", expectedQty: 320, actualQty: null, unit: "bags", notes: "" },
-			{ id: "wl-2", reference: "TRN-SKU-9018", description: "Vaccine cooling packs", location: "CB-01-08", expectedQty: 180, actualQty: null, unit: "cartons", notes: "" },
-			{ id: "wl-3", reference: "TRN-SKU-9014", description: "Temperature loggers", location: "CB-02-01", expectedQty: 40, actualQty: null, unit: "packages", notes: "" },
-		],
+		id: "yd-2",
+		containerNo: "MSCU9876540",
+		movementType: "EXAMINATION_TO_YARD",
+		gateLane: "",
+		originSlot: "Examination Bay 01",
+		targetSlot: "Yard B · Block A · Row 03 · Slot 01 · Tier 2",
+		equipment: "Forklift 04",
+		operator: "K. Lawal",
+		reason: "Positioning for examination coordination",
+		status: "Moving",
+		timestamp: "In progress",
 	},
 	{
-		id: "cc-3", reference: "TRN-CC-2026-00411", area: "Examination", scope: "Examination Bays 01–03", date: "2026-11-02", assignedTo: "M. Danjuma · Examination Officer", startedAt: "02 Nov 2026 · 10:00", completedAt: "—", status: "Awaiting approval", notes: "One container was not found in its assigned bay. Verify its last movement before approval.",
-		lines: [
-			{ id: "el-1", reference: "TRIU1234564", description: "40ft dry container · Under examination", location: "EX-01", expectedQty: 1, actualQty: 1, unit: "container", notes: "" },
-			{ id: "el-2", reference: "MSCU7654321", description: "40ft high-cube · Examination scheduled", location: "EX-02", expectedQty: 1, actualQty: 0, unit: "container", notes: "Not present at assigned bay; movement history to be checked." },
-		],
+		id: "yd-3",
+		containerNo: "CMAU5544335",
+		movementType: "YARD_TRANSFER",
+		gateLane: "",
+		originSlot: "Yard A · Block A · Row 02 · Slot 01 · Tier 1",
+		targetSlot: "Yard C · Block A · Row 02 · Slot 02 · Tier 1",
+		equipment: "Reach stacker 02",
+		operator: "M. Danjuma",
+		reason: "Yard restacking",
+		status: "Pending equipment",
+		timestamp: "Queued",
 	},
 	{
-		id: "cc-4", reference: "TRN-CC-2026-00409", area: "Yard", scope: "Block B · Rows 01–02", date: "2026-10-30", assignedTo: "S. Eze · Yard Officer", startedAt: "30 Oct 2026 · 09:00", completedAt: "30 Oct 2026 · 10:45", status: "Completed", approvedBy: "D. Okafor · Operations Manager", notes: "All container locations matched.",
-		lines: [
-			{ id: "yl-5", reference: "OOLU1112233", description: "20ft dry container", location: "B-01-01", expectedQty: 1, actualQty: 1, unit: "container", notes: "" },
-			{ id: "yl-6", reference: "FCIU4455667", description: "40ft dry container", location: "B-02-02", expectedQty: 1, actualQty: 1, unit: "container", notes: "" },
-		],
+		id: "yd-4",
+		containerNo: "HLCU1122338",
+		movementType: "WAREHOUSE_TO_YARD",
+		gateLane: "",
+		originSlot: "Warehouse Zone A · Rack 01",
+		targetSlot: "Yard C · Block A · Row 01 · Slot 01 · Ground",
+		equipment: "Reach stacker 01",
+		operator: "S. Adeleke",
+		reason: "Hold repositioning",
+		status: "Blocked",
+		timestamp: "Yesterday",
+		blockedBy: "Customs inspection hold",
 	},
 ];
 
-const areaLocations: Record<CountArea, string[]> = {
-	Yard: ["All yard blocks", "Block A · Rows 01–04", "Block B · Rows 01–02", "Block C · Rows 01–03", "Reefer Area", "Heavy Cargo Area"],
-	Examination: ["All examination bays", "Examination Bays 01–03", "Examination Bay 01", "Examination Bay 02", "Examination Bay 03"],
-	Warehouse: ["Full warehouse", "Aisle A", "Aisle B", "Aisle C", "Cold Bay", "Heavy Bay"],
-};
+const STATUS_FILTERS: (MovementStatus | "ALL")[] = [
+	"ALL",
+	"Positioned",
+	"Moving",
+	"Pending equipment",
+	"Blocked",
+];
 
-const areaDescriptions: Record<CountArea, string> = {
-	Yard: "Verify container identity and physical slot against Yard Management records.",
-	Examination: "Verify that containers are physically present in their assigned examination bays. This does not change examination progress.",
-	Warehouse: "Verify stored cargo quantities and bin allocations against warehouse inventory records.",
-};
+const labelClass =
+	"block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft";
 
-const statusFilters: (CountStatus | "All")[] = ["All", "Scheduled", "In progress", "Awaiting approval", "Completed", "Cancelled"];
+export default function OperationsYardRoute() {
+	const [movements, setMovements] =
+		useState<YardMovementItem[]>(initialMovements);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [statusFilter, setStatusFilter] = useState<MovementStatus | "ALL">(
+		"ALL"
+	);
+	const [view, setView] = useState<"list" | "intake">("list");
 
-function getProgress(count: CycleCount) {
-	const counted = count.lines.filter((line) => line.actualQty !== null).length;
-	return { counted, total: count.lines.length, percent: count.lines.length ? Math.round((counted / count.lines.length) * 100) : 0 };
-}
+	const filteredMovements = useMemo(() => {
+		return movements.filter((m) => {
+			const query = searchQuery.trim().toLowerCase();
+			const matchQuery =
+				!query ||
+				m.containerNo.toLowerCase().includes(query) ||
+				m.movementType.toLowerCase().includes(query) ||
+				m.gateLane.toLowerCase().includes(query) ||
+				m.originSlot.toLowerCase().includes(query) ||
+				m.targetSlot.toLowerCase().includes(query) ||
+				m.operator.toLowerCase().includes(query) ||
+				m.reason.toLowerCase().includes(query);
 
-function getVarianceCount(count: CycleCount) {
-	return count.lines.filter((line) => line.actualQty !== null && line.actualQty !== line.expectedQty).length;
-}
+			const matchStatus =
+				statusFilter === "ALL" ? true : m.status === statusFilter;
 
-function formatDate(value: string) {
-	if (!value) return "—";
-	return new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-}
+			return matchQuery && matchStatus;
+		});
+	}, [movements, searchQuery, statusFilter]);
 
-export default function OperationsCycleCountRoute() {
-	const [counts, setCounts] = useState<CycleCount[]>(initialCounts);
-	const [query, setQuery] = useState("");
-	const [areaFilter, setAreaFilter] = useState<CountArea | "All">("All");
-	const [statusFilter, setStatusFilter] = useState<CountStatus | "All">("All");
-	const [selectedId, setSelectedId] = useState<string | null>(null);
-	const [isScheduleOpen, setIsScheduleOpen] = useState(false);
-	const selected = counts.find((count) => count.id === selectedId) ?? null;
-
-	const filtered = useMemo(() => counts.filter((count) => {
-		const search = query.toLowerCase();
-		const matchesQuery = [count.reference, count.scope, count.assignedTo, count.area, ...count.lines.map((line) => line.reference)].some((value) => value.toLowerCase().includes(search));
-		return matchesQuery && (areaFilter === "All" || count.area === areaFilter) && (statusFilter === "All" || count.status === statusFilter);
-	}), [counts, query, areaFilter, statusFilter]);
-
-	const stats = useMemo(() => ({
-		total: counts.length,
-		inProgress: counts.filter((count) => count.status === "In progress").length,
-		awaiting: counts.filter((count) => count.status === "Awaiting approval").length,
-		variances: counts.reduce((sum, count) => sum + getVarianceCount(count), 0),
-	}), [counts]);
-
-	const updateCount = (id: string, updater: (count: CycleCount) => CycleCount) => {
-		setCounts((current) => current.map((count) => count.id === id ? updater(count) : count));
+	const handleMovement = (items: YardMovementItem[]) => {
+		setMovements((prev) => [...items].reverse().concat(prev));
+		setView("list");
+		toast.success(`${items.length} container movement${items.length === 1 ? "" : "s"} recorded.`);
 	};
 
-	const handleSchedule = (count: CycleCount) => {
-		setCounts((current) => [count, ...current]);
-		setIsScheduleOpen(false);
-		setSelectedId(count.id);
-		toast.success("Cycle count scheduled in this preview.");
+	const handleExport = () => {
+		toast.success("Yard movement log exported locally.");
 	};
 
-	const handleStart = (id: string) => {
-		updateCount(id, (count) => ({ ...count, status: "In progress", startedAt: new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) }));
-		toast.success("Cycle count started in this preview.");
-	};
+	const activeEquipmentCount = new Set(
+		movements
+			.filter((m) => m.status === "Moving" || m.status === "Positioned")
+			.map((m) => m.equipment)
+	).size;
 
-	const handleLineChange = (countId: string, lineId: string, actualQty: number | null, notes?: string) => {
-		updateCount(countId, (count) => ({ ...count, lines: count.lines.map((line) => line.id === lineId ? { ...line, actualQty, ...(notes === undefined ? {} : { notes }) } : line) }));
-	};
+	const pendingCount = movements.filter(
+		(m) => m.status === "Pending equipment" || m.status === "Moving"
+	).length;
 
-	const handleSubmitCount = (id: string) => {
-		const count = counts.find((item) => item.id === id);
-		if (!count) return;
-		if (count.lines.some((line) => line.actualQty === null)) {
-			toast.error("Complete every physical verification before submitting.");
-			return;
-		}
-		const varianceCount = getVarianceCount(count);
-		updateCount(id, (current) => ({ ...current, status: varianceCount > 0 ? "Awaiting approval" : "Completed", completedAt: varianceCount > 0 ? "Awaiting review" : new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) }));
-		toast.success(varianceCount > 0 ? "Count submitted for supervisor review." : "Count completed. No variances found.");
-		setSelectedId(null);
-	};
-
-	const handleApprove = (id: string) => {
-		updateCount(id, (count) => ({ ...count, status: "Completed", approvedBy: "D. Okafor · Operations Manager", completedAt: new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) }));
-		toast.success("Count review approved in this preview. No source records were changed.");
-		setSelectedId(null);
-	};
+	const blockedCount = movements.filter((m) => m.status === "Blocked").length;
 
 	return (
-		<AppShell title="Cycle counts" eyebrow="Operations · Inventory Control">
-			<div className="flex flex-wrap items-end justify-between gap-4">
-				<div>
-					<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">Terminal operations · Physical verification</p>
-					<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">Cycle count management</h2>
-					<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">Verify containers, locations, and cargo quantities across the yard, examination bays, and warehouse. Variances are recorded for investigation and approval; counts do not move cargo or silently adjust stock.</p>
-				</div>
-				<div className="flex flex-wrap gap-2">
-					<Button variant="outline" className="border-line bg-paper text-ink" onClick={() => toast.success("Export is a UI preview only.")}><Download className="mr-1.5 size-4" /> Export history</Button>
-					<Button className="bg-orange text-white hover:bg-orange-deep" onClick={() => setIsScheduleOpen(true)}><Plus className="mr-1.5 size-4" /> Schedule count</Button>
-				</div>
-			</div>
-
-			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-				<Metric label="Total counts" value={String(stats.total)} detail="All operational areas" tone="info" icon={ClipboardCheck} />
-				<Metric label="In progress" value={String(stats.inProgress)} detail="Physical verification underway" tone="info" icon={Play} />
-				<Metric label="Awaiting approval" value={String(stats.awaiting)} detail="Discrepancies need review" tone={stats.awaiting ? "warning" : "success"} icon={AlertTriangle} />
-				<Metric label="Variances flagged" value={String(stats.variances)} detail="Across submitted counts" tone={stats.variances ? "critical" : "success"} icon={Boxes} />
-			</div>
-
-			<div className="grid gap-3 lg:grid-cols-3">
-				<AreaCard icon={MapPin} title="Yard" description="Container presence and slot accuracy" count={counts.filter((count) => count.area === "Yard").length} onClick={() => setAreaFilter(areaFilter === "Yard" ? "All" : "Yard")} active={areaFilter === "Yard"} />
-				<AreaCard icon={ClipboardCheck} title="Examination" description="Containers assigned to examination bays" count={counts.filter((count) => count.area === "Examination").length} onClick={() => setAreaFilter(areaFilter === "Examination" ? "All" : "Examination")} active={areaFilter === "Examination"} />
-				<AreaCard icon={Warehouse} title="Warehouse" description="Cargo quantities and storage-bin accuracy" count={counts.filter((count) => count.area === "Warehouse").length} onClick={() => setAreaFilter(areaFilter === "Warehouse" ? "All" : "Warehouse")} active={areaFilter === "Warehouse"} />
-			</div>
-
-			<section className="rounded-xl bg-paper ring-1 ring-line">
-				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
-					<div className="relative min-w-[240px] flex-1">
-						<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
-						<Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search count, location, container, SKU, or officer..." className="h-10 border-line bg-sand pl-9 text-sm text-ink" />
-					</div>
-					<div className="flex flex-wrap items-center gap-2">
-						<Filter className="size-4 text-ink-soft" />
-						<select value={areaFilter} onChange={(event) => setAreaFilter(event.target.value as CountArea | "All")} className="h-9 rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25"><option value="All">All areas</option><option value="Yard">Yard</option><option value="Examination">Examination</option><option value="Warehouse">Warehouse</option></select>
-						<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as CountStatus | "All")} className="h-9 rounded-md border border-line bg-sand px-3 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25">{statusFilters.map((status) => <option key={status} value={status}>{status === "All" ? "All statuses" : status}</option>)}</select>
-					</div>
-				</div>
-
-				{filtered.length === 0 ? <div className="p-12 text-center"><ClipboardCheck className="mx-auto size-7 text-ink-soft" /><p className="mt-3 font-medium text-ink">No cycle counts match your filters.</p><p className="mt-1 text-xs text-ink-soft">Try another area, reference, or status.</p></div> : (
-					<div className="overflow-x-auto">
-						<table className="w-full min-w-[900px] text-left text-sm">
-							<thead><tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft"><th className="px-4 py-3 font-medium">Count reference</th><th className="px-4 py-3 font-medium">Area / scope</th><th className="px-4 py-3 font-medium">Assigned officer</th><th className="px-4 py-3 font-medium">Progress</th><th className="px-4 py-3 font-medium">Variances</th><th className="px-4 py-3 font-medium">Scheduled</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 text-right font-medium"> </th></tr></thead>
-							<tbody className="divide-y divide-line">{filtered.map((count) => {
-								const progress = getProgress(count);
-								const variances = getVarianceCount(count);
-								return <tr key={count.id} className="transition-colors hover:bg-sand/40"><td className="px-4 py-3.5"><p className="font-mono text-xs font-semibold text-ink">{count.reference}</p><p className="mt-1 text-[10px] text-ink-soft">{count.lines.length} verification lines</p></td><td className="px-4 py-3.5"><span className="rounded-md bg-orange/10 px-2 py-1 font-mono text-[10px] font-semibold text-orange-deep">{count.area}</span><p className="mt-1.5 text-xs text-ink">{count.scope}</p></td><td className="px-4 py-3.5 text-xs text-ink">{count.assignedTo}</td><td className="px-4 py-3.5"><div className="h-1.5 w-28 overflow-hidden rounded-full bg-sand-2"><div className="h-full rounded-full bg-orange" style={{ width: `${progress.percent}%` }} /></div><p className="mt-1.5 font-mono text-[10px] text-ink-soft">{progress.counted}/{progress.total} verified · {progress.percent}%</p></td><td className="px-4 py-3.5">{variances ? <span className="rounded bg-coral/10 px-2 py-1 font-mono text-[10px] text-coral">{variances} flagged</span> : <span className="text-xs text-ink-soft">—</span>}</td><td className="px-4 py-3.5 font-mono text-xs text-ink-soft">{formatDate(count.date)}</td><td className="px-4 py-3.5"><StatusBadge label={count.status} tone={statusTone(count.status)} /></td><td className="px-4 py-3.5 text-right"><Button variant="ghost" size="sm" onClick={() => setSelectedId(count.id)} className="text-xs font-semibold text-orange-deep hover:bg-orange/10">View <ArrowRight className="ml-1 size-3.5" /></Button></td></tr>;
-							})}</tbody>
-						</table>
-					</div>
+		<AppShell
+			title="Yard Management"
+			eyebrow="Operations · Ground Stacking & Movement"
+		>
+			<div className="overflow-hidden">
+				{view === "list" ? (
+					<ListView
+						key="list"
+						movements={movements}
+						filteredMovements={filteredMovements}
+						searchQuery={searchQuery}
+						statusFilter={statusFilter}
+						onSearchChange={setSearchQuery}
+						onStatusChange={setStatusFilter}
+						onNewMovement={() => setView("intake")}
+						onExport={handleExport}
+						metrics={{
+							activeEquipmentCount,
+							pendingCount,
+							blockedCount,
+						}}
+					/>
+				) : (
+					<IntakeView
+						key="intake"
+						onCancel={() => setView("list")}
+						onSubmit={handleMovement}
+						existingCount={movements.length}
+					/>
 				)}
-				<div className="flex flex-wrap items-center justify-between gap-2 border-t border-line px-4 py-3 font-mono text-[10px] text-ink-soft"><span>Showing {filtered.length} of {counts.length} count records</span><span>Counts verify records; they do not move cargo or adjust stock automatically.</span></div>
-			</section>
-
-			{selected && <CountDetailDialog count={selected} onClose={() => setSelectedId(null)} onStart={() => handleStart(selected.id)} onLineChange={handleLineChange} onSubmit={() => handleSubmitCount(selected.id)} onApprove={() => handleApprove(selected.id)} />}
-			{isScheduleOpen && <ScheduleModal onClose={() => setIsScheduleOpen(false)} onSubmit={handleSchedule} />}
+			</div>
 		</AppShell>
 	);
 }
 
-function AreaCard({ icon: Icon, title, description, count, onClick, active }: { icon: LucideIcon; title: CountArea; description: string; count: number; onClick: () => void; active: boolean }) {
-	return <button type="button" onClick={onClick} className={cn("rounded-xl bg-paper p-4 text-left ring-1 transition-all", active ? "ring-orange shadow-sm" : "ring-line hover:ring-orange/40")}><div className="flex items-start justify-between gap-3"><span className="grid size-10 place-items-center rounded-lg bg-orange/10 text-orange-deep"><Icon className="size-5" /></span><span className="font-mono text-xl font-semibold text-ink">{count}</span></div><p className="mt-3 text-sm font-semibold text-ink">{title} counts</p><p className="mt-1 text-xs text-ink-soft">{description}</p></button>;
-}
+function ListView({
+	movements,
+	filteredMovements,
+	searchQuery,
+	statusFilter,
+	onSearchChange,
+	onStatusChange,
+	onNewMovement,
+	onExport,
+	metrics,
+}: {
+	movements: YardMovementItem[];
+	filteredMovements: YardMovementItem[];
+	searchQuery: string;
+	statusFilter: MovementStatus | "ALL";
+	onSearchChange: (v: string) => void;
+	onStatusChange: (v: MovementStatus | "ALL") => void;
+	onNewMovement: () => void;
+	onExport: () => void;
+	metrics: {
+		activeEquipmentCount: number;
+		pendingCount: number;
+		blockedCount: number;
+	};
+}) {
+	const { activeEquipmentCount, pendingCount, blockedCount } = metrics;
 
-function CountDetailDialog({ count, onClose, onStart, onLineChange, onSubmit, onApprove }: { count: CycleCount; onClose: () => void; onStart: () => void; onLineChange: (countId: string, lineId: string, actualQty: number | null, notes?: string) => void; onSubmit: () => void; onApprove: () => void }) {
-	const progress = getProgress(count);
-	const varianceCount = getVarianceCount(count);
-	const isContainerCount = count.area !== "Warehouse";
-	const canEdit = count.status === "In progress";
-	const canApprove = count.status === "Awaiting approval";
+	return (
+		<div
+			className="space-y-6 pb-8"
+			style={{
+				animation:
+					"slideInFromRight 260ms cubic-bezier(0.32, 0.72, 0, 1)",
+			}}
+		>
+			<style>{`
+				@keyframes slideInFromRight {
+					from { opacity: 0; transform: translateX(24px); }
+					to { opacity: 1; transform: translateX(0); }
+				}
+				@keyframes slideInFromLeft {
+					from { opacity: 0; transform: translateX(-24px); }
+					to { opacity: 1; transform: translateX(0); }
+				}
+			`}</style>
 
-	return <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 py-6 backdrop-blur-sm" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-		<div className="w-full max-w-5xl overflow-hidden rounded-2xl bg-paper shadow-2xl ring-1 ring-line">
-			<div className="flex flex-wrap items-start justify-between gap-3 border-b border-line p-5 sm:p-6"><div><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-deep">{count.area} physical verification</p><h3 className="mt-1 font-display text-xl font-bold text-ink">{count.reference}</h3><p className="mt-1 text-xs text-ink-soft">{count.scope} · Scheduled {formatDate(count.date)}</p></div><Button variant="ghost" size="icon" onClick={onClose} aria-label="Close dialog"><X /></Button></div>
-			<div className="max-h-[72vh] space-y-5 overflow-y-auto p-5 sm:p-6">
-				<div className="grid gap-3 sm:grid-cols-4"><InfoCard label="Area" value={count.area} /><InfoCard label="Assigned officer" value={count.assignedTo} /><InfoCard label="Verification" value={`${progress.counted} of ${progress.total} lines`} /><InfoCard label="Variances" value={String(varianceCount)} /></div>
-				<div className="rounded-xl bg-sand p-4 ring-1 ring-line"><div className="flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2"><StatusBadge label={count.status} tone={statusTone(count.status)} />{varianceCount > 0 && <span className="rounded bg-coral/10 px-2 py-1 font-mono text-[10px] text-coral">{varianceCount} discrepancy{varianceCount > 1 ? "ies" : ""}</span>}</div><span className="font-mono text-[10px] text-ink-soft">Started {count.startedAt} · Completed {count.completedAt}</span></div><p className="mt-2 text-xs leading-5 text-ink-soft">{areaDescriptions[count.area]}</p><p className="mt-1 text-xs text-ink-soft">{count.notes}</p></div>
-				<div><div className="mb-3 flex flex-wrap items-end justify-between gap-2"><div><h4 className="text-sm font-semibold text-ink">{isContainerCount ? "Expected containers" : "Expected cargo stock"}</h4><p className="mt-1 text-xs text-ink-soft">{canEdit ? "Enter the physical finding for each line. Use zero or mark not found where applicable." : "Compare the recorded expected values with the physical findings."}</p></div><span className="font-mono text-[10px] text-ink-soft">{progress.percent}% verified</span></div>
-					<div className="overflow-x-auto rounded-xl ring-1 ring-line"><table className="w-full min-w-[850px] text-left text-sm"><thead><tr className="border-b border-line bg-sand/60 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft"><th className="px-3 py-3 font-medium">{isContainerCount ? "Container" : "Cargo / SKU"}</th><th className="px-3 py-3 font-medium">Expected location</th><th className="px-3 py-3 text-right font-medium">Expected</th><th className="px-3 py-3 text-right font-medium">Physical finding</th><th className="px-3 py-3 text-right font-medium">Variance</th><th className="px-3 py-3 font-medium">Finding / notes</th></tr></thead><tbody className="divide-y divide-line">{count.lines.map((line) => { const delta = line.actualQty === null ? null : line.actualQty - line.expectedQty; return <tr key={line.id} className="hover:bg-sand/30"><td className="px-3 py-3"><p className="font-mono text-[11px] font-semibold text-ink">{line.reference}</p><p className="mt-0.5 text-[10px] text-ink-soft">{line.description}</p></td><td className="px-3 py-3 font-mono text-xs text-ink-soft">{line.location}</td><td className="px-3 py-3 text-right font-mono text-xs text-ink">{line.expectedQty} {line.unit}</td><td className="px-3 py-3 text-right">{canEdit ? <Input type="number" min="0" step="1" value={line.actualQty ?? ""} onChange={(event) => onLineChange(count.id, line.id, event.target.value === "" ? null : Math.max(0, Number(event.target.value)))} placeholder="Enter count" className="ml-auto h-9 w-28 border-line bg-white text-right font-mono text-xs text-ink" /> : <span className="font-mono text-xs text-ink">{line.actualQty === null ? "Not counted" : `${line.actualQty} ${line.unit}`}</span>}</td><td className="px-3 py-3 text-right font-mono text-xs">{delta === null ? <span className="text-ink-soft">—</span> : delta === 0 ? <span className="text-teal-deep">Match</span> : <span className="text-coral">{delta > 0 ? "+" : ""}{delta}</span>}</td><td className="px-3 py-3">{canEdit ? <Input value={line.notes} onChange={(event) => onLineChange(count.id, line.id, line.actualQty, event.target.value)} placeholder="Optional note" className="h-9 min-w-40 border-line bg-white text-xs text-ink" /> : <span className="text-xs text-ink-soft">{line.notes || "—"}</span>}</td></tr>; })}</tbody></table></div>
+			<div className="flex flex-wrap items-end justify-between gap-4">
+				<div className="min-w-0">
+					<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">
+						Ground stacking · Equipment movement
+					</p>
+					<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+						Yard stacking &amp; equipment movement logs
+					</h2>
+					<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+						Track equipment work orders, container restacking, dwell
+						positioning, and examination bay shunts.
+					</p>
 				</div>
-				{canApprove && <div className="rounded-xl bg-orange/5 p-4 ring-1 ring-orange/20"><div className="flex items-start gap-3"><AlertTriangle className="mt-0.5 size-4 shrink-0 text-orange-deep" /><div><p className="text-sm font-semibold text-ink">Discrepancy review required</p><p className="mt-1 text-xs leading-5 text-ink-soft">Review each variance and investigate the relevant movement, receiving, examination, or warehouse records. Approval here records the count review only; it does not move containers or directly adjust inventory.</p></div></div></div>}
-				{count.approvedBy && <div className="rounded-xl bg-teal/5 p-4 ring-1 ring-teal/20"><div className="flex items-center gap-2 text-teal-deep"><Check className="size-4" /><p className="text-sm font-semibold">Reviewed by {count.approvedBy}</p></div><p className="mt-1 text-xs text-ink-soft">Count completed {count.completedAt}. Source location and inventory records remain unchanged in this UI-only preview.</p></div>}
+				<div className="flex flex-wrap gap-2">
+					<Button
+						variant="outline"
+						className="border-line bg-paper text-ink hover:bg-sand"
+						onClick={onExport}
+					>
+						<Download className="size-4" /> Export log
+					</Button>
+					<Button
+						className="bg-orange text-white hover:bg-orange-deep"
+						onClick={onNewMovement}
+					>
+						<Plus className="size-4" /> Record movement
+					</Button>
+				</div>
 			</div>
-			<div className="flex flex-wrap items-center justify-between gap-2 border-t border-line p-5 sm:p-6"><Button variant="ghost" onClick={onClose} className="text-ink-soft">Close</Button><div className="flex flex-wrap gap-2">{count.status === "Scheduled" && <Button onClick={onStart} className="bg-orange text-white hover:bg-orange-deep"><Play className="mr-1.5 size-4" /> Start count</Button>}{canEdit && <Button onClick={onSubmit} className="bg-orange text-white hover:bg-orange-deep"><Check className="mr-1.5 size-4" /> Submit findings</Button>}{canApprove && <Button onClick={onApprove} className="bg-orange text-white hover:bg-orange-deep"><Check className="mr-1.5 size-4" /> Approve review</Button>}</div></div>
+
+			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+				<Metric
+					label="Occupied ground slots"
+					value="942 TEU"
+					detail="92% terminal utilisation"
+					tone="success"
+					icon={Grid2X2}
+				/>
+				<Metric
+					label="Active equipment"
+					value={`${activeEquipmentCount} units`}
+					detail="From movement log"
+					tone="info"
+					icon={Truck}
+				/>
+				<Metric
+					label="Pending work orders"
+					value={`${pendingCount}`}
+					detail={
+						pendingCount > 0
+							? "In progress or awaiting equipment"
+							: "All queued moves complete"
+					}
+					tone={pendingCount > 0 ? "warning" : "success"}
+					icon={RefreshCw}
+				/>
+				<Metric
+					label="Blocked moves"
+					value={`${blockedCount}`}
+					detail={
+						blockedCount > 0
+							? "Check hold records"
+							: "No holds blocking"
+					}
+					tone={blockedCount > 0 ? "critical" : "success"}
+					icon={CheckCircle2}
+				/>
+			</div>
+
+			<section className="rounded-2xl bg-paper ring-1 ring-line">
+				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
+					<div className="relative min-w-[260px] flex-1">
+						<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
+						<Input
+							value={searchQuery}
+							onChange={(e) => onSearchChange(e.target.value)}
+							placeholder="Search by container, movement type, location, equipment, or purpose…"
+							className="h-10 border-line bg-sand pl-9 text-sm text-ink"
+						/>
+					</div>
+
+					<div className="flex flex-wrap items-center gap-1.5">
+						<span className="flex items-center gap-1 text-xs text-ink-soft">
+							<Filter className="size-3.5" /> Status:
+						</span>
+						{STATUS_FILTERS.map((s) => (
+							<button
+								key={s}
+								type="button"
+								onClick={() => onStatusChange(s)}
+								className={cn(
+									"rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+									statusFilter === s
+										? "bg-ink text-sand"
+										: "bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink"
+								)}
+							>
+								{s}
+							</button>
+						))}
+					</div>
+				</div>
+
+				{filteredMovements.length === 0 ? (
+					<div className="p-10 text-center">
+						<Truck className="mx-auto size-7 text-ink-soft" />
+						<p className="mt-3 text-sm font-semibold text-ink">
+							No movements match your filters
+						</p>
+						<p className="mt-1 text-xs text-ink-soft">
+							Try another search term or status.
+						</p>
+					</div>
+				) : (
+					<div className="overflow-x-auto">
+						<table className="w-full min-w-[980px] text-left text-sm">
+							<thead>
+								<tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+									<th className="px-4 py-3 font-medium">
+										Container
+									</th>
+									<th className="px-4 py-3 font-medium">Movement type</th>
+									<th className="px-4 py-3 font-medium">Origin</th>
+									<th className="px-4 py-3 font-medium">
+										Destination
+									</th>
+									<th className="px-4 py-3 font-medium">Gate lane</th>
+									<th className="px-4 py-3 font-medium">
+										Equipment
+									</th>
+									<th className="px-4 py-3 font-medium">
+										Reason
+									</th>
+									<th className="px-4 py-3 font-medium">
+										Status
+									</th>
+									<th className="px-4 py-3 text-right font-medium">
+										Time
+									</th>
+								</tr>
+							</thead>
+							<tbody className="divide-y divide-line">
+								{filteredMovements.map((m) => (
+									<tr
+										key={m.id}
+										className="transition-colors hover:bg-sand/40"
+									>
+										<td className="px-4 py-3.5 font-mono text-xs font-bold text-ink">
+											{m.containerNo}
+										</td>
+										<td className="px-4 py-3.5">
+											<span className={cn("rounded-md px-2 py-1 font-mono text-[10px] font-semibold", m.movementType === "GATE_IN" ? "bg-orange/10 text-orange-deep" : "bg-sand text-ink-soft")}>
+												{MOVEMENT_CONFIG[m.movementType].label}
+											</span>
+										</td>
+										<td className="px-4 py-3.5 font-mono text-xs text-ink-soft">
+											{m.originSlot}
+										</td>
+										<td className="px-4 py-3.5 font-mono text-xs font-semibold text-orange-deep">
+											{m.targetSlot}
+										</td>
+										<td className="px-4 py-3.5 font-mono text-xs text-ink-soft">{m.gateLane || "—"}</td>
+										<td className="px-4 py-3.5 text-xs text-ink">
+											{m.equipment}
+										</td>
+										<td className="px-4 py-3.5 text-xs text-ink">
+											{m.reason}
+										</td>
+										<td className="px-4 py-3.5">
+											<div className="flex flex-col gap-1">
+												<StatusBadge
+													label={m.status}
+													tone={statusTone(m.status)}
+												/>
+												{m.blockedBy && (
+													<span className="font-mono text-[10px] text-carmine">
+														{m.blockedBy}
+													</span>
+												)}
+											</div>
+										</td>
+										<td className="px-4 py-3.5 text-right font-mono text-xs text-ink-soft">
+											{m.timestamp}
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</table>
+					</div>
+				)}
+
+				<div className="flex items-center justify-between border-t border-line px-4 py-3 font-mono text-[10px] text-ink-soft">
+					<span>
+						Showing {filteredMovements.length} of {movements.length}{" "}
+						container movement logs
+					</span>
+					<span>Every movement creates a timestamped event</span>
+				</div>
+			</section>
+
+			<div className="rounded-2xl bg-paper p-5 ring-1 ring-line">
+				<div className="flex flex-wrap items-start gap-3">
+					<RefreshCw className="mt-0.5 size-4 shrink-0 text-orange-deep" />
+					<div className="min-w-0">
+						<p className="text-[13px] font-semibold text-ink">
+							Movements are immutable
+						</p>
+						<p className="mt-1 text-[12px] leading-5 text-ink-soft">
+							Every container movement is recorded as an immutable
+							event with actor, timestamp, device, and reason. Origin
+							and destination slots are drawn from the terminal
+							configuration, and a move cannot be recorded to the
+							same location it came from.
+						</p>
+					</div>
+				</div>
+			</div>
 		</div>
-	</div>;
+	);
 }
 
-function InfoCard({ label, value }: { label: string; value: string }) {
-	return <div className="rounded-lg bg-sand p-3 ring-1 ring-line"><p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">{label}</p><p className="mt-1 text-xs font-semibold text-ink">{value}</p></div>;
+interface BillOfLadingContainer {
+	containerNo: string;
+	currentLocation: string;
+	status: string;
 }
 
-function ScheduleModal({ onClose, onSubmit }: { onClose: () => void; onSubmit: (count: CycleCount) => void }) {
-	const [area, setArea] = useState<CountArea>("Yard");
-	const [scope, setScope] = useState(areaLocations.Yard[0]);
-	const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-	const [assignedTo, setAssignedTo] = useState("");
-	const [notes, setNotes] = useState("");
-	const [referenceFilter, setReferenceFilter] = useState("");
+interface BillOfLadingRecord {
+	billOfLading: string;
+	shipmentReference: string;
+	consignee: string;
+	containers: BillOfLadingContainer[];
+}
 
-	const handleAreaChange = (nextArea: CountArea) => {
-		setArea(nextArea);
-		setScope(areaLocations[nextArea][0]);
-		setReferenceFilter("");
+const inferMovementType = (location: string): MovementType => {
+	if (location.startsWith("Examination")) return "EXAMINATION_TO_YARD";
+	if (location.startsWith("Warehouse")) return "WAREHOUSE_TO_YARD";
+	if (location.startsWith("Yard")) return "YARD_TRANSFER";
+	return "GATE_IN";
+};
+
+const SAMPLE_BILL_OF_LADING_RECORDS: BillOfLadingRecord[] = [
+	{
+		billOfLading: "MAEUABJ202610045",
+		shipmentReference: "TRN-SHP-2026-A1045",
+		consignee: "Atlantic Manufacturing Ltd.",
+		containers: [
+			{ containerNo: "MSCU1234567", currentLocation: "Receiving Area", status: "Received" },
+			{ containerNo: "TGHU7654321", currentLocation: "Yard A · Block A · Row 01 · Slot 01 · Ground", status: "In Yard" },
+			{ containerNo: "CMAU2468135", currentLocation: "Examination Bay 01", status: "Under Examination" },
+			{ containerNo: "TRIU1357924", currentLocation: "Yard B · Block A · Row 03 · Slot 01 · Tier 2", status: "In Yard" },
+		],
+	},
+	{
+		billOfLading: "ONEYLOS202610082",
+		shipmentReference: "TRN-SHP-2026-B2082",
+		consignee: "Northern Star Trading",
+		containers: [
+			{ containerNo: "HLXU1122334", currentLocation: "Receiving Bay 01", status: "Received" },
+			{ containerNo: "FCIU5566778", currentLocation: "Yard C · Block A · Row 01 · Slot 01 · Ground", status: "In Yard" },
+		],
+	},
+];
+
+interface ContainerMovementDraft {
+	equipment: string;
+	destination: string;
+}
+
+function IntakeView({
+	onCancel,
+	onSubmit,
+	existingCount,
+}: {
+	onCancel: () => void;
+	onSubmit: (items: YardMovementItem[]) => void;
+	existingCount: number;
+}) {
+	const [billOfLading, setBillOfLading] = useState("");
+	const [record, setRecord] = useState<BillOfLadingRecord | null>(null);
+	const [hasSearched, setHasSearched] = useState(false);
+	const [drafts, setDrafts] = useState<Record<string, ContainerMovementDraft>>({});
+	const [selectedContainers, setSelectedContainers] = useState<string[]>([]);
+	const [bulkEquipment, setBulkEquipment] = useState(EQUIPMENT_OPTIONS[0] ?? "");
+	const [reason, setReason] = useState(REASON_OPTIONS[0] ?? "");
+
+	const getDraft = (containerNo: string): ContainerMovementDraft =>
+		drafts[containerNo] ?? {
+			equipment: EQUIPMENT_OPTIONS[0] ?? "",
+			destination: "",
+		};
+
+	const updateDraft = (containerNo: string, updates: Partial<ContainerMovementDraft>) => {
+		setDrafts((prev) => ({
+			...prev,
+			[containerNo]: { ...getDraft(containerNo), ...updates },
+		}));
 	};
 
-	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-		event.preventDefault();
-		if (!assignedTo.trim()) { toast.error("Assign this count to an officer."); return; }
-		const dateLabel = formatDate(date);
-		const samples: CountLine[] = area === "Yard" ? [
-			{ id: `line-${Date.now()}-1`, reference: referenceFilter || "TRIU1234564", description: "40ft dry container", location: scope === "All yard blocks" ? "A-01-03" : scope, expectedQty: 1, actualQty: null, unit: "container", notes: "" },
-			{ id: `line-${Date.now()}-2`, reference: "MSCU7654321", description: "40ft high-cube container", location: scope === "All yard blocks" ? "A-01-04" : scope, expectedQty: 1, actualQty: null, unit: "container", notes: "" },
-		] : area === "Examination" ? [
-			{ id: `line-${Date.now()}-1`, reference: referenceFilter || "CMAU9876543", description: "20ft dry container · Examination scheduled", location: scope === "All examination bays" ? "EX-01" : scope, expectedQty: 1, actualQty: null, unit: "container", notes: "" },
-			{ id: `line-${Date.now()}-2`, reference: "TGHU4567890", description: "40ft reefer · Under examination", location: scope === "All examination bays" ? "EX-02" : scope, expectedQty: 1, actualQty: null, unit: "container", notes: "" },
-		] : [
-			{ id: `line-${Date.now()}-1`, reference: referenceFilter || "TRN-SKU-9022", description: "Pharmaceutical grade glucose", location: scope === "Full warehouse" ? "CB-01-04" : scope, expectedQty: 320, actualQty: null, unit: "bags", notes: "" },
-			{ id: `line-${Date.now()}-2`, reference: "TRN-SKU-9018", description: "Vaccine cooling packs", location: scope === "Full warehouse" ? "CB-01-08" : scope, expectedQty: 180, actualQty: null, unit: "cartons", notes: "" },
-		];
-		const sequence = 414 + Math.floor(Math.random() * 80);
-		onSubmit({ id: `cc-${Date.now()}`, reference: `TRN-CC-2026-${sequence}`, area, scope, date, assignedTo: assignedTo.trim(), startedAt: "—", completedAt: "—", status: "Scheduled", notes: notes || `${area} physical verification scheduled for ${dateLabel}.`, lines: samples });
+	const handleSearch = () => {
+		const query = billOfLading.trim().toUpperCase();
+		if (!query) {
+			toast.error("Enter a Bill of Lading number.");
+			return;
+		}
+		const found = SAMPLE_BILL_OF_LADING_RECORDS.find(
+			(item) => item.billOfLading.toUpperCase() === query
+		);
+		setHasSearched(true);
+		setRecord(found ?? null);
+		setDrafts({});
+		setSelectedContainers([]);
 	};
 
-	return <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 py-6 backdrop-blur-sm" onMouseDown={(event) => event.target === event.currentTarget && onClose()}><div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-paper shadow-2xl ring-1 ring-line"><form onSubmit={handleSubmit} className="flex max-h-[90vh] flex-col"><div className="flex items-start justify-between border-b border-line p-5 sm:p-6"><div><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-deep">Schedule physical verification</p><h3 className="mt-1 font-display text-xl font-bold text-ink">New cycle count</h3><p className="mt-1 text-xs text-ink-soft">Choose the operational area. The expected records are presented for verification.</p></div><Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close dialog"><X /></Button></div>
-			<div className="flex-1 space-y-5 overflow-y-auto p-5 sm:p-6"><div><p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">Count area</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{(["Yard", "Examination", "Warehouse"] as CountArea[]).map((item) => <button key={item} type="button" onClick={() => handleAreaChange(item)} className={cn("rounded-xl border p-3 text-left transition-colors", area === item ? "border-orange bg-orange/5 text-orange-deep ring-1 ring-orange/30" : "border-line bg-sand text-ink-soft hover:bg-sand-2")}><span className="text-xs font-semibold">{item}</span><span className="mt-1 block text-[10px] leading-4">{item === "Yard" ? "Container slots" : item === "Examination" ? "Examination bays" : "Cargo bins and quantities"}</span></button>)}</div><p className="mt-2 text-xs leading-5 text-ink-soft">{areaDescriptions[area]}</p></div>
-				<div className="grid gap-3 sm:grid-cols-2"><label className="block"><span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">Location / scope</span><select value={scope} onChange={(event) => setScope(event.target.value)} className="mt-2 h-11 w-full rounded-md border border-line bg-sand px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-orange/25">{areaLocations[area].map((location) => <option key={location}>{location}</option>)}</select></label><label className="block"><span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">Scheduled date</span><Input required type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-2 h-11 border-line bg-sand text-ink" /></label></div>
-				<label className="block"><span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">{area === "Warehouse" ? "Optional SKU / consignment filter" : "Optional container number filter"}</span><Input value={referenceFilter} onChange={(event) => setReferenceFilter(event.target.value.toUpperCase())} placeholder={area === "Warehouse" ? "e.g. TRN-SKU-9022" : "e.g. TRIU1234564"} className="mt-2 h-11 border-line bg-sand font-mono text-xs text-ink" /></label>
-				<div className="grid gap-3 sm:grid-cols-2"><label className="block"><span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">Assigned officer <span className="text-coral">*</span></span><Input required value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} placeholder="Officer name / role" className="mt-2 h-11 border-line bg-sand text-ink" /></label><div className="rounded-lg bg-sand p-3 ring-1 ring-line"><p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">Count basis</p><p className="mt-1 text-xs font-semibold text-ink">{area === "Warehouse" ? "Physical cargo quantity by bin" : "Physical container presence by location"}</p></div></div>
-				<label className="block"><span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">Instructions / notes</span><textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Instructions for the assigned officer..." className="mt-2 min-h-20 w-full rounded-md border border-line bg-sand px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:ring-2 focus:ring-orange/30" /></label>
-				<div className="rounded-xl bg-sand p-4 ring-1 ring-line"><div className="flex items-start gap-3"><ClipboardCheck className="mt-0.5 size-4 shrink-0 text-orange-deep" /><div><p className="text-xs font-semibold text-ink">Important</p><p className="mt-1 text-xs leading-5 text-ink-soft">A cycle count only records what is physically found. Missing or unexpected containers must be investigated against movement history. Warehouse quantity variances require review before any stock adjustment is made.</p></div></div></div>
-			</div><div className="flex items-center justify-between gap-3 border-t border-line p-5 sm:p-6"><Button type="button" variant="ghost" onClick={onClose} className="text-ink-soft">Cancel</Button><Button type="submit" className="bg-orange text-white hover:bg-orange-deep">Schedule count <ArrowRight className="ml-1 size-4" /></Button></div></form></div></div>;
+	const toggleAll = (checked: boolean) => {
+		setSelectedContainers(
+			checked && record ? record.containers.map((item) => item.containerNo) : []
+		);
+	};
+
+	const applyBulkSettings = () => {
+		if (!selectedContainers.length) {
+			toast.error("Select at least one container first.");
+			return;
+		}
+		setDrafts((prev) => {
+			const next = { ...prev };
+			selectedContainers.forEach((containerNo) => {
+				const current = next[containerNo] ?? getDraft(containerNo);
+				next[containerNo] = {
+					...current,
+					equipment: bulkEquipment,
+				};
+			});
+			return next;
+		});
+		toast.success(`Settings applied to ${selectedContainers.length} container${selectedContainers.length === 1 ? "" : "s"}.`);
+	};
+
+	const handleSubmit = (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!record) return;
+
+		const containersToMove = record.containers.filter(
+			(container) => Boolean(getDraft(container.containerNo).destination)
+		);
+
+		if (!containersToMove.length) {
+			toast.error("Choose a new location for at least one container.");
+			return;
+		}
+
+		const invalid = containersToMove.find((container) => {
+			const draft = getDraft(container.containerNo);
+			return !draft.equipment || draft.destination === container.currentLocation;
+		});
+
+		if (invalid) {
+			toast.error(`Complete the movement details for ${invalid.containerNo}.`);
+			return;
+		}
+
+		const items = containersToMove.map((container, index): YardMovementItem => {
+			const draft = getDraft(container.containerNo);
+			return {
+				id: `yd-${existingCount + index + 1}`,
+				containerNo: container.containerNo,
+				movementType: inferMovementType(container.currentLocation),
+				gateLane: "",
+				originSlot: container.currentLocation,
+				targetSlot: draft.destination,
+				equipment: draft.equipment,
+				operator: "",
+				reason,
+				status: "Positioned",
+				timestamp: "Just now",
+			};
+		});
+		onSubmit(items);
+	};
+
+	return (
+		<form onSubmit={handleSubmit} className="space-y-6 pb-24" style={{ animation: "slideInFromLeft 260ms cubic-bezier(0.32, 0.72, 0, 1)" }}>
+			<style>{`
+				@keyframes slideInFromLeft {
+					from { opacity: 0; transform: translateX(-24px); }
+					to { opacity: 1; transform: translateX(0); }
+				}
+			`}</style>
+
+			<div className="flex flex-wrap items-center justify-between gap-3">
+				<Button type="button" variant="ghost" onClick={onCancel} className="-ml-3 gap-2 text-ink-soft hover:text-ink">
+					<ArrowLeft className="size-4" />
+					Back to movement log
+				</Button>
+			</div>
+
+			<div>
+				<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">Ground stacking · Equipment movement</p>
+				<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">Move containers to the yard</h2>
+				<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+					Search for a shipment, choose where each container should go, then save the movements.
+				</p>
+			</div>
+
+			<section className="rounded-2xl bg-paper p-5 ring-1 ring-line sm:p-6">
+				<label className="block">
+					<span className={labelClass}>1. Enter Bill of Lading number</span>
+					<div className="mt-2 flex flex-col gap-2 sm:flex-row">
+						<Input
+							value={billOfLading}
+							onChange={(e) => setBillOfLading(e.target.value.toUpperCase())}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") {
+									e.preventDefault();
+									handleSearch();
+								}
+							}}
+							placeholder="e.g. MAEUABJ202610045"
+							className="h-11 border-line bg-sand font-mono text-ink"
+						/>
+						<Button type="button" onClick={handleSearch} className="h-11 gap-2 bg-orange text-white hover:bg-orange-deep">
+							<Search className="size-4" />
+							Find containers
+						</Button>
+					</div>
+				</label>
+				<p className="mt-2 text-[11px] text-ink-soft">Try MAEUABJ202610045 or ONEYLOS202610082 in this UI preview.</p>
+			</section>
+
+			{hasSearched && !record && (
+				<div className="rounded-2xl border border-carmine/20 bg-carmine/5 p-5">
+					<p className="text-sm font-semibold text-ink">Shipment not found</p>
+					<p className="mt-1 text-xs text-ink-soft">Check the Bill of Lading number and search again.</p>
+				</div>
+			)}
+
+			{record && (
+				<>
+					<section className="rounded-2xl bg-paper p-5 ring-1 ring-line sm:p-6">
+						<div className="flex flex-wrap items-start justify-between gap-3">
+							<div>
+								<p className={labelClass}>Shipment found</p>
+								<h3 className="mt-1 font-mono text-base font-bold text-ink">{record.billOfLading}</h3>
+								<p className="mt-1 text-xs text-ink-soft">{record.shipmentReference} · {record.consignee}</p>
+							</div>
+							<div className="rounded-lg bg-sand px-3 py-2">
+								<p className={labelClass}>Containers</p>
+								<p className="text-xl font-bold text-ink">{record.containers.length}</p>
+							</div>
+						</div>
+					</section>
+
+					<section className="rounded-2xl bg-paper ring-1 ring-line">
+						<div className="border-b border-line p-5 sm:p-6">
+							<div className="flex flex-wrap items-center justify-between gap-3">
+								<div>
+									<p className={labelClass}>2. Choose containers</p>
+									<h3 className="mt-1 font-display text-sm font-bold text-ink">Apply the same settings to several containers</h3>
+									<p className="mt-1 text-xs text-ink-soft">Optional. Select containers, choose the settings and apply.</p>
+								</div>
+								<label className="flex items-center gap-2 text-xs font-medium text-ink">
+									<input
+										type="checkbox"
+										checked={selectedContainers.length === record.containers.length}
+										onChange={(e) => toggleAll(e.target.checked)}
+										className="size-4 accent-orange"
+									/>
+									Select all
+								</label>
+							</div>
+							<div className="mt-4 max-w-md">
+								<SelectField label="Equipment" value={bulkEquipment} onChange={setBulkEquipment} options={EQUIPMENT_OPTIONS} />
+							</div>
+							<div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+								<p className="text-xs text-ink-soft">{selectedContainers.length} container{selectedContainers.length === 1 ? "" : "s"} selected</p>
+								<Button type="button" variant="outline" onClick={applyBulkSettings} className="border-line bg-paper text-ink hover:bg-sand">
+									Apply to selected
+								</Button>
+							</div>
+						</div>
+
+						<div className="p-5 sm:p-6">
+							<div className="mb-4">
+								<p className={labelClass}>3. Set each container's destination</p>
+								<p className="mt-1 text-xs text-ink-soft">The system identifies each container's current location. Choose its equipment and destination.</p>
+							</div>
+							<div className="space-y-3">
+								{record.containers.map((container, index) => {
+									const draft = getDraft(container.containerNo);
+									const options = YARD_POSITIONS.filter(
+										(location) => location !== container.currentLocation
+									);
+									return (
+										<div key={container.containerNo} className="rounded-xl border border-line bg-paper p-4">
+											<div className="flex flex-wrap items-start justify-between gap-3">
+												<div className="flex items-start gap-3">
+													<span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sand font-mono text-xs font-bold text-ink-soft">{index + 1}</span>
+													<div>
+														<p className="font-mono text-sm font-bold text-ink">{container.containerNo}</p>
+														<p className="mt-1 text-xs text-ink-soft">Currently at: {container.currentLocation}</p>
+														<div className="mt-2">
+															<StatusBadge label={container.status} tone={statusTone(container.status)} />
+														</div>
+													</div>
+												</div>
+												<span className="text-[10px] font-mono uppercase tracking-wider text-ink-soft">
+													{draft.destination ? "Ready to move" : "No change"}
+												</span>
+											</div>
+											<div className="mt-4 grid gap-3 sm:grid-cols-2">
+												<SelectField
+													label="Equipment assigned"
+													value={draft.equipment}
+													onChange={(value) => updateDraft(container.containerNo, { equipment: value })}
+													options={EQUIPMENT_OPTIONS}
+												/>
+												<SelectField
+													label="New yard location"
+													value={draft.destination}
+													onChange={(value) => updateDraft(container.containerNo, { destination: value })}
+													options={["", ...options]}
+													formatOption={(value) => value || "Keep current location"}
+												/>
+											</div>
+										</div>
+									);
+								})}
+							</div>
+						</div>
+					</section>
+
+					<section className="rounded-2xl bg-paper p-5 ring-1 ring-line sm:p-6">
+						<p className={labelClass}>4. Confirm movement</p>
+						<div className="mt-3 max-w-md">
+							<SelectField label="Reason for movement" value={reason} onChange={setReason} options={REASON_OPTIONS} />
+						</div>
+						<p className="mt-3 text-xs leading-5 text-ink-soft">
+							Only containers with a new yard location will be included. Each container is saved as its own movement.
+						</p>
+					</section>
+
+					<div className="sticky bottom-4 z-10 rounded-2xl bg-slate p-4 text-sand ring-1 ring-slate shadow-xl">
+						<div className="flex flex-wrap items-center justify-between gap-3">
+							<div>
+								<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange">Ready to save</p>
+								<p className="mt-1 text-xs text-sand/75">
+									{record.containers.filter((container) => Boolean(getDraft(container.containerNo).destination)).length} of {record.containers.length} containers selected for movement
+								</p>
+							</div>
+							<div className="flex flex-wrap gap-2">
+								<Button type="button" variant="outline" onClick={onCancel} className="border-sand/25 bg-transparent text-sand hover:bg-sand/10">Cancel</Button>
+								<Button type="submit" className="gap-2 bg-orange text-white hover:bg-orange-deep">
+									<ArrowRight className="size-4" />
+									Save movements
+								</Button>
+							</div>
+						</div>
+					</div>
+				</>
+			)}
+		</form>
+	);
+}
+
+function SelectField({
+	label,
+	value,
+	onChange,
+	options,
+	formatOption,
+}: {
+	label: string;
+	value: string;
+	onChange: (value: string) => void;
+	options: string[];
+	formatOption?: (value: string) => string;
+}) {
+	return (
+		<label className="block">
+			<span className={labelClass}>{label}</span>
+			<div className="relative mt-1.5">
+				<select
+					value={value}
+					onChange={(e) => onChange(e.target.value)}
+					className="h-11 w-full appearance-none rounded-md border border-line bg-sand px-3 pr-9 font-mono text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25"
+				>
+					{options.map((o) => (
+						<option key={o} value={o}>
+							{formatOption ? formatOption(o) : o}
+						</option>
+					))}
+				</select>
+				<ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-3.5 -translate-y-1/2 text-ink-soft" />
+			</div>
+		</label>
+	);
 }

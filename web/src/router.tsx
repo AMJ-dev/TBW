@@ -87,6 +87,7 @@ const TransportVehicleFormPage = lazy(() => import("@/pages/portal/transport/veh
 const TransportDriversPage = lazy(() => import("@/pages/portal/transport/drivers"));
 const TransportDriverFormPage = lazy(() => import("@/pages/portal/transport/driver-form"));
 const DirectIntakePage = lazy(() => import("@/pages/portal/shipment/direct-intake"));
+const OperationsOverridesPage = lazy(()=>import("@/pages/operations/documentation"))
 const TransportDriverAssignmentsPage = lazy(() => import("@/pages/portal/transport/driver-assignments"));
 const TransportBookAppointmentsPage = lazy(() => import("@/pages/portal/transport/book-appointments"));
 const TransportVehicleDetailsPage = lazy(() => import("@/pages/portal/transport/vehicle-details"));
@@ -109,10 +110,12 @@ const OperationsManifestDetailsPage = lazy(() => import("@/pages/manifest/detail
 const OperationsStuffingPage = lazy(() => import("@/pages/operations/stuffing"));
 const OperationsCycleCountPage = lazy(() => import("@/pages/operations/cycle-count"));
 const OperationsValueAddedPage = lazy(() => import("@/pages/operations/value-added"));
-const OperationsOverridesPage = lazy(() => import("@/pages/operations/overrides"));
 const OperationsReviewPage = lazy(() => import("@/pages/shipment/review"));
 const OperationsShipmentReviewPage = lazy(() => import("@/pages/shipment/shipment-review-details"));
 const OperationDocumentationPage = lazy(()=>import("@/pages/operations/documentation"))
+const OperationsOverstayPage = lazy(()=>import("@/pages/operations/overstay"))
+const OperationsTransferPage = lazy(()=>import("@/pages/operations/transfer"))
+
 
 const PortalDashboardPage = lazy(() => import("@/pages/portal/dashboard"));
 const CargoPage = lazy(() => import("@/pages/portal/cargo"));
@@ -254,6 +257,8 @@ export default function Routers() {
 						<Route path="/operations/cycle-count" element={<OperationsCycleCountPage />} />
 						<Route path="/operations/value-added" element={<OperationsValueAddedPage />} />
 						<Route path="/operations/overrides" element={<OperationsOverridesPage />} />
+						<Route path="/operations/overstay" element={<OperationsOverstayPage />}/>
+						<Route path="/operations/transfers" element={<OperationsTransferPage />}/>
 						<Route path="/operations/shipments/review" element={<OperationsReviewPage />} />
 						<Route path="/operations/shipments/:id" element={<OperationsShipmentReviewPage />} />
 
