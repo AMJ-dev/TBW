@@ -9,12 +9,7 @@ import {
     HelpCircle, LayoutDashboard, LogOut, Menu,
     PackageCheck, Package, QrCode, Search, Settings, ShieldCheck,
     Truck, User, UsersRound, Warehouse, X, Container,
-    CarFront,
-    CreditCard,
-    ReceiptText,
-    CalendarDays,
-    UserRoundCheck,
-    Users,
+    CarFront, CreditCard, ReceiptText, UserRoundCheck, Users, BookOpen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -178,6 +173,7 @@ const sections = [
             { label: "Receiving", to: "/operations/receiving", icon: PackageCheck, access: ["system"] },
             { label: "Yard", to: "/operations/yard", icon: Grid2X2, access: ["system"] },
             { label: "Warehouse", to: "/operations/warehouse", icon: Warehouse, access: ["system"] },
+            { label: "Documentation", to: "/operations/documentation", icon: BookOpen, access: ["system"] },
             { label: "Examination", to: "/operations/examination", icon: ClipboardCheck, access: ["system"] },
             { label: "Seal Events", to: "/operations/seals", icon: ShieldCheck, access: ["system"] },
             { label: "Inventory", to: "/operations/inventory", icon: Boxes, access: ["system"] },

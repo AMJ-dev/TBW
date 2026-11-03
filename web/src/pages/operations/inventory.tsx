@@ -173,7 +173,6 @@ export default function OperationsInventoryRoute() {
 	const [query, setQuery] = useState("");
 	const [statusFilter, setStatusFilter] = useState<StockStatus | "all">("all");
 	const [selected, setSelected] = useState<InventoryItem | null>(null);
-	const [isAddOpen, setIsAddOpen] = useState(false);
 
 	const filtered = useMemo(() => {
 		return inventory.filter((i) => {
@@ -196,12 +195,6 @@ export default function OperationsInventoryRoute() {
 		const pendingCounts = inventory.filter((i) => i.status === "Cycle count pending").length;
 		return { total, inStock, holds, variances, pendingCounts };
 	}, [inventory]);
-
-	const handleAdd = (next: InventoryItem) => {
-		setInventory((prev) => [next, ...prev]);
-		setIsAddOpen(false);
-		toast.success("Inventory record added locally.");
-	};
 
 	const handleMarkCounted = (id: string) => {
 		setInventory((prev) =>
@@ -253,12 +246,6 @@ export default function OperationsInventoryRoute() {
 							<ClipboardCheck className="mr-1.5 size-4" /> Start cycle count
 						</Button>
 					</Link>
-					<Button
-						className="bg-orange text-white hover:bg-orange-deep"
-						onClick={() => setIsAddOpen(true)}
-					>
-						<Plus className="mr-1.5 size-4" /> Add stock record
-					</Button>
 				</div>
 			</div>
 
@@ -422,13 +409,6 @@ export default function OperationsInventoryRoute() {
 					onCountComplete={() => handleMarkCounted(selected.id)}
 				/>
 			)}
-
-			{isAddOpen && (
-				<AddInventoryModal
-					onClose={() => setIsAddOpen(false)}
-					onSubmit={handleAdd}
-				/>
-			)}
 		</AppShell>
 	);
 }
@@ -582,245 +562,5 @@ function InventoryDetailDialog({
 				</div>
 			</div>
 		</div>
-	);
-}
-
-function AddInventoryModal({
-	onClose,
-	onSubmit,
-}: {
-	onClose: () => void;
-	onSubmit: (i: InventoryItem) => void;
-}) {
-	const [sku, setSku] = useState("");
-	const [description, setDescription] = useState("");
-	const [consignee, setConsignee] = useState("");
-	const [kind, setKind] = useState<InventoryItem["kind"]>("Carton");
-	const [quantity, setQuantity] = useState("");
-	const [unit, setUnit] = useState("cartons");
-	const [weight, setWeight] = useState("");
-	const [volume, setVolume] = useState("");
-	const [location, setLocation] = useState("");
-	const [consignment, setConsignment] = useState("");
-	const [container, setContainer] = useState("");
-	const [notes, setNotes] = useState("");
-
-	const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-		e.preventDefault();
-		if (!sku.trim() || !description.trim() || !quantity.trim()) {
-			toast.error("SKU, description, and quantity are required.");
-			return;
-		}
-		onSubmit({
-			id: `inv-${Date.now()}`,
-			sku,
-			description,
-			consignee: consignee || "—",
-			kind,
-			quantity: Number(quantity) || 0,
-			unit,
-			weight: weight || "—",
-			volume: volume || "—",
-			location: location || "Aisle A · Rack 01 · Bin 01",
-			consignment: consignment || "—",
-			container: container || "—",
-			receivedAt: new Date().toLocaleDateString("en-GB", {
-				day: "2-digit",
-				month: "short",
-				year: "numeric",
-			}),
-			lastCountedAt: "—",
-			status: "In stock",
-			notes: notes || "Stock line added from the operations console.",
-		});
-	};
-
-	return (
-		<div
-			className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 px-4 py-10 backdrop-blur-sm"
-			onMouseDown={(e) => e.target === e.currentTarget && onClose()}
-		>
-			<div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-paper shadow-2xl ring-1 ring-line">
-				<form onSubmit={handleSubmit} className="flex max-h-[90vh] flex-col">
-					<div className="flex items-start justify-between border-b border-line p-5 sm:p-6">
-						<div>
-							<p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-deep">
-								New stock line
-							</p>
-							<h3 className="mt-1 font-display text-xl font-bold text-ink">
-								Add stock to bonded inventory
-							</h3>
-							<p className="mt-1 text-[12px] text-ink-soft">
-								New stock lines are recorded with a SKU, description, and location.
-							</p>
-						</div>
-						<Button
-							type="button"
-							variant="ghost"
-							size="icon"
-							onClick={onClose}
-							aria-label="Close dialog"
-						>
-							<X />
-						</Button>
-					</div>
-
-					<div className="flex-1 space-y-5 overflow-y-auto p-5 sm:p-6">
-						<div className="grid gap-3 sm:grid-cols-2">
-							<Field
-								label="SKU"
-								placeholder="TRN-SKU-9027"
-								value={sku}
-								onChange={setSku}
-								mono
-								required
-							/>
-							<Field
-								label="Kind"
-								placeholder="Carton"
-								value={kind}
-								onChange={(v) => setKind(v as InventoryItem["kind"])}
-							/>
-						</div>
-
-						<Field
-							label="Description"
-							placeholder="What is the cargo?"
-							value={description}
-							onChange={setDescription}
-							required
-						/>
-
-						<Field
-							label="Consignee"
-							placeholder="Atlantic Trade Nigeria Ltd"
-							value={consignee}
-							onChange={setConsignee}
-						/>
-
-						<div className="grid gap-3 sm:grid-cols-3">
-							<Field
-								label="Quantity"
-								placeholder="120"
-								value={quantity}
-								onChange={setQuantity}
-								mono
-								required
-							/>
-							<Field
-								label="Unit"
-								placeholder="cartons"
-								value={unit}
-								onChange={setUnit}
-							/>
-							<Field
-								label="Weight"
-								placeholder="18,420 kg"
-								value={weight}
-								onChange={setWeight}
-								mono
-							/>
-						</div>
-
-						<div className="grid gap-3 sm:grid-cols-2">
-							<Field
-								label="Volume"
-								placeholder="24.5 m³"
-								value={volume}
-								onChange={setVolume}
-								mono
-							/>
-							<Field
-								label="Location"
-								placeholder="Aisle A · Rack 03 · Bin 12"
-								value={location}
-								onChange={setLocation}
-								mono
-							/>
-						</div>
-
-						<div className="grid gap-3 sm:grid-cols-2">
-							<Field
-								label="Consignment"
-								placeholder="TRN-IMP-002481"
-								value={consignment}
-								onChange={setConsignment}
-								mono
-							/>
-							<Field
-								label="Container"
-								placeholder="TRIU1234564"
-								value={container}
-								onChange={setContainer}
-								mono
-							/>
-						</div>
-
-						<label className="block">
-							<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-								Notes
-							</span>
-							<textarea
-								value={notes}
-								onChange={(e) => setNotes(e.target.value)}
-								className="mt-2 min-h-24 w-full rounded-md border border-line bg-sand px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-soft/70 focus:ring-2 focus:ring-orange/30"
-								placeholder="Handling notes, packaging details, or other context."
-							/>
-						</label>
-					</div>
-
-					<div className="flex items-center justify-between gap-3 border-t border-line p-5 sm:p-6">
-						<Button
-							type="button"
-							variant="ghost"
-							onClick={onClose}
-							className="text-ink-soft"
-						>
-							Cancel
-						</Button>
-						<Button type="submit" className="bg-orange text-white hover:bg-orange-deep">
-							Add stock line <ArrowRight />
-						</Button>
-					</div>
-				</form>
-			</div>
-		</div>
-	);
-}
-
-function Field({
-	label,
-	placeholder,
-	value,
-	onChange,
-	type = "text",
-	mono,
-	required,
-}: {
-	label: string;
-	placeholder: string;
-	value: string;
-	onChange: (v: string) => void;
-	type?: string;
-	mono?: boolean;
-	required?: boolean;
-}) {
-	return (
-		<label className="block">
-			<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-				{label}
-				{required && <span className="text-coral"> *</span>}
-			</span>
-			<Input
-				type={type}
-				value={value}
-				onChange={(e) => onChange(e.target.value)}
-				placeholder={placeholder}
-				className={cn(
-					"mt-2 h-11 border-line bg-sand text-ink",
-					mono && "font-mono"
-				)}
-			/>
-		</label>
 	);
 }
