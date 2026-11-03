@@ -4,253 +4,274 @@ require_once __DIR__ . "/include/conn.php";
 try {
     $conn->beginTransaction();
 
-    $equipment = [
+    $locations = [
         [
-            "name" => "Kalmar Reach Stacker RS01",
-            "code" => "EQ-RS-001",
-            "type" => "REACH_STACKER",
-            "registration" => "TRN-RS-001",
-            "capacity" => 45,
-            "unit" => "TONNES",
-            "status" => "AVAILABLE",
-            "description" => "Heavy-duty reach stacker for loading, unloading and stacking loaded shipping containers."
+            "code" => "YARD-A",
+            "name" => "Main Container Yard A",
+            "description" => "Primary container storage area for import and export containers.",
+            "kind" => "YARD",
+            "status" => "active",
+            "capacity" => 2500,
+            "parent" => null
         ],
         [
-            "name" => "Kalmar Reach Stacker RS02",
-            "code" => "EQ-RS-002",
-            "type" => "REACH_STACKER",
-            "registration" => "TRN-RS-002",
-            "capacity" => 45,
-            "unit" => "TONNES",
-            "status" => "IN_USE",
-            "description" => "Container handling reach stacker assigned to the main container yard."
+            "code" => "YARD-B",
+            "name" => "Container Yard B",
+            "description" => "Secondary container storage area for overflow and general container stacking.",
+            "kind" => "YARD",
+            "status" => "active",
+            "capacity" => 1800,
+            "parent" => null
         ],
         [
-            "name" => "Konecranes Reach Stacker RS03",
-            "code" => "EQ-RS-003",
-            "type" => "REACH_STACKER",
-            "registration" => "TRN-RS-003",
-            "capacity" => 45,
-            "unit" => "TONNES",
-            "status" => "MAINTENANCE",
-            "description" => "Reach stacker currently undergoing scheduled hydraulic system maintenance."
+            "code" => "YARD-C",
+            "name" => "Empty Container Yard",
+            "description" => "Dedicated storage area for empty shipping containers.",
+            "kind" => "YARD",
+            "status" => "active",
+            "capacity" => 1200,
+            "parent" => null
         ],
         [
-            "name" => "Toyota Forklift FL01",
-            "code" => "EQ-FL-001",
-            "type" => "FORKLIFT",
-            "registration" => "TRN-FL-001",
-            "capacity" => 5,
-            "unit" => "TONNES",
-            "status" => "AVAILABLE",
-            "description" => "Medium-duty forklift for handling palletised cargo and warehouse goods."
+            "code" => "YARD-D",
+            "name" => "Export Container Yard",
+            "description" => "Designated storage area for export containers awaiting dispatch.",
+            "kind" => "YARD",
+            "status" => "active",
+            "capacity" => 1500,
+            "parent" => null
         ],
         [
-            "name" => "Hyster Forklift FL02",
-            "code" => "EQ-FL-002",
-            "type" => "FORKLIFT",
-            "registration" => "TRN-FL-002",
-            "capacity" => 7,
-            "unit" => "TONNES",
-            "status" => "IN_USE",
-            "description" => "Heavy-duty forklift assigned to warehouse cargo handling operations."
+            "code" => "YARD-E",
+            "name" => "Reefer Container Yard",
+            "description" => "Specialised container yard with power connections for refrigerated containers.",
+            "kind" => "YARD",
+            "status" => "active",
+            "capacity" => 350,
+            "parent" => null
         ],
         [
-            "name" => "Toyota Forklift FL03",
-            "code" => "EQ-FL-003",
-            "type" => "FORKLIFT",
-            "registration" => "TRN-FL-003",
-            "capacity" => 3,
-            "unit" => "TONNES",
-            "status" => "AVAILABLE",
-            "description" => "Compact forklift for general warehouse and cargo movement."
+            "code" => "YARD-A-01",
+            "name" => "Yard A Block 01",
+            "description" => "First container stacking block in Main Container Yard A.",
+            "kind" => "YARD",
+            "status" => "active",
+            "capacity" => 300,
+            "parent" => "YARD-A"
         ],
         [
-            "name" => "Kalmar Terminal Tractor TT01",
-            "code" => "EQ-TT-001",
-            "type" => "TERMINAL_TRACTOR",
-            "registration" => "TRN-TT-001",
-            "capacity" => 30,
-            "unit" => "TONNES",
-            "status" => "AVAILABLE",
-            "description" => "Terminal tractor for moving container trailers between the yard and handling areas."
+            "code" => "YARD-A-02",
+            "name" => "Yard A Block 02",
+            "description" => "Second container stacking block in Main Container Yard A.",
+            "kind" => "YARD",
+            "status" => "active",
+            "capacity" => 300,
+            "parent" => "YARD-A"
         ],
         [
-            "name" => "Terberg Terminal Tractor TT02",
-            "code" => "EQ-TT-002",
-            "type" => "TERMINAL_TRACTOR",
-            "registration" => "TRN-TT-002",
-            "capacity" => 30,
-            "unit" => "TONNES",
-            "status" => "IN_USE",
-            "description" => "Terminal tractor currently assigned to internal container transportation."
+            "code" => "YARD-A-03",
+            "name" => "Yard A Block 03",
+            "description" => "Third container stacking block in Main Container Yard A.",
+            "kind" => "YARD",
+            "status" => "active",
+            "capacity" => 300,
+            "parent" => "YARD-A"
         ],
         [
-            "name" => "Terberg Terminal Tractor TT03",
-            "code" => "EQ-TT-003",
-            "type" => "TERMINAL_TRACTOR",
-            "registration" => "TRN-TT-003",
-            "capacity" => 30,
-            "unit" => "TONNES",
-            "status" => "OUT_OF_SERVICE",
-            "description" => "Terminal tractor temporarily withdrawn from operations pending inspection."
+            "code" => "YARD-B-01",
+            "name" => "Yard B Block 01",
+            "description" => "First stacking block in Container Yard B.",
+            "kind" => "YARD",
+            "status" => "active",
+            "capacity" => 300,
+            "parent" => "YARD-B"
         ],
         [
-            "name" => "Liebherr Mobile Crane MC01",
-            "code" => "EQ-MC-001",
-            "type" => "MOBILE_CRANE",
-            "registration" => "TRN-MC-001",
-            "capacity" => 100,
-            "unit" => "TONNES",
-            "status" => "AVAILABLE",
-            "description" => "Mobile crane for heavy cargo lifting and specialised terminal handling."
+            "code" => "YARD-B-02",
+            "name" => "Yard B Block 02",
+            "description" => "Second stacking block in Container Yard B.",
+            "kind" => "YARD",
+            "status" => "maintenance",
+            "capacity" => 300,
+            "parent" => "YARD-B"
         ],
         [
-            "name" => "Grove Mobile Crane MC02",
-            "code" => "EQ-MC-002",
-            "type" => "MOBILE_CRANE",
-            "registration" => "TRN-MC-002",
-            "capacity" => 80,
-            "unit" => "TONNES",
-            "status" => "MAINTENANCE",
-            "description" => "Mobile crane undergoing routine inspection and scheduled servicing."
+            "code" => "WH-MAIN",
+            "name" => "Main General Warehouse",
+            "description" => "Primary covered warehouse for general cargo, palletised goods and consolidated shipments.",
+            "kind" => "WAREHOUSE",
+            "status" => "active",
+            "capacity" => 5000,
+            "parent" => null
         ],
         [
-            "name" => "Rubber Tyred Gantry Crane GC01",
-            "code" => "EQ-GC-001",
-            "type" => "GANTRY_CRANE",
-            "registration" => "TRN-GC-001",
-            "capacity" => 40,
-            "unit" => "TONNES",
-            "status" => "IN_USE",
-            "description" => "Rubber-tyred gantry crane used for container stacking and yard operations."
+            "code" => "WH-BONDED",
+            "name" => "Bonded Cargo Warehouse",
+            "description" => "Secure warehouse for cargo held under customs control.",
+            "kind" => "WAREHOUSE",
+            "status" => "active",
+            "capacity" => 3500,
+            "parent" => null
         ],
         [
-            "name" => "Rubber Tyred Gantry Crane GC02",
-            "code" => "EQ-GC-002",
-            "type" => "GANTRY_CRANE",
-            "registration" => "TRN-GC-002",
-            "capacity" => 40,
-            "unit" => "TONNES",
-            "status" => "AVAILABLE",
-            "description" => "Yard gantry crane available for container stacking assignments."
+            "code" => "WH-EXPORT",
+            "name" => "Export Cargo Warehouse",
+            "description" => "Warehouse for export cargo awaiting documentation and dispatch.",
+            "kind" => "WAREHOUSE",
+            "status" => "active",
+            "capacity" => 2500,
+            "parent" => null
         ],
         [
-            "name" => "MAN Heavy Duty Terminal Truck TR01",
-            "code" => "EQ-TR-001",
-            "type" => "TRUCK",
-            "registration" => "ABC-123-XY",
-            "capacity" => 30,
-            "unit" => "TONNES",
-            "status" => "AVAILABLE",
-            "description" => "Heavy-duty truck for authorised cargo transportation within terminal operations."
+            "code" => "WH-01",
+            "name" => "Main Warehouse Section 01",
+            "description" => "First storage section in the Main General Warehouse.",
+            "kind" => "WAREHOUSE",
+            "status" => "active",
+            "capacity" => 1000,
+            "parent" => "WH-MAIN"
         ],
         [
-            "name" => "Mercedes-Benz Cargo Truck TR02",
-            "code" => "EQ-TR-002",
-            "type" => "TRUCK",
-            "registration" => "ABC-456-XY",
+            "code" => "WH-02",
+            "name" => "Main Warehouse Section 02",
+            "description" => "Second storage section in the Main General Warehouse.",
+            "kind" => "WAREHOUSE",
+            "status" => "active",
+            "capacity" => 1000,
+            "parent" => "WH-MAIN"
+        ],
+        [
+            "code" => "WH-03",
+            "name" => "Main Warehouse Section 03",
+            "description" => "Third storage section in the Main General Warehouse.",
+            "kind" => "WAREHOUSE",
+            "status" => "active",
+            "capacity" => 1000,
+            "parent" => "WH-MAIN"
+        ],
+        [
+            "code" => "EXAM-01",
+            "name" => "Primary Examination Bay",
+            "description" => "Main examination area for physical cargo inspection and customs examination.",
+            "kind" => "EXAMINATION_BAY",
+            "status" => "active",
             "capacity" => 20,
-            "unit" => "TONNES",
-            "status" => "IN_USE",
-            "description" => "Cargo truck assigned to terminal logistics and internal transportation."
+            "parent" => null
         ],
         [
-            "name" => "Flatbed Container Trailer TL01",
-            "code" => "EQ-TL-001",
-            "type" => "TRAILER",
-            "registration" => "TRL-001-AB",
-            "capacity" => 35,
-            "unit" => "TONNES",
-            "status" => "AVAILABLE",
-            "description" => "Flatbed trailer for transporting standard shipping containers."
+            "code" => "EXAM-02",
+            "name" => "Secondary Examination Bay",
+            "description" => "Secondary examination area for additional cargo inspections.",
+            "kind" => "EXAMINATION_BAY",
+            "status" => "active",
+            "capacity" => 15,
+            "parent" => null
         ],
         [
-            "name" => "Skeletal Container Trailer TL02",
-            "code" => "EQ-TL-002",
-            "type" => "TRAILER",
-            "registration" => "TRL-002-AB",
-            "capacity" => 40,
-            "unit" => "TONNES",
-            "status" => "IN_USE",
-            "description" => "Skeletal trailer currently assigned to container transfer operations."
+            "code" => "EXAM-03",
+            "name" => "Scanning Examination Bay",
+            "description" => "Designated examination area for cargo scanning and non-intrusive inspection.",
+            "kind" => "EXAMINATION_BAY",
+            "status" => "active",
+            "capacity" => 10,
+            "parent" => null
         ],
         [
-            "name" => "Skeletal Container Trailer TL03",
-            "code" => "EQ-TL-003",
-            "type" => "TRAILER",
-            "registration" => "TRL-003-AB",
-            "capacity" => 40,
-            "unit" => "TONNES",
-            "status" => "OUT_OF_SERVICE",
-            "description" => "Container trailer temporarily unavailable pending mechanical repairs."
+            "code" => "EXAM-04",
+            "name" => "Special Cargo Examination Bay",
+            "description" => "Dedicated examination area for cargo requiring specialised inspection.",
+            "kind" => "EXAMINATION_BAY",
+            "status" => "maintenance",
+            "capacity" => 8,
+            "parent" => null
         ]
     ];
 
-    $check = $conn->prepare("
+    $existing = $conn->prepare("
         SELECT id
-        FROM terminal_equipment
-        WHERE equipment_code = :equipment_code
+        FROM terminal_locations
+        WHERE code = :code
         LIMIT 1
     ");
 
     $insert = $conn->prepare("
-        INSERT INTO terminal_equipment (
+        INSERT INTO terminal_locations (
             id,
-            equipment_name,
-            equipment_code,
-            equipment_type,
-            registration_number,
+            parent_location_id,
+            code,
+            name,
+            description,
+            kind,
+            status,
             capacity,
             capacity_unit,
-            operational_status,
-            description,
-            is_active,
-            created_at,
-            updated_at
+            change_reason
         ) VALUES (
             :id,
-            :equipment_name,
-            :equipment_code,
-            :equipment_type,
-            :registration_number,
-            :capacity,
-            :capacity_unit,
-            :operational_status,
+            :parent_location_id,
+            :code,
+            :name,
             :description,
-            :is_active,
-            NOW(),
-            NOW()
+            :kind,
+            :status,
+            :capacity,
+            'TEU',
+            :change_reason
         )
     ");
 
+    $locationIds = [];
     $inserted = 0;
     $skipped = 0;
 
-    foreach ($equipment as $item) {
-        $check->bindValue(":equipment_code", $item["code"], PDO::PARAM_STR);
-        $check->execute();
+    foreach ($locations as $location) {
+        $existing->bindValue(":code", $location["code"], PDO::PARAM_STR);
+        $existing->execute();
 
-        if ($check->fetch(PDO::FETCH_ASSOC)) {
+        $existingRecord = $existing->fetch(PDO::FETCH_ASSOC);
+
+        if ($existingRecord) {
+            $locationIds[$location["code"]] = $existingRecord["id"];
             $skipped++;
             continue;
         }
 
         $id = generateId();
 
+        $parentId = $location["parent"]
+            ? ($locationIds[$location["parent"]] ?? null)
+            : null;
+
+        if ($location["parent"] && !$parentId) {
+            throw new RuntimeException(
+                "Parent location not found for " . $location["code"]
+            );
+        }
+
         $insert->bindValue(":id", $id, PDO::PARAM_STR);
-        $insert->bindValue(":equipment_name", $item["name"], PDO::PARAM_STR);
-        $insert->bindValue(":equipment_code", $item["code"], PDO::PARAM_STR);
-        $insert->bindValue(":equipment_type", $item["type"], PDO::PARAM_STR);
-        $insert->bindValue(":registration_number", $item["registration"], PDO::PARAM_STR);
-        $insert->bindValue(":capacity", $item["capacity"], PDO::PARAM_STR);
-        $insert->bindValue(":capacity_unit", $item["unit"], PDO::PARAM_STR);
-        $insert->bindValue(":operational_status", $item["status"], PDO::PARAM_STR);
-        $insert->bindValue(":description", $item["description"], PDO::PARAM_STR);
-        $insert->bindValue(":is_active", 1, PDO::PARAM_INT);
+
+        $insert->bindValue(
+            ":parent_location_id",
+            $parentId,
+            $parentId === null ? PDO::PARAM_NULL : PDO::PARAM_STR
+        );
+
+        $insert->bindValue(":code", $location["code"], PDO::PARAM_STR);
+        $insert->bindValue(":name", $location["name"], PDO::PARAM_STR);
+        $insert->bindValue(":description", $location["description"], PDO::PARAM_STR);
+        $insert->bindValue(":kind", $location["kind"], PDO::PARAM_STR);
+        $insert->bindValue(":status", $location["status"], PDO::PARAM_STR);
+        $insert->bindValue(":capacity", (string) $location["capacity"], PDO::PARAM_STR);
+
+        $insert->bindValue(
+            ":change_reason",
+            "Initial terminal location configuration",
+            PDO::PARAM_STR
+        );
 
         $insert->execute();
 
+        $locationIds[$location["code"]] = $id;
         $inserted++;
     }
 
@@ -258,11 +279,11 @@ try {
 
     echo json_encode([
         "error" => false,
-        "data" => "Equipment seed completed successfully.",
+        "data" => "Terminal locations created successfully.",
         "code" => [
             "inserted" => $inserted,
             "skipped" => $skipped,
-            "total" => count($equipment)
+            "total" => count($locations)
         ]
     ]);
 
@@ -273,7 +294,7 @@ try {
 
     echo json_encode([
         "error" => true,
-        "data" => "Could not create equipment records.",
+        "data" => "Could not create terminal locations.",
         "code" => null
     ]);
 }

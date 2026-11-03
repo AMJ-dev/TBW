@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { http, type Resp } from "@/lib/httpClient";
 
-type LocationType = "YARD" | "WAREHOUSE" | "EXAMINATION_BAY";
+type LocationType = "YARD" | "WAREHOUSE" | "EXAMINATION_BAY" | "RECEIVING";
 
 interface TerminalLocation {
   id: string;
@@ -67,12 +67,14 @@ const locationTypes: { value: LocationType; label: string }[] = [
     { value: "YARD", label: "Yard" },
     { value: "WAREHOUSE", label: "Warehouse" },
     { value: "EXAMINATION_BAY", label: "Examination Bay" },
+    { value: "RECEIVING", label: "Receiving" },
 ];
 
 const locationTypeLabels: Record<LocationType, string> = {
   YARD: "Yard",
   WAREHOUSE: "Warehouse",
   EXAMINATION_BAY: "Examination Bay",
+  RECEIVING: "Receiving",
 };
 
 const normaliseLocationType = (value: unknown): LocationType => {
@@ -137,6 +139,8 @@ const getTypeIcon = (type: LocationType) => {
       return Warehouse;
     case "EXAMINATION_BAY":
       return ShieldCheck;
+    case "RECEIVING":
+      return Clock3;
     default:
       return MapPin;
   }
@@ -414,7 +418,7 @@ export default function AdminLocationsConfigurationPage() {
                     Terminal Locations
                   </h2>
                   <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-                    Configure the yards, warehouses, and examination bays used by terminal operations.
+                    Configure the yards, warehouses, examination bays and receiving areas used by terminal operations.
                   </p>
                 </div>
 
@@ -564,7 +568,7 @@ export default function AdminLocationsConfigurationPage() {
                     </h3>
                     <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-ink-soft">
                       {locations.length === 0
-                        ? "Add your terminal's yards, warehouses and examination bays to get started."
+                        ? "Add your terminal's yards, warehouses, examination bays and receiving areas to get started."
                         : "Try a different search term or change the filters."}
                     </p>
                   </div>

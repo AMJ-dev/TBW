@@ -34,7 +34,7 @@ try {
         exit;
     }
 
-    if (!in_array($kind, ["YARD", "WAREHOUSE", "EXAMINATION_BAY"], true)) {
+    if (!in_array($kind, ["YARD", "WAREHOUSE", "EXAMINATION_BAY". "RECEIVING"], true)) {
         echo json_encode(["error" => true, "data" => "Invalid location type.", "code" => null]);
         exit;
     }
