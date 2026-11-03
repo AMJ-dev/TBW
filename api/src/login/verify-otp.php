@@ -1,7 +1,4 @@
 <?php
-
-    use Firebase\JWT\JWT;
-
     require_once dirname(__DIR__, 2) . "/include/set-header.php";
 
     $email = strtolower(trim($_POST["email"] ?? ""));
@@ -18,7 +15,6 @@
             "data" => "Email and verification code are required.",
             "code" => []
         ]);
-
         exit;
     }
 
@@ -28,7 +24,6 @@
             "data" => "Invalid email address.",
             "code" => []
         ]);
-
         exit;
     }
 
@@ -38,11 +33,11 @@
             "data" => "Enter a valid 6-digit verification code.",
             "code" => []
         ]);
-
         exit;
     }
 
     try {
+
         $conn->beginTransaction();
 
         $stmt = $conn->prepare("
@@ -76,21 +71,71 @@
                 "data" => "Invalid verification request.",
                 "code" => []
             ]);
-
             exit;
         }
 
         $user_id = $user["id"];
 
-        if (!in_array($user["account_status"], ["active", "rejected"], true)) {
+        $organisation = null;
+
+        $stmt = $conn->prepare("
+            SELECT
+                id,
+                organisation_name,
+                organisation_type,
+                verification_status,
+                rejection_reason,
+                verified_by,
+                verified_at
+            FROM organisations
+            WHERE id = :id
+            LIMIT 1
+        ");
+
+        $stmt->execute([":id" => $user["organisation_id"]]);
+
+        $organisation = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$organisation) {
             $conn->rollBack();
 
             echo json_encode([
                 "error" => true,
-                "data" => "Your account is not currently active.",
+                "data" => "Organisation associated with this account was not found.",
                 "code" => []
             ]);
+            exit;
+        }
 
+        $can_login = false;
+
+        if (
+            $user["account_status"] === "active" &&
+            $organisation["verification_status"] === "verified"
+        ) {
+            $can_login = true;
+        }
+
+        if (
+            $user["account_type"] === "organisation" &&
+            $user["account_status"] === "pending_approval" &&
+            $organisation["verification_status"] === "rejected"
+        ) {
+            $can_login = true;
+        }
+
+        if (!$can_login) {
+            $conn->rollBack();
+
+            echo json_encode([
+                "error" => true,
+                "data" => "Your account is not currently eligible to sign in.",
+                "code" => [
+                    "status" => $user["account_status"],
+                    "organisation_status" => $organisation["verification_status"] ?? null,
+                    "organisation_rejection_reason" => $organisation["rejection_reason"] ?? null
+                ]
+            ]);
             exit;
         }
 
@@ -102,7 +147,6 @@
                 "data" => "Your email address has not been verified.",
                 "code" => []
             ]);
-
             exit;
         }
 
@@ -124,9 +168,7 @@
             FOR UPDATE
         ");
 
-        $stmt->execute([
-            ":user_id" => $user_id
-        ]);
+        $stmt->execute([":user_id" => $user_id]);
 
         $otp_record = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -138,20 +180,13 @@
                 "data" => "Verification code not found. Please request a new code.",
                 "code" => []
             ]);
-
             exit;
         }
 
         if (strtotime($otp_record["expires_at"]) <= time()) {
-            $stmt = $conn->prepare("
-                UPDATE otp_codes
-                SET revoked_at = NOW()
-                WHERE id = :id
-            ");
 
-            $stmt->execute([
-                ":id" => $otp_record["id"]
-            ]);
+            $stmt = $conn->prepare("UPDATE otp_codes SET revoked_at = NOW() WHERE id = :id");
+            $stmt->execute([":id" => $otp_record["id"]]);
 
             $conn->commit();
 
@@ -160,20 +195,13 @@
                 "data" => "This verification code has expired. Please request a new code.",
                 "code" => []
             ]);
-
             exit;
         }
 
         if ((int)$otp_record["attempts"] >= (int)$otp_record["max_attempts"]) {
-            $stmt = $conn->prepare("
-                UPDATE otp_codes
-                SET revoked_at = NOW()
-                WHERE id = :id
-            ");
 
-            $stmt->execute([
-                ":id" => $otp_record["id"]
-            ]);
+            $stmt = $conn->prepare("UPDATE otp_codes SET revoked_at = NOW() WHERE id = :id");
+            $stmt->execute([":id" => $otp_record["id"]]);
 
             $conn->commit();
 
@@ -182,37 +210,17 @@
                 "data" => "Too many verification attempts. Please request a new code.",
                 "code" => []
             ]);
-
             exit;
         }
 
         if (!password_verify($otp, $otp_record["otp_hash"])) {
             $attempts = (int)$otp_record["attempts"] + 1;
-
             if ($attempts >= (int)$otp_record["max_attempts"]) {
-                $stmt = $conn->prepare("
-                    UPDATE otp_codes
-                    SET
-                        attempts = :attempts,
-                        revoked_at = NOW()
-                    WHERE id = :id
-                ");
-
-                $stmt->execute([
-                    ":attempts" => $attempts,
-                    ":id" => $otp_record["id"]
-                ]);
+                $stmt = $conn->prepare("UPDATE otp_codes SET attempts = :attempts, revoked_at = NOW() WHERE id = :id");
+                $stmt->execute([":attempts" => $attempts, ":id" => $otp_record["id"]]);
             } else {
-                $stmt = $conn->prepare("
-                    UPDATE otp_codes
-                    SET attempts = :attempts
-                    WHERE id = :id
-                ");
-
-                $stmt->execute([
-                    ":attempts" => $attempts,
-                    ":id" => $otp_record["id"]
-                ]);
+                $stmt = $conn->prepare("UPDATE otp_codes SET attempts = :attempts WHERE id = :id");
+                $stmt->execute([":attempts" => $attempts, ":id" => $otp_record["id"]]);
             }
 
             $attempt_id = generateId();
@@ -271,58 +279,14 @@
             WHERE id = :id
         ");
 
-        $stmt->execute([
-            ":id" => $otp_record["id"]
-        ]);
-
-        $organisation = null;
-
-        if (
-            $user["account_type"] === "organisation" &&
-            !empty($user["organisation_id"])
-        ) {
-            $stmt = $conn->prepare("
-                SELECT
-                    id,
-                    organisation_name,
-                    organisation_type,
-                    verification_status,
-                    rejection_reason,
-                    verified_by,
-                    verified_at
-                FROM organisations
-                WHERE id = :id
-                LIMIT 1
-            ");
-
-            $stmt->execute([
-                ":id" => $user["organisation_id"]
-            ]);
-
-            $organisation = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$organisation) {
-                $conn->rollBack();
-
-                echo json_encode([
-                    "error" => true,
-                    "data" => "Organisation associated with this account was not found.",
-                    "code" => []
-                ]);
-
-                exit;
-            }
-        }
+        $stmt->execute([":id" => $otp_record["id"]]);
 
         $session_id = generateId();
 
         $session_token = bin2hex(random_bytes(32));
         $session_token_hash = hash("sha256", $session_token);
 
-        $session_expires_at = date(
-            "Y-m-d H:i:s",
-            time() + (30 * 24 * 60 * 60)
-        );
+        $session_expires_at = date("Y-m-d H:i:s", time() + (30 * 24 * 60 * 60));
 
         $stmt = $conn->prepare("
             INSERT INTO sessions (
@@ -376,9 +340,7 @@
             WHERE id = :user_id
         ");
 
-        $stmt->execute([
-            ":user_id" => $user_id
-        ]);
+        $stmt->execute([":user_id" => $user_id]);
 
         $attempt_id = generateId();
 
@@ -415,6 +377,7 @@
         $role = null;
 
         if ($user["account_type"] === "system") {
+
             if (empty($user["system_role_id"])) {
                 $conn->rollBack();
 
@@ -423,7 +386,6 @@
                     "data" => "Your system account does not have an assigned role.",
                     "code" => []
                 ]);
-
                 exit;
             }
 
@@ -440,12 +402,8 @@
                 LIMIT 1
             ");
 
-            $stmt->execute([
-                ":role_id" => $user["system_role_id"]
-            ]);
-
+            $stmt->execute([":role_id" => $user["system_role_id"]]);
             $role = $stmt->fetch(PDO::FETCH_ASSOC);
-
         } else {
             $stmt = $conn->prepare("
                 SELECT
@@ -477,9 +435,7 @@
                 LIMIT 1
             ");
 
-            $stmt->execute([
-                ":user_id" => $user_id
-            ]);
+            $stmt->execute([":user_id" => $user_id]);
 
             $role = $stmt->fetch(PDO::FETCH_ASSOC);
         }
@@ -492,7 +448,6 @@
                 "data" => "Your account does not have an active role.",
                 "code" => []
             ]);
-
             exit;
         }
 
@@ -513,9 +468,7 @@
             ORDER BY p.module, p.action
         ");
 
-        $stmt->execute([
-            ":role_id" => $role_id
-        ]);
+        $stmt->execute([":role_id" => $role_id]);
 
         $permission_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -524,87 +477,26 @@
 
         foreach ($permission_rows as $permission) {
             $permissions[] = $permission["permission_key"];
-
-            if (!in_array($permission["module"], $privileges, true)) {
-                $privileges[] = $permission["module"];
-            }
-        }
-
-        if (
-            $user["account_type"] === "organisation" &&
-            $organisation &&
-            $organisation["verification_status"] === "rejected"
-        ) {
-            $route = "/organisation/review";
-        } else {
-            $route = $route_map[$role_key] ?? "/portal";
+            if (!in_array($permission["module"], $privileges, true)) $privileges[] = $permission["module"];
         }
 
         $conn->commit();
 
-        $token = [
-            "id" => $user_id,
-            "session_id" => $session_id
-        ];
+        if ($user["account_type"] === "organisation" && $organisation && $organisation["verification_status"] === "rejected") $route = "/organisation/review";
+        else if($user["account_type"] === "system") $route = "/admin";
+        else $route = "/portal";
 
-        $jwt = JWT::encode($token, $privateKey, "RS256");
-
-        setcookie(
-            "token",
-            $jwt,
-            [
-                "expires" => time() + 86400,
-                "path" => "/",
-                "domain" => "",
-                "secure" => str_starts_with(strtolower($baseURL), "https://"),
-                "httponly" => true,
-                "samesite" => "Lax"
-            ]
-        );
-
-        echo json_encode([
-            "error" => false,
-            "data" => "Login successful.",
-            "code" => [
-                "email" => $user["email"],
-                "expires_in" => 2592000,
-                "user" => [
-                    "id" => $user["id"],
-                    "email" => $user["email"],
-                    "full_name" => $user["full_name"],
-                    "phone" => $user["phone"],
-                    "account_type" => $user["account_type"],
-                    "account_status" => $user["account_status"],
-                ],
-                "organisation" => $organisation,
-                "role" => [
-                    "id" => $role_id,
-                    "key" => $role_key,
-                    "name" => $role_name,
-                    "scope" => $role_scope
-                ],
-                "route" => $route,
-                "privileges" => $privileges,
-                "permissions" => $permissions
-            ]
-        ]);
-
-        exit;
-
+        require_once dirname(__DIR__, 2) . "/include/set-token.php";
     } catch (Throwable $e) {
-
-        if ($conn->inTransaction()) {
-            $conn->rollBack();
-        }
-
+        if ($conn->inTransaction()) $conn->rollBack();
         error_log("Login verify OTP error: " . $e->getMessage());
 
-        http_response_code(500);
+        
 
         echo json_encode([
             "error" => true,
             "data" => "An error occurred while verifying your code.",
-            "code" => []
+            "code" => $e->getMessage()
         ]);
 
         exit;

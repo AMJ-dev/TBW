@@ -47,6 +47,7 @@ axiosRetry(http, {
     retryCondition: err => {
         const code = (err as any).code || ''
         const status = err.response?.status
+        
         const method = err.config?.method?.toUpperCase()
         if (method && method !== 'GET') return false
         if (status && status >= 500) return true
@@ -76,6 +77,21 @@ http.interceptors.response.use(
         if (cfg?.showLoading !== false) {
             active = Math.max(0, active - 1)
             notify()
+        }
+
+        if (err.response) {
+            const status = err.response.status
+            const responseData = err.response.data
+            console.log({status})
+            if (status === 401 || status === 403 || status === 405) {
+                if (status === 403 && responseData?.code === 'ACCOUNT_SUSPENDED') {
+                    console.log('Account is suspended:', responseData.data)
+                    window.location.href = '/account-suspended'
+                } else if (status === 405) {
+                    console.log('Invalid token / Method Not Allowed:', responseData?.data)
+                    window.location.href = '/unauthorized'
+                }
+            }
         }
         return Promise.reject(err)
     }

@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LocalFilePicker } from "@/components/ui/local-file-picker";
-import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
+import { PublicFrame, PublicKicker } from "@/components/public-shell";
 
 const steps = [
 	{ key: "company", label: "Company", icon: Building2 },

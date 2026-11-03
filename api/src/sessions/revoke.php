@@ -73,11 +73,6 @@
         ]);
 
     } catch (Throwable $e) {
-
-        error_log("Session revoke error: ".$e->getMessage());
-
-        http_response_code(500);
-
         echo json_encode([
             "error" => true,
             "data" => "An error occurred while revoking the session.",

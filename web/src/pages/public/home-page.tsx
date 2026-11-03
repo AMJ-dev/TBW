@@ -13,7 +13,7 @@ import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PublicFrame, PublicStatus } from "@/components/public/public-shell";
+import { PublicFrame, PublicStatus } from "@/components/public-shell";
 
 const audiences = [
 	[

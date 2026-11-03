@@ -11,7 +11,7 @@ import {
 	PackageCheck,
 	Truck,
 } from "lucide-react";
-import { AppShell, Metric } from "@/components/shell";
+import { AppShell, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { notifications } from "@/data/mock";

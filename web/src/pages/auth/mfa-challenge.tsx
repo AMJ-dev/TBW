@@ -1,4 +1,14 @@
-import { useState, useEffect, useContext, startTransition, type FormEvent } from "react";
+import {
+	useState,
+	useEffect,
+	useContext,
+	useRef,
+	startTransition,
+	type FormEvent,
+	type ChangeEvent,
+	type KeyboardEvent,
+	type ClipboardEvent,
+} from "react";
 import { Link } from "@/components/router-link";
 import { useNavigate } from "react-router-dom";
 import {
@@ -7,7 +17,6 @@ import {
 	KeyRound,
 	LifeBuoy,
 	Loader2,
-	Smartphone,
 } from "lucide-react";
 import { http, type Resp } from "@/lib/httpClient";
 import userContext from "@/lib/userContext";
@@ -34,6 +43,8 @@ export default function MfaChallenge() {
 	const [trustDevice, setTrustDevice] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 	const [mounted, setMounted] = useState(false);
+
+	const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
 	const digits =
 		mode === "verify"
@@ -68,6 +79,12 @@ export default function MfaChallenge() {
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [complete, mode, mounted]);
 
+	useEffect(() => {
+		if (!mounted || mode !== "verify") return;
+		const t = setTimeout(() => inputsRef.current[0]?.focus(), 50);
+		return () => clearTimeout(t);
+	}, [mounted, mode]);
+
 	const formatDeviceInfo = () =>
 		`${deviceInfo.browser} on ${deviceInfo.os} (${deviceInfo.deviceType})`;
 
@@ -75,6 +92,77 @@ export default function MfaChallenge() {
 		locationInfo
 			? `${locationInfo.city}, ${locationInfo.region}, ${locationInfo.country}`
 			: "Unknown";
+
+	const handleChange = (index: number, e: ChangeEvent<HTMLInputElement>) => {
+		const raw = e.target.value.replace(/\D/g, "");
+		if (!raw) return;
+
+		const next = digits.split("");
+		if (raw.length > 1) {
+			const spread = raw.slice(0, 6 - index).split("");
+			spread.forEach((d, i) => {
+				if (index + i < 6) next[index + i] = d;
+			});
+			const joined = next.join("").slice(0, 6);
+			setCode(joined);
+			const focusIdx = Math.min(index + spread.length, 5);
+			inputsRef.current[focusIdx]?.focus();
+			return;
+		}
+
+		const first = raw.charAt(0);
+		if (first) next[index] = first;
+		const joined = next.join("").slice(0, 6);
+		setCode(joined);
+		if (index < 5) inputsRef.current[index + 1]?.focus();
+	};
+
+	const handleKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
+		if (e.key === "Backspace") {
+			e.preventDefault();
+			const next = digits.split("");
+			if (next[index]) {
+				next[index] = "";
+				setCode(next.join(""));
+			} else if (index > 0) {
+				next[index - 1] = "";
+				setCode(next.join(""));
+				inputsRef.current[index - 1]?.focus();
+			}
+			return;
+		}
+		if (e.key === "ArrowLeft" && index > 0) {
+			e.preventDefault();
+			inputsRef.current[index - 1]?.focus();
+		}
+		if (e.key === "ArrowRight" && index < 5) {
+			e.preventDefault();
+			inputsRef.current[index + 1]?.focus();
+		}
+		if (e.key === "Delete") {
+			e.preventDefault();
+			const next = digits.split("");
+			next[index] = "";
+			setCode(next.join(""));
+		}
+	};
+
+	const handlePaste = (index: number, e: ClipboardEvent<HTMLInputElement>) => {
+		e.preventDefault();
+		const pasted = e.clipboardData
+			.getData("text")
+			.replace(/\D/g, "")
+			.slice(0, 6);
+		if (!pasted) return;
+		const next = digits.split("");
+		pasted.split("").forEach((d, i) => {
+			if (index + i < 6) next[index + i] = d;
+		});
+		const joined = next.join("").slice(0, 6);
+		setCode(joined);
+		const focusIdx = Math.min(index + pasted.length, 5);
+		inputsRef.current[focusIdx]?.focus();
+	};
 
 	const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
 		e.preventDefault();
@@ -105,6 +193,7 @@ export default function MfaChallenge() {
 			if (resp.error) {
 				toast.error(resp.data || "Invalid code. Try again.");
 				setCode("");
+				if (mode === "verify") inputsRef.current[0]?.focus();
 				return;
 			}
 
@@ -134,6 +223,7 @@ export default function MfaChallenge() {
 		} catch (error: any) {
 			toast.error(error?.response?.data?.message || "Verification failed. Try again.");
 			setCode("");
+			if (mode === "verify") inputsRef.current[0]?.focus();
 		} finally {
 			setSubmitting(false);
 		}
@@ -174,38 +264,43 @@ export default function MfaChallenge() {
 
 				<form onSubmit={handleSubmit} className="p-6 sm:p-7">
 					{mode === "verify" ? (
-						<label className="block">
+						<div className="block">
 							<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
 								One-time code
 							</span>
+
 							<div className="mt-3 grid grid-cols-6 gap-2">
 								{Array.from({ length: 6 }).map((_, i) => (
-									<div
+									<input
 										key={i}
+										ref={(el) => {
+											inputsRef.current[i] = el;
+										}}
+										type="text"
+										inputMode="numeric"
+										autoComplete={i === 0 ? "one-time-code" : "off"}
+										pattern="[0-9]*"
+										maxLength={1}
+										value={digits[i] ?? ""}
+										onChange={(e) => handleChange(i, e)}
+										onKeyDown={(e) => handleKeyDown(i, e)}
+										onPaste={(e) => handlePaste(i, e)}
+										onFocus={(e) => e.target.select()}
+										aria-label={`Digit ${i + 1}`}
 										className={cn(
-											"grid h-12 place-items-center rounded-md border border-line bg-sand font-mono text-lg font-semibold text-ink transition-colors",
-											digits[i] ? "border-orange/50 bg-orange/10 text-orange" : ""
+											"h-12 w-full rounded-md border border-line bg-sand text-center font-mono text-lg font-semibold text-ink outline-none transition-colors",
+											"focus:border-orange focus:bg-paper focus:ring-2 focus:ring-orange/25",
+											digits[i] &&
+												"border-orange/50 bg-orange/10 text-orange"
 										)}
-									>
-										{digits[i] ?? ""}
-									</div>
+									/>
 								))}
 							</div>
-							<Input
-								autoFocus
-								inputMode="numeric"
-								autoComplete="one-time-code"
-								maxLength={6}
-								value={digits}
-								onChange={(e) => setCode(e.target.value)}
-								placeholder=""
-								aria-label="One-time code"
-								className="sr-only"
-							/>
+
 							<p className="mt-3 text-[11px] leading-5 text-ink-soft">
 								The code refreshes every 30 seconds. If it expires, wait for the next one.
 							</p>
-						</label>
+						</div>
 					) : (
 						<label className="block">
 							<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">

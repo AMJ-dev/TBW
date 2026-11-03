@@ -218,20 +218,11 @@
         exit;
 
     } catch (Throwable $e) {
-
-        if ($conn->inTransaction()) {
-            $conn->rollBack();
-        }
-
-        error_log("Change password error: " . $e->getMessage());
-
-        http_response_code(500);
-
+        if ($conn->inTransaction()) $conn->rollBack();
         echo json_encode([
             "error" => true,
             "data" => "An error occurred while changing your password.",
             "code" => []
         ]);
-
         exit;
     }

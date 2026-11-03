@@ -1,19 +1,10 @@
-import {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-    type PropsWithChildren
-} from "react";
-import UserContext, {
-    type User,
-    type UserRole,
-    type LoginData
-} from "@/lib/userContext";
+import { useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from "react";
+import UserContext, { type User, type UserRole, type LoginData } from "@/lib/userContext";
+import { useLocation } from 'react-router-dom';
 import { http, type Resp } from "@/lib/httpClient";
 
 export default function UserProvider({ children }: PropsWithChildren) {
+    const location = useLocation();
     const [hydrated, setHydrated] = useState(false);
     const [detailsReady, setDetailsReady] = useState(false);
     const [auth, setAuth] = useState(false);
@@ -60,10 +51,8 @@ export default function UserProvider({ children }: PropsWithChildren) {
     }, [clearStorage]);
 
     const updateProfile = useCallback((data: any) => {
-        if (!data?.user || !data?.role) {
-            return false;
-        }
-
+        if (!data?.user || !data?.role) return false;
+        
         const user: User = {
             id: data.user.id,
             email: data.user.email,
@@ -71,7 +60,8 @@ export default function UserProvider({ children }: PropsWithChildren) {
             phone: data.user.phone,
             full_name: data.user.full_name,
             account_type: data.user.account_type,
-            account_status: data.user.account_status
+            account_status: data.user.account_status,
+            organisation_status: data.organisation?.verification_status
         };
 
         const userRole: UserRole = {
@@ -82,12 +72,8 @@ export default function UserProvider({ children }: PropsWithChildren) {
         };
 
         const userRoute = data.route || "/portal";
-        const userPrivileges = Array.isArray(data.privileges)
-            ? data.privileges
-            : [];
-        const userPermissions = Array.isArray(data.permissions)
-            ? data.permissions
-            : [];
+        const userPrivileges = Array.isArray(data.privileges) ? data.privileges : [];
+        const userPermissions = Array.isArray(data.permissions) ? data.permissions : [];
 
         const storage = getStorage();
 
@@ -109,9 +95,9 @@ export default function UserProvider({ children }: PropsWithChildren) {
     }, [getStorage]);
 
     const fetchUser = useCallback(async () => {
-        if (fetchingProfile.current) {
-            return;
-        }
+        const excludedPaths = ['/unauthorized', '/account-suspended', '/401', '/403', '/404', '/429', '/500'];
+
+        if (fetchingProfile.current || excludedPaths.includes(location.pathname)) return;
 
         const storage = getStorage();
         const storedUser = storage.getItem("user");
@@ -124,22 +110,20 @@ export default function UserProvider({ children }: PropsWithChildren) {
         fetchingProfile.current = true;
 
         try {
-            const res: any = await http.get("get-profile/");
+            const res = await http.get("get-profile/");
             const resp: Resp = res.data;
 
             if (resp.error === false && resp.data) {
                 updateProfile(resp.data);
-                // console.log(resp.data.user)
             }
+            else console.log("error")
         } catch (error: any) {
             const status =
                 error?.status ||
                 error?.response?.status ||
                 error?.response?.data?.status;
-
-            if (status === 401) {
-                logout();
-            }
+            console.log({status})
+            if (status === 401 || status === 403 || status === 405) logout();
         } finally {
             fetchingProfile.current = false;
             setDetailsReady(true);
@@ -161,13 +145,8 @@ export default function UserProvider({ children }: PropsWithChildren) {
                 const user = JSON.parse(storedUser);
                 const userRole = JSON.parse(storedRole);
 
-                const userPrivileges = storedPrivileges
-                    ? JSON.parse(storedPrivileges)
-                    : [];
-
-                const userPermissions = storedPermissions
-                    ? JSON.parse(storedPermissions)
-                    : [];
+                const userPrivileges = storedPrivileges ? JSON.parse(storedPrivileges) : [];
+                const userPermissions = storedPermissions ? JSON.parse(storedPermissions) : [];
 
                 setMyDetails(user);
                 setMyID(user.id);
@@ -185,79 +164,40 @@ export default function UserProvider({ children }: PropsWithChildren) {
     }, [clearStorage]);
 
     useEffect(() => {
-        if (!hydrated) {
-            return;
-        }
+        if (!hydrated) return;
 
         fetchUser();
     }, [hydrated, fetchUser]);
 
     useEffect(() => {
-        if (!hydrated) {
-            return;
-        }
+        if (!hydrated) return;
 
         const handleVisibilityChange = () => {
-            if (document.visibilityState === "visible") {
-                fetchUser();
-            }
+            if (document.visibilityState === "visible") fetchUser();
         };
 
-        const handleFocus = () => {
-            fetchUser();
-        };
+        const handleFocus = () => fetchUser();
 
-        document.addEventListener(
-            "visibilitychange",
-            handleVisibilityChange
-        );
-
+        document.addEventListener("visibilitychange", handleVisibilityChange);
         window.addEventListener("focus", handleFocus);
 
         return () => {
-            document.removeEventListener(
-                "visibilitychange",
-                handleVisibilityChange
-            );
-
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
             window.removeEventListener("focus", handleFocus);
         };
     }, [hydrated, fetchUser]);
 
     const login = useCallback(async (data: LoginData) => {
-        const storage = data.remember
-            ? localStorage
-            : sessionStorage;
+        const storage = data.remember ? localStorage : sessionStorage;
 
-        storage.setItem(
-            "remember",
-            data.remember ? "1" : "0"
-        );
+        storage.setItem("remember", data.remember ? "1" : "0");
 
-        storage.setItem(
-            "user",
-            JSON.stringify(data.user)
-        );
+        storage.setItem("user", JSON.stringify(data.user));
+        storage.setItem("role", JSON.stringify(data.role));
+        storage.setItem("route", data.route);
 
-        storage.setItem(
-            "role",
-            JSON.stringify(data.role)
-        );
-
-        storage.setItem(
-            "route",
-            data.route
-        );
-
-        storage.setItem(
-            "privileges",
-            JSON.stringify(data.privileges)
-        );
-
-        storage.setItem(
-            "permissions",
-            JSON.stringify(data.permissions)
-        );
+        storage.setItem("privileges", JSON.stringify(data.privileges));
+        storage.setItem("permissions", JSON.stringify(data.permissions));
 
         if (data.remember) {
             sessionStorage.removeItem("remember");
@@ -282,16 +222,12 @@ export default function UserProvider({ children }: PropsWithChildren) {
         setPrivileges(data.privileges || []);
         setPermissions(data.permissions || []);
         setAuth(true);
-
         await fetchUser();
     }, [fetchUser]);
 
     const hasPermission = useCallback(
         (permission: string) => {
-            if (role?.key === "system_admin") {
-                return true;
-            }
-
+            if (role?.key === "system_admin") return true;
             return permissions.includes(permission);
         },
         [role, permissions]
@@ -299,36 +235,23 @@ export default function UserProvider({ children }: PropsWithChildren) {
 
     const hasAnyPermission = useCallback(
         (required: string[]) => {
-            if (role?.key === "system_admin") {
-                return true;
-            }
-
-            return required.some(permission =>
-                permissions.includes(permission)
-            );
+            if (role?.key === "system_admin") return true;
+            return required.some(permission => permissions.includes(permission));
         },
         [role, permissions]
     );
 
     const hasAllPermissions = useCallback(
         (required: string[]) => {
-            if (role?.key === "system_admin") {
-                return true;
-            }
-
-            return required.every(permission =>
-                permissions.includes(permission)
-            );
+            if (role?.key === "system_admin") return true;
+            return required.every(permission => permissions.includes(permission));
         },
         [role, permissions]
     );
 
     const hasPrivilege = useCallback(
         (privilege: string) => {
-            if (role?.key === "system_admin") {
-                return true;
-            }
-
+            if (role?.key === "system_admin") return true;
             return privileges.includes(privilege);
         },
         [role, privileges]

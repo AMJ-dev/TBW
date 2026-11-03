@@ -18,7 +18,7 @@ import {
 	Truck,
 } from "lucide-react";
 import { toast } from "sonner";
-import { AppShell, Metric, StatusBadge, statusTone } from "@/components/shell";
+import { AppShell, Metric, StatusBadge, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { cargoRecords, documents, timeline } from "@/data/mock";
 

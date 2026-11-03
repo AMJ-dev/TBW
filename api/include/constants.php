@@ -1,8 +1,7 @@
 <?php
     require_once dirname(__DIR__, 1)."/env.php";
     $date_time=date("Y-m-d");
-    $AppName = "EVCarsNG";
-    $admin_email = "admin@evcarsng.com";
+    $AppName = "TRÏNŪ";
     $currency_sign='₦';
     $currency='NGN';
     $country = "NG";
@@ -15,15 +14,16 @@
 
     $route_map = [
         "system_admin" => "/admin",
-        "organisation_owner" => "/dashboard",
-        "management" => "/dashboard",
-        "finance" => "/finance",
-        "terminal_operations" => "/operations",
-        "gate_officer" => "/gate",
-        "warehouse_yard_officer" => "/warehouse",
-        "documentation_officer" => "/documents",
-        "customer_service_sales" => "/customer-service",
-        "compliance_customs_liaison" => "/compliance",
-        "regulator_auditor" => "/reports",
-        "portal_user" => "/portal"
+        "terminal_operations" => "/admin",
+        "gate_officer" => "/admin",
+        "warehouse_yard_officer" => "/admin",
+        "documentation_officer" => "/admin",
+
+        "organisation_owner" => "/operations",
+        "management" => "/operations",
+        "finance" => "/operations",
+        "customer_service_sales" => "/operations",
+        "compliance_customs_liaison" => "/operations",
+        "regulator_auditor" => "/operations",
+        "portal_user" => "/operations"
     ];

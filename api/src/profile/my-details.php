@@ -105,19 +105,10 @@
         exit;
 
     } catch (Throwable $e) {
-
-        error_log(
-            "My profile error: " .
-            $e->getMessage()
-        );
-
-        http_response_code(500);
-
         echo json_encode([
             "error" => true,
             "data" => "An error occurred while loading your profile.",
             "code" => []
         ]);
-
         exit;
     }

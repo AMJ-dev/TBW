@@ -18,6 +18,19 @@
         echo json_encode(["error"=>true, "data"=>"Invalid Token"]);
         die(); 
     }
+    function account_suspended() { 
+        header($_SERVER['SERVER_PROTOCOL'] . ' 403 Forbidden');
+        echo json_encode([
+            "error" => true, 
+            "code" => "ACCOUNT_SUSPENDED",
+            "data" => "Account Suspended"
+        ]);
+        die(); 
+    }
+    function is_valid_phone(string $phone): bool {
+        $cleaned = preg_replace('/[^\d+]/', '', $phone);
+        return (bool) preg_match('/^(?:\+234|234|0)[789]\d{9}$|^\+?[1-9]\d{1,14}$/', $cleaned);
+    }
     function no_permision(){ 
         header($_SERVER['SERVER_PROTOCOL'] . ' 403 Forbidden');
         echo json_encode(["error"=>true, "data"=>"You don't have enough permission to access this Resources"]);
@@ -29,7 +42,6 @@
     function humandatetime($timestamp){
         return date("F jS, Y h:i A", strtotime($timestamp));
     }
-
     function rm_special_char($char){
         return preg_replace("/[^a-zA-Z0-9\.]/", "1", $char);
     }
@@ -49,7 +61,6 @@
         } else $data="Invalid file";
         return ["error"=>$error, "data"=>$data];
     } 
-        
     function upload_multiple_files($file, $i, $accepted){ 
         $error=true;
         $target_path = gen_filename($file["name"][$i]); 
@@ -104,7 +115,7 @@
     }
     function send_email($to, $name, $subject, $message, $reply_to="", $reply_name="", $attachment=[]){
         global $baseURL, $AppName, $sender_email, $comp_logo, $email_host, $email_port, $email_user, $email_password;  
-   
+
         $template = file_get_contents(__DIR__."/email/index.tpl");
         $template = str_replace("<!-- #{AppName} -->", $AppName, $template);
         $template = str_replace("<!-- #{comp_logo} -->", $comp_logo, $template);
@@ -127,14 +138,14 @@
             $mail->Username   = $email_user;                    
             $mail->Password   = $email_password; 
             $mail->Sender = $sender_email;    
-            $mail->From     = $email_user;
+            $mail->From     = $sender_email;
             $mail->FromName = $AppName;                         
             $mail->Subject = $subject;
             $mail->Body    = $template;
             $mail->addAddress($to, $name);
             
             if(!empty($reply_to)) $mail->addReplyTo($reply_to, $reply_name);  
-            else $mail->addReplyTo($email_user, $AppName);
+            else $mail->addReplyTo($sender_email, $AppName);
             if (is_array($attachment) && isset($attachment['path']) && file_exists($attachment['path'])) {
                 $name = isset($attachment['name']) ? $attachment['name'] : basename($attachment['path']);
                 $mail->addAttachment($attachment['path'], $name);
@@ -148,10 +159,47 @@
                 $mail->clearCustomHeaders();
                 return $is_send;
             } catch (\Throwable $th) {
-                //throw $th;
+                throw $th;
             }
         } catch (Exception $e) {
             echo "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
+        }
+    }
+    function update_integration_setting(string $encryptionKey): bool {
+        global $conn,$redis;
+
+        $q = $conn->prepare("
+            SELECT
+                a.adapter_key,
+                c.field_key,
+                c.encrypted_value
+            FROM integration_credentials c
+            INNER JOIN integration_adapters a ON a.id = c.integration_id
+            WHERE a.adapter_key IN ('email_provider', 'sms_provider')
+        ");
+        $q->execute();
+
+        $settings = [];
+
+        foreach ($q->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $encryptedValue = base64_decode((string) $row['encrypted_value'], true);
+            if ($encryptedValue === false || strlen($encryptedValue) < 29) continue;
+
+            $iv = substr($encryptedValue, 0, 12);
+            $tag = substr($encryptedValue, 12, 16);
+            $ciphertext = substr($encryptedValue, 28);
+
+            $value = openssl_decrypt($ciphertext, 'aes-256-gcm', $encryptionKey, OPENSSL_RAW_DATA, $iv, $tag);
+
+            if ($value === false) continue;
+            $settings[(string) $row['adapter_key']][(string) $row['field_key']] = $value;
+        }
+
+        try {
+            $redis->setex('trinu:integration_settings:v1', 300, json_encode($settings, JSON_THROW_ON_ERROR));
+            return true;
+        } catch (Throwable $e) {
+            return false;
         }
     }
     function generateId(){
@@ -207,6 +255,17 @@
             $user = $get_user->fetch(PDO::FETCH_OBJ);
             if(!isset($user->middle_name) || empty($user->middle_name)) $user->middle_name="";
             unset($user->passord);
+            $get_org = $conn->prepare("SELECT * FROM organisations WHERE id=:organisation_id");
+            $get_org->execute([":organisation_id"=>$user->organisation_id]);
+            if($get_org->rowCount()>0) {
+                $organisation = $get_org->fetch(PDO::FETCH_OBJ);
+                unset($organisation->verified_by);
+                unset($organisation->verified_at);
+                unset($organisation->rejection_reason);
+                unset($organisation->created_at);
+                unset($organisation->updated_at);
+                $user->organisation = $organisation;
+            }
         }
         return $user;
     }
@@ -230,33 +289,24 @@
         $len  = floor(strlen($name)/2);
         return substr($name,0, $len) . str_repeat('*', $len) . "@" . end($em);
     }
-
-
+    function hide_phone(string $phone): string {
+        $cleaned = preg_replace('/[^\d+]/', '', $phone);
+        $len = strlen($cleaned);
+        if ($len <= 4) return str_repeat('*', $len);
+        $visible_tail = substr($cleaned, -3);
+        $masked_part = str_repeat('*', $len - 3);
+        
+        return $masked_part . $visible_tail;
+    }
     function getUserIP(): string {
-        $keys = [
-            'HTTP_CF_CONNECTING_IP',   // Cloudflare
-            'HTTP_X_REAL_IP',          // Nginx proxy
-            'HTTP_X_FORWARDED_FOR',    // Standard proxy header (may contain multiple IPs)
-            'HTTP_X_FORWARDED',
-            'HTTP_FORWARDED_FOR',
-            'HTTP_FORWARDED',
-            'HTTP_CLIENT_IP',
-            'REMOTE_ADDR'
-        ];
-
+        $keys = ['HTTP_CF_CONNECTING_IP','HTTP_X_REAL_IP','HTTP_X_FORWARDED_FOR','HTTP_X_FORWARDED','HTTP_FORWARDED_FOR','HTTP_FORWARDED','HTTP_CLIENT_IP','REMOTE_ADDR'];
         foreach ($keys as $key) {
             if (!empty($_SERVER[$key])) {
-                // Handle comma-separated list (e.g., X-Forwarded-For: client, proxy1, proxy2)
                 $ip = trim(explode(',', $_SERVER[$key])[0]);
-                
-                // Validate IP format
-                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
-                    return $ip;
-                }
+                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) return $ip;
             }
         }
-        
-        return '0.0.0.0'; // Fallback
+        return '0.0.0.0'; 
     }
     function save_activity_log($action, $entity, $entity_name, $user_email){
         global $conn;

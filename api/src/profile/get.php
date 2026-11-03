@@ -9,7 +9,7 @@
                 "error" => true,
                 "data" => "Your system account does not have an assigned role.",
                 "code" => []
-            ]);
+            ]); 
             exit;
         }
 
@@ -62,7 +62,6 @@
                 "data" => "Your organisation could not be found.",
                 "code" => []
             ]);
-            http_response_code(401);
             exit;
         }
 
@@ -108,7 +107,6 @@
             "data" => "Your account does not have an active role.",
             "code" => []
         ]);
-        http_response_code(401);
         exit;
     }
 
@@ -140,20 +138,12 @@
     foreach ($permission_rows as $permission) {
         $permissions[] = $permission["permission_key"];
 
-        if (!in_array($permission["module"], $privileges, true)) {
-            $privileges[] = $permission["module"];
-        }
+        if (!in_array($permission["module"], $privileges, true)) $privileges[] = $permission["module"];
     }
 
-    if (
-        $my_details->account_type === "organisation" &&
-        $organisation &&
-        $organisation["verification_status"] === "rejected"
-    ) {
-        $route = "/organisation/review";
-    } else {
-        $route = $route_map[$role_key] ?? "/portal";
-    }
+    if ($my_details->account_type === "organisation" && $organisation && $organisation["verification_status"] === "rejected") $route = "/organisation/review";
+    else if($my_details->account_type === "system") $route = "/admin";
+    else $route = "/portal";
 
     echo json_encode([
         "error" => false,

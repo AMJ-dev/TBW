@@ -111,15 +111,7 @@
         ]);
 
     } catch (Throwable $e) {
-
-        if ($conn->inTransaction()) {
-            $conn->rollBack();
-        }
-
-        error_log("Profile update error: " . $e->getMessage());
-
-        http_response_code(500);
-
+        if ($conn->inTransaction()) $conn->rollBack();
         echo json_encode([
             "error" => true,
             "data" => "An error occurred while updating your profile.",

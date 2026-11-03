@@ -2,6 +2,7 @@ import { useContext } from "react";
 import moment from "moment";
 import UserContext from "@/lib/userContext";
 import { api_url } from "@/lib/constants";
+import { toast } from "sonner";
 
 export const check_login = ()=>{
 	const {login} = useContext(UserContext);
@@ -16,6 +17,10 @@ export const get_token = ()=>{
         : sessionStorage.getItem("token");
     
     return token;
+}
+export const copy_text = (text:string)=>{
+    navigator.clipboard.writeText(text);
+    toast.success("Text copied to clipboard");
 }
 export const resolveSrc = (s: string) => {
     const ASSET_BASE = (api_url as string)?.replace(/\/+$/, "") || "";
@@ -77,3 +82,11 @@ export function short_numbers(num: number): string {
 
     return num.toString();
 }
+export const statusLabel = (status?: string | null): string => {
+    if (!status) return "Unknown";
+    return status
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2") 
+        .replace(/[_-]+/g, " ")                
+        .toLowerCase()                         
+        .replace(/\b\w/g, (value) => value.toUpperCase()); 
+};

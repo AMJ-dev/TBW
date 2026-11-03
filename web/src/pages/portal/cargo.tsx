@@ -8,7 +8,7 @@ import {
 	FileText,
 	Search,
 } from "lucide-react";
-import { AppShell, Metric, StatusBadge, statusTone } from "@/components/shell";
+import { AppShell, Metric, StatusBadge, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cargoRecords, type CargoRecord } from "@/data/mock";

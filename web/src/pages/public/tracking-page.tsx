@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cargoRecords } from "@/data/mock";
 import type { CargoRecord } from "@/data/mock";
-import { PublicFrame, PublicKicker, PublicStatus } from "@/components/public/public-shell";
+import { PublicFrame, PublicKicker, PublicStatus } from "@/components/public-shell";
 
 const suggestedRefs = ["TRIU1234564", "TRN-BL-2026-008721", "TRN-IMP-002481"];
 

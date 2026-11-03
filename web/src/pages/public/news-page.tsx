@@ -3,7 +3,7 @@ import { Link } from "@/components/router-link";
 import { ArrowRight, Bell, Calendar, Check, Clock3, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { PublicFrame, PublicKicker } from "@/components/public/public-shell";
+import { PublicFrame, PublicKicker } from "@/components/public-shell";
 
 const notices = [
 	{
