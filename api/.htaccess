@@ -184,3 +184,4 @@ RewriteRule ^operator/receiving/details/([0-9a-zA-Z-]+)/$ src/receiving/details.
 RewriteRule ^operator/yards/$ src/yards/all.php [NC]
 RewriteRule ^operator/yards/save/$ src/yards/save.php [NC]
 RewriteRule ^operator/yards/search/$ src/yards/search.php [NC]
+RewriteRule ^operator/yards/equipments/$ src/yards/equipments.php [NC]

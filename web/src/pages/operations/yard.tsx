@@ -4,14 +4,14 @@ import {
 	ArrowLeft,
 	ArrowRight,
 	CheckCircle2,
-	ChevronDown,
 	Download,
-	Filter,
 	Grid2X2,
 	Plus,
 	RefreshCw,
 	Search,
 	Truck,
+	Container,
+	MapPin,
 } from "lucide-react";
 import {
 	AppShell,
@@ -22,8 +22,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import {http, type Resp} from "@/lib/httpClient";
+import { http, type Resp } from "@/lib/httpClient";
+import YardMovementDetailsDrawer from "@/components/yard-movement-details-drawer";
 
+interface YardEquipment {
+	id: string;
+	equipment_name: string;
+	equipment_type: string;
+	operational_status: string;
+}
+
+interface ContainerMovementAssignment {
+	destination: string;
+	equipmentId: string;
+}
 type MovementStatus =
 	| "Positioned"
 	| "Moving"
@@ -36,7 +48,7 @@ type MovementType =
 	| "EXAMINATION_TO_YARD"
 	| "WAREHOUSE_TO_YARD";
 
-	interface YardShipment {
+interface YardShipment {
     shipment_id: string;
     shipment_reference: string;
     shipment_type: string;
@@ -75,8 +87,19 @@ interface YardLocation {
 	capacity_unit?: string;
 }
 
+interface YardMovementLog {
+	id?: string;
+	action?: string;
+	description?: string;
+	previous_location_name?: string;
+	new_location_name?: string;
+	performed_by?: string;
+	performed_at?: string;
+}
+
 interface YardMovementItem {
 	id: string;
+	containerId: string;
 	billOfLading: string;
 	shipmentReference: string;
 	containerNo: string;
@@ -90,6 +113,42 @@ interface YardMovementItem {
 	status: MovementStatus | string;
 	timestamp: string;
 	blockedBy?: string;
+	containerSize: string;
+	sealNo: string;
+	equipmentCode: string;
+	equipmentType: string;
+	registrationNumber: string;
+	movementReference: string;
+	shipmentId: string;
+	containerStatus: string;
+	logs: YardMovementLog[];
+
+	movement_reference?: string;
+	shipment_reference?: string;
+	bill_of_lading?: string;
+	container_no?: string;
+	container_size?: string;
+	seal_no?: string;
+	container_status?: string;
+	movement_type?: string;
+	from_location_name?: string;
+	to_location_name?: string;
+	to_location_code?: string;
+	equipment_name?: string;
+	equipment_code?: string;
+	equipment_type?: string;
+	registration_number?: string;
+	operator_name?: string;
+	moved_by?: string;
+	remarks?: string;
+	completed_at?: string;
+	created_at?: string;
+	bookingNumber?: string;
+	vesselName?: string;
+	voyageNumber?: string;
+	shippingLine?: string;
+	grossWeight?: string;
+	cargoDescription?: string;
 }
 
 interface ContainerMovementDraft {
@@ -115,6 +174,11 @@ interface YardSearchContainer extends YardMovementItem {
 	shipping_line?: string;
 	container_size?: string;
 	seal_no?: string;
+	bookingNumber: string;
+	vesselName: string;
+	voyageNumber: string;
+	shippingLine: string;
+	grossWeight: string;
 }
 
 const labelClass =
@@ -125,15 +189,8 @@ const MOVEMENT_LABELS: Record<string, string> = {
 	YARD_TRANSFER: "Yard Transfer",
 	EXAMINATION_TO_YARD: "Examination to Yard",
 	WAREHOUSE_TO_YARD: "Warehouse to Yard",
+	YARD_PLACEMENT: "Yard Placement",
 };
-
-const STATUS_FILTERS = [
-	"ALL",
-	"Positioned",
-	"Moving",
-	"Pending equipment",
-	"Blocked",
-] as const;
 
 const REASON_OPTIONS = [
 	"Inbound arrival and receiving check",
@@ -142,7 +199,12 @@ const REASON_OPTIONS = [
 	"Hold repositioning",
 	"Quarantine transfer",
 ];
-
+const normalizeEquipment = (item: any): YardEquipment => ({
+	id: getString(item.id),
+	equipment_name: getString(item.equipment_name),
+	equipment_type: getString(item.equipment_type),
+	operational_status: getString(item.operational_status),
+});
 const getArray = <T,>(value: unknown): T[] => {
 	if (Array.isArray(value)) return value as T[];
 
@@ -182,46 +244,73 @@ const normalizeLocation = (item: any): YardLocation => ({
 	capacity_unit: getString(item.capacity_unit, "TEU"),
 });
 
-const normalizeMovement = (item: any): YardMovementItem => ({
-	id: getString(item.id ?? item.movement_id),
-	billOfLading: getString(
-		item.bill_of_lading ?? item.billOfLading
-	),
-	shipmentReference: getString(
-		item.shipment_reference ?? item.shipmentReference
-	),
-	containerNo: getString(
-		item.container_no ?? item.container_number ?? item.containerNo
-	),
-	movementType: getString(
-		item.movement_type ?? item.movementType
-	),
-	gateLane: getString(item.gate_lane ?? item.gateLane),
-	originSlot: getString(
-		item.origin_location_name ??
-			item.origin_name ??
-			item.origin_slot ??
-			item.originSlot
-	),
-	targetSlot: getString(
-		item.destination_location_name ??
-			item.destination_name ??
-			item.target_slot ??
-			item.targetSlot
-	),
-	equipment: getString(
-		item.equipment_name ?? item.equipment
-	),
-	operator: getString(
-		item.operator_name ?? item.operator
-	),
-	reason: getString(item.reason ?? item.remarks),
-	status: getString(item.status, "Pending equipment"),
-	timestamp: getString(
-		item.created_at ?? item.moved_at ?? item.completed_at ?? item.timestamp
-	),
-	blockedBy: getString(item.blocked_by ?? item.blockedBy),
-});
+const normalizeMovement = (item: any): YardMovementItem => {
+    const logs = Array.isArray(item.logs) ? item.logs : [];
+    const firstLog = logs[0];
+    const origin =
+        item.from_location_name ??
+        firstLog?.previous_location_name ??
+        "Container Receiving Bay";
+
+    return {
+        id: getString(item.id ?? item.movement_id),
+        containerId: getString(item.container_id),
+        billOfLading: getString(item.bill_of_lading),
+        shipmentReference: getString(item.shipment_reference),
+        containerNo: getString(item.container_no),
+        movementType: getString(item.movement_type, "YARD_PLACEMENT"),
+        gateLane: getString(item.gate_lane),
+        originSlot: getString(origin),
+        targetSlot: getString(item.to_location_name),
+        equipment: getString(item.equipment_name),
+        operator: getString(
+            item.operator_name ?? item.moved_by,
+            "Not recorded"
+        ),
+		bookingNumber: getString(item.booking_number),
+		vesselName: getString(item.vessel_name),
+		voyageNumber: getString(item.voyage_number),
+		shippingLine: getString(item.shipping_line),
+		grossWeight: getString(item.gross_weight),
+		cargoDescription: getString(item.cargo_description),
+        reason: getString(item.remarks),
+        status: getString(item.container_status, "UNKNOWN"),
+        timestamp: getString(item.completed_at ?? item.created_at),
+        blockedBy: "",
+        containerSize: getString(item.container_size ?? item.size),
+        sealNo: getString(item.seal_no),
+        equipmentCode: getString(item.equipment_code),
+        equipmentType: getString(item.equipment_type),
+        registrationNumber: getString(item.registration_number),
+        movementReference: getString(item.movement_reference),
+        shipmentId: getString(item.shipment_id),
+        containerStatus: getString(item.container_status),
+        logs,
+
+        // Drawer compatibility fields
+        movement_reference: getString(item.movement_reference),
+        shipment_reference: getString(item.shipment_reference),
+        bill_of_lading: getString(item.bill_of_lading),
+        container_no: getString(item.container_no),
+        container_size: getString(item.container_size ?? item.size),
+        seal_no: getString(item.seal_no),
+        container_status: getString(item.container_status),
+        movement_type: getString(item.movement_type, "YARD_PLACEMENT"),
+        from_location_name: getString(origin),
+        to_location_name: getString(item.to_location_name),
+        to_location_code: getString(item.to_location_code),
+        equipment_name: getString(item.equipment_name),
+        equipment_code: getString(item.equipment_code),
+        equipment_type: getString(item.equipment_type),
+        registration_number: getString(item.registration_number),
+        operator_name: getString(item.operator_name),
+        moved_by: getString(item.moved_by),
+        remarks: getString(item.remarks),
+        completed_at: getString(item.completed_at),
+        created_at: getString(item.created_at),
+    };
+};
+
 const normalizeYardShipment = (item: any): YardShipment => ({
     shipment_id: getString(item.shipment_id),
     shipment_reference: getString(item.shipment_reference),
@@ -289,22 +378,28 @@ const normalizeYardSearchContainer = (item: any): YardSearchContainer => ({
 	shipping_line: getString(item.shipping_line),
 	container_size: getString(item.container_size),
 	seal_no: getString(item.seal_no),
+	containerSize: getString(item.container_size),
+	sealNo: getString(item.seal_no),
+	equipmentCode: "",
+	equipmentType: "",
+	registrationNumber: "",
+	movementReference: getString(item.last_movement_reference),
+	containerStatus: getString(item.container_status ?? item.receiving_status),
+	logs: [],
+	bookingNumber: getString(item.booking_number),
+	vesselName: getString(item.vessel_name),
+	voyageNumber: getString(item.voyage_number),
+	shippingLine: getString(item.shipping_line),
+	grossWeight: getString(item.gross_weight ?? item.actual_weight),
 });
 
-const getLocationLabel = (location: YardLocation) =>
-	[location.code, location.name].filter(Boolean).join(" · ");
+const getLocationLabel = (location: YardLocation) => [location.code, location.name].filter(Boolean).join(" · ");
 
 const getMovementLabel = (movementType: string) =>
-	MOVEMENT_LABELS[movementType] ?? movementType.replaceAll("_", " ");
-
-const getMovementType = (location: string): MovementType => {
-	const value = location.toLowerCase();
-
-	if (value.includes("examination")) return "EXAMINATION_TO_YARD";
-	if (value.includes("warehouse")) return "WAREHOUSE_TO_YARD";
-
-	return "YARD_TRANSFER";
-};
+	MOVEMENT_LABELS[movementType] ??
+	(movementType
+		? movementType.replaceAll("_", " ")
+		: "Yard Placement");
 
 export default function OperationsYardRoute() {
 	const [movements, setMovements] = useState<YardMovementItem[]>([]);
@@ -312,10 +407,17 @@ export default function OperationsYardRoute() {
 	const [loading, setLoading] = useState(true);
 	const [loadingLocations, setLoadingLocations] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
-	const [statusFilter, setStatusFilter] =
-		useState<string>("ALL");
 	const [view, setView] = useState<"list" | "intake">("list");
+	const [yardEquipment, setYardEquipment] = useState<YardEquipment[]>([]);
+	const [loadingEquipment, setLoadingEquipment] = useState(false);
+	const [selectedMovement, setSelectedMovement] = useState<YardMovementItem | null>(null);
 
+	const [movementDrawerOpen, setMovementDrawerOpen] = useState(false);
+
+	const handleMovementClick = (movement: YardMovementItem) => {
+		setSelectedMovement(movement);
+		setMovementDrawerOpen(true);
+	};
 	const fetchMovements = useCallback(async () => {
 		try {
 			setLoading(true);
@@ -343,6 +445,44 @@ export default function OperationsYardRoute() {
 			setMovements([]);
 		} finally {
 			setLoading(false);
+		}
+	}, []);
+
+	const fetchYardEquipment = useCallback(async () => {
+		try {
+			setLoadingEquipment(true);
+
+			const response = await http.get("/operator/yards/equipments/");
+			const resp: Resp = response.data;
+
+			if (resp.error) {
+				throw new Error(
+					typeof resp.data === "string"
+						? resp.data
+						: "Could not load available equipment."
+				);
+			}
+
+			const data = resp.data as { equipments?: any[] };
+
+			setYardEquipment(
+				(Array.isArray(data?.equipments) ? data.equipments : [])
+					.map(normalizeEquipment)
+					.filter(
+						(item) =>
+							item.id &&
+							item.operational_status === "AVAILABLE"
+					)
+			);
+		} catch (error: any) {
+			toast.error(
+				error?.response?.data?.data ||
+					error?.message ||
+					"Could not load available equipment."
+			);
+			setYardEquipment([]);
+		} finally {
+			setLoadingEquipment(false);
 		}
 	}, []);
 
@@ -393,7 +533,8 @@ export default function OperationsYardRoute() {
 	useEffect(() => {
 		void fetchMovements();
 		void fetchYardLocations();
-	}, [fetchMovements, fetchYardLocations]);
+		void fetchYardEquipment();
+	}, [fetchMovements, fetchYardLocations, fetchYardEquipment]);
 
 	const filteredMovements = useMemo(() => {
 		const query = searchQuery.trim().toLowerCase();
@@ -414,37 +555,9 @@ export default function OperationsYardRoute() {
 				.join(" ")
 				.toLowerCase();
 
-			const matchesQuery =
-				!query || searchable.includes(query);
-
-			const matchesStatus =
-				statusFilter === "ALL" ||
-				movement.status === statusFilter;
-
-			return matchesQuery && matchesStatus;
+			return !query || searchable.includes(query);
 		});
-	}, [movements, searchQuery, statusFilter]);
-
-	const activeEquipmentCount = new Set(
-		movements
-			.filter(
-				(movement) =>
-					movement.status === "Moving" ||
-					movement.status === "Positioned"
-			)
-			.map((movement) => movement.equipment)
-			.filter(Boolean)
-	).size;
-
-	const pendingCount = movements.filter(
-		(movement) =>
-			movement.status === "Pending equipment" ||
-			movement.status === "Moving"
-	).length;
-
-	const blockedCount = movements.filter(
-		(movement) => movement.status === "Blocked"
-	).length;
+	}, [movements, searchQuery]);
 
 	const handleExport = () => {
 		if (!movements.length) {
@@ -502,6 +615,42 @@ export default function OperationsYardRoute() {
 		URL.revokeObjectURL(url);
 	};
 
+	const yardMetrics = useMemo(() => {
+		const latestByContainer = new Map<string, YardMovementItem>();
+
+		const sortedMovements = [...movements].sort(
+			(a, b) =>
+				new Date(b.timestamp.replace(" ", "T")).getTime() -
+				new Date(a.timestamp.replace(" ", "T")).getTime()
+		);
+
+		sortedMovements.forEach((movement) => {
+			const key = movement.containerId || movement.containerNo;
+
+			if (key && !latestByContainer.has(key)) {
+				latestByContainer.set(key, movement);
+			}
+		});
+
+		const currentYardContainers = Array.from(
+			latestByContainer.values()
+		).filter((movement) => movement.status === "IN_YARD");
+
+		const occupiedLocations = new Set(
+			currentYardContainers
+				.map((movement) => movement.targetSlot)
+				.filter(Boolean)
+		);
+
+		return {
+			totalMovements: movements.length,
+			availableEquipment: yardEquipment.length,
+			containersInYard: currentYardContainers.length,
+			occupiedLocations: occupiedLocations.size,
+		};
+	}, [movements, yardEquipment]);
+	
+	
 	return (
 		<AppShell
 			title="Yard Management"
@@ -513,23 +662,20 @@ export default function OperationsYardRoute() {
 						movements={movements}
 						filteredMovements={filteredMovements}
 						searchQuery={searchQuery}
-						statusFilter={statusFilter}
 						loading={loading}
 						onSearchChange={setSearchQuery}
-						onStatusChange={setStatusFilter}
 						onNewMovement={() => setView("intake")}
 						onExport={handleExport}
 						onRefresh={fetchMovements}
-						metrics={{
-							activeEquipmentCount,
-							pendingCount,
-							blockedCount,
-						}}
+						metrics={yardMetrics}
+						onMovementClick={handleMovementClick}
 					/>
 				) : (
 					<IntakeView
 						yardLocations={yardLocations}
 						loadingLocations={loadingLocations}
+						yardEquipment={yardEquipment}
+						loadingEquipment={loadingEquipment}
 						onCancel={() => setView("list")}
 						onSaved={async () => {
 							await fetchMovements();
@@ -538,6 +684,15 @@ export default function OperationsYardRoute() {
 					/>
 				)}
 			</div>
+
+			<YardMovementDetailsDrawer
+				open={movementDrawerOpen}
+				onClose={() => {
+					setMovementDrawerOpen(false);
+					setSelectedMovement(null);
+				}}
+				movement={selectedMovement}
+			/>
 		</AppShell>
 	);
 }
@@ -545,53 +700,55 @@ function ListView({
 	movements,
 	filteredMovements,
 	searchQuery,
-	statusFilter,
 	loading,
 	onSearchChange,
-	onStatusChange,
 	onNewMovement,
 	onExport,
 	onRefresh,
 	metrics,
+	onMovementClick
 }: {
 	movements: YardMovementItem[];
 	filteredMovements: YardMovementItem[];
 	searchQuery: string;
-	statusFilter: string;
 	loading: boolean;
 	onSearchChange: (value: string) => void;
-	onStatusChange: (value: string) => void;
 	onNewMovement: () => void;
 	onExport: () => void;
 	onRefresh: () => Promise<void>;
+	onMovementClick: (movement: YardMovementItem) => void;
 	metrics: {
-		activeEquipmentCount: number;
-		pendingCount: number;
-		blockedCount: number;
+		totalMovements: number;
+		availableEquipment: number;
+		containersInYard: number;
+		occupiedLocations: number;
 	};
 }) {
 	return (
 		<div className="space-y-6">
-			<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+			<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
 				<Metric
 					label="Total Movements"
-					value={String(movements.length)}
+					value={String(metrics.totalMovements)}
 					icon={Grid2X2}
 				/>
+
 				<Metric
-					label="Active Equipment"
-					value={String(metrics.activeEquipmentCount)}
+					label="Available Equipment"
+					value={String(metrics.availableEquipment)}
 					icon={Truck}
 				/>
+
 				<Metric
-					label="Pending Movements"
-					value={String(metrics.pendingCount)}
-					icon={RefreshCw}
+					label="Containers in Yard"
+					value={String(metrics.containersInYard)}
+					icon={Container}
 				/>
+
 				<Metric
-					label="Blocked Movements"
-					value={String(metrics.blockedCount)}
-					icon={Filter}
+					label="Occupied Yard Locations"
+					value={String(metrics.occupiedLocations)}
+					icon={MapPin}
 				/>
 			</div>
 
@@ -647,23 +804,6 @@ function ListView({
 						/>
 					</div>
 
-					<div className="flex flex-wrap gap-2">
-						{STATUS_FILTERS.map((status) => (
-							<button
-								type="button"
-								key={status}
-								onClick={() => onStatusChange(status)}
-								className={cn(
-									"rounded-full border px-3 py-2 text-xs font-medium transition-colors",
-									statusFilter === status
-										? "border-orange bg-orange text-white"
-										: "border-line text-ink-soft hover:border-orange/50 hover:text-ink",
-								)}
-							>
-								{status === "ALL" ? "All" : status}
-							</button>
-						))}
-					</div>
 				</div>
 
 				<div className="overflow-x-auto">
@@ -703,8 +843,9 @@ function ListView({
 							) : (
 								filteredMovements.map((movement) => (
 									<tr
-										key={movement.id}
-										className="transition-colors hover:bg-sand/30"
+									  	key={movement.id}
+										onClick={() => onMovementClick(movement)}
+										className="cursor-pointer transition-colors hover:bg-sand/60"
 									>
 										<td className="px-4 py-4">
 											<p className="font-medium text-ink">
@@ -741,7 +882,11 @@ function ListView({
 
 										<td className="px-4 py-4">
 											<StatusBadge
-												label={movement.status}
+												label={
+													movement.status === "IN_YARD"
+														? "In Yard"
+														: movement.status.replaceAll("_", " ")
+												}
 												tone={statusTone(movement.status)}
 											/>
 										</td>
@@ -771,42 +916,52 @@ function ListView({
 function IntakeView({
 	yardLocations,
 	loadingLocations,
+	yardEquipment,
+	loadingEquipment,
 	onCancel,
 	onSaved,
 }: {
 	yardLocations: YardLocation[];
 	loadingLocations: boolean;
+	yardEquipment: YardEquipment[];
+	loadingEquipment: boolean;
 	onCancel: () => void;
 	onSaved: () => Promise<void>;
 }) {
 	const [query, setQuery] = useState("");
 	const [shipment, setShipment] = useState<YardShipment | null>(null);
 	const [searchResults, setSearchResults] = useState<YardSearchContainer[]>([]);
-	const [drafts, setDrafts] = useState<Record<string, ContainerMovementDraft>>({});
+	const [assignments, setAssignments] = useState<
+		Record<string, ContainerMovementAssignment>
+	>({});
 	const [selectedContainers, setSelectedContainers] = useState<string[]>([]);
 	const [bulkDestination, setBulkDestination] = useState("");
+	const [bulkEquipment, setBulkEquipment] = useState("");
 	const [reason, setReason] = useState(REASON_OPTIONS[0]);
 	const [remarks, setRemarks] = useState("");
 	const [searching, setSearching] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [hasSearched, setHasSearched] = useState(false);
 	const [searchWhere, setSearchWhere] = useState("bill_of_lading");
-	
 
 	const eligibleContainers = useMemo(
 		() => searchResults.filter((container) => container.canMove),
-		[searchResults],
+		[searchResults]
 	);
 
 	const selectedEligibleContainers = useMemo(
 		() =>
 			eligibleContainers.filter((container) =>
-				selectedContainers.includes(container.containerId),
+				selectedContainers.includes(container.containerId)
 			),
-		[eligibleContainers, selectedContainers],
+		[eligibleContainers, selectedContainers]
 	);
 
-	const getDraft = (containerId: string) => drafts[containerId] ?? { destination: "" };
+	const getAssignment = (containerId: string) =>
+		assignments[containerId] ?? {
+			destination: "",
+			equipmentId: "",
+		};
 
 	const handleSearch = async () => {
 		const value = query.trim();
@@ -821,7 +976,7 @@ function IntakeView({
 		setShipment(null);
 		setSearchResults([]);
 		setSelectedContainers([]);
-		setDrafts({});
+		setAssignments({});
 
 		try {
 			const response = await http.post("/operator/yards/search/", {
@@ -850,15 +1005,19 @@ function IntakeView({
 				: [];
 
 			setShipment(
-				shipmentData ? normalizeYardShipment(shipmentData) : null
+				shipmentData
+					? normalizeYardShipment(shipmentData)
+					: null
 			);
 
-			const rows = containerData.map(normalizeYardSearchContainer);
+			setSearchResults(
+				containerData.map(normalizeYardSearchContainer)
+			);
 
-			setSearchResults(rows);
-
-			if (!shipmentData || !rows.length) {
-				toast.info("No shipment containers found for the supplied identifier.");
+			if (!shipmentData || !containerData.length) {
+				toast.info(
+					"No shipment containers found for the supplied identifier."
+				);
 			}
 		} catch (error: any) {
 			toast.error(
@@ -874,114 +1033,131 @@ function IntakeView({
 		}
 	};
 
-	const toggleContainer = (containerId: string, checked: boolean) => {
+	const toggleContainer = (
+		containerId: string,
+		checked: boolean
+	) => {
 		setSelectedContainers((current) =>
 			checked
 				? [...new Set([...current, containerId])]
-				: current.filter((id) => id !== containerId),
+				: current.filter((id) => id !== containerId)
 		);
 	};
 
-	const updateDestination = (
+	const updateAssignment = (
 		containerId: string,
-		destination: string,
+		field: keyof ContainerMovementAssignment,
+		value: string
 	) => {
-		setDrafts((current) => ({
+		setAssignments((current) => ({
 			...current,
 			[containerId]: {
-				destination,
+				...getAssignment(containerId),
+				[field]: value,
 			},
 		}));
 	};
 
-	const applyBulkDestination = () => {
-		if (!bulkDestination) {
-			toast.error("Select a yard destination.");
-			return;
-		}
-
+	const applyBulkAssignment = () => {
 		if (!selectedEligibleContainers.length) {
 			toast.error("Select eligible containers first.");
 			return;
 		}
 
-		setDrafts((current) => {
+		if (!bulkDestination) {
+			toast.error("Select a yard destination.");
+			return;
+		}
+
+		setAssignments((current) => {
 			const updated = { ...current };
 
 			selectedEligibleContainers.forEach((container) => {
 				updated[container.containerId] = {
 					destination: bulkDestination,
+					equipmentId: bulkEquipment,
 				};
 			});
 
 			return updated;
 		});
 
-		toast.success("Destination applied to selected containers.");
+		toast.success("Destination and equipment applied to selected containers.");
 	};
 
 	const containersToMove = useMemo(
 		() =>
-			eligibleContainers.filter(
-				(container) =>
+			eligibleContainers.filter((container) => {
+				const assignment = assignments[container.containerId];
+
+				return (
 					selectedContainers.includes(container.containerId) &&
-					Boolean(getDraft(container.containerId).destination),
-			),
-		[eligibleContainers, selectedContainers, drafts],
+					Boolean(assignment?.destination)
+				);
+			}),
+		[eligibleContainers, selectedContainers, assignments]
 	);
 
 	const handleSave = async () => {
-		if (!containersToMove.length) {
-			toast.error("Select containers and assign their yard destinations.");
+		if (!shipment?.shipment_id) {
+			toast.error("Shipment information is missing. Search again.");
 			return;
 		}
 
+		if (!selectedEligibleContainers.length) {
+			toast.error("Select at least one eligible container.");
+			return;
+		}
+
+		if (
+			containersToMove.length !== selectedEligibleContainers.length
+		) {
+			toast.error("Assign a yard destination to every selected container.");
+			return;
+		}
+
+		const containers = containersToMove.map((container) => {
+			const assignment = assignments[container.containerId];
+
+			return {
+				container_id: container.containerId,
+				to_location_id: assignment?.destination ?? "",
+				equipment_id: assignment?.equipmentId || null,
+				remarks: [reason, remarks.trim()]
+					.filter(Boolean)
+					.join(" — "),
+			};
+		});
+
 		setSaving(true);
 
-		let successful = 0;
-		let failed = 0;
-
 		try {
-			for (const container of containersToMove) {
-				const destinationId = getDraft(container.containerId).destination;
+			const response = await http.post("/operator/yards/save/", {
+				shipment_id: shipment.shipment_id,
+				containers,
+			});
 
-				try {
-					const response = await http.post("/operator/yards/save/", {
-						shipment_id: container.shipmentId,
-						container_id: container.containerId,
-						to_location_id: destinationId,
-						remarks: [reason, remarks.trim()]
-							.filter(Boolean)
-							.join(" — "),
-					});
+			const resp: Resp = response.data;
 
-					const resp: Resp = response.data;
-
-					if (resp.error) {
-						failed++;
-					} else {
-						successful++;
-					}
-				} catch {
-					failed++;
-				}
-			}
-
-			if (successful) {
-				toast.success(
-					`${successful} container${successful === 1 ? "" : "s"} placed successfully.`,
+			if (resp.error) {
+				throw new Error(
+					typeof resp.data === "string"
+						? resp.data
+						: "Could not complete yard placement."
 				);
 			}
 
-			if (failed) {
-				toast.error(
-					`${failed} container${failed === 1 ? "" : "s"} could not be placed.`,
-				);
-			}
+			toast.success(
+				`${containers.length} container${containers.length === 1 ? "" : "s"} placed successfully.`
+			);
 
-			if (successful) {
-				await onSaved();
-			}
+			await onSaved();
+		} catch (error: any) {
+			toast.error(
+				error?.response?.data?.data ||
+					error?.message ||
+					"Could not complete yard placement."
+			);
 		} finally {
 			setSaving(false);
 		}
@@ -990,7 +1166,7 @@ function IntakeView({
 	const allEligibleSelected =
 		eligibleContainers.length > 0 &&
 		eligibleContainers.every((container) =>
-			selectedContainers.includes(container.containerId),
+			selectedContainers.includes(container.containerId)
 		);
 
 	return (
@@ -1001,6 +1177,7 @@ function IntakeView({
 						variant="outline"
 						size="icon"
 						onClick={onCancel}
+						disabled={saving}
 					>
 						<ArrowLeft className="h-4 w-4" />
 					</Button>
@@ -1033,7 +1210,8 @@ function IntakeView({
 							setQuery("");
 							setSearchResults([]);
 							setSelectedContainers([]);
-							setDrafts({});
+							setAssignments({});
+							setShipment(null);
 							setHasSearched(false);
 						}}
 						disabled={searching || saving}
@@ -1060,10 +1238,10 @@ function IntakeView({
 								searchWhere === "bill_of_lading"
 									? "Bill of Lading"
 									: searchWhere === "shipment_reference"
-									? "Shipment Reference"
-									: searchWhere === "container_number"
-										? "Container Number"
-										: "Seal Number"
+										? "Shipment Reference"
+										: searchWhere === "container_number"
+											? "Container Number"
+											: "Seal Number"
 							}...`}
 							className="pl-9"
 							disabled={searching || saving}
@@ -1091,17 +1269,23 @@ function IntakeView({
 						/>
 						<Metric
 							label="Ready for Placement"
-							value={String(searchResults.filter((item) => item.yardStatus === "READY").length)}
+							value={String(
+								searchResults.filter((item) => item.yardStatus === "READY").length
+							)}
 							icon={CheckCircle2}
 						/>
 						<Metric
 							label="Not Received"
-							value={String(searchResults.filter((item) => item.yardStatus === "NOT_RECEIVED").length)}
+							value={String(
+								searchResults.filter((item) => item.yardStatus === "NOT_RECEIVED").length
+							)}
 							icon={Truck}
 						/>
 						<Metric
 							label="Already in Yard"
-							value={String(searchResults.filter((item) => item.yardStatus === "IN_YARD").length)}
+							value={String(
+								searchResults.filter((item) => item.yardStatus === "IN_YARD").length
+							)}
 							icon={Grid2X2}
 						/>
 					</div>
@@ -1125,7 +1309,7 @@ function IntakeView({
 									setSelectedContainers(
 										allEligibleSelected
 											? []
-											: eligibleContainers.map((item) => item.containerId),
+											: eligibleContainers.map((item) => item.containerId)
 									)
 								}
 							>
@@ -1197,12 +1381,9 @@ function IntakeView({
 
 							{searchResults.map((container) => {
 								const selected = selectedContainers.includes(
-									container.containerId,
+									container.containerId
 								);
-
-								const destination = getDraft(
-									container.containerId,
-								).destination;
+								const assignment = getAssignment(container.containerId);
 
 								return (
 									<div
@@ -1211,7 +1392,7 @@ function IntakeView({
 											"rounded-xl border p-4 transition-colors",
 											selected
 												? "border-orange/60 bg-orange/[0.035]"
-												: "border-line",
+												: "border-line"
 										)}
 									>
 										<div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -1223,7 +1404,7 @@ function IntakeView({
 													onChange={(event) =>
 														toggleContainer(
 															container.containerId,
-															event.target.checked,
+															event.target.checked
 														)
 													}
 													className="mt-1 h-4 w-4 accent-orange disabled:cursor-not-allowed"
@@ -1325,14 +1506,15 @@ function IntakeView({
 												</div>
 											</div>
 
-											<div className="w-full xl:max-w-[260px]">
+											<div className="grid w-full gap-3 xl:max-w-[280px]">
 												<SelectField
 													label="Yard Destination"
-													value={destination}
+													value={assignment.destination}
 													onChange={(value) =>
-														updateDestination(
+														updateAssignment(
 															container.containerId,
-															value,
+															"destination",
+															value
 														)
 													}
 													options={yardLocations.map((location) => ({
@@ -1351,6 +1533,29 @@ function IntakeView({
 															: "Not eligible"
 													}
 												/>
+
+												<SelectField
+													label="Equipment"
+													value={assignment.equipmentId}
+													onChange={(value) =>
+														updateAssignment(
+															container.containerId,
+															"equipmentId",
+															value
+														)
+													}
+													options={yardEquipment.map((equipment) => ({
+														value: equipment.id,
+														label: `${equipment.equipment_name} · ${equipment.equipment_type}`,
+													}))}
+													disabled={
+														!container.canMove ||
+														!selected ||
+														saving
+													}
+													loading={loadingEquipment}
+													placeholder="Select equipment"
+												/>
 											</div>
 										</div>
 									</div>
@@ -1361,43 +1566,58 @@ function IntakeView({
 
 					<div className="rounded-xl border border-line bg-paper p-5">
 						<h3 className="font-semibold text-ink">
-							Bulk Destination
+							Bulk Assignment
 						</h3>
 
 						<p className="mt-1 text-xs text-ink-soft">
-							Apply the same destination to all selected eligible containers.
+							Apply one destination and equipment to all selected containers.
 						</p>
 
-						<div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-							<div className="flex-1">
-								<SelectField
-									label="Destination"
-									value={bulkDestination}
-									onChange={setBulkDestination}
-									options={yardLocations.map((location) => ({
-										value: location.id,
-										label: getLocationLabel(location),
-									}))}
-									disabled={
-										loadingLocations ||
-										selectedEligibleContainers.length === 0
-									}
-									loading={loadingLocations}
-									placeholder="Select destination"
-								/>
-							</div>
-
-							<Button
-								variant="outline"
-								onClick={applyBulkDestination}
+						<div className="mt-4 grid gap-3 sm:grid-cols-2">
+							<SelectField
+								label="Destination"
+								value={bulkDestination}
+								onChange={setBulkDestination}
+								options={yardLocations.map((location) => ({
+									value: location.id,
+									label: getLocationLabel(location),
+								}))}
 								disabled={
-									!bulkDestination ||
+									loadingLocations ||
 									selectedEligibleContainers.length === 0
 								}
-							>
-								Apply to Selected
-							</Button>
+								loading={loadingLocations}
+								placeholder="Select destination"
+							/>
+
+							<SelectField
+								label="Equipment"
+								value={bulkEquipment}
+								onChange={setBulkEquipment}
+								options={yardEquipment.map((equipment) => ({
+									value: equipment.id,
+									label: `${equipment.equipment_name} · ${equipment.equipment_type}`,
+								}))}
+								disabled={
+									loadingEquipment ||
+									selectedEligibleContainers.length === 0
+								}
+								loading={loadingEquipment}
+								placeholder="Select equipment"
+							/>
 						</div>
+
+						<Button
+							variant="outline"
+							className="mt-3"
+							onClick={applyBulkAssignment}
+							disabled={
+								!bulkDestination ||
+								selectedEligibleContainers.length === 0
+							}
+						>
+							Apply to Selected
+						</Button>
 					</div>
 
 					<div className="rounded-xl border border-line bg-paper p-5">
@@ -1406,6 +1626,7 @@ function IntakeView({
 						<select
 							value={reason}
 							onChange={(event) => setReason(event.target.value)}
+							disabled={saving}
 							className="mt-2 h-10 w-full rounded-lg border border-line bg-paper px-3 text-sm text-ink outline-none focus:border-orange sm:max-w-md"
 						>
 							{REASON_OPTIONS.map((option) => (
@@ -1422,6 +1643,7 @@ function IntakeView({
 						<textarea
 							value={remarks}
 							onChange={(event) => setRemarks(event.target.value)}
+							disabled={saving}
 							rows={3}
 							placeholder="Enter additional remarks..."
 							className="mt-2 w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-orange"
@@ -1435,13 +1657,17 @@ function IntakeView({
 								{containersToMove.length === 1 ? "" : "s"} ready for placement
 							</p>
 							<p className="mt-1 text-xs text-ink-soft">
-								Only received containers with a destination will be submitted.
+								Selected containers are submitted together as one placement request.
 							</p>
 						</div>
 
 						<Button
 							onClick={() => void handleSave()}
-							disabled={saving || containersToMove.length === 0}
+							disabled={
+								saving ||
+								containersToMove.length === 0 ||
+								containersToMove.length !== selectedEligibleContainers.length
+							}
 							className="gap-2 bg-orange text-white hover:bg-orange/90"
 						>
 							{saving ? (
@@ -1449,7 +1675,7 @@ function IntakeView({
 							) : (
 								<CheckCircle2 className="h-4 w-4" />
 							)}
-							{saving ? "Saving..." : "Complete Placement"}
+							{saving ? "Submitting..." : "Complete Placement"}
 							<ArrowRight className="h-4 w-4" />
 						</Button>
 					</div>

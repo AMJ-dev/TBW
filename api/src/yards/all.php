@@ -69,7 +69,7 @@ try {
             ym.to_location_id,
             ym.equipment_id,
             ym.remarks,
-            ym.moved_by,
+            COALESCE(NULLIF(TRIM(u.full_name), ''), 'Not recorded') AS moved_by,
             ym.completed_at,
             ym.created_at,
 
@@ -106,21 +106,17 @@ try {
 
         FROM terminal_yard_movements ym
 
-        INNER JOIN portal_shipments ps
-            ON ps.id = ym.shipment_id
+        INNER JOIN portal_shipments ps ON ps.id = ym.shipment_id
 
-        INNER JOIN portal_shipment_containers psc
-            ON psc.id = ym.container_id
+        INNER JOIN portal_shipment_containers psc ON psc.id = ym.container_id
 
-        LEFT JOIN terminal_locations tl_from
-            ON tl_from.id = ym.from_location_id
+        LEFT JOIN terminal_locations tl_from ON tl_from.id = ym.from_location_id
 
-        INNER JOIN terminal_locations tl_to
-            ON tl_to.id = ym.to_location_id
+        INNER JOIN terminal_locations tl_to ON tl_to.id = ym.to_location_id
 
-        LEFT JOIN terminal_equipment te
-            ON te.id = ym.equipment_id
+        LEFT JOIN terminal_equipment te ON te.id = ym.equipment_id
 
+        LEFT JOIN users u ON u.id = ym.moved_by
         {$where_sql}
 
         ORDER BY ym.completed_at DESC
