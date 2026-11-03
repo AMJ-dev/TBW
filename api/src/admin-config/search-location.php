@@ -11,14 +11,14 @@
             exit;
         }
 
-        $allowed_types = ["RECEIVING", "WAREHOUSE", "INSPECTION"];
+        $allowed_types = ["RECEIVING", "WAREHOUSE", "EXAMINATION_BAY", "YARD"];
 
         $kind = strtoupper(trim($_POST["q"] ?? ""));
 
         if (!in_array($kind, $allowed_types, true)) {
             echo json_encode([
                 "error" => true,
-                "data" => "Invalid location type. Allowed types are RECEIVING, WAREHOUSE, and INSPECTION.",
+                "data" => "Invalid location type. Allowed types are RECEIVING, WAREHOUSE, YARD and EXAMINATION_BAY.",
                 "code" => null
             ]);
             exit;
