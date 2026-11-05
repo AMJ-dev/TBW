@@ -1,5 +1,6 @@
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
+    require_once dirname(__DIR__, 2) . "/rate-limit/non-auth.php";
 
     try {
 

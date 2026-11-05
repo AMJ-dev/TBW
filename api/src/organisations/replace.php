@@ -453,7 +453,7 @@ try {
         }
 
         $relativePath = "uploads/" . $storedName;
-        $absolutePath = dirname(__DIR__, 1) . "/" . $relativePath;
+        $absolutePath = dirname(__DIR__, 2) . "/" . $relativePath;
 
         $uploadDirectory = dirname($absolutePath);
 
