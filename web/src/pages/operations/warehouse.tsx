@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -7,7 +6,6 @@ import {
 	ArrowRight,
 	Boxes,
 	Check,
-	CheckCircle2,
 	ChevronDown,
 	Clock3,
 	MapPin,
@@ -15,6 +13,7 @@ import {
 	RefreshCw,
 	Search,
 	Warehouse,
+	X,
 } from "lucide-react";
 import { AppShell, StatusBadge, statusTone, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
@@ -65,7 +64,7 @@ interface ShipmentContainer {
 	current_location_code: string;
 	current_location_kind: string;
 	receiving_status: string;
-	can_move: boolean | number;
+	can_move: boolean;
 }
 
 interface WarehouseMovement {
@@ -73,13 +72,23 @@ interface WarehouseMovement {
 	movement_reference: string;
 	shipment_id: string;
 	container_id: string;
+	from_location_id: string | null;
+	to_location_id: string | null;
 	shipment_reference: string;
 	bill_of_lading: string;
+	vessel_name: string;
+	voyage_number: string;
+	shipping_line: string;
 	container_no: string;
-	origin_location_name: string;
-	origin_location_code: string;
-	destination_location_name: string;
-	destination_location_code: string;
+	container_size: string;
+	seal_no: string;
+	gross_weight: string | number | null;
+	cargo_description: string;
+	container_status: string;
+	from_location_code: string;
+	from_location_name: string;
+	to_location_code: string;
+	to_location_name: string;
 	remarks: string;
 	moved_by: string;
 	completed_at: string;
@@ -102,12 +111,13 @@ const SEARCH_OPTIONS: { value: SearchWhere; label: string }[] = [
 const WAREHOUSE_ELIGIBLE_STATUSES = new Set([
 	"RECEIVED",
 	"IN_YARD",
+	"IN_WAREHOUSE",
 	"UNDER_EXAMINATION",
+	"EXAMINATION_SCHEDULED",
 	"EXAMINATION_COMPLETE",
 	"CHARGES_PENDING",
 	"CHARGES_SETTLED",
 	"RELEASE_AUTHORISED",
-	"GATE_OUT",
 ]);
 
 const labelClass = "block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft";
@@ -145,10 +155,12 @@ const normalizeContainer = (item: any): ShipmentContainer => ({
 	package_type: getString(item.package_type),
 	status: getString(item.container_status ?? item.status).toUpperCase(),
 	current_location_id: getString(item.current_location_id),
-	current_location_name: getString(item.current_location_name ?? item.current_location ?? item.receiving_location_name),
+	current_location_name: getString(
+		item.current_location_name ?? item.current_location ?? item.receiving_location_name,
+	),
 	current_location_code: getString(item.current_location_code),
 	current_location_kind: getString(item.current_location_kind ?? item.location_kind),
-	receiving_status: getString(item.receiving_status),
+	receiving_status: getString(item.receiving_status).toUpperCase(),
 	can_move: item.can_move === true || item.can_move === 1 || item.can_move === "1",
 });
 
@@ -169,18 +181,28 @@ const normalizeMovement = (item: any): WarehouseMovement => ({
 	movement_reference: getString(item.movement_reference),
 	shipment_id: getString(item.shipment_id),
 	container_id: getString(item.container_id),
+	from_location_id: item.from_location_id ?? null,
+	to_location_id: item.to_location_id ?? null,
 	shipment_reference: getString(item.shipment_reference),
 	bill_of_lading: getString(item.bill_of_lading),
+	vessel_name: getString(item.vessel_name),
+	voyage_number: getString(item.voyage_number),
+	shipping_line: getString(item.shipping_line),
 	container_no: getString(item.container_no ?? item.container_number),
-	origin_location_name: getString(item.origin_location_name ?? item.origin_name),
-	origin_location_code: getString(item.origin_location_code ?? item.origin_code),
-	destination_location_name: getString(item.destination_location_name ?? item.destination_name),
-	destination_location_code: getString(item.destination_location_code ?? item.destination_code),
+	container_size: getString(item.container_size ?? item.size),
+	seal_no: getString(item.seal_no),
+	gross_weight: item.gross_weight ?? null,
+	cargo_description: getString(item.cargo_description),
+	container_status: getString(item.container_status ?? item.status),
+	from_location_code: getString(item.from_location_code),
+	from_location_name: getString(item.from_location_name),
+	to_location_code: getString(item.to_location_code),
+	to_location_name: getString(item.to_location_name),
 	remarks: getString(item.remarks),
-	moved_by: getString(item.moved_by),
+	moved_by: getString(item.operator_name ?? item.moved_by),
 	completed_at: getString(item.completed_at),
 	created_at: getString(item.created_at),
-	status: getString(item.status, "COMPLETED"),
+	status: getString(item.movement_status ?? item.status, "COMPLETED"),
 });
 
 export default function WarehouseManagementPage() {
@@ -188,10 +210,17 @@ export default function WarehouseManagementPage() {
 	const [warehouseLocations, setWarehouseLocations] = useState<WarehouseLocation[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadingLocations, setLoadingLocations] = useState(false);
-	const [view, setView] = useState<"list" | "placement">("list");
+	const [view, setView] = useState<"list" | "placement" | "details">("list");
 	const [selectedMovement, setSelectedMovement] = useState<WarehouseMovement | null>(null);
 	const [searchQuery, setSearchQuery] = useState("");
 	const [statusFilter, setStatusFilter] = useState("ALL");
+
+	const openMovementDetails = (movement: WarehouseMovement) => {
+		setSelectedMovement(movement);
+		setView("details");
+	};
+
+	const closeMovementDetails = () => setView("list")
 
 	const fetchMovements = useCallback(async () => {
 		try {
@@ -200,12 +229,24 @@ export default function WarehouseManagementPage() {
 			const resp: Resp = res.data;
 			const data = resp.data as any;
 
-			if (resp.error) throw new Error(getString(data, "Could not load warehouse movements."));
+			if (resp.error) {
+				throw new Error(getString(data, "Could not load warehouse movements."));
+			}
 
-			const rows = Array.isArray(data) ? data : Array.isArray(data?.movements) ? data.movements : [];
+			const rows = Array.isArray(data)
+				? data
+				: Array.isArray(data?.movements)
+					? data.movements
+					: [];
+
 			setMovements(rows.map(normalizeMovement));
 		} catch (error: any) {
-			toast.error(error?.response?.data?.data || error?.response?.data?.message || error?.message || "Could not load warehouse movements.");
+			toast.error(
+				error?.response?.data?.data ||
+				error?.response?.data?.message ||
+				error?.message ||
+				"Could not load warehouse movements.",
+			);
 			setMovements([]);
 		} finally {
 			setLoading(false);
@@ -219,14 +260,23 @@ export default function WarehouseManagementPage() {
 			const resp: Resp = res.data;
 			const code = resp.code as any;
 
-			if (resp.error) throw new Error(getString(resp.data, "Could not load warehouse locations."));
+			if (resp.error) {
+				throw new Error(getString(resp.data, "Could not load warehouse locations."));
+			}
 
 			const rows = Array.isArray(code?.locations) ? code.locations : [];
-			const normalized = rows.map(normalizeLocation).filter((location: WarehouseLocation) => location.id);
+			const normalized = rows
+				.map(normalizeLocation)
+				.filter((location: WarehouseLocation) => location.id);
 
 			setWarehouseLocations(normalized);
 		} catch (error: any) {
-			toast.error(error?.response?.data?.data || error?.response?.data?.message || error?.message || "Could not load warehouse locations.");
+			toast.error(
+				error?.response?.data?.data ||
+				error?.response?.data?.message ||
+				error?.message ||
+				"Could not load warehouse locations.",
+			);
 			setWarehouseLocations([]);
 		} finally {
 			setLoadingLocations(false);
@@ -247,20 +297,30 @@ export default function WarehouseManagementPage() {
 				movement.shipment_reference,
 				movement.bill_of_lading,
 				movement.container_no,
-				movement.origin_location_name,
-				movement.origin_location_code,
-				movement.destination_location_name,
-				movement.destination_location_code,
+				movement.from_location_name,
+				movement.from_location_code,
+				movement.to_location_name,
+				movement.to_location_code,
 				movement.moved_by,
 				movement.remarks,
 			].join(" ").toLowerCase();
 
-			return (!query || searchable.includes(query)) && (statusFilter === "ALL" || movement.status === statusFilter);
+			return (
+				(!query || searchable.includes(query)) &&
+				(statusFilter === "ALL" || movement.status === statusFilter)
+			);
 		});
 	}, [movements, searchQuery, statusFilter]);
 
-	const storedContainers = new Set(movements.map((movement) => movement.container_id)).size;
-	const uniqueWarehouses = new Set(movements.map((movement) => movement.destination_location_code || movement.destination_location_name).filter(Boolean)).size;
+	const storedContainers = new Set(
+		movements.map((movement) => movement.container_id),
+	).size;
+
+	const uniqueWarehouses = new Set(
+		movements
+			.map((movement) => movement.to_location_code || movement.to_location_name)
+			.filter(Boolean),
+	).size;
 
 	const handleExport = () => {
 		if (!movements.length) {
@@ -268,20 +328,35 @@ export default function WarehouseManagementPage() {
 			return;
 		}
 
-		const headers = ["Movement Reference", "Shipment Reference", "Bill of Lading", "Container", "Origin", "Warehouse", "Operator", "Remarks", "Completed At"];
+		const headers = [
+			"Movement Reference",
+			"Shipment Reference",
+			"Bill of Lading",
+			"Container",
+			"Origin",
+			"Warehouse",
+			"Operator",
+			"Remarks",
+			"Completed At",
+		];
+
 		const rows = movements.map((movement) => [
 			movement.movement_reference,
 			movement.shipment_reference,
 			movement.bill_of_lading,
 			movement.container_no,
-			movement.origin_location_name,
-			movement.destination_location_name,
+			movement.from_location_name,
+			movement.to_location_name,
 			movement.moved_by,
 			movement.remarks,
 			movement.completed_at || movement.created_at,
 		].map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(","));
 
-		const blob = new Blob([[headers.join(","), ...rows].join("\n")], { type: "text/csv;charset=utf-8;" });
+		const blob = new Blob(
+			[[headers.join(","), ...rows].join("\n")],
+			{ type: "text/csv;charset=utf-8;" },
+		);
+
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement("a");
 		link.href = url;
@@ -293,13 +368,49 @@ export default function WarehouseManagementPage() {
 	return (
 		<AppShell title="Warehouse Management" eyebrow="Operations · Warehouse Storage & Placement">
 			<div className="overflow-hidden">
-				{view === "list" ? (
-					<MovementList movements={movements} filteredMovements={filteredMovements} loading={loading} searchQuery={searchQuery} statusFilter={statusFilter} onSearchChange={setSearchQuery} onStatusChange={setStatusFilter} onNewPlacement={() => { setSelectedMovement(null); setView("placement"); }} onRefresh={fetchMovements} onExport={handleExport} onSelectMovement={setSelectedMovement} warehouseCount={uniqueWarehouses} storedCount={storedContainers} />
-				) : (
-					<WarehousePlacement warehouseLocations={warehouseLocations} loadingLocations={loadingLocations} onCancel={() => setView("list")} onSaved={async () => { await fetchMovements(); setView("list"); }} />
+				{view === "list" && (
+					<div key="movement-list" className="trinu-page-backward">
+						<MovementList
+							movements={movements}
+							filteredMovements={filteredMovements}
+							loading={loading}
+							searchQuery={searchQuery}
+							statusFilter={statusFilter}
+							onSearchChange={setSearchQuery}
+							onStatusChange={setStatusFilter}
+							onNewPlacement={() => setView("placement")}
+							onRefresh={fetchMovements}
+							onExport={handleExport}
+							onSelectMovement={openMovementDetails}
+							warehouseCount={uniqueWarehouses}
+							storedCount={storedContainers}
+						/>
+					</div>
+				)}
+
+				{view === "placement" && (
+					<div key="placement" className="trinu-page-forward">
+						<WarehousePlacement
+							warehouseLocations={warehouseLocations}
+							loadingLocations={loadingLocations}
+							onCancel={() => setView("list")}
+							onSaved={async () => {
+								await fetchMovements();
+								setView("list");
+							}}
+						/>
+					</div>
+				)}
+
+				{view === "details" && selectedMovement && (
+					<div key="movement-details" className="trinu-page-forward">
+						<MovementDetails
+							movement={selectedMovement}
+							onClose={closeMovementDetails}
+						/>
+					</div>
 				)}
 			</div>
-			{selectedMovement && <MovementDetails movement={selectedMovement} onClose={() => setSelectedMovement(null)} />}
 		</AppShell>
 	);
 }
@@ -336,74 +447,224 @@ function MovementList({
 	return (
 		<div className="space-y-6 pb-8" style={{ animation: "slideInFromRight 260ms cubic-bezier(0.32, 0.72, 0, 1)" }}>
 			<style>{`
-				@keyframes slideInFromRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
-				@keyframes slideInFromLeft { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: translateX(0); } }
+				@keyframes slideInFromRight {
+					from { opacity: 0; transform: translateX(24px); }
+					to { opacity: 1; transform: translateX(0); }
+				}
+				@keyframes slideInFromLeft {
+					from { opacity: 0; transform: translateX(-24px); }
+					to { opacity: 1; transform: translateX(0); }
+				}
 			`}</style>
+
 			<div className="flex flex-wrap items-end justify-between gap-4">
 				<div className="min-w-0">
-					<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">Storage · Warehouse placement</p>
-					<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">Warehouse storage &amp; placement</h2>
-					<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">Receive eligible containers from the yard into configured warehouse locations and maintain a record of every completed placement.</p>
+					<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">
+						Storage · Warehouse placement
+					</p>
+					<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">
+						Warehouse storage &amp; placement
+					</h2>
+					<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+						Receive eligible containers into configured warehouse locations and maintain a record of every completed placement.
+					</p>
 				</div>
+
 				<div className="flex flex-wrap gap-2">
-					<Button variant="outline" className="border-line bg-paper text-ink hover:bg-sand" onClick={onRefresh} disabled={loading}><RefreshCw className={cn("size-4", loading && "animate-spin")} />Refresh</Button>
-					<Button variant="outline" className="border-line bg-paper text-ink hover:bg-sand" onClick={onExport}><Package className="size-4" />Export log</Button>
-					<Button className="bg-orange text-white hover:bg-orange-deep" onClick={onNewPlacement}><Warehouse className="size-4" />New placement</Button>
+					<Button
+						variant="outline"
+						className="border-line bg-paper text-ink hover:bg-sand"
+						onClick={onRefresh}
+						disabled={loading}
+					>
+						<RefreshCw className={cn("size-4", loading && "animate-spin")} />
+						Refresh
+					</Button>
+					<Button
+						variant="outline"
+						className="border-line bg-paper text-ink hover:bg-sand"
+						onClick={onExport}
+					>
+						<Package className="size-4" />
+						Export log
+					</Button>
+					<Button
+						className="bg-orange text-white hover:bg-orange-deep"
+						onClick={onNewPlacement}
+					>
+						<Warehouse className="size-4" />
+						New placement
+					</Button>
 				</div>
 			</div>
 
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-				<Metric label="Movement records" value={movements.length.toLocaleString()} detail="Completed warehouse movements" tone="info" icon={Boxes} />
-				<Metric label="Containers stored" value={storedCount.toLocaleString()} detail="Containers with warehouse movement records" tone="success" icon={Package} />
-				<Metric label="Active warehouses used" value={warehouseCount.toLocaleString()} detail="Destinations in movement history" tone="info" icon={Warehouse} />
-				<Metric label="Available destinations" value={loading ? "Loading" : "Configured"} detail="Loaded from terminal locations" tone="info" icon={MapPin} />
+				<Metric
+					label="Movement records"
+					value={movements.length.toLocaleString()}
+					detail="Completed warehouse movements"
+					tone="info"
+					icon={Boxes}
+				/>
+				<Metric
+					label="Containers stored"
+					value={storedCount.toLocaleString()}
+					detail="Containers with warehouse movement records"
+					tone="success"
+					icon={Package}
+				/>
+				<Metric
+					label="Active warehouses used"
+					value={warehouseCount.toLocaleString()}
+					detail="Destinations in movement history"
+					tone="info"
+					icon={Warehouse}
+				/>
+				<Metric
+					label="Available destinations"
+					value={loading ? "Loading" : "Configured"}
+					detail="Loaded from terminal locations"
+					tone="info"
+					icon={MapPin}
+				/>
 			</div>
 
 			<section className="rounded-2xl bg-paper ring-1 ring-line">
 				<div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
 					<div className="relative min-w-[260px] flex-1">
 						<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
-						<Input value={searchQuery} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search by container, shipment, warehouse, or movement reference…" className="h-10 border-line bg-sand pl-9 text-sm text-ink" />
+						<Input
+							value={searchQuery}
+							onChange={(event) => onSearchChange(event.target.value)}
+							placeholder="Search by container, shipment, warehouse, or movement reference…"
+							className="h-10 border-line bg-sand pl-9 text-sm text-ink"
+						/>
 					</div>
+
 					<div className="flex flex-wrap items-center gap-1.5">
 						<span className="text-xs text-ink-soft">Status:</span>
-						{["ALL", "COMPLETED"].map((status) => <button key={status} type="button" onClick={() => onStatusChange(status)} className={cn("rounded-md px-2.5 py-1 text-xs font-medium transition-colors", statusFilter === status ? "bg-ink text-sand" : "bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink")}>{status === "ALL" ? "All" : "Completed"}</button>)}
+						{["ALL", "COMPLETED"].map((status) => (
+							<button
+								key={status}
+								type="button"
+								onClick={() => onStatusChange(status)}
+								className={cn(
+									"rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+									statusFilter === status
+										? "bg-ink text-sand"
+										: "bg-sand text-ink-soft hover:bg-sand-2 hover:text-ink",
+								)}
+							>
+								{status === "ALL" ? "All" : "Completed"}
+							</button>
+						))}
 					</div>
 				</div>
 
 				{loading ? (
-					<div className="p-10 text-center"><RefreshCw className="mx-auto size-6 animate-spin text-orange" /><p className="mt-3 text-sm text-ink-soft">Loading warehouse movements...</p></div>
+					<div className="p-10 text-center">
+						<RefreshCw className="mx-auto size-6 animate-spin text-orange" />
+						<p className="mt-3 text-sm text-ink-soft">Loading warehouse movements...</p>
+					</div>
 				) : filteredMovements.length === 0 ? (
-					<div className="p-10 text-center"><Warehouse className="mx-auto size-7 text-ink-soft" /><p className="mt-3 text-sm font-semibold text-ink">{movements.length ? "No movements match your search" : "No warehouse movements found"}</p><p className="mt-1 text-xs text-ink-soft">{movements.length ? "Try another search term or filter." : "Completed warehouse placements will appear here."}</p></div>
+					<div className="p-10 text-center">
+						<Warehouse className="mx-auto size-7 text-ink-soft" />
+						<p className="mt-3 text-sm font-semibold text-ink">
+							{movements.length ? "No movements match your search" : "No warehouse movements found"}
+						</p>
+						<p className="mt-1 text-xs text-ink-soft">
+							{movements.length
+								? "Try another search term or filter."
+								: "Completed warehouse placements will appear here."}
+						</p>
+					</div>
 				) : (
 					<div className="overflow-x-auto">
 						<table className="w-full min-w-[1050px] text-left text-sm">
-							<thead><tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-								<th className="px-4 py-3 font-medium">Container</th><th className="px-4 py-3 font-medium">Shipment</th><th className="px-4 py-3 font-medium">Origin</th><th className="px-4 py-3 font-medium">Warehouse destination</th><th className="px-4 py-3 font-medium">Movement reference</th><th className="px-4 py-3 font-medium">Operator</th><th className="px-4 py-3 font-medium">Status</th><th className="px-4 py-3 text-right font-medium">Completed</th>
-							</tr></thead>
+							<thead>
+								<tr className="border-b border-line bg-sand/40 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+									<th className="px-4 py-3 font-medium">Container</th>
+									<th className="px-4 py-3 font-medium">Shipment</th>
+									<th className="px-4 py-3 font-medium">Origin</th>
+									<th className="px-4 py-3 font-medium">Warehouse destination</th>
+									<th className="px-4 py-3 font-medium">Movement reference</th>
+									<th className="px-4 py-3 font-medium">Operator</th>
+									<th className="px-4 py-3 font-medium">Status</th>
+									<th className="px-4 py-3 text-right font-medium">Completed</th>
+								</tr>
+							</thead>
+
 							<tbody className="divide-y divide-line">
 								{filteredMovements.map((movement) => (
-									<tr key={movement.id} onClick={() => onSelectMovement(movement)} className="cursor-pointer transition-colors hover:bg-sand/40">
-										<td className="px-4 py-3.5 font-mono text-xs font-bold text-ink">{movement.container_no || "—"}</td>
-										<td className="px-4 py-3.5"><p className="font-mono text-xs text-ink">{movement.shipment_reference || "—"}</p><p className="mt-1 font-mono text-[10px] text-ink-soft">{movement.bill_of_lading || "—"}</p></td>
-										<td className="px-4 py-3.5 text-xs text-ink-soft">{movement.origin_location_name || "—"}</td>
-										<td className="px-4 py-3.5"><p className="text-xs font-semibold text-orange-deep">{movement.destination_location_name || "—"}</p>{movement.destination_location_code && <p className="mt-1 font-mono text-[10px] text-ink-soft">{movement.destination_location_code}</p>}</td>
-										<td className="px-4 py-3.5 font-mono text-[10px] text-ink-soft">{movement.movement_reference || "—"}</td>
-										<td className="px-4 py-3.5 text-xs text-ink">{movement.moved_by || "—"}</td>
-										<td className="px-4 py-3.5"><StatusBadge label={movement.status} tone={statusTone(movement.status)} /></td>
-										<td className="px-4 py-3.5 text-right font-mono text-[10px] text-ink-soft">{movement.completed_at || movement.created_at || "—"}</td>
+									<tr
+										key={movement.id}
+										onClick={() => onSelectMovement(movement)}
+										onKeyDown={(event) => {
+											if (event.key === "Enter" || event.key === " ") {
+												event.preventDefault();
+												onSelectMovement(movement);
+											}
+										}}
+										tabIndex={0}
+										role="button"
+										title="Click to view movement details"
+										className="cursor-pointer transition-colors hover:bg-sand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange"
+									>
+										<td className="px-4 py-3.5 font-mono text-xs font-bold text-ink">
+											{movement.container_no || "—"}
+										</td>
+										<td className="px-4 py-3.5">
+											<p className="font-mono text-xs text-ink">
+												{movement.shipment_reference || "—"}
+											</p>
+											<p className="mt-1 font-mono text-[10px] text-ink-soft">
+												{movement.bill_of_lading || "—"}
+											</p>
+										</td>
+										<td className="px-4 py-3.5 text-xs text-ink-soft">
+											{movement.from_location_name || "—"}
+										</td>
+										<td className="px-4 py-3.5">
+											<p className="text-xs font-semibold text-orange-deep">
+												{movement.to_location_name || "—"}
+											</p>
+											{movement.to_location_code && (
+												<p className="mt-1 font-mono text-[10px] text-ink-soft">
+													{movement.to_location_code}
+												</p>
+											)}
+										</td>
+										<td className="px-4 py-3.5 font-mono text-[10px] text-ink-soft">
+											{movement.movement_reference || "—"}
+										</td>
+										<td className="px-4 py-3.5 text-xs text-ink">
+											{movement.moved_by || "—"}
+										</td>
+										<td className="px-4 py-3.5">
+											<StatusBadge
+												label={movement.status}
+												tone={statusTone(movement.status)}
+											/>
+										</td>
+										<td className="px-4 py-3.5 text-right text-xs text-ink-soft">
+											{movement.completed_at || movement.created_at || "—"}
+										</td>
 									</tr>
 								))}
 							</tbody>
 						</table>
 					</div>
 				)}
-				<div className="flex items-center justify-between border-t border-line px-4 py-3 font-mono text-[10px] text-ink-soft"><span>Showing {filteredMovements.length} of {movements.length} warehouse movements</span><span>Each placement creates a movement record</span></div>
-			</section>
 
-			<div className="rounded-2xl bg-paper p-5 ring-1 ring-line">
-				<div className="flex flex-wrap items-start gap-3"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-orange-deep" /><div className="min-w-0"><p className="text-[13px] font-semibold text-ink">Warehouse movements are recorded separately</p><p className="mt-1 text-[12px] leading-5 text-ink-soft">Only containers already received into the yard can be placed into a warehouse. Each completed placement updates the container's current location and creates a warehouse movement history record.</p></div></div>
-			</div>
+				<div className="flex items-center justify-between border-t border-line px-4 py-3">
+					<p className="text-xs text-ink-soft">
+						Showing {filteredMovements.length} of {movements.length} movement records
+					</p>
+					<p className="font-mono text-[10px] text-ink-soft">
+						Select a row to view full movement details
+					</p>
+				</div>
+			</section>
 		</div>
 	);
 }
@@ -429,11 +690,27 @@ function WarehousePlacement({
 	const [saving, setSaving] = useState(false);
 	const [hasSearched, setHasSearched] = useState(false);
 
-	const eligibleContainers = useMemo(() => containers.filter((container) => container.can_move && WAREHOUSE_ELIGIBLE_STATUSES.has(container.status)), [containers]);
-	const getDraft = (containerId: string): ContainerDraft => drafts[containerId] ?? { to_location_id: "", remarks: "" };
+	const eligibleContainers = useMemo(
+		() => containers.filter(
+			(container) =>
+				container.can_move &&
+				container.receiving_status === "RECEIVED" &&
+				WAREHOUSE_ELIGIBLE_STATUSES.has(container.status),
+		),
+		[containers],
+	);
+
+	const getDraft = (containerId: string): ContainerDraft =>
+		drafts[containerId] ?? { to_location_id: "", remarks: "" };
 
 	const updateDraft = (containerId: string, updates: Partial<ContainerDraft>) => {
-		setDrafts((previous) => ({ ...previous, [containerId]: { ...(previous[containerId] ?? { to_location_id: "", remarks: "" }), ...updates } }));
+		setDrafts((previous) => ({
+			...previous,
+			[containerId]: {
+				...(previous[containerId] ?? { to_location_id: "", remarks: "" }),
+				...updates,
+			},
+		}));
 	};
 
 	const handleSearch = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -453,37 +730,71 @@ function WarehousePlacement({
 			setSelectedContainers([]);
 			setDrafts({});
 
-			const res = await http.post("/operator/warehouses/search/", { q: value, where: searchWhere });
+			const res = await http.post("/operator/warehouses/search/", {
+				q: value,
+				where: searchWhere,
+			});
+
 			const resp: Resp = res.data;
 			const data = resp.data as any;
 
-			if (resp.error) throw new Error(getString(data, "No matching shipment or container was found."));
+			if (resp.error) {
+				throw new Error(getString(data, "No matching shipment or container was found."));
+			}
 
 			const shipmentData = data?.shipment ?? data;
-			const containerRows: unknown[] = Array.isArray(data?.containers) ? data.containers : [];
+			const containerRows: unknown[] = Array.isArray(data?.containers)
+				? data.containers
+				: [];
 
-			if (!shipmentData?.shipment_id && !shipmentData?.id) throw new Error("No matching shipment or container was found.");
+			if (!shipmentData?.shipment_id && !shipmentData?.id) {
+				throw new Error("No matching shipment or container was found.");
+			}
 
 			setShipment(normalizeShipment(shipmentData));
+
 			const normalizedContainers = containerRows.map(normalizeContainer);
 			setContainers(normalizedContainers);
 			setHasSearched(true);
 
-			if (!normalizedContainers.length) toast.error("No containers were found under this shipment.");
-			else if (!normalizedContainers.some((container) => container.can_move && WAREHOUSE_ELIGIBLE_STATUSES.has(container.status))) toast.error("No containers in this shipment are currently eligible for warehouse placement.");
+			if (!normalizedContainers.length) {
+				toast.error("No containers were found under this shipment.");
+			} else if (
+				!normalizedContainers.some(
+					(container) =>
+						container.can_move &&
+						container.receiving_status === "RECEIVED" &&
+						WAREHOUSE_ELIGIBLE_STATUSES.has(container.status),
+				)
+			) {
+				toast.error("No containers in this shipment are currently eligible for warehouse placement.");
+			}
 		} catch (error: any) {
-			toast.error(error?.response?.data?.data || error?.response?.data?.message || error?.message || "Could not search for the shipment.");
+			toast.error(
+				error?.response?.data?.data ||
+				error?.response?.data?.message ||
+				error?.message ||
+				"Could not search for the shipment.",
+			);
 		} finally {
 			setSearching(false);
 		}
 	};
 
 	const toggleContainer = (containerId: string, checked: boolean) => {
-		setSelectedContainers((previous) => checked ? [...previous, containerId] : previous.filter((id) => id !== containerId));
+		setSelectedContainers((previous) =>
+			checked
+				? [...previous, containerId]
+				: previous.filter((id) => id !== containerId),
+		);
 	};
 
 	const toggleAll = (checked: boolean) => {
-		setSelectedContainers(checked ? eligibleContainers.map((container) => container.container_id) : []);
+		setSelectedContainers(
+			checked
+				? eligibleContainers.map((container) => container.container_id)
+				: [],
+		);
 	};
 
 	const applyDestinationToSelected = () => {
@@ -492,7 +803,9 @@ function WarehousePlacement({
 			return;
 		}
 
-		const destination = eligibleContainers.map((container) => getDraft(container.container_id).to_location_id).find(Boolean);
+		const destination = eligibleContainers
+			.map((container) => getDraft(container.container_id).to_location_id)
+			.find(Boolean);
 
 		if (!destination) {
 			toast.error("Choose a warehouse destination for one container first.");
@@ -501,16 +814,23 @@ function WarehousePlacement({
 
 		setDrafts((previous) => {
 			const next = { ...previous };
+
 			selectedContainers.forEach((containerId) => {
-				next[containerId] = { ...(next[containerId] ?? { to_location_id: "", remarks: "" }), to_location_id: destination };
+				next[containerId] = {
+					...(next[containerId] ?? { to_location_id: "", remarks: "" }),
+					to_location_id: destination,
+				};
 			});
+
 			return next;
 		});
 
 		toast.success(`Destination applied to ${selectedContainers.length} selected container(s).`);
 	};
 
-	const containersToMove = eligibleContainers.filter((container) => selectedContainers.includes(container.container_id));
+	const containersToMove = eligibleContainers.filter(
+		(container) => selectedContainers.includes(container.container_id),
+	);
 
 	const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -527,7 +847,10 @@ function WarehousePlacement({
 
 		const invalidContainer = containersToMove.find((container) => {
 			const destination = getDraft(container.container_id).to_location_id;
-			return !destination || !warehouseLocations.some((location) => location.id === destination);
+
+			return !destination || !warehouseLocations.some(
+				(location) => location.id === destination,
+			);
 		});
 
 		if (invalidContainer) {
@@ -537,24 +860,37 @@ function WarehousePlacement({
 
 		try {
 			setSaving(true);
+
 			const formData = new FormData();
 			formData.append("shipment_id", shipment.shipment_id);
-			formData.append("containers", JSON.stringify(containersToMove.map((container) => ({
-				container_id: container.container_id,
-				to_location_id: getDraft(container.container_id).to_location_id,
-				remarks: getDraft(container.container_id).remarks,
-			}))));
+			formData.append(
+				"containers",
+				JSON.stringify(
+					containersToMove.map((container) => ({
+						container_id: container.container_id,
+						to_location_id: getDraft(container.container_id).to_location_id,
+						remarks: getDraft(container.container_id).remarks,
+					})),
+				),
+			);
 
 			const res = await http.post("/operator/warehouses/save/", formData);
 			const resp: Resp = res.data;
 			const data = resp.data as any;
 
-			if (resp.error) throw new Error(getString(data, "Could not save warehouse placement."));
+			if (resp.error) {
+				throw new Error(getString(data, "Could not save warehouse placement."));
+			}
 
 			toast.success(`${containersToMove.length} container(s) placed into the warehouse.`);
 			await onSaved();
 		} catch (error: any) {
-			toast.error(error?.response?.data?.data || error?.response?.data?.message || error?.message || "Could not save warehouse placement.");
+			toast.error(
+				error?.response?.data?.data ||
+				error?.response?.data?.message ||
+				error?.message ||
+				"Could not save warehouse placement.",
+			);
 		} finally {
 			setSaving(false);
 		}
@@ -564,23 +900,78 @@ function WarehousePlacement({
 		<div className="space-y-6 pb-8" style={{ animation: "slideInFromLeft 260ms cubic-bezier(0.32, 0.72, 0, 1)" }}>
 			<div className="flex flex-wrap items-center justify-between gap-3">
 				<div className="flex items-center gap-3">
-					<Button variant="outline" size="icon" className="size-9 border-line bg-paper text-ink hover:bg-sand" onClick={onCancel}><ArrowLeft className="size-4" /></Button>
-					<div><p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">Warehouse operations</p><h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink">New warehouse placement</h2></div>
+					<Button
+						variant="outline"
+						size="icon"
+						className="size-9 border-line bg-paper text-ink hover:bg-sand"
+						onClick={onCancel}
+					>
+						<ArrowLeft className="size-4" />
+					</Button>
+					<div>
+						<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">
+							Warehouse operations
+						</p>
+						<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink">
+							New warehouse placement
+						</h2>
+					</div>
 				</div>
 				<StatusBadge label="Container placement" tone="info" />
 			</div>
 
 			<section className="rounded-2xl bg-paper p-5 ring-1 ring-line">
-				<div className="mb-4"><h3 className="text-sm font-semibold text-ink">Find shipment or container</h3><p className="mt-1 text-xs leading-5 text-ink-soft">Search using a Bill of Lading, shipment reference, container number, or seal number.</p></div>
-				<form onSubmit={handleSearch} className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)_auto]">
-					<div><label className={labelClass}>Search by</label><div className="relative mt-1.5">
-						<select value={searchWhere} onChange={(event) => setSearchWhere(event.target.value as SearchWhere)} className="h-10 w-full appearance-none rounded-lg border border-line bg-sand px-3 pr-9 text-sm text-ink outline-none focus:border-orange">
-							{SEARCH_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-						</select>
-						<ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
-					</div></div>
-					<div><label className={labelClass}>Search value</label><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Enter search value..." className="mt-1.5 h-10 border-line bg-sand text-sm text-ink" /></div>
-					<div className="flex items-end"><Button type="submit" disabled={searching} className="h-10 w-full bg-orange text-white hover:bg-orange-deep md:w-auto">{searching ? <RefreshCw className="size-4 animate-spin" /> : <Search className="size-4" />}Search</Button></div>
+				<div className="mb-4">
+					<h3 className="text-sm font-semibold text-ink">Find shipment or container</h3>
+					<p className="mt-1 text-xs leading-5 text-ink-soft">
+						Search using a Bill of Lading, shipment reference, container number, or seal number.
+					</p>
+				</div>
+
+				<form
+					onSubmit={handleSearch}
+					className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)_auto]"
+				>
+					<div>
+						<label className={labelClass}>Search by</label>
+						<div className="relative mt-1.5">
+							<select
+								value={searchWhere}
+								onChange={(event) => setSearchWhere(event.target.value as SearchWhere)}
+								className="h-10 w-full appearance-none rounded-lg border border-line bg-sand px-3 pr-9 text-sm text-ink outline-none focus:border-orange"
+							>
+								{SEARCH_OPTIONS.map((option) => (
+									<option key={option.value} value={option.value}>
+										{option.label}
+									</option>
+								))}
+							</select>
+							<ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
+						</div>
+					</div>
+
+					<div>
+						<label className={labelClass}>Search value</label>
+						<Input
+							value={query}
+							onChange={(event) => setQuery(event.target.value)}
+							placeholder="Enter search value..."
+							className="mt-1.5 h-10 border-line bg-sand text-sm text-ink"
+						/>
+					</div>
+
+					<div className="flex items-end">
+						<Button
+							type="submit"
+							disabled={searching}
+							className="h-10 w-full bg-orange text-white hover:bg-orange-deep md:w-auto"
+						>
+							{searching
+								? <RefreshCw className="size-4 animate-spin" />
+								: <Search className="size-4" />}
+							Search
+						</Button>
+					</div>
 				</form>
 			</section>
 
@@ -588,68 +979,203 @@ function WarehousePlacement({
 				<>
 					<section className="rounded-2xl bg-paper p-5 ring-1 ring-line">
 						<div className="flex flex-wrap items-start justify-between gap-3">
-							<div><p className={labelClass}>Shipment information</p><h3 className="mt-1 font-mono text-lg font-bold text-ink">{shipment.shipment_reference || "—"}</h3><p className="mt-1 text-xs text-ink-soft">Bill of Lading: <span className="font-mono text-ink">{shipment.bill_of_lading || "—"}</span></p></div>
-							<StatusBadge label={shipment.status || "Unknown"} tone={statusTone(shipment.status)} />
+							<div>
+								<p className={labelClass}>Shipment information</p>
+								<h3 className="mt-1 font-mono text-lg font-bold text-ink">
+									{shipment.shipment_reference || "—"}
+								</h3>
+								<p className="mt-1 text-xs text-ink-soft">
+									Bill of Lading:{" "}
+									<span className="font-mono text-ink">
+										{shipment.bill_of_lading || "—"}
+									</span>
+								</p>
+							</div>
+							<StatusBadge
+								label={shipment.status || "Unknown"}
+								tone={statusTone(shipment.status)}
+							/>
 						</div>
+
 						<div className="mt-5 grid gap-4 border-t border-line pt-4 sm:grid-cols-2 xl:grid-cols-4">
-							<InfoItem label="Consignee" value={shipment.consignee} /><InfoItem label="Shipping line" value={shipment.shipping_line} /><InfoItem label="Vessel" value={shipment.vessel_name} /><InfoItem label="Voyage number" value={shipment.voyage_number} />
+							<InfoItem label="Consignee" value={shipment.consignee} />
+							<InfoItem label="Shipping line" value={shipment.shipping_line} />
+							<InfoItem label="Vessel" value={shipment.vessel_name} />
+							<InfoItem label="Voyage number" value={shipment.voyage_number} />
 						</div>
 					</section>
 
 					<form onSubmit={handleSubmit} className="space-y-5">
 						<section className="overflow-hidden rounded-2xl bg-paper ring-1 ring-line">
 							<div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
-								<div><h3 className="text-sm font-semibold text-ink">Shipment containers</h3><p className="mt-1 text-xs text-ink-soft">Select containers currently in the yard and assign their warehouse destinations.</p></div>
-								<div className="flex flex-wrap items-center gap-2"><span className="rounded-md bg-sand px-2.5 py-1 font-mono text-[10px] text-ink-soft">{eligibleContainers.length} eligible</span><span className="rounded-md bg-orange/10 px-2.5 py-1 font-mono text-[10px] text-orange-deep">{selectedContainers.length} selected</span></div>
+								<div>
+									<h3 className="text-sm font-semibold text-ink">Shipment containers</h3>
+									<p className="mt-1 text-xs text-ink-soft">
+										Select received containers and assign their warehouse destinations.
+									</p>
+								</div>
+								<div className="flex flex-wrap items-center gap-2">
+									<span className="rounded-md bg-sand px-2.5 py-1 font-mono text-[10px] text-ink-soft">
+										{eligibleContainers.length} eligible
+									</span>
+									<span className="rounded-md bg-orange/10 px-2.5 py-1 font-mono text-[10px] text-orange-deep">
+										{selectedContainers.length} selected
+									</span>
+								</div>
 							</div>
 
 							{eligibleContainers.length > 0 && (
 								<div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-sand/30 px-4 py-3">
-									<label className="flex cursor-pointer items-center gap-2 text-xs text-ink"><input type="checkbox" checked={selectedContainers.length === eligibleContainers.length && eligibleContainers.length > 0} onChange={(event) => toggleAll(event.target.checked)} className="size-4 accent-orange" />Select all eligible containers</label>
-									<Button type="button" variant="outline" size="sm" onClick={applyDestinationToSelected} className="border-line bg-paper text-ink hover:bg-sand"><Check className="size-3.5" />Apply destination to selected</Button>
+									<label className="flex cursor-pointer items-center gap-2 text-xs text-ink">
+										<input
+											type="checkbox"
+											checked={
+												selectedContainers.length === eligibleContainers.length &&
+												eligibleContainers.length > 0
+											}
+											onChange={(event) => toggleAll(event.target.checked)}
+											className="size-4 accent-orange"
+										/>
+										Select all eligible containers
+									</label>
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										onClick={applyDestinationToSelected}
+										className="border-line bg-paper text-ink hover:bg-sand"
+									>
+										<Check className="size-3.5" />
+										Apply destination to selected
+									</Button>
 								</div>
 							)}
 
 							{containers.length === 0 ? (
-								<div className="p-8 text-center"><Package className="mx-auto size-7 text-ink-soft" /><p className="mt-3 text-sm font-semibold text-ink">No containers found</p></div>
+								<div className="p-8 text-center">
+									<Package className="mx-auto size-7 text-ink-soft" />
+									<p className="mt-3 text-sm font-semibold text-ink">No containers found</p>
+								</div>
 							) : (
 								<div className="divide-y divide-line">
 									{containers.map((container) => {
-										const eligible = container.can_move && WAREHOUSE_ELIGIBLE_STATUSES.has(container.status);
+										const eligible =
+											container.can_move &&
+											container.receiving_status === "RECEIVED" &&
+											WAREHOUSE_ELIGIBLE_STATUSES.has(container.status);
+
 										const selected = selectedContainers.includes(container.container_id);
 										const draft = getDraft(container.container_id);
 
 										return (
-											<div key={container.container_id} className={cn("p-4 transition-colors", selected && "bg-orange/[0.035]")}>
+											<div
+												key={container.container_id}
+												className={cn("p-4 transition-colors", selected && "bg-orange/[0.035]")}
+											>
 												<div className="flex flex-wrap items-start gap-3">
-													<div className="pt-1"><input type="checkbox" checked={selected} disabled={!eligible} onChange={(event) => toggleContainer(container.container_id, event.target.checked)} className="size-4 accent-orange" /></div>
+													<div className="pt-1">
+														<input
+															type="checkbox"
+															checked={selected}
+															disabled={!eligible}
+															onChange={(event) =>
+																toggleContainer(container.container_id, event.target.checked)
+															}
+															className="size-4 accent-orange"
+														/>
+													</div>
+
 													<div className="min-w-0 flex-1">
 														<div className="flex flex-wrap items-center gap-2">
-															<p className="font-mono text-sm font-bold text-ink">{container.container_no || "Unnamed container"}</p>
-															{container.size && <span className="rounded bg-sand px-2 py-0.5 font-mono text-[10px] text-ink-soft">{container.size}</span>}
-															<StatusBadge label={container.status || "Unknown"} tone={statusTone(container.status)} />
+															<p className="font-mono text-sm font-bold text-ink">
+																{container.container_no || "Unnamed container"}
+															</p>
+															{container.size && (
+																<span className="rounded bg-sand px-2 py-0.5 font-mono text-[10px] text-ink-soft">
+																	{container.size}
+																</span>
+															)}
+															<StatusBadge
+																label={container.status || "Unknown"}
+																tone={statusTone(container.status)}
+															/>
 														</div>
+
 														<div className="mt-2 grid gap-2 text-xs sm:grid-cols-2 xl:grid-cols-4">
-															<InfoItem label="Seal number" value={container.actual_seal_no || container.seal_no} />
-															<InfoItem label="Current location" value={container.current_location_name || container.current_location_code} />
-															<InfoItem label="Weight" value={container.actual_weight ?? container.gross_weight} />
-															<InfoItem label="Package count" value={container.package_count} />
+															<InfoItem
+																label="Seal number"
+																value={container.actual_seal_no || container.seal_no}
+															/>
+															<InfoItem
+																label="Current location"
+																value={container.current_location_name || container.current_location_code}
+															/>
+															<InfoItem
+																label="Weight"
+																value={container.actual_weight ?? container.gross_weight}
+															/>
+															<InfoItem
+																label="Package count"
+																value={container.package_count}
+															/>
 														</div>
-														{container.cargo_description && <p className="mt-2 text-xs leading-5 text-ink-soft">{container.cargo_description}</p>}
+
+														{container.cargo_description && (
+															<p className="mt-2 text-xs leading-5 text-ink-soft">
+																{container.cargo_description}
+															</p>
+														)}
 
 														{eligible ? (
 															<div className="mt-4 grid gap-3 md:grid-cols-2">
-																<div><label className={labelClass}>Warehouse destination</label><div className="relative mt-1.5">
-																	<select value={draft.to_location_id} onChange={(event) => updateDraft(container.container_id, { to_location_id: event.target.value })} disabled={loadingLocations || warehouseLocations.length === 0} className="h-10 w-full appearance-none rounded-lg border border-line bg-sand px-3 pr-9 text-sm text-ink outline-none focus:border-orange disabled:opacity-60">
-																		<option value="">{loadingLocations ? "Loading warehouses..." : warehouseLocations.length ? "Select warehouse" : "No warehouse locations available"}</option>
-																		{warehouseLocations.map((location) => <option key={location.id} value={location.id}>{getLocationLabel(location)}</option>)}
-																	</select>
-																	<ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
-																</div></div>
-																<div><label className={labelClass}>Remarks</label><Input value={draft.remarks} onChange={(event) => updateDraft(container.container_id, { remarks: event.target.value })} placeholder="Optional placement remarks" className="mt-1.5 h-10 border-line bg-sand text-sm text-ink" /></div>
+																<div>
+																	<label className={labelClass}>Warehouse destination</label>
+																	<div className="relative mt-1.5">
+																		<select
+																			value={draft.to_location_id}
+																			onChange={(event) =>
+																				updateDraft(container.container_id, {
+																					to_location_id: event.target.value,
+																				})
+																			}
+																			disabled={loadingLocations || warehouseLocations.length === 0}
+																			className="h-10 w-full appearance-none rounded-lg border border-line bg-sand px-3 pr-9 text-sm text-ink outline-none focus:border-orange disabled:opacity-60"
+																		>
+																			<option value="">
+																				{loadingLocations
+																					? "Loading warehouses..."
+																					: warehouseLocations.length
+																						? "Select warehouse"
+																						: "No warehouse locations available"}
+																			</option>
+																			{warehouseLocations.map((location) => (
+																				<option key={location.id} value={location.id}>
+																					{getLocationLabel(location)}
+																				</option>
+																			))}
+																		</select>
+																		<ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
+																	</div>
+																</div>
+
+																<div>
+																	<label className={labelClass}>Remarks</label>
+																	<Input
+																		value={draft.remarks}
+																		onChange={(event) =>
+																			updateDraft(container.container_id, {
+																				remarks: event.target.value,
+																			})
+																		}
+																		placeholder="Optional placement remarks"
+																		className="mt-1.5 h-10 border-line bg-sand text-sm text-ink"
+																	/>
+																</div>
 															</div>
 														) : (
-															<div className="mt-3 rounded-lg bg-sand px-3 py-2 text-xs text-ink-soft">This container is not eligible for warehouse placement. It must be received and currently located in an active yard location.</div>
+															<div className="mt-3 rounded-lg bg-sand px-3 py-2 text-xs text-ink-soft">
+																This container is not eligible. It must have a completed receiving record and must not have exited the terminal.
+															</div>
 														)}
 													</div>
 												</div>
@@ -660,16 +1186,40 @@ function WarehousePlacement({
 							)}
 
 							<div className="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-sand/30 px-4 py-3">
-								<p className="text-xs text-ink-soft">{selectedContainers.length} of {eligibleContainers.length} eligible containers selected</p>
-								<p className="font-mono text-[10px] text-ink-soft">Only eligible containers currently located in the yard can be placed</p>
+								<p className="text-xs text-ink-soft">
+									{selectedContainers.length} of {eligibleContainers.length} eligible containers selected
+								</p>
+								<p className="font-mono text-[10px] text-ink-soft">
+									Received containers can be moved from operational locations, including yards, examination areas, and other warehouses.
+								</p>
 							</div>
 						</section>
 
 						<div className="flex flex-wrap items-center justify-between gap-3">
-							<Button type="button" variant="outline" onClick={onCancel} className="border-line bg-paper text-ink hover:bg-sand">Cancel</Button>
-							<Button type="submit" disabled={saving || !containersToMove.length || loadingLocations || !warehouseLocations.length} className="bg-orange text-white hover:bg-orange-deep">
-								{saving ? <RefreshCw className="size-4 animate-spin" /> : <Warehouse className="size-4" />}
-								{saving ? "Saving placement..." : `Place ${containersToMove.length || ""} container(s)`}
+							<Button
+								type="button"
+								variant="outline"
+								onClick={onCancel}
+								className="border-line bg-paper text-ink hover:bg-sand"
+							>
+								Cancel
+							</Button>
+							<Button
+								type="submit"
+								disabled={
+									saving ||
+									!containersToMove.length ||
+									loadingLocations ||
+									!warehouseLocations.length
+								}
+								className="bg-orange text-white hover:bg-orange-deep"
+							>
+								{saving
+									? <RefreshCw className="size-4 animate-spin" />
+									: <Warehouse className="size-4" />}
+								{saving
+									? "Saving placement..."
+									: `Place ${containersToMove.length || ""} container(s)`}
 								<ArrowRight className="size-4" />
 							</Button>
 						</div>
@@ -677,11 +1227,24 @@ function WarehousePlacement({
 				</>
 			)}
 
-			{!shipment && hasSearched && <div className="rounded-2xl bg-paper p-8 text-center ring-1 ring-line"><Package className="mx-auto size-7 text-ink-soft" /><p className="mt-3 text-sm font-semibold text-ink">No shipment details available</p></div>}
+			{!shipment && hasSearched && (
+				<div className="rounded-2xl bg-paper p-8 text-center ring-1 ring-line">
+					<Package className="mx-auto size-7 text-ink-soft" />
+					<p className="mt-3 text-sm font-semibold text-ink">No shipment details available</p>
+				</div>
+			)}
 
 			{!shipment && !hasSearched && (
 				<div className="rounded-2xl bg-paper p-6 ring-1 ring-line">
-					<div className="flex items-start gap-3"><ArrowDown className="mt-0.5 size-4 shrink-0 text-orange-deep" /><div><p className="text-sm font-semibold text-ink">How warehouse placement works</p><p className="mt-1 text-xs leading-5 text-ink-soft">Search for an existing shipment, review its containers, select containers currently in the yard, and assign each one to an active warehouse location. The system records the movement and updates the container's current location.</p></div></div>
+					<div className="flex items-start gap-3">
+						<ArrowDown className="mt-0.5 size-4 shrink-0 text-orange-deep" />
+						<div>
+							<p className="text-sm font-semibold text-ink">How warehouse placement works</p>
+							<p className="mt-1 text-xs leading-5 text-ink-soft">
+								Search for an existing shipment, review its containers, select eligible containers, and assign each one to a warehouse location. The system records the movement and updates the container's current location.
+							</p>
+						</div>
+					</div>
 				</div>
 			)}
 		</div>
@@ -691,34 +1254,136 @@ function WarehousePlacement({
 function InfoItem({ label, value }: { label: string; value: unknown }) {
 	return (
 		<div className="min-w-0">
-			<p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">{label}</p>
-			<p className="mt-1 truncate text-xs font-medium text-ink">{value === null || value === undefined || value === "" ? "—" : String(value)}</p>
+			<p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">
+				{label}
+			</p>
+			<p className="mt-1 truncate text-xs font-medium text-ink">
+				{value === null || value === undefined || value === "" ? "—" : String(value)}
+			</p>
 		</div>
 	);
 }
 
-function MovementDetails({ movement, onClose }: { movement: WarehouseMovement; onClose: () => void }) {
+function MovementDetails({movement, onClose}: {movement: WarehouseMovement; onClose: () => void;}) {
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-			<div className="w-full max-w-xl overflow-hidden rounded-2xl bg-paper shadow-2xl">
-				<div className="flex items-start justify-between gap-3 border-b border-line p-5">
-					<div><p className="font-mono text-[10px] uppercase tracking-[0.16em] text-ink-soft">Warehouse movement details</p><h3 className="mt-1 font-display text-xl font-bold text-ink">{movement.container_no || "Container movement"}</h3><p className="mt-1 font-mono text-xs text-ink-soft">{movement.movement_reference || movement.id}</p></div>
-					<Button variant="outline" size="sm" onClick={onClose} className="border-line bg-paper text-ink hover:bg-sand">Close</Button>
-				</div>
-				<div className="space-y-5 p-5">
-					<div className="grid gap-4 sm:grid-cols-2">
-						<InfoItem label="Shipment reference" value={movement.shipment_reference} />
-						<InfoItem label="Bill of Lading" value={movement.bill_of_lading} />
-						<InfoItem label="Origin location" value={movement.origin_location_name} />
-						<InfoItem label="Destination warehouse" value={movement.destination_location_name} />
-						<InfoItem label="Destination code" value={movement.destination_location_code} />
-						<InfoItem label="Operator" value={movement.moved_by} />
-						<InfoItem label="Completed at" value={movement.completed_at || movement.created_at} />
-						<InfoItem label="Movement status" value={movement.status} />
+		<div className="space-y-6 pb-8">
+			<div className="flex flex-wrap items-center justify-between gap-3">
+				<div className="flex items-center gap-3">
+					<Button
+						variant="outline"
+						size="icon"
+						onClick={onClose}
+						className="size-9 border-line bg-paper text-ink hover:bg-sand"
+					>
+						<ArrowLeft className="size-4" />
+					</Button>
+					<div>
+						<p className={labelClass}>Warehouse movement</p>
+						<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink">
+							Movement details
+						</h2>
+						<p className="mt-1 break-all font-mono text-xs text-ink-soft">
+							{movement.movement_reference || movement.id}
+						</p>
 					</div>
-					<div className="rounded-xl bg-sand p-4"><p className={labelClass}>Movement remarks</p><p className="mt-2 text-sm leading-6 text-ink">{movement.remarks || "No remarks recorded."}</p></div>
-					<div className="flex items-center gap-2 text-xs text-ink-soft"><Clock3 className="size-4" />This record represents a completed warehouse movement.</div>
 				</div>
+				<StatusBadge
+					label={movement.status || "COMPLETED"}
+					tone={statusTone(movement.status || "COMPLETED")}
+				/>
+			</div>
+
+			<section className="rounded-2xl bg-paper p-5 ring-1 ring-line">
+				<h3 className="text-sm font-semibold text-ink">Movement information</h3>
+				<div className="mt-4 grid gap-4 border-t border-line pt-4 sm:grid-cols-2 xl:grid-cols-4">
+					<InfoItem label="Movement reference" value={movement.movement_reference} />
+					<InfoItem label="Movement ID" value={movement.id} />
+					<InfoItem label="Operator" value={movement.moved_by} />
+					<InfoItem label="Completed at" value={movement.completed_at} />
+					<InfoItem label="Created at" value={movement.created_at} />
+				</div>
+			</section>
+
+			<section className="rounded-2xl bg-paper p-5 ring-1 ring-line">
+				<h3 className="text-sm font-semibold text-ink">Shipment information</h3>
+				<div className="mt-4 grid gap-4 border-t border-line pt-4 sm:grid-cols-2 xl:grid-cols-3">
+					<InfoItem label="Shipment reference" value={movement.shipment_reference} />
+					<InfoItem label="Bill of Lading" value={movement.bill_of_lading} />
+					<InfoItem label="Vessel" value={movement.vessel_name} />
+					<InfoItem label="Voyage number" value={movement.voyage_number} />
+					<InfoItem label="Shipping line" value={movement.shipping_line} />
+					<InfoItem label="Shipment ID" value={movement.shipment_id} />
+				</div>
+			</section>
+
+			<section className="rounded-2xl bg-paper p-5 ring-1 ring-line">
+				<h3 className="text-sm font-semibold text-ink">Container information</h3>
+				<div className="mt-4 grid gap-4 border-t border-line pt-4 sm:grid-cols-2 xl:grid-cols-3">
+					<InfoItem label="Container number" value={movement.container_no} />
+					<InfoItem label="Container size" value={movement.container_size} />
+					<InfoItem label="Seal number" value={movement.seal_no} />
+					<InfoItem label="Gross weight" value={movement.gross_weight} />
+					<InfoItem label="Container status" value={movement.container_status} />
+					<InfoItem label="Container ID" value={movement.container_id} />
+					<div className="sm:col-span-2 xl:col-span-3">
+						<InfoItem label="Cargo description" value={movement.cargo_description} />
+					</div>
+				</div>
+			</section>
+
+			<section className="rounded-2xl bg-paper p-5 ring-1 ring-line">
+				<h3 className="text-sm font-semibold text-ink">Location movement</h3>
+				<div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
+					<div className="rounded-xl border border-line bg-sand/50 p-4">
+						<p className={labelClass}>From location</p>
+						<p className="mt-2 text-sm font-semibold text-ink">
+							{movement.from_location_name || "Not recorded"}
+						</p>
+						<p className="mt-1 font-mono text-xs text-ink-soft">
+							{movement.from_location_code || "—"}
+						</p>
+						{movement.from_location_id && (
+							<p className="mt-2 break-all font-mono text-[10px] text-ink-soft">
+								{movement.from_location_id}
+							</p>
+						)}
+					</div>
+
+					<ArrowRight className="mx-auto size-5 text-orange-deep" />
+
+					<div className="rounded-xl border border-orange/30 bg-orange/[0.04] p-4">
+						<p className={labelClass}>To warehouse</p>
+						<p className="mt-2 text-sm font-semibold text-ink">
+							{movement.to_location_name || "Not recorded"}
+						</p>
+						<p className="mt-1 font-mono text-xs text-ink-soft">
+							{movement.to_location_code || "—"}
+						</p>
+						{movement.to_location_id && (
+							<p className="mt-2 break-all font-mono text-[10px] text-ink-soft">
+								{movement.to_location_id}
+							</p>
+						)}
+					</div>
+				</div>
+			</section>
+
+			<section className="rounded-2xl bg-paper p-5 ring-1 ring-line">
+				<p className={labelClass}>Movement remarks</p>
+				<p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink">
+					{movement.remarks || "No remarks recorded."}
+				</p>
+			</section>
+
+			<div className="flex justify-start">
+				<Button
+					variant="outline"
+					onClick={onClose}
+					className="border-line bg-paper text-ink hover:bg-sand"
+				>
+					<ArrowLeft className="size-4" />
+					Back to movements
+				</Button>
 			</div>
 		</div>
 	);

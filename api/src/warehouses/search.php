@@ -6,8 +6,6 @@
         $where = trim($_POST["where"] ?? "bill_of_lading");
 
         if ($search === "") {
-            http_response_code(422);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Enter a search value.",
@@ -24,8 +22,6 @@
         ];
 
         if (!in_array($where, $allowedSearchFields, true)) {
-            http_response_code(422);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid search type.",
@@ -135,16 +131,16 @@
 
                 CASE
                     WHEN receiving.receiving_status = 'RECEIVED'
-                        AND psc.current_location_id IS NOT NULL
-                        AND current_location.kind = 'YARD'
-                        AND current_location.status = 'active'
-                        AND latest_movement.id IS NOT NULL
-                        AND latest_movement.to_location_id = psc.current_location_id
-                        AND psc.status NOT IN (
-                            'GATE_OUT',
-                            'TRANSFERRED_OUT',
-                            'RETURNED_RE_EXPORTED',
-                            'CANCELLED'
+                        AND psc.status IN (
+                            'RECEIVED',
+                            'IN_YARD',
+                            'IN_WAREHOUSE',
+                            'UNDER_EXAMINATION',
+                            'EXAMINATION_SCHEDULED',
+                            'EXAMINATION_COMPLETE',
+                            'CHARGES_PENDING',
+                            'CHARGES_SETTLED',
+                            'RELEASE_AUTHORISED'
                         )
                     THEN 1
                     ELSE 0
@@ -326,8 +322,6 @@
         ]);
 
     } catch (Throwable $e) {
-        http_response_code(500);
-
         echo json_encode([
             "error" => true,
             "data" => "Could not search shipment containers.",

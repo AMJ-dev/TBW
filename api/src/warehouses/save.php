@@ -1,331 +1,372 @@
+
 <?php
-    require_once dirname(__DIR__, 2) . "/include/verify-user.php";
+require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
-    try {
-        $shipment_id = trim($_POST["shipment_id"] ?? "");
-        $containers = $_POST["containers"] ?? null;
+header("Content-Type: application/json; charset=UTF-8");
 
-        if ($shipment_id === "" || !is_string($containers)) {
-            http_response_code(400);
+try {
+	$shipment_id = trim($_POST["shipment_id"] ?? "");
+	$containers = $_POST["containers"] ?? null;
 
-            echo json_encode([
-                "error" => true,
-                "data" => "Shipment and container details are required.",
-                "code" => null
-            ]);
-            exit;
-        }
+	if ($shipment_id === "" || !is_string($containers)) {
+		echo json_encode([
+			"error" => true,
+			"data" => "Shipment and container details are required.",
+			"code" => null
+		]);
+		exit;
+	}
 
-        $containers = json_decode($containers, true);
+	$containers = json_decode($containers, true);
 
-        if (!is_array($containers) || count($containers) === 0) {
-            http_response_code(400);
+	if (!is_array($containers) || count($containers) === 0) {
+		echo json_encode([
+			"error" => true,
+			"data" => "Select at least one container.",
+			"code" => null
+		]);
+		exit;
+	}
 
-            echo json_encode([
-                "error" => true,
-                "data" => "Select at least one container.",
-                "code" => null
-            ]);
-            exit;
-        }
+	$operator_id = $my_details->id ?? null;
 
-        $operator_id = $my_details->id ?? null;
+	$eligibleStatuses = [
+		"RECEIVED",
+		"IN_YARD",
+		"IN_WAREHOUSE",
+		"UNDER_EXAMINATION",
+		"EXAMINATION_SCHEDULED",
+		"EXAMINATION_COMPLETE",
+		"CHARGES_PENDING",
+		"CHARGES_SETTLED",
+		"RELEASE_AUTHORISED"
+	];
 
-        $conn->beginTransaction();
+	$conn->beginTransaction();
 
-        $shipmentStmt = $conn->prepare("
-            SELECT id, status
-            FROM portal_shipments
-            WHERE id = :id
-            LIMIT 1
-            FOR UPDATE
-        ");
+	$shipmentStmt = $conn->prepare("
+		SELECT id, status
+		FROM portal_shipments
+		WHERE id = :id
+		LIMIT 1
+		FOR UPDATE
+	");
 
-        $shipmentStmt->bindValue(":id", $shipment_id, PDO::PARAM_STR);
-        $shipmentStmt->execute();
+	$shipmentStmt->bindValue(":id", $shipment_id, PDO::PARAM_STR);
+	$shipmentStmt->execute();
 
-        $shipment = $shipmentStmt->fetch(PDO::FETCH_ASSOC);
+	$shipment = $shipmentStmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$shipment) {
-            throw new RuntimeException("Shipment was not found.");
-        }
+	if (!$shipment) {
+		throw new RuntimeException("Shipment was not found.");
+	}
 
-        $containerStmt = $conn->prepare("
-            SELECT
-                pc.id,
-                pc.shipment_id,
-                pc.container_no,
-                pc.status,
-                pc.current_location_id,
-                tl.kind AS current_location_kind,
-                tl.status AS current_location_status
-            FROM portal_shipment_containers pc
-            LEFT JOIN terminal_locations tl
-                ON tl.id = pc.current_location_id
-            WHERE pc.id = :container_id
-            AND pc.shipment_id = :shipment_id
-            LIMIT 1
-            FOR UPDATE
-        ");
+	$containerStmt = $conn->prepare("
+		SELECT
+			pc.id,
+			pc.shipment_id,
+			pc.container_no,
+			pc.status,
+			pc.current_location_id,
+			current_location.kind AS current_location_kind,
+			receiving.receiving_status,
+			receiving.receiving_location_id
+		FROM portal_shipment_containers pc
+		LEFT JOIN terminal_locations current_location
+			ON current_location.id = pc.current_location_id
+		LEFT JOIN (
+			SELECT
+				rc.container_id,
+				rc.receiving_status,
+				rc.receiving_location_id,
+				ROW_NUMBER() OVER (
+					PARTITION BY rc.container_id
+					ORDER BY
+						COALESCE(
+							rc.received_at,
+							rc.updated_at,
+							rc.created_at
+						) DESC,
+						rc.created_at DESC
+				) AS row_num
+			FROM portal_receiving_containers rc
+		) receiving
+			ON receiving.container_id = pc.id
+			AND receiving.row_num = 1
+		WHERE pc.id = :container_id
+			AND pc.shipment_id = :shipment_id
+		LIMIT 1
+		FOR UPDATE
+	");
 
-        $destinationStmt = $conn->prepare("
-            SELECT id, code, name, kind, status
-            FROM terminal_locations
-            WHERE id = :id
-            LIMIT 1
-        ");
+	$destinationStmt = $conn->prepare("
+		SELECT id, code, name, kind, status
+		FROM terminal_locations
+		WHERE id = :id
+		LIMIT 1
+	");
 
-        $insertMovement = $conn->prepare("
-            INSERT INTO terminal_warehouse_movements (
-                id,
-                movement_reference,
-                shipment_id,
-                container_id,
-                from_location_id,
-                to_location_id,
-                remarks,
-                moved_by,
-                completed_at,
-                created_at
-            ) VALUES (
-                :id,
-                :movement_reference,
-                :shipment_id,
-                :container_id,
-                :from_location_id,
-                :to_location_id,
-                :remarks,
-                :moved_by,
-                NOW(),
-                NOW()
-            )
-        ");
+	$insertMovement = $conn->prepare("
+		INSERT INTO terminal_warehouse_movements (
+			id,
+			movement_reference,
+			shipment_id,
+			container_id,
+			from_location_id,
+			to_location_id,
+			remarks,
+			moved_by,
+			completed_at,
+			created_at
+		) VALUES (
+			:id,
+			:movement_reference,
+			:shipment_id,
+			:container_id,
+			:from_location_id,
+			:to_location_id,
+			:remarks,
+			:moved_by,
+			NOW(),
+			NOW()
+		)
+	");
 
-        $insertLog = $conn->prepare("
-            INSERT INTO terminal_warehouse_movement_logs (
-                id,
-                movement_id,
-                shipment_id,
-                container_id,
-                action,
-                previous_location_id,
-                new_location_id,
-                description,
-                metadata,
-                performed_by,
-                performed_at
-            ) VALUES (
-                :id,
-                :movement_id,
-                :shipment_id,
-                :container_id,
-                'WAREHOUSE_PLACEMENT',
-                :previous_location_id,
-                :new_location_id,
-                :description,
-                :metadata,
-                :performed_by,
-                NOW()
-            )
-        ");
+	$insertLog = $conn->prepare("
+		INSERT INTO terminal_warehouse_movement_logs (
+			id,
+			movement_id,
+			shipment_id,
+			container_id,
+			action,
+			previous_location_id,
+			new_location_id,
+			description,
+			metadata,
+			performed_by,
+			performed_at
+		) VALUES (
+			:id,
+			:movement_id,
+			:shipment_id,
+			:container_id,
+			:action,
+			:previous_location_id,
+			:new_location_id,
+			:description,
+			:metadata,
+			:performed_by,
+			NOW()
+		)
+	");
 
-        $updateContainer = $conn->prepare("
-            UPDATE portal_shipment_containers
-            SET
-                current_location_id = :location_id,
-                status = 'IN_WAREHOUSE',
-                stored_at = COALESCE(stored_at, NOW()),
-                updated_at = NOW()
-            WHERE id = :container_id
-            AND shipment_id = :shipment_id
-        ");
+	$updateContainer = $conn->prepare("
+		UPDATE portal_shipment_containers
+		SET
+			current_location_id = :location_id,
+			status = 'IN_WAREHOUSE',
+			stored_at = COALESCE(stored_at, NOW()),
+			updated_at = NOW()
+		WHERE id = :container_id
+			AND shipment_id = :shipment_id
+	");
 
-        $saved = [];
+	$saved = [];
 
-        foreach ($containers as $item) {
-            $container_id = trim($item["container_id"] ?? "");
-            $destination_id = trim($item["to_location_id"] ?? "");
-            $remarks = trim($item["remarks"] ?? "");
+	foreach ($containers as $item) {
+		$container_id = trim($item["container_id"] ?? "");
+		$destination_id = trim($item["to_location_id"] ?? "");
+		$remarks = trim($item["remarks"] ?? "");
 
-            if ($container_id === "" || $destination_id === "") {
-                throw new RuntimeException("Every selected container needs a warehouse destination.");
-            }
+		if ($container_id === "" || $destination_id === "") {
+			throw new RuntimeException(
+				"Every selected container needs a warehouse destination."
+			);
+		}
 
-            $containerStmt->bindValue(":container_id", $container_id, PDO::PARAM_STR);
-            $containerStmt->bindValue(":shipment_id", $shipment_id, PDO::PARAM_STR);
-            $containerStmt->execute();
+		$containerStmt->bindValue(":container_id", $container_id, PDO::PARAM_STR);
+		$containerStmt->bindValue(":shipment_id", $shipment_id, PDO::PARAM_STR);
+		$containerStmt->execute();
 
-            $container = $containerStmt->fetch(PDO::FETCH_ASSOC);
+		$container = $containerStmt->fetch(PDO::FETCH_ASSOC);
 
-            if (!$container) {
-                throw new RuntimeException("One of the selected containers does not belong to this shipment.");
-            }
+		if (!$container) {
+			throw new RuntimeException(
+				"One of the selected containers does not belong to this shipment."
+			);
+		}
 
-            if (
-                $container["status"] === "GATE_OUT" ||
-                $container["status"] === "TRANSFERRED_OUT" ||
-                $container["status"] === "RETURNED_RE_EXPORTED" ||
-                $container["status"] === "CANCELLED" ||
-                $container["status"] === "IN_WAREHOUSE"
-            ) {
-                throw new RuntimeException(
-                    "Container " . $container["container_no"] . " is not eligible for warehouse placement."
-                );
-            }
+		if ($container["receiving_status"] !== "RECEIVED") {
+			throw new RuntimeException(
+				"Container " . $container["container_no"] . " has not been received."
+			);
+		}
 
-            if (
-                !$container["current_location_id"] ||
-                $container["current_location_kind"] !== "YARD" ||
-                $container["current_location_status"] !== "active"
-            ) {
-                throw new RuntimeException(
-                    "Container " . $container["container_no"] . " must be in an active yard location before warehouse placement."
-                );
-            }
+		if (!in_array($container["status"], $eligibleStatuses, true)) {
+			throw new RuntimeException(
+				"Container " . $container["container_no"] . " is not eligible for warehouse placement."
+			);
+		}
 
-            $destinationStmt->bindValue(":id", $destination_id, PDO::PARAM_STR);
-            $destinationStmt->execute();
+		$source_location_id = $container["current_location_id"]
+			?: $container["receiving_location_id"];
 
-            $destination = $destinationStmt->fetch(PDO::FETCH_ASSOC);
+		$destinationStmt->bindValue(":id", $destination_id, PDO::PARAM_STR);
+		$destinationStmt->execute();
 
-            if (
-                !$destination ||
-                $destination["kind"] !== "WAREHOUSE" ||
-                $destination["status"] !== "active"
-            ) {
-                throw new RuntimeException(
-                    "The selected warehouse destination is not active or is not a warehouse."
-                );
-            }
+		$destination = $destinationStmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($destination_id === $container["current_location_id"]) {
-                throw new RuntimeException(
-                    "Container " . $container["container_no"] . " is already at the selected location."
-                );
-            }
+		if (
+			!$destination ||
+			$destination["kind"] !== "WAREHOUSE" ||
+			$destination["status"] !== "active"
+		) {
+			throw new RuntimeException(
+				"The selected warehouse destination is not active or is not a warehouse."
+			);
+		}
 
-            $movement_id = generateId();
-            $movement_reference = "TRN-WHM-" . date("Y") . "-" . strtoupper(bin2hex(random_bytes(5)));
+		if ($source_location_id && $destination_id === $source_location_id) {
+			throw new RuntimeException(
+				"Container " . $container["container_no"] . " is already at the selected location."
+			);
+		}
 
-            $insertMovement->execute([
-                ":id" => $movement_id,
-                ":movement_reference" => $movement_reference,
-                ":shipment_id" => $shipment_id,
-                ":container_id" => $container_id,
-                ":from_location_id" => $container["current_location_id"],
-                ":to_location_id" => $destination_id,
-                ":remarks" => $remarks !== "" ? $remarks : null,
-                ":moved_by" => $operator_id
-            ]);
+		$movement_id = generateId();
+		$movement_reference = "TRN-WHM-" . date("Y") . "-" . strtoupper(bin2hex(random_bytes(5)));
 
-            $updateContainer->execute([
-                ":location_id" => $destination_id,
-                ":container_id" => $container_id,
-                ":shipment_id" => $shipment_id
-            ]);
+		$isRelocation = $container["current_location_kind"] === "WAREHOUSE";
 
-            $insertLog->execute([
-                ":id" => generateId(),
-                ":movement_id" => $movement_id,
-                ":shipment_id" => $shipment_id,
-                ":container_id" => $container_id,
-                ":previous_location_id" => $container["current_location_id"],
-                ":new_location_id" => $destination_id,
-                ":description" => "Container placed in " . $destination["name"],
-                ":metadata" => json_encode([
-                    "movement_reference" => $movement_reference,
-                    "container_no" => $container["container_no"],
-                    "destination_code" => $destination["code"],
-                    "remarks" => $remarks
-                ]),
-                ":performed_by" => $operator_id
-            ]);
+		$action = $isRelocation
+			? "WAREHOUSE_RELOCATION"
+			: "WAREHOUSE_PLACEMENT";
 
-            $saved[] = [
-                "movement_id" => $movement_id,
-                "movement_reference" => $movement_reference,
-                "container_id" => $container_id,
-                "container_no" => $container["container_no"],
-                "destination" => $destination["name"]
-            ];
-        }
+		$description = $isRelocation
+			? "Container relocated to " . $destination["name"]
+			: "Container placed in " . $destination["name"];
 
-        $countStmt = $conn->prepare("
-            SELECT
-                COUNT(*) AS total_containers,
-                SUM(
-                    CASE
-                        WHEN status = 'IN_WAREHOUSE' THEN 1
-                        ELSE 0
-                    END
-                ) AS stored_containers
-            FROM portal_shipment_containers
-            WHERE shipment_id = :shipment_id
-        ");
+		$insertMovement->execute([
+			":id" => $movement_id,
+			":movement_reference" => $movement_reference,
+			":shipment_id" => $shipment_id,
+			":container_id" => $container_id,
+			":from_location_id" => $source_location_id,
+			":to_location_id" => $destination_id,
+			":remarks" => $remarks !== "" ? $remarks : null,
+			":moved_by" => $operator_id
+		]);
 
-        $countStmt->bindValue(":shipment_id", $shipment_id, PDO::PARAM_STR);
-        $countStmt->execute();
+		$updateContainer->execute([
+			":location_id" => $destination_id,
+			":container_id" => $container_id,
+			":shipment_id" => $shipment_id
+		]);
 
-        $counts = $countStmt->fetch(PDO::FETCH_ASSOC);
+		$insertLog->execute([
+			":id" => generateId(),
+			":movement_id" => $movement_id,
+			":shipment_id" => $shipment_id,
+			":container_id" => $container_id,
+			":action" => $action,
+			":previous_location_id" => $source_location_id,
+			":new_location_id" => $destination_id,
+			":description" => $description,
+			":metadata" => json_encode([
+				"movement_reference" => $movement_reference,
+				"container_no" => $container["container_no"],
+				"source_location_id" => $source_location_id,
+				"destination_code" => $destination["code"],
+				"destination_name" => $destination["name"],
+				"movement_type" => $action,
+				"remarks" => $remarks
+			]),
+			":performed_by" => $operator_id
+		]);
 
-        $total = (int) ($counts["total_containers"] ?? 0);
-        $stored = (int) ($counts["stored_containers"] ?? 0);
+		$saved[] = [
+			"movement_id" => $movement_id,
+			"movement_reference" => $movement_reference,
+			"container_id" => $container_id,
+			"container_no" => $container["container_no"],
+			"destination" => $destination["name"],
+			"movement_type" => $action
+		];
+	}
 
-        if ($total > 0 && $stored === $total) {
-            $shipmentStatus = "STORED";
-        } elseif ($stored > 0) {
-            $shipmentStatus = "PARTIALLY_STORED";
-        } else {
-            $shipmentStatus = null;
-        }
+	$countStmt = $conn->prepare("
+		SELECT
+			COUNT(*) AS total_containers,
+			SUM(
+				CASE
+					WHEN status = 'IN_WAREHOUSE' THEN 1
+					ELSE 0
+				END
+			) AS stored_containers
+		FROM portal_shipment_containers
+		WHERE shipment_id = :shipment_id
+	");
 
-        if ($shipmentStatus !== null) {
-           $updateShipment = $conn->prepare("
-                UPDATE portal_shipments
-                SET status = :status, updated_at = NOW()
-                WHERE id = :shipment_id
-                AND status IN (
-                    'EXPECTED',
-                    'PARTIALLY_GATED_IN',
-                    'GATED_IN',
-                    'PARTIALLY_RECEIVED',
-                    'RECEIVED',
-                    'PARTIALLY_STORED',
-                    'STORED'
-                )
-            ");
+	$countStmt->bindValue(":shipment_id", $shipment_id, PDO::PARAM_STR);
+	$countStmt->execute();
 
-            $updateShipment->execute([
-                ":status" => $shipmentStatus,
-                ":shipment_id" => $shipment_id
-            ]);
-        }
+	$counts = $countStmt->fetch(PDO::FETCH_ASSOC);
 
-        $conn->commit();
+	$total = (int) ($counts["total_containers"] ?? 0);
+	$stored = (int) ($counts["stored_containers"] ?? 0);
 
-        echo json_encode([
-            "error" => false,
-            "data" => [
-                "message" => "Warehouse placement completed.",
-                "saved" => $saved,
-                "total_saved" => count($saved),
-                "shipment_status" => $shipmentStatus
-            ],
-            "code" => null
-        ]);
+	if ($total > 0 && $stored === $total) {
+		$shipmentStatus = "STORED";
+	} elseif ($stored > 0) {
+		$shipmentStatus = "PARTIALLY_STORED";
+	} else {
+		$shipmentStatus = null;
+	}
 
-    } catch (Throwable $e) {
-        if ($conn->inTransaction()) {
-            $conn->rollBack();
-        }
+	if ($shipmentStatus !== null) {
+		$updateShipment = $conn->prepare("
+			UPDATE portal_shipments
+			SET status = :status, updated_at = NOW()
+			WHERE id = :shipment_id
+			AND status IN (
+				'EXPECTED',
+				'PARTIALLY_GATED_IN',
+				'GATED_IN',
+				'PARTIALLY_RECEIVED',
+				'RECEIVED',
+				'PARTIALLY_STORED',
+				'STORED'
+			)
+		");
 
-        http_response_code(400);
+		$updateShipment->execute([
+			":status" => $shipmentStatus,
+			":shipment_id" => $shipment_id
+		]);
+	}
 
-        echo json_encode([
-            "error" => true,
-            "data" => $e instanceof RuntimeException
-                ? $e->getMessage()
-                : "Could not save warehouse placement.",
-            "code" => null
-        ]);
-    }
+	$conn->commit();
+
+	echo json_encode([
+		"error" => false,
+		"data" => [
+			"message" => "Warehouse movement completed.",
+			"saved" => $saved,
+			"total_saved" => count($saved),
+			"shipment_status" => $shipmentStatus
+		],
+		"code" => null
+	]);
+
+} catch (Throwable $e) {
+	if ($conn->inTransaction()) {
+		$conn->rollBack();
+	}
+
+	echo json_encode([
+		"error" => true,
+		"data" => $e instanceof RuntimeException
+			? $e->getMessage()
+			: "Could not save warehouse movement.",
+		"code" => null
+	]);
+}
