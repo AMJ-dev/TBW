@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
+	Eye,
 	ArrowDown,
 	ArrowLeft,
 	ArrowRight,
 	Boxes,
 	Check,
 	ChevronDown,
-	Clock3,
 	MapPin,
 	Package,
 	RefreshCw,
@@ -591,6 +591,7 @@ function MovementList({
 									<th className="px-4 py-3 font-medium">Operator</th>
 									<th className="px-4 py-3 font-medium">Status</th>
 									<th className="px-4 py-3 text-right font-medium">Completed</th>
+									<th className="px-4 py-4 text-right font-semibold">Action</th>
 								</tr>
 							</thead>
 
@@ -598,17 +599,8 @@ function MovementList({
 								{filteredMovements.map((movement) => (
 									<tr
 										key={movement.id}
-										onClick={() => onSelectMovement(movement)}
-										onKeyDown={(event) => {
-											if (event.key === "Enter" || event.key === " ") {
-												event.preventDefault();
-												onSelectMovement(movement);
-											}
-										}}
 										tabIndex={0}
-										role="button"
-										title="Click to view movement details"
-										className="cursor-pointer transition-colors hover:bg-sand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange"
+										className="transition-colors hover:bg-sand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange"
 									>
 										<td className="px-4 py-3.5 font-mono text-xs font-bold text-ink">
 											{movement.container_no || "—"}
@@ -648,6 +640,18 @@ function MovementList({
 										</td>
 										<td className="px-4 py-3.5 text-right text-xs text-ink-soft">
 											{movement.completed_at || movement.created_at || "—"}
+										</td>
+										<td className="px-4 py-4 text-right">
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												onClick={() => onSelectMovement(movement)}
+												className="gap-2 cursor-pointer"
+											>
+												<Eye className="h-4 w-4" />
+												View
+											</Button>
 										</td>
 									</tr>
 								))}

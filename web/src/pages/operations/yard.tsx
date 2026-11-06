@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { AnimatePresence, motion } from "framer-motion";
 import {
 	ArrowLeft,
 	ArrowRight,
@@ -12,6 +13,10 @@ import {
 	Truck,
 	Container,
 	MapPin,
+	Eye,
+	Calendar,
+	FileText,
+	User,
 } from "lucide-react";
 import {
 	AppShell,
@@ -23,7 +28,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { http, type Resp } from "@/lib/httpClient";
-import YardMovementDetailsDrawer from "@/components/yard-movement-details-drawer";
 
 interface YardEquipment {
 	id: string;
@@ -36,6 +40,7 @@ interface ContainerMovementAssignment {
 	destination: string;
 	equipmentId: string;
 }
+
 type MovementStatus =
 	| "Positioned"
 	| "Moving"
@@ -49,30 +54,30 @@ type MovementType =
 	| "WAREHOUSE_TO_YARD";
 
 interface YardShipment {
-    shipment_id: string;
-    shipment_reference: string;
-    shipment_type: string;
-    bill_of_lading: string;
-    booking_number: string;
-    vessel_name: string;
-    voyage_number: string;
-    shipping_line: string;
-    origin_country: string;
-    origin_port: string;
-    destination_port: string;
-    expected_arrival: string;
-    consignee: string;
-    consignee_email: string;
-    consignee_phone: string;
-    licensed_agent_name: string;
-    shipment_cargo_description: string;
-    cargo_category: string;
-    package_type: string;
-    package_count: string;
-    shipment_gross_weight: string;
-    volume: string;
-    shipment_status: string;
-    shipment_created_at: string;
+	shipment_id: string;
+	shipment_reference: string;
+	shipment_type: string;
+	bill_of_lading: string;
+	booking_number: string;
+	vessel_name: string;
+	voyage_number: string;
+	shipping_line: string;
+	origin_country: string;
+	origin_port: string;
+	destination_port: string;
+	expected_arrival: string;
+	consignee: string;
+	consignee_email: string;
+	consignee_phone: string;
+	licensed_agent_name: string;
+	shipment_cargo_description: string;
+	cargo_category: string;
+	package_type: string;
+	package_count: string;
+	shipment_gross_weight: string;
+	volume: string;
+	shipment_status: string;
+	shipment_created_at: string;
 }
 
 interface YardLocation {
@@ -199,12 +204,14 @@ const REASON_OPTIONS = [
 	"Hold repositioning",
 	"Quarantine transfer",
 ];
+
 const normalizeEquipment = (item: any): YardEquipment => ({
 	id: getString(item.id),
 	equipment_name: getString(item.equipment_name),
 	equipment_type: getString(item.equipment_type),
 	operational_status: getString(item.operational_status),
 });
+
 const getArray = <T,>(value: unknown): T[] => {
 	if (Array.isArray(value)) return value as T[];
 
@@ -245,98 +252,98 @@ const normalizeLocation = (item: any): YardLocation => ({
 });
 
 const normalizeMovement = (item: any): YardMovementItem => {
-    const logs = Array.isArray(item.logs) ? item.logs : [];
-    const firstLog = logs[0];
-    const origin =
-        item.from_location_name ??
-        firstLog?.previous_location_name ??
-        "Container Receiving Bay";
+	const logs = Array.isArray(item.logs) ? item.logs : [];
+	const firstLog = logs[0];
+	const origin =
+		item.from_location_name ??
+		firstLog?.previous_location_name ??
+		"Container Receiving Bay";
 
-    return {
-        id: getString(item.id ?? item.movement_id),
-        containerId: getString(item.container_id),
-        billOfLading: getString(item.bill_of_lading),
-        shipmentReference: getString(item.shipment_reference),
-        containerNo: getString(item.container_no),
-        movementType: getString(item.movement_type, "YARD_PLACEMENT"),
-        gateLane: getString(item.gate_lane),
-        originSlot: getString(origin),
-        targetSlot: getString(item.to_location_name),
-        equipment: getString(item.equipment_name),
-        operator: getString(
-            item.operator_name ?? item.moved_by,
-            "Not recorded"
-        ),
+	return {
+		id: getString(item.id ?? item.movement_id),
+		containerId: getString(item.container_id),
+		billOfLading: getString(item.bill_of_lading),
+		shipmentReference: getString(item.shipment_reference),
+		containerNo: getString(item.container_no),
+		movementType: getString(item.movement_type, "YARD_PLACEMENT"),
+		gateLane: getString(item.gate_lane),
+		originSlot: getString(origin),
+		targetSlot: getString(item.to_location_name),
+		equipment: getString(item.equipment_name),
+		operator: getString(
+			item.operator_name ?? item.moved_by,
+			"Not recorded"
+		),
 		bookingNumber: getString(item.booking_number),
 		vesselName: getString(item.vessel_name),
 		voyageNumber: getString(item.voyage_number),
 		shippingLine: getString(item.shipping_line),
 		grossWeight: getString(item.gross_weight),
 		cargoDescription: getString(item.cargo_description),
-        reason: getString(item.remarks),
-        status: getString(item.container_status, "UNKNOWN"),
-        timestamp: getString(item.completed_at ?? item.created_at),
-        blockedBy: "",
-        containerSize: getString(item.container_size ?? item.size),
-        sealNo: getString(item.seal_no),
-        equipmentCode: getString(item.equipment_code),
-        equipmentType: getString(item.equipment_type),
-        registrationNumber: getString(item.registration_number),
-        movementReference: getString(item.movement_reference),
-        shipmentId: getString(item.shipment_id),
-        containerStatus: getString(item.container_status),
-        logs,
+		reason: getString(item.remarks),
+		status: getString(item.container_status, "UNKNOWN"),
+		timestamp: getString(item.completed_at ?? item.created_at),
+		blockedBy: "",
+		containerSize: getString(item.container_size ?? item.size),
+		sealNo: getString(item.seal_no),
+		equipmentCode: getString(item.equipment_code),
+		equipmentType: getString(item.equipment_type),
+		registrationNumber: getString(item.registration_number),
+		movementReference: getString(item.movement_reference),
+		shipmentId: getString(item.shipment_id),
+		containerStatus: getString(item.container_status),
+		logs,
 
-        // Drawer compatibility fields
-        movement_reference: getString(item.movement_reference),
-        shipment_reference: getString(item.shipment_reference),
-        bill_of_lading: getString(item.bill_of_lading),
-        container_no: getString(item.container_no),
-        container_size: getString(item.container_size ?? item.size),
-        seal_no: getString(item.seal_no),
-        container_status: getString(item.container_status),
-        movement_type: getString(item.movement_type, "YARD_PLACEMENT"),
-        from_location_name: getString(origin),
-        to_location_name: getString(item.to_location_name),
-        to_location_code: getString(item.to_location_code),
-        equipment_name: getString(item.equipment_name),
-        equipment_code: getString(item.equipment_code),
-        equipment_type: getString(item.equipment_type),
-        registration_number: getString(item.registration_number),
-        operator_name: getString(item.operator_name),
-        moved_by: getString(item.moved_by),
-        remarks: getString(item.remarks),
-        completed_at: getString(item.completed_at),
-        created_at: getString(item.created_at),
-    };
+		movement_reference: getString(item.movement_reference),
+		shipment_reference: getString(item.shipment_reference),
+		bill_of_lading: getString(item.bill_of_lading),
+		container_no: getString(item.container_no),
+		container_size: getString(item.container_size ?? item.size),
+		seal_no: getString(item.seal_no),
+		container_status: getString(item.container_status),
+		movement_type: getString(item.movement_type, "YARD_PLACEMENT"),
+		from_location_name: getString(origin),
+		to_location_name: getString(item.to_location_name),
+		to_location_code: getString(item.to_location_code),
+		equipment_name: getString(item.equipment_name),
+		equipment_code: getString(item.equipment_code),
+		equipment_type: getString(item.equipment_type),
+		registration_number: getString(item.registration_number),
+		operator_name: getString(item.operator_name),
+		moved_by: getString(item.moved_by),
+		remarks: getString(item.remarks),
+		completed_at: getString(item.completed_at),
+		created_at: getString(item.created_at),
+	};
 };
 
 const normalizeYardShipment = (item: any): YardShipment => ({
-    shipment_id: getString(item.shipment_id),
-    shipment_reference: getString(item.shipment_reference),
-    shipment_type: getString(item.shipment_type),
-    bill_of_lading: getString(item.bill_of_lading),
-    booking_number: getString(item.booking_number),
-    vessel_name: getString(item.vessel_name),
-    voyage_number: getString(item.voyage_number),
-    shipping_line: getString(item.shipping_line),
-    origin_country: getString(item.origin_country),
-    origin_port: getString(item.origin_port),
-    destination_port: getString(item.destination_port),
-    expected_arrival: getString(item.expected_arrival),
-    consignee: getString(item.consignee),
-    consignee_email: getString(item.consignee_email),
-    consignee_phone: getString(item.consignee_phone),
-    licensed_agent_name: getString(item.licensed_agent_name),
-    shipment_cargo_description: getString(item.shipment_cargo_description),
-    cargo_category: getString(item.cargo_category),
-    package_type: getString(item.package_type),
-    package_count: getString(item.package_count),
-    shipment_gross_weight: getString(item.shipment_gross_weight),
-    volume: getString(item.volume),
-    shipment_status: getString(item.shipment_status),
-    shipment_created_at: getString(item.shipment_created_at),
+	shipment_id: getString(item.shipment_id),
+	shipment_reference: getString(item.shipment_reference),
+	shipment_type: getString(item.shipment_type),
+	bill_of_lading: getString(item.bill_of_lading),
+	booking_number: getString(item.booking_number),
+	vessel_name: getString(item.vessel_name),
+	voyage_number: getString(item.voyage_number),
+	shipping_line: getString(item.shipping_line),
+	origin_country: getString(item.origin_country),
+	origin_port: getString(item.origin_port),
+	destination_port: getString(item.destination_port),
+	expected_arrival: getString(item.expected_arrival),
+	consignee: getString(item.consignee),
+	consignee_email: getString(item.consignee_email),
+	consignee_phone: getString(item.consignee_phone),
+	licensed_agent_name: getString(item.licensed_agent_name),
+	shipment_cargo_description: getString(item.shipment_cargo_description),
+	cargo_category: getString(item.cargo_category),
+	package_type: getString(item.package_type),
+	package_count: getString(item.package_count),
+	shipment_gross_weight: getString(item.shipment_gross_weight),
+	volume: getString(item.volume),
+	shipment_status: getString(item.shipment_status),
+	shipment_created_at: getString(item.shipment_created_at),
 });
+
 const normalizeYardSearchContainer = (item: any): YardSearchContainer => ({
 	id: getString(item.container_id),
 	shipmentId: getString(item.shipment_id),
@@ -393,7 +400,8 @@ const normalizeYardSearchContainer = (item: any): YardSearchContainer => ({
 	grossWeight: getString(item.gross_weight ?? item.actual_weight),
 });
 
-const getLocationLabel = (location: YardLocation) => [location.code, location.name].filter(Boolean).join(" · ");
+const getLocationLabel = (location: YardLocation) =>
+	[location.code, location.name].filter(Boolean).join(" · ");
 
 const getMovementLabel = (movementType: string) =>
 	MOVEMENT_LABELS[movementType] ??
@@ -407,17 +415,21 @@ export default function OperationsYardRoute() {
 	const [loading, setLoading] = useState(true);
 	const [loadingLocations, setLoadingLocations] = useState(false);
 	const [searchQuery, setSearchQuery] = useState("");
-	const [view, setView] = useState<"list" | "intake">("list");
+	const [view, setView] = useState<"list" | "intake" | "details">("list");
 	const [yardEquipment, setYardEquipment] = useState<YardEquipment[]>([]);
 	const [loadingEquipment, setLoadingEquipment] = useState(false);
 	const [selectedMovement, setSelectedMovement] = useState<YardMovementItem | null>(null);
 
-	const [movementDrawerOpen, setMovementDrawerOpen] = useState(false);
-
 	const handleMovementClick = (movement: YardMovementItem) => {
 		setSelectedMovement(movement);
-		setMovementDrawerOpen(true);
+		setView("details");
 	};
+
+	const handleBackFromDetails = () => {
+		setView("list");
+		setSelectedMovement(null);
+	};
+
 	const fetchMovements = useCallback(async () => {
 		try {
 			setLoading(true);
@@ -516,7 +528,6 @@ export default function OperationsYardRoute() {
 					.map(normalizeLocation)
 					.filter((location: YardLocation) => location.id)
 			);
-
 		} catch (error: any) {
 			toast.error(
 				error?.response?.data?.data ||
@@ -649,53 +660,79 @@ export default function OperationsYardRoute() {
 			occupiedLocations: occupiedLocations.size,
 		};
 	}, [movements, yardEquipment]);
-	
-	
+
 	return (
 		<AppShell
 			title="Yard Management"
 			eyebrow="Operations · Ground Stacking & Movement"
 		>
-			<div className="overflow-hidden">
-				{view === "list" ? (
-					<ListView
-						movements={movements}
-						filteredMovements={filteredMovements}
-						searchQuery={searchQuery}
-						loading={loading}
-						onSearchChange={setSearchQuery}
-						onNewMovement={() => setView("intake")}
-						onExport={handleExport}
-						onRefresh={fetchMovements}
-						metrics={yardMetrics}
-						onMovementClick={handleMovementClick}
-					/>
-				) : (
-					<IntakeView
-						yardLocations={yardLocations}
-						loadingLocations={loadingLocations}
-						yardEquipment={yardEquipment}
-						loadingEquipment={loadingEquipment}
-						onCancel={() => setView("list")}
-						onSaved={async () => {
-							await fetchMovements();
-							setView("list");
-						}}
-					/>
-				)}
-			</div>
+			<div className="relative overflow-hidden">
+				<AnimatePresence mode="wait" initial={false}>
+					{view === "list" && (
+						<motion.div
+							key="yard-list"
+							initial={{ opacity: 0, x: -35 }}
+							animate={{ opacity: 1, x: 0 }}
+							exit={{ opacity: 0, x: -35 }}
+							transition={{ duration: 0.25, ease: "easeInOut" }}
+						>
+							<ListView
+								movements={movements}
+								filteredMovements={filteredMovements}
+								searchQuery={searchQuery}
+								loading={loading}
+								onSearchChange={setSearchQuery}
+								onNewMovement={() => setView("intake")}
+								onExport={handleExport}
+								onRefresh={fetchMovements}
+								metrics={yardMetrics}
+								onMovementClick={handleMovementClick}
+							/>
+						</motion.div>
+					)}
 
-			<YardMovementDetailsDrawer
-				open={movementDrawerOpen}
-				onClose={() => {
-					setMovementDrawerOpen(false);
-					setSelectedMovement(null);
-				}}
-				movement={selectedMovement}
-			/>
+					{view === "intake" && (
+						<motion.div
+							key="yard-intake"
+							initial={{ opacity: 0, x: 35 }}
+							animate={{ opacity: 1, x: 0 }}
+							exit={{ opacity: 0, x: 35 }}
+							transition={{ duration: 0.25, ease: "easeInOut" }}
+						>
+							<IntakeView
+								yardLocations={yardLocations}
+								loadingLocations={loadingLocations}
+								yardEquipment={yardEquipment}
+								loadingEquipment={loadingEquipment}
+								onCancel={() => setView("list")}
+								onSaved={async () => {
+									await fetchMovements();
+									setView("list");
+								}}
+							/>
+						</motion.div>
+					)}
+
+					{view === "details" && selectedMovement && (
+						<motion.div
+							key={`yard-details-${selectedMovement.id}`}
+							initial={{ opacity: 0, x: 35 }}
+							animate={{ opacity: 1, x: 0 }}
+							exit={{ opacity: 0, x: 35 }}
+							transition={{ duration: 0.25, ease: "easeInOut" }}
+						>
+							<YardMovementDetails
+								movement={selectedMovement}
+								onBack={handleBackFromDetails}
+							/>
+						</motion.div>
+					)}
+				</AnimatePresence>
+			</div>
 		</AppShell>
 	);
 }
+
 function ListView({
 	movements,
 	filteredMovements,
@@ -706,7 +743,7 @@ function ListView({
 	onExport,
 	onRefresh,
 	metrics,
-	onMovementClick
+	onMovementClick,
 }: {
 	movements: YardMovementItem[];
 	filteredMovements: YardMovementItem[];
@@ -803,7 +840,6 @@ function ListView({
 							className="pl-9"
 						/>
 					</div>
-
 				</div>
 
 				<div className="overflow-x-auto">
@@ -819,19 +855,20 @@ function ListView({
 								<th className="px-4 py-4 font-semibold">Operator</th>
 								<th className="px-4 py-4 font-semibold">Status</th>
 								<th className="px-4 py-4 font-semibold">Date</th>
+								<th className="px-4 py-4 text-right font-semibold">Action</th>
 							</tr>
 						</thead>
 
 						<tbody className="divide-y divide-line">
 							{loading ? (
 								<tr>
-									<td colSpan={9} className="px-4 py-12 text-center text-ink-soft">
+									<td colSpan={10} className="px-4 py-12 text-center text-ink-soft">
 										Loading movements...
 									</td>
 								</tr>
 							) : filteredMovements.length === 0 ? (
 								<tr>
-									<td colSpan={9} className="px-4 py-12 text-center">
+									<td colSpan={10} className="px-4 py-12 text-center">
 										<p className="font-medium text-ink">
 											No movements found
 										</p>
@@ -843,9 +880,8 @@ function ListView({
 							) : (
 								filteredMovements.map((movement) => (
 									<tr
-									  	key={movement.id}
-										onClick={() => onMovementClick(movement)}
-										className="cursor-pointer transition-colors hover:bg-sand/60"
+										key={movement.id}
+										className="transition-colors hover:bg-sand/60"
 									>
 										<td className="px-4 py-4">
 											<p className="font-medium text-ink">
@@ -895,6 +931,19 @@ function ListView({
 											{movement.timestamp
 												? new Date(movement.timestamp).toLocaleString()
 												: "—"}
+										</td>
+
+										<td className="px-4 py-4 text-right">
+											<Button
+												type="button"
+												size="sm"
+												variant="outline"
+												onClick={() => onMovementClick(movement)}
+												className="gap-2 cursor-pointer"
+											>
+												<Eye className="h-4 w-4" />
+												View
+											</Button>
 										</td>
 									</tr>
 								))
@@ -1715,7 +1764,7 @@ function SelectField({
 	placeholder?: string;
 	disabled?: boolean;
 	loading?: boolean;
-}) { 
+}) {
 	return (
 		<div className="space-y-2">
 			<label className={labelClass}>{label}</label>
@@ -1738,6 +1787,258 @@ function SelectField({
 					</option>
 				))}
 			</select>
+		</div>
+	);
+}
+
+function YardMovementDetails({
+	movement,
+	onBack,
+}: {
+	movement: YardMovementItem;
+	onBack: () => void;
+}) {
+	const formatDate = (value?: string) => {
+		if (!value) return "Not recorded";
+
+		const date = new Date(value.replace(" ", "T"));
+
+		if (Number.isNaN(date.getTime())) return value;
+
+		return date.toLocaleString();
+	};
+
+	const DetailItem = ({
+		label,
+		value,
+	}: {
+		label: string;
+		value?: string | number | null | undefined;
+	}) => (
+		<div className="min-w-0 space-y-1">
+			<p className="text-xs text-ink-soft">{label}</p>
+			<p className="break-words text-sm font-medium text-ink">
+				{value !== null && value !== undefined && value !== ""
+					? value
+					: "Not recorded"}
+			</p>
+		</div>
+	);
+
+	const logs = movement.logs ?? [];
+
+	return (
+		<div className="space-y-6">
+			<div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+				<div className="flex items-start gap-3">
+					<Button
+						type="button"
+						variant="outline"
+						size="icon"
+						onClick={onBack}
+						className="shrink-0 cursor-pointer"
+					>
+						<ArrowLeft className="h-4 w-4" />
+					</Button>
+
+					<div>
+						<h2 className="text-xl font-semibold text-ink">
+							Yard Movement Details
+						</h2>
+						<p className="mt-1 text-sm text-ink-soft">
+							{movement.movementReference || "Movement record"}
+						</p>
+					</div>
+				</div>
+
+				<StatusBadge
+					label={movement.containerStatus || "Unknown"}
+					tone={statusTone(movement.containerStatus || "")}
+				/>
+			</div>
+
+			<div className="rounded-xl border border-line bg-paper p-5">
+				<p className={labelClass}>Movement Reference</p>
+				<p className="mt-1 text-lg font-semibold text-ink">
+					{movement.movementReference || "Not recorded"}
+				</p>
+			</div>
+
+			<div className="rounded-xl border border-line bg-paper p-5 space-y-4">
+				<div className="flex items-center gap-2">
+					<Container className="h-[18px] text-orange" />
+					<h3 className="text-sm font-semibold text-ink">
+						Container Information
+					</h3>
+				</div>
+
+				<div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+					<DetailItem label="Container number" value={movement.containerNo} />
+					<DetailItem label="Container size" value={movement.containerSize} />
+					<DetailItem label="Seal number" value={movement.sealNo} />
+					<DetailItem label="Container status" value={movement.containerStatus} />
+					<DetailItem label="Gross weight" value={movement.grossWeight} />
+					<DetailItem label="Cargo description" value={movement.cargoDescription} />
+				</div>
+			</div>
+
+			<div className="rounded-xl border border-line bg-paper p-5 space-y-4">
+				<div className="flex items-center gap-2">
+					<FileText className="h-[18px] text-orange" />
+					<h3 className="text-sm font-semibold text-ink">
+						Shipment Information
+					</h3>
+				</div>
+
+				<div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+					<DetailItem label="Shipment reference" value={movement.shipmentReference} />
+					<DetailItem label="Bill of lading" value={movement.billOfLading} />
+					<DetailItem label="Booking number" value={movement.bookingNumber} />
+					<DetailItem label="Vessel" value={movement.vesselName} />
+					<DetailItem label="Voyage" value={movement.voyageNumber} />
+					<DetailItem label="Shipping line" value={movement.shippingLine} />
+				</div>
+			</div>
+
+			<div className="rounded-xl border border-line bg-paper p-5 space-y-4">
+				<div className="flex items-center gap-2">
+					<MapPin className="h-[18px] text-orange" />
+					<h3 className="text-sm font-semibold text-ink">Movement Route</h3>
+				</div>
+
+				<div className="grid grid-cols-1 gap-4 rounded-xl bg-sand/50 p-4 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+					<div>
+						<p className={labelClass}>From location</p>
+						<p className="mt-1 text-sm font-medium text-ink">
+							{movement.originSlot || "Container Receiving Bay"}
+						</p>
+					</div>
+
+					<ArrowRight className="hidden h-5 w-5 text-orange sm:block" />
+
+					<div>
+						<p className={labelClass}>To location</p>
+						<p className="mt-1 text-sm font-medium text-ink">
+							{movement.targetSlot || "Not recorded"}
+						</p>
+					</div>
+				</div>
+
+				<DetailItem
+					label="Movement type"
+					value={getMovementLabel(movement.movementType)}
+				/>
+			</div>
+
+			<div className="rounded-xl border border-line bg-paper p-5 space-y-4">
+				<div className="flex items-center gap-2">
+					<Truck className="h-[18px] text-orange" />
+					<h3 className="text-sm font-semibold text-ink">
+						Equipment Information
+					</h3>
+				</div>
+
+				<div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+					<DetailItem label="Equipment" value={movement.equipment} />
+					<DetailItem label="Equipment code" value={movement.equipmentCode} />
+					<DetailItem label="Equipment type" value={movement.equipmentType} />
+					<DetailItem label="Registration number" value={movement.registrationNumber} />
+				</div>
+			</div>
+
+			<div className="rounded-xl border border-line bg-paper p-5 space-y-4">
+				<div className="flex items-center gap-2">
+					<User className="h-[18px] text-orange" />
+					<h3 className="text-sm font-semibold text-ink">
+						Operator Information
+					</h3>
+				</div>
+
+				<DetailItem label="Moved by" value={movement.operator} />
+			</div>
+
+			<div className="rounded-xl border border-line bg-paper p-5 space-y-4">
+				<div className="flex items-center gap-2">
+					<Calendar className="h-[18px] text-orange" />
+					<h3 className="text-sm font-semibold text-ink">
+						Movement Information
+					</h3>
+				</div>
+
+				<DetailItem
+					label="Completed at"
+					value={formatDate(movement.timestamp)}
+				/>
+
+				<div className="space-y-1">
+					<p className={labelClass}>Remarks</p>
+					<p className="rounded-lg bg-sand/50 p-3 text-sm text-ink">
+						{movement.reason || "No remarks provided"}
+					</p>
+				</div>
+			</div>
+
+			<div className="rounded-xl border border-line bg-paper p-5">
+				<div>
+					<h3 className="text-sm font-semibold text-ink">
+						Movement Activity
+					</h3>
+					<p className="mt-1 text-xs text-ink-soft">
+						Recorded activities for this movement
+					</p>
+				</div>
+
+				{logs.length === 0 ? (
+					<div className="mt-4 rounded-xl border border-dashed border-line p-5 text-center">
+						<p className="text-sm text-ink-soft">
+							No additional activity records found.
+						</p>
+					</div>
+				) : (
+					<div className="mt-5 space-y-4">
+						{logs.map((log, index) => (
+							<div key={log.id || index} className="flex gap-3">
+								<div className="flex flex-col items-center">
+									<div className="h-2.5 w-2.5 rounded-full bg-orange" />
+									{index !== logs.length - 1 && (
+										<div className="mt-1 w-px flex-1 bg-line" />
+									)}
+								</div>
+
+								<div className="min-w-0 flex-1 pb-3">
+									<p className="text-sm font-semibold text-ink">
+										{log.action || "Movement activity"}
+									</p>
+
+									{log.description && (
+										<p className="mt-1 text-sm text-ink-soft">
+											{log.description}
+										</p>
+									)}
+
+									<p className="mt-2 text-xs text-ink-soft">
+										{log.performed_by || "Not recorded"}
+										{" · "}
+										{formatDate(log.performed_at)}
+									</p>
+								</div>
+							</div>
+						))}
+					</div>
+				)}
+			</div>
+
+			<div className="flex justify-start">
+				<Button
+					type="button"
+					variant="outline"
+					onClick={onBack}
+					className="gap-2 cursor-pointer"
+				>
+					<ArrowLeft className="h-4 w-4" />
+					Back to movements
+				</Button>
+			</div>
 		</div>
 	);
 }
