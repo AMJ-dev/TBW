@@ -94,11 +94,16 @@ const TransportBookAppointmentsPage = lazy(() => import("@/pages/portal/transpor
 const TransportVehicleDetailsPage = lazy(() => import("@/pages/portal/transport/vehicle-details"));
 
 const OperationsDashboardPage = lazy(() => import("@/pages/operations/dashboard"));
-const OperationsExaminationPage = lazy(() => import("@/pages/operations/examination"));
 const OperationsHoldsPage = lazy(() => import("@/pages/operations/holds"));
 const OperationsReceivingPage = lazy(() => import("@/pages/operations/receiving/index"));
 const OperationsReceivingNewPage = lazy(() => import("@/pages/operations/receiving/new"));
 const OperationsReceivingDetailsPage = lazy(() => import("@/pages/operations/receiving/details"));
+
+const ExaminationsPage = lazy(() => import("@/pages/operations/examination/index"));
+const ScheduleExaminationPage = lazy(() => import("@/pages/operations/examination/schedule"));
+const ExaminationReviewPage = lazy(() => import("@/pages/operations/examination/review"));
+const ExaminationDetailsPage = lazy(() => import("@/pages/operations/examination/details"));
+const ExaminationReviewDetailsPage = lazy(() => import("@/pages/operations/examination/review-details"));
 
 const OperationsWarehousePage = lazy(() => import("@/pages/operations/warehouse"));
 const OperationsYardPage = lazy(() => import("@/pages/operations/yard"));
@@ -240,12 +245,18 @@ export default function Routers() {
 						
 						<Route path="/operations" element={<OperationsDashboardPage />} />
 						<Route path="/operations/dashboard" element={<OperationsDashboardPage />} />
-						<Route path="/operations/examination" element={<OperationsExaminationPage />} />
+
 						<Route path="/operations/holds" element={<OperationsHoldsPage />} />
 						<Route path="/operations/receiving" element={<OperationsReceivingPage />} />
 						<Route path="/operations/receiving/new" element={<OperationsReceivingNewPage />} />		
 						<Route path="/operations/receiving/details/:id" element={<OperationsReceivingDetailsPage />} />		
-									
+								
+						<Route path="/operations/examinations" element={<ExaminationsPage />} />
+						<Route path="/operations/examinations/schedule" element={<ScheduleExaminationPage />} />
+						<Route path="/operations/examinations/review" element={<ExaminationReviewPage />} />
+						<Route path="/operations/examinations/:id" element={<ExaminationDetailsPage />} />
+						<Route path="/operations/examinations/review/:id" element={<ExaminationReviewDetailsPage />} />
+
 						<Route path="/operations/warehouse" element={<OperationsWarehousePage />} />
 						<Route path="/operations/yard" element={<OperationsYardPage />} />
 						<Route path="/operations/documentation" element={<OperationDocumentationPage />} />

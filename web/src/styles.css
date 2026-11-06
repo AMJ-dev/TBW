@@ -252,3 +252,39 @@
 		animation: none;
 	}
 }
+@keyframes trinu-page-forward {
+	from {
+		opacity: 0;
+		transform: translateX(36px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@keyframes trinu-page-backward {
+	from {
+		opacity: 0;
+		transform: translateX(-36px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+@utility trinu-page-forward {
+	animation: trinu-page-forward 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility trinu-page-backward {
+	animation: trinu-page-backward 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.trinu-page-forward,
+	.trinu-page-backward {
+		animation: none;
+	}
+}
