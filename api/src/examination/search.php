@@ -1,8 +1,18 @@
 <?php
-
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
     try {
+        if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+            http_response_code(405);
+
+            echo json_encode([
+                "error" => true,
+                "data" => "Method not allowed.",
+                "code" => 405
+            ]);
+            exit;
+        }
+
         $where = trim($_POST["where"] ?? "");
         $search = trim($_POST["q"] ?? "");
 
@@ -68,6 +78,15 @@
             INNER JOIN portal_shipments s
                 ON s.id = c.shipment_id
             WHERE $column LIKE :search
+                AND c.status NOT IN (
+                    'EXPECTED',
+                    'SCHEDULED',
+                    'ENTERED',
+                    'GATE_OUT',
+                    'TRANSFERRED_OUT',
+                    'RETURNED_RE_EXPORTED',
+                    'CANCELLED'
+                )
             ORDER BY s.shipment_reference ASC
             LIMIT 30
         ");
@@ -83,6 +102,8 @@
             "data" => $records,
             "code" => 200
         ]);
+        exit;
+
     } catch (Throwable $e) {
         http_response_code(500);
 
@@ -91,4 +112,5 @@
             "data" => "Could not search shipment containers.",
             "code" => 500
         ]);
+        exit;
     }

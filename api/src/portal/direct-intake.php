@@ -315,8 +315,7 @@ try {
     }
 
     $shipmentId = generateId();
-    $shipmentReference = "TRN-SHP-" . date("Y") . "-" .
-        strtoupper(bin2hex(random_bytes(6)));
+    $shipmentReference = generate_ref();
 
     $totalPackages = 0;
     $totalWeight = 0;

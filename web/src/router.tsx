@@ -103,6 +103,7 @@ const ExaminationsPage = lazy(() => import("@/pages/operations/examination/index
 const ScheduleExaminationPage = lazy(() => import("@/pages/operations/examination/schedule"));
 const ExaminationReviewPage = lazy(() => import("@/pages/operations/examination/review"));
 const ExaminationDetailsPage = lazy(() => import("@/pages/operations/examination/details"));
+const StartExaminationPage = lazy(() => import("@/pages/operations/examination/start"));
 const ExaminationReviewDetailsPage = lazy(() => import("@/pages/operations/examination/review-details"));
 
 const OperationsWarehousePage = lazy(() => import("@/pages/operations/warehouse"));
@@ -121,7 +122,6 @@ const OperationsShipmentReviewPage = lazy(() => import("@/pages/shipment/shipmen
 const OperationDocumentationPage = lazy(()=>import("@/pages/operations/documentation"))
 const OperationsOverstayPage = lazy(()=>import("@/pages/operations/overstay"))
 const OperationsTransferPage = lazy(()=>import("@/pages/operations/transfer"))
-
 
 const PortalDashboardPage = lazy(() => import("@/pages/portal/dashboard"));
 const CargoPage = lazy(() => import("@/pages/portal/cargo"));
@@ -253,6 +253,7 @@ export default function Routers() {
 								
 						<Route path="/operations/examinations" element={<ExaminationsPage />} />
 						<Route path="/operations/examinations/schedule" element={<ScheduleExaminationPage />} />
+						<Route path="/operations/examinations/start/:id" element={<StartExaminationPage />} />
 						<Route path="/operations/examinations/review" element={<ExaminationReviewPage />} />
 						<Route path="/operations/examinations/:id" element={<ExaminationDetailsPage />} />
 						<Route path="/operations/examinations/review/:id" element={<ExaminationReviewDetailsPage />} />

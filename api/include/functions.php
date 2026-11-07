@@ -45,6 +45,9 @@
     function rm_special_char($char){
         return preg_replace("/[^a-zA-Z0-9\.]/", "1", $char);
     }
+    function generate_ref(){
+        return "TRN-SHP-" . date("Y") . "-" . strtoupper(bin2hex(random_bytes(6)));
+    }
     function gen_filename($filename){
         $file_name = rm_special_char($filename);
         $bytes = bin2hex(openssl_random_pseudo_bytes(5));
