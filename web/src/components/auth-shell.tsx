@@ -183,7 +183,7 @@ const systemMenu = [
             { label: "Yard", to: "/operations/yard", icon: Grid2X2 },
             { label: "Warehouse", to: "/operations/warehouse", icon: Warehouse },
             { label: "Documentation", to: "/operations/documentation", icon: BookOpen },
-            { label: "Examination", to: "/operations/examination", icon: ClipboardCheck },
+            { label: "Examination", to: "/operations/examinations", icon: ClipboardCheck },
             { label: "Seal Events", to: "/operations/seals", icon: ShieldCheck },
             { label: "Inventory", to: "/operations/inventory", icon: Boxes },
             { label: "Value-added Services", to: "/operations/value-added", icon: Settings },

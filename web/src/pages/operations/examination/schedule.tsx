@@ -1,8 +1,17 @@
-import { useMemo, useState, type ReactNode, type FormEvent } from "react";
+import {
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+	type ReactNode,
+	type FormEvent,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { Link } from "@/components/router-link";
 import { AppShell } from "@/components/auth-shell";
+import { http, type Resp } from "@/lib/httpClient";
 import { AnimatePresence, motion } from "framer-motion";
+import { toast } from "sonner";
 import {
 	Activity,
 	ArrowLeft,
@@ -14,6 +23,7 @@ import {
 	Container,
 	FileSearch,
 	MapPin,
+	RefreshCw,
 	Search,
 	Ship,
 	UserRound,
@@ -37,58 +47,27 @@ type ContainerRecord = {
 	status: string;
 };
 
-const availableContainers: ContainerRecord[] = [
-	{
-		id: "CNT-001",
-		container_no: "JHN-93849",
-		size: "40ft",
-		seal_no: "JHJB-43984",
-		shipment_reference: "TRN-SHP-2026-5D1F6F38F193",
-		bill_of_lading: "KSBK-87384",
-		vessel_name: "MV Atlantic Star",
-		voyage_number: "AS-3874",
-		shipping_line: "Oceanic Shipping",
-		consignee: "Global Trade Nigeria Ltd",
-		cargo_description: "Television and electronic appliances",
-		gross_weight: "234.000 kg",
-		current_location: "Main Bonded Warehouse",
-		status: "IN_WAREHOUSE",
-	},
-	{
-		id: "CNT-002",
-		container_no: "JHBJ-374374",
-		size: "20ft",
-		seal_no: "BKJ-349384",
-		shipment_reference: "TRN-SHP-2026-5D1F6F38F193",
-		bill_of_lading: "KSBK-87384",
-		vessel_name: "MV Atlantic Star",
-		voyage_number: "AS-3874",
-		shipping_line: "Oceanic Shipping",
-		consignee: "Global Trade Nigeria Ltd",
-		cargo_description: "Television and electronic appliances",
-		gross_weight: "2,323.000 kg",
-		current_location: "Heavy Cargo Yard",
-		status: "IN_YARD",
-	},
-	{
-		id: "CNT-003",
-		container_no: "MSCU-7382910",
-		size: "20ft",
-		seal_no: "MSC-82719",
-		shipment_reference: "TRN-SHP-2026-8A2D4C1F",
-		bill_of_lading: "BOL-839202",
-		vessel_name: "MV Ocean Pearl",
-		voyage_number: "OP-2026-14",
-		shipping_line: "Maersk Line",
-		consignee: "Prime Imports Ltd",
-		cargo_description: "Industrial machinery",
-		gross_weight: "8,450.000 kg",
-		current_location: "Receiving Area 01",
-		status: "RECEIVED",
-	},
-];
+type ExaminationLocation = {
+	id: string;
+	name: string;
+	code: string;
+	kind: string;
+	status: string;
+};
 
-const examinationTypes = [
+type ExaminationOfficer = {
+	id: string;
+	name: string;
+	role: string;
+};
+
+type ExaminationType = {
+	value: string;
+	label: string;
+	description: string;
+};
+
+const examinationTypes: ExaminationType[] = [
 	{
 		value: "PHYSICAL",
 		label: "Physical Examination",
@@ -111,19 +90,87 @@ const examinationTypes = [
 	},
 ];
 
-const examinationLocations = [
-	{ id: "LOC-001", name: "Examination Bay 01", code: "EXM-01" },
-	{ id: "LOC-002", name: "Examination Bay 02", code: "EXM-02" },
-	{ id: "LOC-003", name: "Examination Bay 03", code: "EXM-03" },
-	{ id: "LOC-004", name: "Scanning Bay 01", code: "SCN-01" },
-];
+const inputClass =
+	"w-full rounded-lg border border-line bg-background px-3 py-2.5 text-sm text-ink outline-none transition focus:border-orange focus:ring-2 focus:ring-orange/10 disabled:cursor-not-allowed disabled:opacity-60";
 
-const officers = [
-	{ id: "USR-001", name: "Mathias Jacobs", role: "Examination Officer" },
-	{ id: "USR-002", name: "Daniel Okafor", role: "Senior Examination Officer" },
-	{ id: "USR-003", name: "Ibrahim Musa", role: "Examination Officer" },
-	{ id: "USR-004", name: "Samuel Ade", role: "Scanning Officer" },
-];
+const getString = (value: unknown, fallback = ""): string => {
+	if (value === null || value === undefined) return fallback;
+	return String(value);
+};
+
+const getErrorMessage = (error: any, fallback: string) => {
+	const responseData = error?.response?.data;
+
+	if (typeof responseData?.data === "string") {
+		return responseData.data;
+	}
+
+	if (typeof responseData?.message === "string") {
+		return responseData.message;
+	}
+
+	if (typeof error?.message === "string") {
+		return error.message;
+	}
+
+	return fallback;
+};
+
+const getArray = (value: unknown): any[] => {
+	if (Array.isArray(value)) return value;
+	if (Array.isArray((value as any)?.data)) return (value as any).data;
+	if (Array.isArray((value as any)?.locations)) return (value as any).locations;
+	if (Array.isArray((value as any)?.officers)) return (value as any).officers;
+	if (Array.isArray((value as any)?.containers)) return (value as any).containers;
+	if (Array.isArray((value as any)?.results)) return (value as any).results;
+	return [];
+};
+
+const normalizeContainer = (item: any): ContainerRecord => ({
+	id: getString(item.container_id ?? item.id),
+	container_no: getString(item.container_no ?? item.container_number),
+	size: getString(item.container_size ?? item.size),
+	seal_no: getString(item.actual_seal_no ?? item.seal_no),
+	shipment_reference: getString(item.shipment_reference),
+	bill_of_lading: getString(item.bill_of_lading ?? item.bl_number),
+	vessel_name: getString(item.vessel_name),
+	voyage_number: getString(item.voyage_number),
+	shipping_line: getString(item.shipping_line),
+	consignee: getString(item.consignee),
+	cargo_description: getString(item.cargo_description),
+	gross_weight: getString(item.actual_weight ?? item.gross_weight),
+	current_location: getString(
+		item.current_location_name ??
+			item.current_location ??
+			item.receiving_location,
+	),
+	status: getString(item.status ?? item.container_status),
+});
+
+const normalizeLocation = (item: any): ExaminationLocation => ({
+	id: getString(item.id),
+	name: getString(item.location_name),
+	code: getString(item.location_code),
+	kind: "",
+	status: "",
+});
+
+const normalizeOfficer = (item: any): ExaminationOfficer => ({
+	id: getString(item.id ?? item.user_id ?? item.officer_id),
+	name: getString(
+		item.full_name ??
+			item.name ??
+			item.officer_name ??
+			item.username,
+	),
+	role: getString(
+		item.role_name ??
+			item.role ??
+			item.designation ??
+			item.position,
+		"Examination Officer",
+	),
+});
 
 function Field({
 	label,
@@ -144,9 +191,6 @@ function Field({
 		</div>
 	);
 }
-
-const inputClass =
-	"w-full rounded-lg border border-line bg-background px-3 py-2.5 text-sm text-ink outline-none transition focus:border-orange focus:ring-2 focus:ring-orange/10";
 
 function Detail({
 	label,
@@ -174,93 +218,218 @@ function ContainerSelector({
 	selected: ContainerRecord | null;
 	onSelect: (container: ContainerRecord | null) => void;
 }) {
+	const [searchType, setSearchType] = useState("container_no");
 	const [query, setQuery] = useState("");
+	const [results, setResults] = useState<ContainerRecord[]>([]);
+	const [searching, setSearching] = useState(false);
 	const [open, setOpen] = useState(false);
+	const [hasSearched, setHasSearched] = useState(false);
 
-	const results = useMemo(() => {
-		const value = query.toLowerCase().trim();
+	const searchOptions = [
+		{ value: "bill_of_lading", label: "Bill of Lading" },
+		{ value: "shipment_reference", label: "Shipment Reference" },
+		{ value: "container_no", label: "Container Number" },
+		{ value: "seal_no", label: "Seal Number" },
+	];
 
-		if (!value) return availableContainers;
+	const handleSearch = async (event?: FormEvent<HTMLFormElement>) => {
+		event?.preventDefault();
 
-		return availableContainers.filter((item) =>
-			[
-				item.container_no,
-				item.shipment_reference,
-				item.bill_of_lading,
-				item.seal_no,
-				item.consignee,
-			].some((field) => field.toLowerCase().includes(value)),
-		);
-	}, [query]);
+		const value = query.trim();
+
+		if (!value) {
+			setResults([]);
+			setHasSearched(false);
+			toast.error("Enter a search value.");
+			return;
+		}
+
+		try {
+			setSearching(true);
+			setHasSearched(false);
+			setOpen(false);
+
+			const response = await http.post("/operator/examination/search/", {
+				q: value,
+				where: searchType,
+			});
+
+			const resp: Resp = response.data;
+
+			if (resp.error) {
+				throw new Error(
+					getString(resp.data, "Could not search containers."),
+				);
+			}
+
+			const data = resp.data as any;
+			const rows = getArray(data?.containers ?? data);
+
+			const normalized = rows
+				.map(normalizeContainer)
+				.filter((item) => item.id && item.container_no);
+
+			setResults(normalized);
+			setHasSearched(true);
+			setOpen(true);
+
+			if (!normalized.length) {
+				toast.info("No matching containers were found.");
+			}
+		} catch (error: any) {
+			setResults([]);
+			setHasSearched(true);
+			setOpen(true);
+			toast.error(
+				getErrorMessage(error, "Could not search containers."),
+			);
+		} finally {
+			setSearching(false);
+		}
+	};
 
 	return (
 		<div className="space-y-3">
-			<div className="relative">
-				<Search
-					size={16}
-					className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
-				/>
+			<div className="grid gap-3 sm:grid-cols-[190px_minmax(0,1fr)]">
+				<div>
+					<label className="mb-2 block text-xs font-semibold text-ink">
+						Search by
+					</label>
+					<select
+						value={searchType}
+						onChange={(event) => {
+							setSearchType(event.target.value);
+							setQuery("");
+							setResults([]);
+							setHasSearched(false);
+							setOpen(false);
+							onSelect(null);
+						}}
+						className={`${inputClass} cursor-pointer`}
+					>
+						{searchOptions.map((option) => (
+							<option key={option.value} value={option.value}>
+								{option.label}
+							</option>
+						))}
+					</select>
+				</div>
 
-				<input
-					value={query}
-					onChange={(event) => {
-						setQuery(event.target.value);
-						setOpen(true);
-					}}
-					onFocus={() => setOpen(true)}
-					onBlur={() => {
-						window.setTimeout(() => setOpen(false), 150);
-					}}
-					placeholder="Search container, shipment reference, BOL or seal..."
-					className={`${inputClass} cursor-text pl-9`}
-				/>
+				<div>
+					<label className="mb-2 block text-xs font-semibold text-ink">
+						{searchOptions.find((item) => item.value === searchType)?.label}
+					</label>
+					<form onSubmit={handleSearch} className="flex gap-2">
+						<div className="relative min-w-0 flex-1">
+							<Search
+								size={16}
+								className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
+							/>
+							<input
+								value={query}
+								onChange={(event) => {
+									setQuery(event.target.value);
+									setOpen(false);
+									setHasSearched(false);
+								}}
+								placeholder={`Enter ${searchOptions
+									.find((item) => item.value === searchType)
+									?.label.toLowerCase()}...`}
+								className={`${inputClass} cursor-text pl-9`}
+							/>
+						</div>
 
-				<AnimatePresence>
-					{open && (
-						<motion.div
-							initial={{ opacity: 0, y: 5 }}
-							animate={{ opacity: 1, y: 0 }}
-							exit={{ opacity: 0, y: 5 }}
-							className="absolute left-0 right-0 top-full z-30 mt-2 max-h-72 overflow-y-auto rounded-xl border border-line bg-paper shadow-xl"
+						<button
+							type="button"
+							onClick={() => void handleSearch()}
+							disabled={searching || !query.trim()}
+							className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg bg-orange px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-orange-deep disabled:cursor-not-allowed disabled:opacity-60"
 						>
-							{results.length ? (
-								results.map((item) => (
+							{searching ? (
+								<RefreshCw size={15} className="animate-spin" />
+							) : (
+								<Search size={15} />
+							)}
+							Search
+						</button>
+					</form>
+				</div>
+			</div>
+
+			<AnimatePresence>
+				{open && (
+					<motion.div
+						initial={{ opacity: 0, y: 5 }}
+						animate={{ opacity: 1, y: 0 }}
+						exit={{ opacity: 0, y: 5 }}
+						className="overflow-hidden rounded-xl border border-line bg-paper shadow-lg"
+					>
+						<div className="flex items-center justify-between border-b border-line px-4 py-3">
+							<p className="text-xs font-semibold text-ink">
+								Search results
+							</p>
+							<button
+								type="button"
+								onClick={() => setOpen(false)}
+								className="cursor-pointer rounded-md p-1 text-ink-soft hover:bg-sand"
+							>
+								<X size={15} />
+							</button>
+						</div>
+
+						{searching ? (
+							<div className="flex items-center justify-center gap-2 p-6 text-xs text-ink-soft">
+								<RefreshCw size={15} className="animate-spin" />
+								Searching containers...
+							</div>
+						) : results.length ? (
+							<div className="max-h-72 divide-y divide-line overflow-y-auto">
+								{results.map((item) => (
 									<button
 										key={item.id}
 										type="button"
 										onClick={() => {
 											onSelect(item);
-											setQuery(item.container_no);
+											setQuery(
+												searchType === "seal_no"
+													? item.seal_no
+													: searchType === "shipment_reference"
+														? item.shipment_reference
+														: searchType === "bill_of_lading"
+															? item.bill_of_lading
+															: item.container_no,
+											);
 											setOpen(false);
 										}}
-										className="flex w-full cursor-pointer items-start justify-between gap-3 border-b border-line px-4 py-3 text-left last:border-0 hover:bg-sand/70"
+										className="flex w-full cursor-pointer items-start justify-between gap-3 px-4 py-3 text-left transition hover:bg-sand/70"
 									>
 										<div className="min-w-0">
 											<p className="text-sm font-semibold text-ink">
 												{item.container_no}
 											</p>
 											<p className="mt-1 truncate text-[11px] text-ink-soft">
-												{item.shipment_reference}
+												{item.shipment_reference || "No shipment reference"}
 											</p>
 											<p className="mt-1 text-[10px] text-ink-soft">
-												{item.bill_of_lading} · {item.size}
+												{item.bill_of_lading || "No BOL"} ·{" "}
+												{item.seal_no || "No seal recorded"}
 											</p>
 										</div>
 
 										<span className="shrink-0 rounded-full bg-sand px-2 py-1 text-[9px] font-semibold text-ink-soft">
-											{item.status.replaceAll("_", " ")}
+											{item.status.replaceAll("_", " ") || "Unknown"}
 										</span>
 									</button>
-								))
-							) : (
-								<div className="px-4 py-8 text-center text-xs text-ink-soft">
-									No matching containers found.
-								</div>
-							)}
-						</motion.div>
-					)}
-				</AnimatePresence>
-			</div>
+								))}
+							</div>
+						) : hasSearched ? (
+							<div className="px-4 py-8 text-center text-xs text-ink-soft">
+								No matching containers found.
+							</div>
+						) : null}
+					</motion.div>
+				)}
+			</AnimatePresence>
 
 			{selected && (
 				<div className="rounded-xl border border-orange/25 bg-orange/[0.035] p-4">
@@ -269,13 +438,13 @@ function ContainerSelector({
 							<div className="rounded-lg bg-orange/10 p-2.5 text-orange">
 								<Container size={20} />
 							</div>
-
 							<div>
 								<p className="text-sm font-semibold text-ink">
 									{selected.container_no}
 								</p>
 								<p className="mt-1 text-[11px] text-ink-soft">
-									{selected.size} · {selected.seal_no}
+									{selected.size || "Size not recorded"} ·{" "}
+									{selected.seal_no || "No seal recorded"}
 								</p>
 							</div>
 						</div>
@@ -285,6 +454,8 @@ function ContainerSelector({
 							onClick={() => {
 								onSelect(null);
 								setQuery("");
+								setResults([]);
+								setHasSearched(false);
 							}}
 							className="cursor-pointer rounded-lg p-1.5 text-ink-soft hover:bg-sand hover:text-ink"
 						>
@@ -293,22 +464,10 @@ function ContainerSelector({
 					</div>
 
 					<div className="mt-4 grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
-						<Detail
-							label="Shipment reference"
-							value={selected.shipment_reference}
-						/>
-						<Detail
-							label="Bill of lading"
-							value={selected.bill_of_lading}
-						/>
-						<Detail
-							label="Current location"
-							value={selected.current_location}
-						/>
-						<Detail
-							label="Container status"
-							value={selected.status.replaceAll("_", " ")}
-						/>
+						<Detail label="Shipment reference" value={selected.shipment_reference} />
+						<Detail label="Bill of lading" value={selected.bill_of_lading} />
+						<Detail label="Current location" value={selected.current_location} />
+						<Detail label="Container status" value={selected.status.replaceAll("_", " ")} />
 					</div>
 				</div>
 			)}
@@ -322,6 +481,8 @@ export default function ScheduleExaminationPage() {
 	const [selectedContainer, setSelectedContainer] =
 		useState<ContainerRecord | null>(null);
 	const [examinationType, setExaminationType] = useState("PHYSICAL");
+	const [locations, setLocations] = useState<ExaminationLocation[]>([]);
+	const [officers, setOfficers] = useState<ExaminationOfficer[]>([]);
 	const [locationId, setLocationId] = useState("");
 	const [officerId, setOfficerId] = useState("");
 	const [scheduledDate, setScheduledDate] = useState("");
@@ -329,9 +490,22 @@ export default function ScheduleExaminationPage() {
 	const [priority, setPriority] = useState("NORMAL");
 	const [instructions, setInstructions] = useState("");
 	const [errors, setErrors] = useState<string[]>([]);
-	const [showConfirmation, setShowConfirmation] = useState(false);
+	const [loadingLocations, setLoadingLocations] = useState(true);
+	const [loadingOfficers, setLoadingOfficers] = useState(true);
+	const [saving, setSaving] = useState(false);
 
-	const selectedLocation = examinationLocations.find(
+	const today = useMemo(
+		() => {
+			const date = new Date();
+			const year = date.getFullYear();
+			const month = String(date.getMonth() + 1).padStart(2, "0");
+			const day = String(date.getDate()).padStart(2, "0");
+			return `${year}-${month}-${day}`;
+		},
+		[],
+	);
+
+	const selectedLocation = locations.find(
 		(item) => item.id === locationId,
 	);
 
@@ -343,20 +517,134 @@ export default function ScheduleExaminationPage() {
 		(item) => item.value === examinationType,
 	);
 
-	const today = new Date().toLocaleDateString("en-CA");
+	const fetchLocations = useCallback(async () => {
+		try {
+			setLoadingLocations(true);
+
+			const response = await http.post(
+				"/admin/config/search-location/",
+				{ q: "EXAMINATION_BAY" },
+			);
+
+			const resp: Resp = response.data;
+
+			if (resp.error) {
+				throw new Error(
+					getString(resp.data, "Could not load examination locations."),
+				);
+			}
+
+			const code = resp.code as any;
+			const rows = Array.isArray(code?.locations)
+				? code.locations
+				: [];
+
+			const normalized = rows
+				.map(normalizeLocation)
+				.filter((location: ExaminationLocation) => location.id && location.name);
+
+			setLocations(normalized);
+		} catch (error: any) {
+			setLocations([]);
+			toast.error(
+				getErrorMessage(error, "Could not load examination locations."),
+			);
+		} finally {
+			setLoadingLocations(false);
+		}
+	}, []);
+
+	const fetchOfficers = useCallback(async () => {
+		try {
+			setLoadingOfficers(true);
+
+			const response = await http.get(
+				"/operator/examination/officers/",
+			);
+
+			const resp: Resp = response.data;
+
+			if (resp.error) {
+				throw new Error(
+					getString(resp.data, "Could not load examination officers."),
+				);
+			}
+
+			const data = resp.data as any;
+			const code = resp.code as any;
+
+			const rows = Array.isArray(data?.officers)
+				? data.officers
+				: Array.isArray(code?.officers)
+					? code.officers
+					: getArray(data);
+
+			const normalized = rows
+				.map(normalizeOfficer)
+				.filter((officer: ExaminationOfficer) => officer.id && officer.name);
+
+			setOfficers(normalized);
+		} catch (error: any) {
+			setOfficers([]);
+			toast.error(
+				getErrorMessage(error, "Could not load examination officers."),
+			);
+		} finally {
+			setLoadingOfficers(false);
+		}
+	}, []);
+
+	useEffect(() => {
+		void fetchLocations();
+		void fetchOfficers();
+	}, [fetchLocations, fetchOfficers]);
 
 	const validate = () => {
 		const nextErrors: string[] = [];
 
-		if (!selectedContainer) nextErrors.push("Select a container.");
-		if (!examinationType) nextErrors.push("Select an examination type.");
-		if (!locationId) nextErrors.push("Select an examination location.");
-		if (!officerId) nextErrors.push("Assign an examination officer.");
-		if (!scheduledDate) nextErrors.push("Select a scheduled date.");
-		if (!scheduledTime) nextErrors.push("Select a scheduled time.");
+		if (!selectedContainer) {
+			nextErrors.push("Select a container.");
+		}
+
+		if (!examinationType) {
+			nextErrors.push("Select an examination type.");
+		}
+
+		if (!locationId || !selectedLocation) {
+			nextErrors.push("Select an examination location.");
+		}
+
+		if (!officerId || !selectedOfficer) {
+			nextErrors.push("Assign an examination officer.");
+		}
+
+		if (!scheduledDate) {
+			nextErrors.push("Select a scheduled date.");
+		}
+
+		if (!scheduledTime) {
+			nextErrors.push("Select a scheduled time.");
+		}
 
 		if (scheduledDate && scheduledDate < today) {
 			nextErrors.push("The scheduled date cannot be in the past.");
+		}
+
+		if (
+			scheduledDate === today &&
+			scheduledTime &&
+			(() => {
+				const [hours = 0, minutes = 0] = scheduledTime.split(":").map(Number);
+				const selected = new Date();
+				selected.setHours(hours, minutes, 0, 0);
+				return selected.getTime() < Date.now();
+			})()
+		) {
+			nextErrors.push("The scheduled time cannot be in the past.");
+		}
+
+		if (instructions.length > 5000) {
+			nextErrors.push("Instructions cannot exceed 5,000 characters.");
 		}
 
 		setErrors(nextErrors);
@@ -364,17 +652,59 @@ export default function ScheduleExaminationPage() {
 		return nextErrors.length === 0;
 	};
 
-	const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 
-		if (!validate()) return;
+		if (saving) return;
 
-		setShowConfirmation(true);
-	};
+		if (!validate()) {
+			toast.error("Please correct the required fields.");
+			return;
+		}
 
-	const handleFinish = () => {
-		setShowConfirmation(false);
-		navigate("/operations/examinations");
+		if (!selectedContainer || !selectedLocation || !selectedOfficer) {
+			return;
+		}
+
+		try {
+			setSaving(true);
+
+			const payload = {
+				container_id: selectedContainer.id,
+				examination_type: examinationType,
+				location_id: locationId,
+				officer_id: officerId,
+				scheduled_date: scheduledDate,
+				scheduled_time: scheduledTime,
+				priority,
+				instructions: instructions.trim(),
+			};
+
+			const response = await http.post(
+				"/operator/examination/save/",
+				payload,
+			);
+
+			const resp: Resp = response.data;
+
+			if (resp.error) {
+				throw new Error(
+					getString(resp.data, "Could not schedule examination."),
+				);
+			}
+
+			toast.success(
+				getString(resp.data, "Examination scheduled successfully."),
+			);
+
+			navigate("/operations/examinations");
+		} catch (error: any) {
+			toast.error(
+				getErrorMessage(error, "Could not schedule examination."),
+			);
+		} finally {
+			setSaving(false);
+		}
 	};
 
 	return (
@@ -409,8 +739,7 @@ export default function ScheduleExaminationPage() {
 							</h2>
 
 							<p className="mt-1 text-sm text-ink-soft">
-								Select a received container, assign an officer and arrange an
-								examination.
+								Select a container, assign an officer and arrange an examination.
 							</p>
 						</div>
 
@@ -423,7 +752,7 @@ export default function ScheduleExaminationPage() {
 					</div>
 				</div>
 
-				<form onSubmit={handleSubmit} className="space-y-5">
+				<form onSubmit={handleSubmit} className="gap-2">
 					<div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
 						<div className="space-y-5">
 							<section className="overflow-visible rounded-xl border border-line bg-paper">
@@ -431,7 +760,6 @@ export default function ScheduleExaminationPage() {
 									<div className="rounded-lg bg-orange/10 p-2 text-orange">
 										<Container size={18} />
 									</div>
-
 									<div>
 										<h3 className="text-sm font-semibold text-ink">
 											Select container
@@ -495,7 +823,6 @@ export default function ScheduleExaminationPage() {
 									<div className="rounded-lg bg-orange/10 p-2 text-orange">
 										<FileSearch size={18} />
 									</div>
-
 									<div>
 										<h3 className="text-sm font-semibold text-ink">
 											Examination setup
@@ -524,7 +851,6 @@ export default function ScheduleExaminationPage() {
 														<p className="text-xs font-semibold text-ink">
 															{type.label}
 														</p>
-
 														<span
 															className={`flex h-5 w-5 items-center justify-center rounded-full border ${
 																examinationType === type.value
@@ -535,7 +861,6 @@ export default function ScheduleExaminationPage() {
 															<Check size={12} />
 														</span>
 													</div>
-
 													<p className="mt-2 text-[11px] leading-5 text-ink-soft">
 														{type.description}
 													</p>
@@ -548,32 +873,62 @@ export default function ScheduleExaminationPage() {
 										<select
 											value={locationId}
 											onChange={(event) => setLocationId(event.target.value)}
+											disabled={loadingLocations || locations.length === 0}
 											className={`${inputClass} cursor-pointer`}
 										>
 											<option value="">
-												Select examination location
+												{loadingLocations
+													? "Loading examination locations..."
+													: locations.length
+														? "Select examination location"
+														: "No examination locations available"}
 											</option>
-											{examinationLocations.map((location) => (
+											{locations.map((location) => (
 												<option key={location.id} value={location.id}>
-													{location.name} ({location.code})
+													{[location.code, location.name].filter(Boolean).join(" · ")}
 												</option>
 											))}
 										</select>
+										{!loadingLocations && !locations.length && (
+											<button
+												type="button"
+												onClick={() => void fetchLocations()}
+												className="mt-2 cursor-pointer text-xs font-semibold text-orange hover:text-orange-deep"
+											>
+												Retry loading locations
+											</button>
+										)}
 									</Field>
 
 									<Field label="Examination officer" required>
 										<select
 											value={officerId}
 											onChange={(event) => setOfficerId(event.target.value)}
+											disabled={loadingOfficers || officers.length === 0}
 											className={`${inputClass} cursor-pointer`}
 										>
-											<option value="">Select responsible officer</option>
+											<option value="">
+												{loadingOfficers
+													? "Loading examination officers..."
+													: officers.length
+														? "Select responsible officer"
+														: "No examination officers available"}
+											</option>
 											{officers.map((officer) => (
 												<option key={officer.id} value={officer.id}>
 													{officer.name} — {officer.role}
 												</option>
 											))}
 										</select>
+										{!loadingOfficers && !officers.length && (
+											<button
+												type="button"
+												onClick={() => void fetchOfficers()}
+												className="mt-2 cursor-pointer text-xs font-semibold text-orange hover:text-orange-deep"
+											>
+												Retry loading officers
+											</button>
+										)}
 									</Field>
 								</div>
 							</section>
@@ -583,7 +938,6 @@ export default function ScheduleExaminationPage() {
 									<div className="rounded-lg bg-orange/10 p-2 text-orange">
 										<Clock3 size={18} />
 									</div>
-
 									<div>
 										<h3 className="text-sm font-semibold text-ink">
 											Schedule and instructions
@@ -600,9 +954,7 @@ export default function ScheduleExaminationPage() {
 											type="date"
 											value={scheduledDate}
 											min={today}
-											onChange={(event) =>
-												setScheduledDate(event.target.value)
-											}
+											onChange={(event) => setScheduledDate(event.target.value)}
 											className={`${inputClass} cursor-pointer`}
 										/>
 									</Field>
@@ -611,9 +963,7 @@ export default function ScheduleExaminationPage() {
 										<input
 											type="time"
 											value={scheduledTime}
-											onChange={(event) =>
-												setScheduledTime(event.target.value)
-											}
+											onChange={(event) => setScheduledTime(event.target.value)}
 											className={`${inputClass} cursor-pointer`}
 										/>
 									</Field>
@@ -635,13 +985,15 @@ export default function ScheduleExaminationPage() {
 										<Field label="Instructions / special remarks">
 											<textarea
 												rows={4}
+												maxLength={5000}
 												value={instructions}
-												onChange={(event) =>
-													setInstructions(event.target.value)
-												}
+												onChange={(event) => setInstructions(event.target.value)}
 												placeholder="Enter instructions or special requirements for the examination..."
 												className={`${inputClass} cursor-text resize-y`}
 											/>
+											<p className="text-right text-[10px] text-ink-soft">
+												{instructions.length.toLocaleString()} / 5,000
+											</p>
 										</Field>
 									</div>
 								</div>
@@ -662,7 +1014,6 @@ export default function ScheduleExaminationPage() {
 										<div className="rounded-lg bg-sand p-2 text-orange">
 											<Container size={16} />
 										</div>
-
 										<div className="min-w-0">
 											<p className="text-[10px] uppercase tracking-wider text-ink-soft">
 												Container
@@ -677,7 +1028,6 @@ export default function ScheduleExaminationPage() {
 										<div className="rounded-lg bg-sand p-2 text-orange">
 											<FileSearch size={16} />
 										</div>
-
 										<div className="min-w-0">
 											<p className="text-[10px] uppercase tracking-wider text-ink-soft">
 												Examination type
@@ -692,7 +1042,6 @@ export default function ScheduleExaminationPage() {
 										<div className="rounded-lg bg-sand p-2 text-orange">
 											<MapPin size={16} />
 										</div>
-
 										<div className="min-w-0">
 											<p className="text-[10px] uppercase tracking-wider text-ink-soft">
 												Location
@@ -707,7 +1056,6 @@ export default function ScheduleExaminationPage() {
 										<div className="rounded-lg bg-sand p-2 text-orange">
 											<UserRound size={16} />
 										</div>
-
 										<div className="min-w-0">
 											<p className="text-[10px] uppercase tracking-wider text-ink-soft">
 												Assigned officer
@@ -722,7 +1070,6 @@ export default function ScheduleExaminationPage() {
 										<div className="rounded-lg bg-sand p-2 text-orange">
 											<CalendarDays size={16} />
 										</div>
-
 										<div className="min-w-0">
 											<p className="text-[10px] uppercase tracking-wider text-ink-soft">
 												Scheduled date and time
@@ -799,68 +1146,25 @@ export default function ScheduleExaminationPage() {
 
 						<button
 							type="submit"
-							className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-orange px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-orange-deep"
+							disabled={
+								saving ||
+								loadingLocations ||
+								loadingOfficers ||
+								!locations.length ||
+								!officers.length
+							}
+							className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg bg-orange px-5 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-deep disabled:cursor-not-allowed disabled:opacity-60"
 						>
-							<CalendarDays size={15} />
-							Schedule examination
+							{saving ? (
+								<RefreshCw size={15} className="animate-spin" />
+							) : (
+								<CalendarDays size={15} />
+							)}
+							{saving ? "Saving examination..." : "Schedule examination"}
 							<ArrowRight size={15} />
 						</button>
 					</div>
 				</form>
-
-				<AnimatePresence>
-					{showConfirmation && (
-						<motion.div
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							exit={{ opacity: 0 }}
-							className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-						>
-							<motion.div
-								initial={{ opacity: 0, y: 15, scale: 0.97 }}
-								animate={{ opacity: 1, y: 0, scale: 1 }}
-								exit={{ opacity: 0, y: 10, scale: 0.97 }}
-								className="w-full max-w-md rounded-2xl border border-line bg-paper p-6 shadow-2xl"
-							>
-								<div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-									<CheckCircle2 size={25} />
-								</div>
-
-								<h3 className="mt-4 text-center text-lg font-semibold text-ink">
-									Details validated
-								</h3>
-
-								<p className="mt-2 text-center text-sm leading-6 text-ink-soft">
-									The examination schedule details are complete. This is a
-									UI preview; no examination has been saved.
-								</p>
-
-								<div className="mt-5 rounded-xl border border-line bg-sand/50 p-4">
-									<p className="text-xs font-semibold text-ink">
-										{selectedContainer?.container_no}
-									</p>
-									<p className="mt-1 text-[11px] text-ink-soft">
-										{selectedType?.label}
-									</p>
-									<p className="mt-1 text-[11px] text-ink-soft">
-										{scheduledDate} · {scheduledTime}
-									</p>
-									<p className="mt-1 text-[11px] text-ink-soft">
-										{selectedLocation?.name} · {selectedOfficer?.name}
-									</p>
-								</div>
-
-								<button
-									type="button"
-									onClick={handleFinish}
-									className="mt-5 w-full cursor-pointer rounded-lg bg-orange px-4 py-3 text-xs font-semibold text-white hover:bg-orange-deep"
-								>
-									Return to examinations
-								</button>
-							</motion.div>
-						</motion.div>
-					)}
-				</AnimatePresence>
 			</div>
 		</AppShell>
 	);

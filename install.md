@@ -12,3 +12,6 @@ sudo apt install php-redis -y
 /operations/finance	Charges and payment reconciliation
 /operations/release	Release authorisation
 /operations/gate	Final gate-out verification
+
+
+

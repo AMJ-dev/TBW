@@ -188,3 +188,8 @@ RewriteRule ^operator/yards/equipments/$ src/yards/equipments.php [NC]
 RewriteRule ^operator/warehouses/$ src/warehouses/all.php [NC]
 RewriteRule ^operator/warehouses/save/$ src/warehouses/save.php [NC]
 RewriteRule ^operator/warehouses/search/$ src/warehouses/search.php [NC]
+
+RewriteRule ^operator/examination/$ src/examination/all.php [NC]
+RewriteRule ^operator/examination/save/$ src/examination/save.php [NC]
+RewriteRule ^operator/examination/search/$ src/examination/search.php [NC]
+RewriteRule ^operator/examination/officers/$ src/examination/officers.php [NC]
