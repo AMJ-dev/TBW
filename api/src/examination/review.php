@@ -33,16 +33,13 @@
 
             FROM terminal_examinations e
 
-            LEFT JOIN portal_shipment_containers c
-                ON c.id = e.container_id
+            LEFT JOIN portal_shipment_containers c ON c.id = e.container_id
 
-            LEFT JOIN portal_shipments s
-                ON s.id = c.shipment_id
+            LEFT JOIN portal_shipments s ON s.id = c.shipment_id
 
-            LEFT JOIN users u
-                ON u.id = e.officer_id
+            LEFT JOIN users u ON u.id = e.officer_id
 
-            WHERE e.status = 'PENDING_REVIEW'
+            WHERE e.status IN ('REJECTED', 'PENDING_REVIEW', 'CHANGES_REQUESTED', 'APPROVED')
 
             ORDER BY e.completed_at DESC, e.scheduled_date DESC, e.scheduled_time DESC
         ";

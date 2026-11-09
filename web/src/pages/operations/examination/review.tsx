@@ -55,7 +55,7 @@ const statusLabel: Record<ReviewStatus, string> = {
 export default function ExaminationReviewPage() {
 	const [examinations, setExaminations] = useState<Examination[]>([]);
 	const [search, setSearch] = useState("");
-	const [filter, setFilter] = useState("PENDING_REVIEW");
+	const [filter, setFilter] = useState("ALL");
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(false);
 
