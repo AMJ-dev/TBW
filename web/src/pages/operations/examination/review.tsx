@@ -13,12 +13,10 @@ import {
 	RefreshCw,
 	Search,
 	ShieldCheck,
+	XCircle,
 } from "lucide-react";
 
-type ReviewStatus =
-	| "PENDING_REVIEW"
-	| "APPROVED"
-	| "CHANGES_REQUESTED";
+type ReviewStatus = | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "CHANGES_REQUESTED";
 
 type Examination = {
 	id: string;
@@ -50,6 +48,7 @@ type Examination = {
 const statusLabel: Record<ReviewStatus, string> = {
 	PENDING_REVIEW: "Pending review",
 	APPROVED: "Approved",
+	REJECTED: "Rejected",
 	CHANGES_REQUESTED: "Changes requested",
 };
 
@@ -87,17 +86,13 @@ export default function ExaminationReviewPage() {
 		fetchExaminations();
 	}, [fetchExaminations]);
 
-	const pendingCount = examinations.filter(
-		(item) => item.status === "PENDING_REVIEW"
-	).length;
+	const pendingCount = examinations.filter(item => item.status === "PENDING_REVIEW").length;
 
-	const approvedCount = examinations.filter(
-		(item) => item.status === "APPROVED"
-	).length;
+	const approvedCount = examinations.filter(item => item.status === "APPROVED").length;
 
-	const returnedCount = examinations.filter(
-		(item) => item.status === "CHANGES_REQUESTED"
-	).length;
+	const returnedCount = examinations.filter(item => item.status === "CHANGES_REQUESTED").length;
+
+	const rejectedCount = examinations.filter(item => item.status === "REJECTED").length;
 
 	const filteredExaminations = useMemo(() => {
 		const value = search.trim().toLowerCase();
@@ -165,7 +160,7 @@ export default function ExaminationReviewPage() {
 					</div>
 				</div>
 
-				<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+				<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
 					<Metric
 						label="Awaiting review"
 						value={String(pendingCount)}
@@ -188,6 +183,14 @@ export default function ExaminationReviewPage() {
 						detail="Require further action"
 						tone="critical"
 						icon={FileText}
+					/>
+
+					<Metric
+						label="Rejected"
+						value={String(rejectedCount)}
+						detail="Examinations rejected"
+						tone="critical"
+						icon={XCircle}
 					/>
 
 					<Metric
@@ -236,6 +239,9 @@ export default function ExaminationReviewPage() {
 									onChange={(e) => setFilter(e.target.value)}
 									className="h-10 w-full cursor-pointer appearance-none rounded-md border border-line bg-white pl-9 pr-8 text-xs text-ink outline-none focus:border-orange sm:w-48"
 								>
+									<option value="ALL">
+										All examinations
+									</option>
 									<option value="PENDING_REVIEW">
 										Awaiting review
 									</option>
@@ -245,8 +251,8 @@ export default function ExaminationReviewPage() {
 									<option value="CHANGES_REQUESTED">
 										Returned
 									</option>
-									<option value="ALL">
-										All examinations
+									<option value="REJECTED">
+										Rejected
 									</option>
 								</select>
 							</div>

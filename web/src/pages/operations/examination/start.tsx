@@ -1,3 +1,4 @@
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams } from "react-router-dom";
@@ -18,6 +19,11 @@ import {
 	ShieldCheck,
 	Trash2,
 	Play,
+	AlertCircle,
+	CheckCircle2,
+	XCircle,
+	MessageSquareText,
+	RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -28,6 +34,7 @@ type ExaminationStatus =
 	| "PENDING_REVIEW"
 	| "APPROVED"
 	| "CHANGES_REQUESTED"
+	| "REJECTED"
 	| "DISCREPANCY_FOUND"
 	| "FURTHER_EXAMINATION"
 	| "CANCELLED";
@@ -50,6 +57,20 @@ type Finding = {
 	severity: FindingSeverity;
 };
 
+type Person = {
+	id: string | null;
+	name: string | null;
+	email: string | null;
+};
+
+type ExaminationReview = {
+	status: string;
+	decision: string | null;
+	remarks: string;
+	reviewed_at: string | null;
+	reviewer: Person;
+};
+
 type Examination = {
 	id: string;
 	reference: string;
@@ -62,6 +83,7 @@ type Examination = {
 	findings: string | null;
 	remarks: string | null;
 	completed_at: string | null;
+	reviewed_at?: string | null;
 	shipment: {
 		id: string;
 		shipment_reference: string;
@@ -101,21 +123,11 @@ type Examination = {
 		description: string;
 		kind: string;
 	};
-	officer: {
-		id: string | null;
-		name: string | null;
-		email: string | null;
+	officer: Person & {
 		phone?: string | null;
 	};
-	reviewer: {
-		id: string | null;
-		name: string | null;
-		email: string | null;
-	};
-	created_by: {
-		id: string | null;
-		name: string | null;
-	};
+	reviewer: Person;
+	created_by: Person;
 };
 
 type ExaminationLog = {
@@ -180,7 +192,7 @@ function getString(value: unknown, fallback = ""): string {
 }
 
 function getStatusLabel(value: string): string {
-	return value
+	return (value || "UNKNOWN")
 		.toLowerCase()
 		.split("_")
 		.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -215,6 +227,53 @@ function formatDateTime(value: string | null | undefined): string {
 		hour: "2-digit",
 		minute: "2-digit",
 	});
+}
+
+function parseSavedFindings(value: unknown): Record<string, any> {
+	if (value && typeof value === "object" && !Array.isArray(value)) {
+		return value as Record<string, any>;
+	}
+
+	if (typeof value !== "string" || !value.trim()) return {};
+
+	try {
+		const parsed = JSON.parse(value);
+
+		return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+			? parsed
+			: {};
+	} catch {
+		return {};
+	}
+}
+
+function normalizeChecklist(value: unknown): ChecklistItem[] {
+	if (!Array.isArray(value)) return checklistTemplate;
+
+	return value.map((item: any, index: number) => ({
+		id: getString(item?.id, `checklist-${index}`),
+		label: getString(item?.label, getString(item?.title, `Item ${index + 1}`)),
+		description: getString(item?.description),
+		result: ["PENDING", "PASS", "ISSUE", "NA"].includes(
+			getString(item?.result).toUpperCase(),
+		)
+			? (getString(item?.result).toUpperCase() as ChecklistResult)
+			: "PENDING",
+		remarks: getString(item?.remarks),
+	}));
+}
+
+function normalizeFindings(value: unknown): Finding[] {
+	if (!Array.isArray(value)) return [];
+
+	return value.map((item: any, index: number) => ({
+		id: getString(item?.id, `finding-${index}`),
+		title: getString(item?.title, `Finding ${index + 1}`),
+		description: getString(item?.description),
+		severity: severityOptions.includes(item?.severity)
+			? item.severity
+			: "MEDIUM",
+	}));
 }
 
 function SectionCard({
@@ -282,15 +341,20 @@ function FieldLabel({
 
 function StatusPill({ status }: { status: string }) {
 	const tone =
-		status === "COMPLETED" || status === "APPROVED" || status === "PASS"
+		status === "COMPLETED" ||
+		status === "APPROVED" ||
+		status === "PASS"
 			? "bg-green-50 text-green-700"
-			: status === "CANCELLED" ||
-				  status === "DISCREPANCY_FOUND" ||
-				  status === "ISSUE"
+			: status === "REJECTED" ||
+					status === "CANCELLED" ||
+					status === "DISCREPANCY_FOUND" ||
+					status === "ISSUE"
 				? "bg-red-50 text-red-700"
 				: status === "IN_PROGRESS"
 					? "bg-blue-50 text-blue-700"
-					: "bg-orange/10 text-orange";
+					: status === "CHANGES_REQUESTED"
+						? "bg-orange/10 text-orange"
+						: "bg-surface text-ink-soft";
 
 	return (
 		<span className={`rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>
@@ -299,10 +363,153 @@ function StatusPill({ status }: { status: string }) {
 	);
 }
 
+function ReviewFeedback({ review }: { review: ExaminationReview }) {
+	const decision = review.decision || review.status;
+
+	if (!["CHANGES_REQUESTED", "REJECTED", "APPROVED"].includes(decision)) {
+		return null;
+	}
+
+	const isReturned = decision === "CHANGES_REQUESTED";
+	const isRejected = decision === "REJECTED";
+	const isApproved = decision === "APPROVED";
+
+	return (
+		<section
+			className={`overflow-hidden rounded-2xl border ${
+				isReturned
+					? "border-orange-300 bg-orange-50"
+					: isRejected
+						? "border-red-200 bg-red-50"
+						: "border-green-200 bg-green-50"
+			}`}
+		>
+			<div className="flex flex-wrap items-center justify-between gap-3 border-b border-current/10 px-5 py-4 sm:px-6">
+				<div className="flex items-center gap-3">
+					<div
+						className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+							isReturned
+								? "bg-orange-100 text-orange-700"
+								: isRejected
+									? "bg-red-100 text-red-700"
+									: "bg-green-100 text-green-700"
+						}`}
+					>
+						{isReturned ? (
+							<RefreshCw size={20} />
+						) : isRejected ? (
+							<XCircle size={20} />
+						) : (
+							<CheckCircle2 size={20} />
+						)}
+					</div>
+					<div>
+						<h2 className="font-semibold text-ink">
+							{isReturned
+								? "Corrections required"
+								: isRejected
+									? "Examination rejected"
+									: "Examination approved"}
+						</h2>
+						<p className="mt-0.5 text-xs text-ink-soft">
+							Reviewer decision and feedback
+						</p>
+					</div>
+				</div>
+				<StatusPill status={decision} />
+			</div>
+
+			<div className="space-y-4 p-5 sm:p-6">
+				<div className="grid gap-4 sm:grid-cols-2">
+					<div>
+						<p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+							Reviewed by
+						</p>
+						<p className="mt-1 text-sm font-semibold text-ink">
+							{review.reviewer?.name || "Reviewer"}
+						</p>
+						{review.reviewer?.email && (
+							<p className="mt-1 text-xs text-ink-soft">
+								{review.reviewer.email}
+							</p>
+						)}
+					</div>
+					<div>
+						<p className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+							Review date
+						</p>
+						<p className="mt-1 text-sm font-semibold text-ink">
+							{formatDateTime(review.reviewed_at)}
+						</p>
+					</div>
+				</div>
+
+				<div className="rounded-xl border border-current/10 bg-white/70 p-4">
+					<div className="flex items-center gap-2">
+						<MessageSquareText size={17} className="text-ink-soft" />
+						<p className="text-sm font-semibold text-ink">
+							Reviewer's remarks
+						</p>
+					</div>
+					<p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-ink">
+						{review.remarks || "The reviewer did not provide any remarks."}
+					</p>
+				</div>
+
+				{isReturned && (
+					<div className="flex items-start gap-3 rounded-xl border border-orange-200 bg-white/70 p-4">
+						<AlertCircle size={19} className="mt-0.5 shrink-0 text-orange" />
+						<div>
+							<p className="text-sm font-semibold text-ink">
+								What you need to do
+							</p>
+							<p className="mt-1 text-sm leading-6 text-ink-soft">
+								Read the reviewer's remarks, correct the examination checklist,
+								findings or report as necessary, then resubmit the examination
+								for review. You do not need to create another examination.
+							</p>
+						</div>
+					</div>
+				)}
+
+				{isRejected && (
+					<div className="flex items-start gap-3 rounded-xl border border-red-200 bg-white/70 p-4">
+						<AlertCircle size={19} className="mt-0.5 shrink-0 text-red-600" />
+						<div>
+							<p className="text-sm font-semibold text-ink">
+								This examination cannot be resubmitted
+							</p>
+							<p className="mt-1 text-sm leading-6 text-ink-soft">
+								The report is retained for audit purposes. Contact an
+								authorised supervisor if another examination is required.
+							</p>
+						</div>
+					</div>
+				)}
+
+				{isApproved && (
+					<div className="flex items-start gap-3 rounded-xl border border-green-200 bg-white/70 p-4">
+						<CheckCircle2 size={19} className="mt-0.5 shrink-0 text-green-700" />
+						<div>
+							<p className="text-sm font-semibold text-ink">
+								Review completed successfully
+							</p>
+							<p className="mt-1 text-sm leading-6 text-ink-soft">
+								The examination report has been approved.
+							</p>
+						</div>
+					</div>
+				)}
+			</div>
+		</section>
+	);
+}
+
 export default function ConductExaminationPage() {
 	const { id } = useParams<{ id: string }>();
 
 	const [examination, setExamination] = useState<Examination | null>(null);
+	const [review, setReview] = useState<ExaminationReview | null>(null);
 	const [logs, setLogs] = useState<ExaminationLog[]>([]);
 	const [checklist, setChecklist] = useState<ChecklistItem[]>(checklistTemplate);
 	const [findings, setFindings] = useState<Finding[]>([]);
@@ -318,13 +525,20 @@ export default function ConductExaminationPage() {
 	const [loadError, setLoadError] = useState("");
 
 	const isScheduled = examination?.status === "SCHEDULED";
-	const isCompleted = examination?.status === "COMPLETED";
-	const isSubmitted =
-		examination?.status === "PENDING_REVIEW" ||
-		examination?.status === "APPROVED";
+	const isChangesRequested = examination?.status === "CHANGES_REQUESTED";
+	const isRejected = examination?.status === "REJECTED";
+
+	const isReadOnly =
+		!examination ||
+		[
+			"COMPLETED",
+			"PENDING_REVIEW",
+			"APPROVED",
+			"REJECTED",
+			"CANCELLED",
+		].includes(examination.status);
 
 	const showWorkspace = !!examination && !isScheduled;
-	const isReadOnly = isCompleted || isSubmitted;
 
 	const completedChecklist = useMemo(
 		() => checklist.filter((item) => item.result !== "PENDING").length,
@@ -333,17 +547,13 @@ export default function ConductExaminationPage() {
 
 	const checklistComplete = completedChecklist === checklist.length;
 
-	const hasChecklistIssues = checklist.some(
-		(item) => item.result === "ISSUE",
-	);
-
 	const checklistIssuesExplained = checklist
 		.filter((item) => item.result === "ISSUE")
 		.every((item) => item.remarks.trim().length > 0);
 
 	const canSubmit =
 		!!examination &&
-		examination.status === "IN_PROGRESS" &&
+		["IN_PROGRESS", "CHANGES_REQUESTED"].includes(examination.status) &&
 		!isReadOnly &&
 		checklistComplete &&
 		checklistIssuesExplained &&
@@ -351,7 +561,6 @@ export default function ConductExaminationPage() {
 
 	const progress = useMemo(() => {
 		if (checklist.length === 0) return 0;
-
 		return Math.round((completedChecklist / checklist.length) * 100);
 	}, [checklist.length, completedChecklist]);
 
@@ -382,48 +591,58 @@ export default function ConductExaminationPage() {
 				throw new Error("The examination record was not found.");
 			}
 
+			const saved = parseSavedFindings(record.findings ?? code?.saved_findings);
+
+			const normalizedChecklist = normalizeChecklist(
+				Array.isArray(code?.checklist)
+					? code.checklist
+					: saved["checklist"],
+			);
+
+			const normalizedFindings = normalizeFindings(
+				Array.isArray(code?.findings)
+					? code.findings
+					: Array.isArray(saved["findings"])
+						? saved["findings"]
+						: [],
+			);
+
+			const apiReport = getString(code?.report?.findings);
+			const normalizedReport = getString(
+				saved["report"],
+				apiReport && !parseSavedFindings(apiReport)["checklist"]
+					? apiReport
+					: "",
+			);
+
+			const normalizedRemarks = getString(
+				code?.report?.remarks,
+				getString(record.remarks),
+			);
+
+			const reviewData = code?.review ?? record.review ?? {};
+			const reviewer = reviewData.reviewer ?? record.reviewer ?? {};
+
 			setExamination(record as Examination);
+			setChecklist(normalizedChecklist);
+			setFindings(normalizedFindings);
+			setReport(normalizedReport);
+			setRemarks(normalizedRemarks);
 
-			const serverChecklist = Array.isArray(code?.checklist)
-				? code.checklist
-				: [];
-
-			setChecklist(
-				serverChecklist.length
-					? serverChecklist.map((item: any, index: number) => ({
-							id: getString(item.id, `checklist-${index}`),
-							label: getString(item.label, getString(item.title)),
-							description: getString(item.description),
-							result: ["PENDING", "PASS", "ISSUE", "NA"].includes(item.result)
-								? item.result
-								: "PENDING",
-							remarks: getString(item.remarks),
-						}))
-					: checklistTemplate,
-			);
-
-			const serverFindings = Array.isArray(code?.findings)
-				? code.findings
-				: [];
-
-			setFindings(
-				serverFindings.map((item: any, index: number) => ({
-					id: getString(item.id, `finding-${index}`),
-					title: getString(item.title),
-					description: getString(item.description),
-					severity: severityOptions.includes(item.severity)
-						? item.severity
-						: "MEDIUM",
-				})),
-			);
-
-			setReport(
-				getString(code?.report?.findings, getString(record.findings)),
-			);
-
-			setRemarks(
-				getString(code?.report?.remarks, getString(record.remarks)),
-			);
+			setReview({
+				status: getString(reviewData.status, getString(record.status)),
+				decision: getString(reviewData.decision) || null,
+				remarks: getString(reviewData.remarks),
+				reviewed_at:
+					getString(reviewData.reviewed_at) ||
+					getString(record.reviewed_at) ||
+					null,
+				reviewer: {
+					id: getString(reviewer.id) || null,
+					name: getString(reviewer.name) || null,
+					email: getString(reviewer.email) || null,
+				},
+			});
 
 			setLogs(Array.isArray(code?.logs) ? code.logs : []);
 		} catch (error) {
@@ -514,7 +733,6 @@ export default function ConductExaminationPage() {
 		setFindingTitle("");
 		setFindingDescription("");
 		setFindingSeverity("MEDIUM");
-
 		toast.success("Finding added.");
 	};
 
@@ -527,8 +745,8 @@ export default function ConductExaminationPage() {
 	const submitExamination = async () => {
 		if (!id || !examination || submitting) return;
 
-		if (examination.status !== "IN_PROGRESS") {
-			toast.error("The examination must be in progress before submission.");
+		if (!["IN_PROGRESS", "CHANGES_REQUESTED"].includes(examination.status)) {
+			toast.error("This examination cannot be submitted in its current status.");
 			return;
 		}
 
@@ -537,11 +755,7 @@ export default function ConductExaminationPage() {
 			return;
 		}
 
-		const unexplainedIssues = checklist.filter(
-			(item) => item.result === "ISSUE" && !item.remarks.trim(),
-		);
-
-		if (unexplainedIssues.length > 0) {
+		if (!checklistIssuesExplained) {
 			toast.error("Provide remarks for every checklist item marked as an issue.");
 			return;
 		}
@@ -593,7 +807,12 @@ export default function ConductExaminationPage() {
 				);
 			}
 
-			toast.success("Examination submitted successfully.");
+			toast.success(
+				isChangesRequested
+					? "Corrections resubmitted successfully."
+					: "Examination submitted successfully.",
+			);
+
 			await loadExamination();
 		} catch (error) {
 			toast.error(
@@ -638,7 +857,7 @@ export default function ConductExaminationPage() {
 						<button
 							type="button"
 							onClick={() => void loadExamination()}
-							className="rounded-lg bg-orange px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-deep"
+							className="rounded-lg bg-orange px-4 py-2.5 text-sm font-semibold text-white"
 						>
 							Try again
 						</button>
@@ -677,7 +896,9 @@ export default function ConductExaminationPage() {
 						<p className="mt-1 text-sm text-ink-soft">
 							{isScheduled
 								? "Review the assignment details before starting the examination."
-								: "Record the inspection results, findings and examination report."}
+								: isChangesRequested
+									? "Review the feedback below and correct the examination report."
+									: "Examination workspace and recorded results."}
 						</p>
 					</div>
 
@@ -686,33 +907,22 @@ export default function ConductExaminationPage() {
 							type="button"
 							onClick={() => void startExamination()}
 							disabled={starting}
-							className="inline-flex items-center gap-2 rounded-xl bg-orange px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-deep disabled:cursor-not-allowed disabled:opacity-60"
+							className="inline-flex items-center gap-2 rounded-xl bg-orange px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-deep disabled:opacity-60"
 						>
-							{starting ? (
-								<div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-							) : (
-								<Play size={17} />
-							)}
+							<Play size={17} />
 							{starting ? "Starting..." : "Start Examination"}
 						</button>
 					)}
 				</div>
 
-				{(isCompleted || isSubmitted) && (
-					<div className="flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-4 text-green-800">
-						<ShieldCheck size={20} className="mt-0.5 shrink-0" />
-						<div>
-							<p className="font-semibold">
-								{isCompleted
-									? "Examination completed"
-									: "Examination submitted"}
-							</p>
-							<p className="mt-1 text-sm">
-								{isCompleted
-									? "This examination has already been completed."
-									: "This examination has been submitted and is awaiting the next review step."}
-							</p>
-						</div>
+				{review && (
+					<ReviewFeedback review={review} />
+				)}
+
+				{isRejected && (
+					<div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+						This examination has been rejected. Its report is retained for
+						record purposes and cannot be edited or resubmitted.
 					</div>
 				)}
 
@@ -722,38 +932,17 @@ export default function ConductExaminationPage() {
 					icon={ClipboardList}
 				>
 					<div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-						<InfoItem
-							label="Examination reference"
-							value={examination.reference}
-						/>
+						<InfoItem label="Examination reference" value={examination.reference} />
 						<InfoItem
 							label="Examination type"
 							value={getStatusLabel(examination.examination_type)}
 						/>
-						<InfoItem
-							label="Priority"
-							value={getStatusLabel(examination.priority)}
-						/>
-						<InfoItem
-							label="Scheduled date"
-							value={formatDate(examination.scheduled_date)}
-						/>
-						<InfoItem
-							label="Scheduled time"
-							value={examination.scheduled_time}
-						/>
-						<InfoItem
-							label="Assigned officer"
-							value={examination.officer?.name}
-						/>
-						<InfoItem
-							label="Examination location"
-							value={examination.location?.name}
-						/>
-						<InfoItem
-							label="Location code"
-							value={examination.location?.code}
-						/>
+						<InfoItem label="Priority" value={getStatusLabel(examination.priority)} />
+						<InfoItem label="Scheduled date" value={formatDate(examination.scheduled_date)} />
+						<InfoItem label="Scheduled time" value={examination.scheduled_time} />
+						<InfoItem label="Assigned officer" value={examination.officer?.name} />
+						<InfoItem label="Examination location" value={examination.location?.name} />
+						<InfoItem label="Location code" value={examination.location?.code} />
 					</div>
 
 					{examination.instructions && (
@@ -774,61 +963,23 @@ export default function ConductExaminationPage() {
 					icon={Container}
 				>
 					<div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-						<InfoItem
-							label="Container number"
-							value={examination.container?.container_no}
-						/>
-						<InfoItem
-							label="Container size"
-							value={examination.container?.size}
-						/>
-						<InfoItem
-							label="Seal number"
-							value={examination.container?.seal_no}
-						/>
+						<InfoItem label="Container number" value={examination.container?.container_no} />
+						<InfoItem label="Container size" value={examination.container?.size} />
+						<InfoItem label="Seal number" value={examination.container?.seal_no} />
 						<InfoItem
 							label="Container weight"
-							value={
-								examination.container?.gross_weight
-									? `${examination.container.gross_weight} kg`
-									: "Not available"
-							}
+							value={examination.container?.gross_weight ? `${examination.container.gross_weight} kg` : "Not available"}
 						/>
-						<InfoItem
-							label="Shipment reference"
-							value={examination.shipment?.shipment_reference}
-						/>
-						<InfoItem
-							label="Bill of lading"
-							value={examination.shipment?.bill_of_lading}
-						/>
-						<InfoItem
-							label="Vessel"
-							value={examination.shipment?.vessel_name}
-						/>
-						<InfoItem
-							label="Voyage number"
-							value={examination.shipment?.voyage_number}
-						/>
-						<InfoItem
-							label="Shipping line"
-							value={examination.shipment?.shipping_line}
-						/>
-						<InfoItem
-							label="Consignee"
-							value={examination.shipment?.consignee}
-						/>
-						<InfoItem
-							label="Cargo category"
-							value={examination.shipment?.cargo_category}
-						/>
+						<InfoItem label="Shipment reference" value={examination.shipment?.shipment_reference} />
+						<InfoItem label="Bill of lading" value={examination.shipment?.bill_of_lading} />
+						<InfoItem label="Vessel" value={examination.shipment?.vessel_name} />
+						<InfoItem label="Voyage number" value={examination.shipment?.voyage_number} />
+						<InfoItem label="Shipping line" value={examination.shipment?.shipping_line} />
+						<InfoItem label="Consignee" value={examination.shipment?.consignee} />
+						<InfoItem label="Cargo category" value={examination.shipment?.cargo_category} />
 						<InfoItem
 							label="Package count"
-							value={
-								examination.shipment?.package_count
-									? `${examination.shipment.package_count} ${examination.shipment.package_type || ""}`
-									: "Not available"
-							}
+							value={examination.shipment?.package_count ? `${examination.shipment.package_count} ${examination.shipment.package_type || ""}` : "Not available"}
 						/>
 					</div>
 
@@ -855,27 +1006,18 @@ export default function ConductExaminationPage() {
 				{isScheduled && (
 					<div className="rounded-2xl border border-orange/20 bg-orange/5 p-6">
 						<div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-							<div className="flex items-start gap-3">
-								<div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-orange/10 text-orange">
-									<ClipboardCheck size={22} />
-								</div>
-								<div>
-									<h2 className="font-semibold text-ink">
-										Ready to begin?
-									</h2>
-									<p className="mt-1 max-w-xl text-sm leading-6 text-ink-soft">
-										Review the examination instructions, container details and
-										shipment information above. When you are ready, start the
-										examination to open the inspection workspace.
-									</p>
-								</div>
+							<div>
+								<h2 className="font-semibold text-ink">Ready to begin?</h2>
+								<p className="mt-1 max-w-xl text-sm leading-6 text-ink-soft">
+									Review the assignment details above, then start the
+									examination to open the inspection workspace.
+								</p>
 							</div>
-
 							<button
 								type="button"
 								onClick={() => void startExamination()}
 								disabled={starting}
-								className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-orange px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-deep disabled:cursor-not-allowed disabled:opacity-60"
+								className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange px-6 py-3.5 text-sm font-semibold text-white disabled:opacity-60"
 							>
 								<Play size={17} />
 								{starting ? "Starting..." : "Start Examination"}
@@ -894,15 +1036,11 @@ export default function ConductExaminationPage() {
 											Examination progress
 										</p>
 										<p className="mt-1 text-xs text-ink-soft">
-											Complete every checklist item. Findings and reports are
-											optional.
+											Complete every checklist item before submitting.
 										</p>
 									</div>
-									<p className="text-lg font-bold tabular-nums text-orange">
-										{progress}%
-									</p>
+									<p className="text-lg font-bold text-orange">{progress}%</p>
 								</div>
-
 								<div className="mt-4 h-2 overflow-hidden rounded-full bg-surface">
 									<motion.div
 										initial={{ width: 0 }}
@@ -911,17 +1049,9 @@ export default function ConductExaminationPage() {
 										className="h-full rounded-full bg-orange"
 									/>
 								</div>
-
-								<div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-ink-soft">
-									<span>
-										{completedChecklist}/{checklist.length} checklist items
-									</span>
+								<div className="mt-3 flex flex-wrap gap-4 text-xs text-ink-soft">
+									<span>{completedChecklist}/{checklist.length} checklist items</span>
 									<span>{findings.length} findings recorded</span>
-									<span>
-										{checklistIssuesExplained
-											? "Issue explanations complete"
-											: "Issue explanations pending"}
-									</span>
 								</div>
 							</div>
 						)}
@@ -935,35 +1065,20 @@ export default function ConductExaminationPage() {
 								<p className="text-sm text-ink-soft">
 									{completedChecklist} of {checklist.length} items completed
 								</p>
-								<span
-									className={`rounded-full px-3 py-1 text-xs font-semibold ${
-										checklistComplete
-											? "bg-green-50 text-green-700"
-											: "bg-orange/10 text-orange"
-									}`}
-								>
-									{checklistComplete ? "Checklist complete" : "Pending"}
-								</span>
+								<StatusPill status={checklistComplete ? "COMPLETED" : "PENDING"} />
 							</div>
 
 							<div className="space-y-4">
 								{checklist.map((item, index) => (
-									<div
-										key={item.id}
-										className="rounded-xl border border-line p-4 sm:p-5"
-									>
+									<div key={item.id} className="rounded-xl border border-line p-4 sm:p-5">
 										<div className="flex flex-wrap items-start justify-between gap-3">
 											<div className="flex min-w-0 gap-3">
 												<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface text-sm font-bold text-ink-soft">
 													{index + 1}
 												</div>
 												<div>
-													<h3 className="text-sm font-semibold text-ink">
-														{item.label}
-													</h3>
-													<p className="mt-1 text-xs leading-5 text-ink-soft">
-														{item.description}
-													</p>
+													<h3 className="text-sm font-semibold text-ink">{item.label}</h3>
+													<p className="mt-1 text-xs leading-5 text-ink-soft">{item.description}</p>
 												</div>
 											</div>
 											<StatusPill status={item.result} />
@@ -975,13 +1090,7 @@ export default function ConductExaminationPage() {
 												<select
 													value={item.result}
 													disabled={isReadOnly}
-													onChange={(event) =>
-														updateChecklist(
-															item.id,
-															"result",
-															event.target.value,
-														)
-													}
+													onChange={(event) => updateChecklist(item.id, "result", event.target.value)}
 													className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-orange disabled:opacity-60"
 												>
 													<option value="PENDING">Select result</option>
@@ -990,32 +1099,17 @@ export default function ConductExaminationPage() {
 													<option value="NA">Not applicable</option>
 												</select>
 											</div>
-
 											<div>
-												<FieldLabel required={item.result === "ISSUE"}>
-													Inspection remarks
-												</FieldLabel>
+												<FieldLabel required={item.result === "ISSUE"}>Inspection remarks</FieldLabel>
 												<input
 													value={item.remarks}
 													disabled={isReadOnly}
-													onChange={(event) =>
-														updateChecklist(
-															item.id,
-															"remarks",
-															event.target.value,
-														)
-													}
-													placeholder={
-														item.result === "ISSUE"
-															? "Explain the issue identified..."
-															: "Optional observations..."
-													}
-													className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft/60 focus:border-orange disabled:opacity-60"
+													onChange={(event) => updateChecklist(item.id, "remarks", event.target.value)}
+													placeholder={item.result === "ISSUE" ? "Explain the issue identified..." : "Optional observations..."}
+													className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-orange disabled:opacity-60"
 												/>
 												{item.result === "ISSUE" && !item.remarks.trim() && (
-													<p className="mt-1.5 text-xs text-red-600">
-														An explanation is required for this issue.
-													</p>
+													<p className="mt-1.5 text-xs text-red-600">An explanation is required for this issue.</p>
 												)}
 											</div>
 										</div>
@@ -1026,37 +1120,27 @@ export default function ConductExaminationPage() {
 
 						<SectionCard
 							title="Examination findings"
-							description="Record discrepancies, damage, seal issues or other observations. This section is optional."
+							description="Record discrepancies, damage, seal issues or other observations."
 							icon={Flag}
 						>
 							{!isReadOnly && (
 								<div className="rounded-xl border border-line bg-surface/50 p-4 sm:p-5">
-									<h3 className="text-sm font-semibold text-ink">
-										Add a finding
-									</h3>
-
+									<h3 className="text-sm font-semibold text-ink">Add a finding</h3>
 									<div className="mt-4 grid gap-4 md:grid-cols-2">
 										<div>
 											<FieldLabel required>Finding title</FieldLabel>
 											<input
 												value={findingTitle}
-												onChange={(event) =>
-													setFindingTitle(event.target.value)
-												}
+												onChange={(event) => setFindingTitle(event.target.value)}
 												placeholder="e.g. Seal number mismatch"
-												className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft/60 focus:border-orange"
+												className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-orange"
 											/>
 										</div>
-
 										<div>
 											<FieldLabel required>Severity</FieldLabel>
 											<select
 												value={findingSeverity}
-												onChange={(event) =>
-													setFindingSeverity(
-														event.target.value as FindingSeverity,
-													)
-												}
+												onChange={(event) => setFindingSeverity(event.target.value as FindingSeverity)}
 												className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-orange"
 											>
 												<option value="LOW">Low</option>
@@ -1064,26 +1148,22 @@ export default function ConductExaminationPage() {
 												<option value="HIGH">High</option>
 											</select>
 										</div>
-
 										<div className="md:col-span-2">
 											<FieldLabel required>Description</FieldLabel>
 											<textarea
 												rows={3}
 												value={findingDescription}
-												onChange={(event) =>
-													setFindingDescription(event.target.value)
-												}
+												onChange={(event) => setFindingDescription(event.target.value)}
 												placeholder="Describe the finding and relevant observations..."
-												className="w-full resize-y rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft/60 focus:border-orange"
+												className="w-full resize-y rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-orange"
 											/>
 										</div>
 									</div>
-
 									<div className="mt-4 flex justify-end">
 										<button
 											type="button"
 											onClick={addFinding}
-											className="inline-flex items-center gap-2 rounded-lg bg-orange px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-orange-deep"
+											className="inline-flex items-center gap-2 rounded-lg bg-orange px-4 py-2.5 text-sm font-semibold text-white"
 										>
 											<Plus size={16} />
 											Add Finding
@@ -1096,22 +1176,14 @@ export default function ConductExaminationPage() {
 								{findings.length === 0 ? (
 									<div className="rounded-xl border border-dashed border-line px-4 py-8 text-center">
 										<Flag size={24} className="mx-auto text-ink-soft/50" />
-										<p className="mt-3 text-sm font-medium text-ink">
-											No findings recorded
-										</p>
+										<p className="mt-3 text-sm font-medium text-ink">No findings recorded</p>
 										<p className="mt-1 text-xs text-ink-soft">
-											No additional findings have been recorded for this
-											examination.
+											No additional findings have been recorded for this examination.
 										</p>
 									</div>
 								) : (
 									findings.map((finding, index) => (
-										<motion.div
-											key={finding.id}
-											initial={{ opacity: 0, y: 8 }}
-											animate={{ opacity: 1, y: 0 }}
-											className="rounded-xl border border-line p-4"
-										>
+										<div key={finding.id} className="rounded-xl border border-line p-4">
 											<div className="flex items-start justify-between gap-3">
 												<div className="flex min-w-0 gap-3">
 													<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange/10 text-sm font-bold text-orange">
@@ -1119,27 +1191,14 @@ export default function ConductExaminationPage() {
 													</div>
 													<div className="min-w-0">
 														<div className="flex flex-wrap items-center gap-2">
-															<h3 className="text-sm font-semibold text-ink">
-																{finding.title}
-															</h3>
-															<span
-																className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-																	finding.severity === "HIGH"
-																		? "bg-red-50 text-red-700"
-																		: finding.severity === "MEDIUM"
-																			? "bg-orange/10 text-orange"
-																			: "bg-blue-50 text-blue-700"
-																}`}
-															>
-																{finding.severity}
-															</span>
+															<h3 className="text-sm font-semibold text-ink">{finding.title}</h3>
+															<StatusPill status={finding.severity} />
 														</div>
 														<p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink-soft">
 															{finding.description}
 														</p>
 													</div>
 												</div>
-
 												{!isReadOnly && (
 													<button
 														type="button"
@@ -1151,7 +1210,7 @@ export default function ConductExaminationPage() {
 													</button>
 												)}
 											</div>
-										</motion.div>
+										</div>
 									))
 								)}
 							</div>
@@ -1159,7 +1218,7 @@ export default function ConductExaminationPage() {
 
 						<SectionCard
 							title="Examination report"
-							description="Provide an overall assessment or additional remarks if necessary. Both fields are optional."
+							description="Provide an overall assessment and additional remarks."
 							icon={FileText}
 						>
 							<div>
@@ -1169,11 +1228,10 @@ export default function ConductExaminationPage() {
 									value={report}
 									disabled={isReadOnly}
 									onChange={(event) => setReport(event.target.value)}
-									placeholder="Enter an overall examination assessment (optional)..."
-									className="w-full resize-y rounded-xl border border-line bg-paper px-4 py-3 text-sm leading-6 text-ink outline-none placeholder:text-ink-soft/60 focus:border-orange disabled:opacity-60"
+									placeholder="Enter an overall examination assessment..."
+									className="w-full resize-y rounded-xl border border-line bg-paper px-4 py-3 text-sm leading-6 text-ink outline-none focus:border-orange disabled:opacity-60"
 								/>
 							</div>
-
 							<div className="mt-5">
 								<FieldLabel>Additional remarks</FieldLabel>
 								<textarea
@@ -1181,28 +1239,10 @@ export default function ConductExaminationPage() {
 									value={remarks}
 									disabled={isReadOnly}
 									onChange={(event) => setRemarks(event.target.value)}
-									placeholder="Add any additional remarks or recommendations (optional)..."
-									className="w-full resize-y rounded-xl border border-line bg-paper px-4 py-3 text-sm leading-6 text-ink outline-none placeholder:text-ink-soft/60 focus:border-orange disabled:opacity-60"
+									placeholder="Add any additional remarks or recommendations..."
+									className="w-full resize-y rounded-xl border border-line bg-paper px-4 py-3 text-sm leading-6 text-ink outline-none focus:border-orange disabled:opacity-60"
 								/>
 							</div>
-
-							{hasChecklistIssues && (
-								<div className="mt-5 flex items-start gap-3 rounded-xl border border-orange/20 bg-orange/5 p-4">
-									<Flag
-										size={18}
-										className="mt-0.5 shrink-0 text-orange"
-									/>
-									<div>
-										<p className="text-sm font-semibold text-ink">
-											Checklist issues identified
-										</p>
-										<p className="mt-1 text-xs leading-5 text-ink-soft">
-											Every checklist item marked as an issue must have an
-											explanation in its inspection remarks.
-										</p>
-									</div>
-								</div>
-							)}
 						</SectionCard>
 
 						{logs.length > 0 && (
@@ -1221,14 +1261,10 @@ export default function ConductExaminationPage() {
 												<p className="text-sm font-semibold text-ink">
 													{getStatusLabel(log.action)}
 												</p>
-												<p className="mt-1 text-sm text-ink-soft">
-													{log.description}
-												</p>
+												<p className="mt-1 text-sm text-ink-soft">{log.description}</p>
 												<div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-soft">
 													<span>{formatDateTime(log.performed_at)}</span>
-													{log.performed_by_name && (
-														<span>By {log.performed_by_name}</span>
-													)}
+													{log.performed_by_name && <span>By {log.performed_by_name}</span>}
 												</div>
 											</div>
 										</div>
@@ -1242,38 +1278,27 @@ export default function ConductExaminationPage() {
 								<div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
 									<div>
 										<h2 className="text-lg font-bold text-ink">
-											Ready to submit?
+											{isChangesRequested ? "Resubmit corrected examination" : "Ready to submit?"}
 										</h2>
 										<p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">
-											Complete every checklist item before submitting. Findings,
-											the examination report and additional remarks are optional.
-											Any checklist item marked as an issue must include an
-											explanation.
+											{isChangesRequested
+												? "Make the corrections requested by the reviewer, then resubmit this examination."
+												: "Complete every checklist item before submitting. Any checklist item marked as an issue must include an explanation."}
 										</p>
 										<div className="mt-3 flex flex-wrap gap-3 text-xs text-ink-soft">
-											<span>
-												{completedChecklist}/{checklist.length} checklist items
-											</span>
+											<span>{completedChecklist}/{checklist.length} checklist items</span>
 											<span>{findings.length} findings</span>
-											<span>
-												{checklistIssuesExplained
-													? "Issue explanations complete"
-													: "Issue explanations pending"}
-											</span>
 										</div>
 									</div>
-
 									<button
-										type="button"
 										onClick={() => void submitExamination()}
 										disabled={!canSubmit}
-										className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-orange px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-deep disabled:cursor-not-allowed disabled:opacity-50"
+										className="cursor-pointer inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-orange px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-deep disabled:cursor-not-allowed disabled:opacity-50"
 									>
-										{submitting ? "Submitting..." : "Submit Examination"}
+										{submitting ? "Submitting..." : isChangesRequested ? "Resubmit Corrections" : "Submit Examination"}
 										<ShieldCheck size={18} />
 									</button>
 								</div>
-
 								{!canSubmit && (
 									<p className="mt-4 border-t border-line pt-4 text-xs text-ink-soft">
 										{!checklistComplete

@@ -123,6 +123,50 @@
             exit;
         }
 
+        $isExaminationOfficer =
+            isset($my_details->id, $row["officer_id"]) &&
+            (string) $my_details->id === (string) $row["officer_id"];
+
+        $savedFindings = [];
+
+        if (!empty($row["findings"])) {
+            $decodedFindings = json_decode($row["findings"], true);
+
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $savedFindings = $decodedFindings;
+            }
+        }
+
+        $checklist = [];
+        $findings = [];
+
+        if ($isExaminationOfficer && is_array($savedFindings)) {
+            if (
+                isset($savedFindings["checklist"]) &&
+                is_array($savedFindings["checklist"])
+            ) {
+                $checklist = $savedFindings["checklist"];
+            }
+
+            if (
+                isset($savedFindings["findings"]) &&
+                is_array($savedFindings["findings"])
+            ) {
+                $findings = $savedFindings["findings"];
+            }
+        }
+
+        $reviewDecision = in_array($row["status"], [
+            "APPROVED",
+            "CHANGES_REQUESTED",
+            "REJECTED"
+        ], true) ? $row["status"] : null;
+
+        $canEditReport = $isExaminationOfficer &&
+            $row["status"] === "CHANGES_REQUESTED";
+
+        $canResubmit = $canEditReport;
+
         $logStmt = $conn->prepare("
             SELECT
                 log.id,
@@ -150,6 +194,7 @@
         foreach ($logs as &$log) {
             if (!empty($log["metadata"])) {
                 $metadata = json_decode($log["metadata"], true);
+
                 $log["metadata"] = json_last_error() === JSON_ERROR_NONE
                     ? $metadata
                     : $log["metadata"];
@@ -234,6 +279,18 @@
             "created_by" => [
                 "id" => $row["created_by"],
                 "name" => $row["creator_name"]
+            ],
+
+            "review" => [
+                "status" => $row["status"],
+                "decision" => $reviewDecision,
+                "remarks" => $row["remarks"],
+                "reviewed_at" => $row["reviewed_at"],
+                "reviewer" => [
+                    "id" => $row["reviewed_by"],
+                    "name" => $row["reviewer_name"],
+                    "email" => $row["reviewer_email"]
+                ]
             ]
         ];
 
@@ -242,12 +299,26 @@
             "data" => "Examination details loaded successfully.",
             "code" => [
                 "examination" => $examination,
-                "checklist" => [],
-                "findings" => [],
+                "is_examination_officer" => $isExaminationOfficer,
+                "can_edit_report" => $canEditReport,
+                "can_resubmit" => $canResubmit,
+                "checklist" => $checklist,
+                "findings" => $findings,
                 "report" => [
                     "findings" => $row["findings"],
                     "remarks" => $row["remarks"],
                     "completed_at" => $row["completed_at"]
+                ],
+                "review" => [
+                    "status" => $row["status"],
+                    "decision" => $reviewDecision,
+                    "remarks" => $row["remarks"],
+                    "reviewed_at" => $row["reviewed_at"],
+                    "reviewer" => [
+                        "id" => $row["reviewed_by"],
+                        "name" => $row["reviewer_name"],
+                        "email" => $row["reviewer_email"]
+                    ]
                 ],
                 "logs" => $logs
             ]

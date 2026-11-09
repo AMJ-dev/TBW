@@ -117,15 +117,16 @@
         $stmt = $conn->prepare("
             UPDATE terminal_examinations
             SET
+                review_remarks = :remarks,     
                 status = :status,
                 reviewed_by = :reviewed_by,
                 reviewed_at = NOW(),
                 updated_at = NOW()
-            WHERE id = :id
-                AND status = 'PENDING_REVIEW'
+            WHERE id = :id AND status = 'PENDING_REVIEW'
         ");
 
         $stmt->execute([
+            ":remarks" => $remarks,
             ":status" => $decision,
             ":reviewed_by" => $my_details->id,
             ":id" => $examination_id
@@ -138,8 +139,7 @@
         if ($decision === "APPROVED") {
             $stmt = $conn->prepare("
                 UPDATE portal_shipment_containers
-                SET
-                    status = 'EXAMINATION_COMPLETE'
+                SET status = 'EXAMINATION_COMPLETE'
                 WHERE id = :container_id
                     AND status = 'UNDER_EXAMINATION'
             ");
@@ -185,6 +185,22 @@
             $stmt->execute([
                 ":shipment_id" => $examination["shipment_id"]
             ]);
+
+        } elseif ($decision === "REJECTED") {
+            $stmt = $conn->prepare("
+                UPDATE portal_shipment_containers
+                SET status = 'EXAMINATION_REJECTED'
+                WHERE id = :container_id
+                    AND status = 'UNDER_EXAMINATION'
+            ");
+
+            $stmt->execute([
+                ":container_id" => $examination["container_id"]
+            ]);
+
+            if ($stmt->rowCount() !== 1) {
+                throw new Exception("Could not update rejected container status.");
+            }
         }
 
         $actions = [

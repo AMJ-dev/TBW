@@ -1,6 +1,7 @@
-
 <?php
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
+
+header("Content-Type: application/json");
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
     http_response_code(405);
@@ -13,6 +14,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 }
 
 $examination_id = trim($_POST["examination_id"] ?? "");
+$action = strtolower(trim($_POST["action"] ?? "submit"));
 $report = trim($_POST["report"] ?? "");
 $remarks = trim($_POST["remarks"] ?? "");
 
@@ -24,6 +26,16 @@ if ($examination_id === "") {
     echo json_encode([
         "error" => true,
         "data" => "Examination ID is required.",
+        "code" => null
+    ]);
+    exit;
+}
+
+if (!in_array($action, ["save", "submit"], true)) {
+    http_response_code(422);
+    echo json_encode([
+        "error" => true,
+        "data" => "Invalid examination action. Use save or submit.",
         "code" => null
     ]);
     exit;
@@ -56,6 +68,7 @@ if (
 }
 
 $allowed_checklist_results = [
+    "PENDING",
     "PASS",
     "ISSUE",
     "NA"
@@ -67,23 +80,30 @@ $allowed_severities = [
     "HIGH"
 ];
 
+$checklist_complete = true;
+
 foreach ($checklist as $item) {
     if (
         !is_array($item) ||
-        empty($item["id"]) ||
-        empty($item["label"]) ||
+        trim($item["id"] ?? "") === "" ||
+        trim($item["label"] ?? "") === "" ||
         !in_array($item["result"] ?? "", $allowed_checklist_results, true)
     ) {
         http_response_code(422);
         echo json_encode([
             "error" => true,
-            "data" => "Complete every checklist item with a valid result.",
+            "data" => "One or more checklist items contain invalid information.",
             "code" => null
         ]);
         exit;
     }
 
+    if ($item["result"] === "PENDING") {
+        $checklist_complete = false;
+    }
+
     if (
+        $action === "submit" &&
         $item["result"] === "ISSUE" &&
         trim($item["remarks"] ?? "") === ""
     ) {
@@ -114,6 +134,18 @@ foreach ($findings as $finding) {
         ]);
         exit;
     }
+}
+
+if ($action === "submit" && !$checklist_complete) {
+    http_response_code(422);
+    echo json_encode([
+        "error" => true,
+        "data" => "Complete every checklist item before submitting the examination.",
+        "code" => [
+            "checklist_complete" => false
+        ]
+    ]);
+    exit;
 }
 
 try {
@@ -154,7 +186,7 @@ try {
         exit;
     }
 
-    if ($examination->officer_id !== $my_details->id) {
+    if ((string) $examination->officer_id !== (string) $my_details->id) {
         $conn->rollBack();
 
         http_response_code(403);
@@ -166,13 +198,18 @@ try {
         exit;
     }
 
-    if ($examination->status !== "IN_PROGRESS") {
+    $editable_statuses = [
+        "IN_PROGRESS",
+        "CHANGES_REQUESTED"
+    ];
+
+    if (!in_array($examination->status, $editable_statuses, true)) {
         $conn->rollBack();
 
         http_response_code(409);
         echo json_encode([
             "error" => true,
-            "data" => "Only examinations currently in progress can be submitted.",
+            "data" => "This examination cannot be edited or submitted in its current status.",
             "code" => [
                 "status" => $examination->status
             ]
@@ -194,6 +231,12 @@ try {
         exit;
     }
 
+    $previous_status = $examination->status;
+
+    $new_status = $action === "submit"
+        ? "PENDING_REVIEW"
+        : $previous_status;
+
     $report_data = [
         "checklist" => array_values($checklist),
         "findings" => array_values($findings),
@@ -209,84 +252,129 @@ try {
         throw new RuntimeException("Could not encode examination report.");
     }
 
-    $update_examination = $conn->prepare("
-        UPDATE terminal_examinations
-        SET
-            status = 'PENDING_REVIEW',
-            findings = :findings,
-            remarks = :remarks,
-            completed_at = NOW()
-        WHERE id = :id
-            AND status = 'IN_PROGRESS'
-    ");
+    if ($action === "submit") {
+        $update_examination = $conn->prepare("
+            UPDATE terminal_examinations
+            SET
+                status = 'PENDING_REVIEW',
+                findings = :findings,
+                remarks = :remarks,
+                completed_at = NOW()
+            WHERE id = :id
+                AND status = :previous_status
+        ");
+    } else {
+        $update_examination = $conn->prepare("
+            UPDATE terminal_examinations
+            SET
+                findings = :findings,
+                remarks = :remarks
+            WHERE id = :id
+                AND status = :previous_status
+        ");
+    }
 
     $update_examination->execute([
         ":findings" => $encoded_findings,
         ":remarks" => $remarks,
-        ":id" => $examination_id
+        ":id" => $examination_id,
+        ":previous_status" => $previous_status
     ]);
 
     if ($update_examination->rowCount() !== 1) {
-        throw new RuntimeException("Examination could not be submitted.");
+        throw new RuntimeException("Examination could not be updated.");
     }
 
-    $eligible_shipment_statuses = [
-        "EXPECTED",
-        "SCHEDULED",
-        "PARTIALLY_GATED_IN",
-        "GATED_IN",
-        "PARTIALLY_RECEIVED",
-        "RECEIVED",
-        "PARTIALLY_STORED",
-        "STORED",
-        "EXAMINATION_SCHEDULED"
-    ];
+    $shipment_updated = false;
 
-    $eligible_container_statuses = [
-        "EXPECTED",
-        "SCHEDULED",
-        "ENTERED",
-        "RECEIVED",
-        "IN_YARD",
-        "IN_WAREHOUSE",
-        "EXAMINATION_SCHEDULED",
-        "UNDER_EXAMINATION"
-    ];
+    if ($action === "submit") {
+        $eligible_shipment_statuses = [
+            "EXPECTED",
+            "SCHEDULED",
+            "PARTIALLY_GATED_IN",
+            "GATED_IN",
+            "PARTIALLY_RECEIVED",
+            "RECEIVED",
+            "PARTIALLY_STORED",
+            "STORED",
+            "EXAMINATION_SCHEDULED",
+            "UNDER_EXAMINATION"
+        ];
 
-    $status_placeholders = implode(
-        ", ",
-        array_fill(0, count($eligible_shipment_statuses), "?")
-    );
+        $eligible_container_statuses = [
+            "EXPECTED",
+            "SCHEDULED",
+            "ENTERED",
+            "RECEIVED",
+            "IN_YARD",
+            "IN_WAREHOUSE",
+            "EXAMINATION_SCHEDULED",
+            "UNDER_EXAMINATION"
+        ];
 
-    $container_placeholders = implode(
-        ", ",
-        array_fill(0, count($eligible_container_statuses), "?")
-    );
+        $status_placeholders = implode(
+            ", ",
+            array_fill(0, count($eligible_shipment_statuses), "?")
+        );
 
-    $update_shipment = $conn->prepare("
-        UPDATE portal_shipments
-        SET status = 'UNDER_EXAMINATION'
-        WHERE id = ?
-            AND status IN ($status_placeholders)
-            AND EXISTS (
-                SELECT 1
-                FROM portal_shipment_containers c
-                WHERE c.shipment_id = portal_shipments.id
-                    AND c.status = 'UNDER_EXAMINATION'
-            )
-            AND NOT EXISTS (
-                SELECT 1
-                FROM portal_shipment_containers c
-                WHERE c.shipment_id = portal_shipments.id
-                    AND c.status NOT IN ($container_placeholders)
-            )
-    ");
+        $container_placeholders = implode(
+            ", ",
+            array_fill(0, count($eligible_container_statuses), "?")
+        );
 
-    $update_shipment->execute(array_merge(
-        [$examination->shipment_id],
-        $eligible_shipment_statuses,
-        $eligible_container_statuses
-    ));
+        $update_shipment = $conn->prepare("
+            UPDATE portal_shipments
+            SET status = 'UNDER_EXAMINATION'
+            WHERE id = ?
+                AND status IN ($status_placeholders)
+                AND EXISTS (
+                    SELECT 1
+                    FROM portal_shipment_containers c
+                    WHERE c.shipment_id = portal_shipments.id
+                        AND c.status = 'UNDER_EXAMINATION'
+                )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM portal_shipment_containers c
+                    WHERE c.shipment_id = portal_shipments.id
+                        AND c.status NOT IN ($container_placeholders)
+                )
+        ");
+
+        $update_shipment->execute(array_merge(
+            [$examination->shipment_id],
+            $eligible_shipment_statuses,
+            $eligible_container_statuses
+        ));
+
+        $shipment_updated = $update_shipment->rowCount() > 0;
+    }
+
+    if ($action === "save") {
+        $log_action = "EXAMINATION_SAVED";
+        $log_description = "Examination report saved for container {$examination->container_no}.";
+        $response_message = "Examination saved successfully.";
+    } elseif ($previous_status === "CHANGES_REQUESTED") {
+        $log_action = "EXAMINATION_RESUBMITTED";
+        $log_description = "Corrected examination resubmitted for review for container {$examination->container_no}.";
+        $response_message = "Corrected examination resubmitted successfully and is awaiting review.";
+    } else {
+        $log_action = "EXAMINATION_SUBMITTED";
+        $log_description = "Examination submitted for review for container {$examination->container_no}.";
+        $response_message = "Examination submitted successfully and is awaiting review.";
+    }
+
+    $log_metadata = json_encode([
+        "container_id" => $examination->container_id,
+        "container_no" => $examination->container_no,
+        "container_status" => $examination->container_status,
+        "checklist_count" => count($checklist),
+        "checklist_complete" => $checklist_complete,
+        "findings_count" => count($findings),
+        "has_report" => $report !== "",
+        "has_remarks" => $remarks !== "",
+        "action" => $action
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
     $log = $conn->prepare("
         INSERT INTO terminal_examination_logs (
@@ -297,6 +385,7 @@ try {
             new_status,
             description,
             metadata,
+            performed_at,
             performed_by
         ) VALUES (
             :id,
@@ -306,6 +395,7 @@ try {
             :new_status,
             :description,
             :metadata,
+            NOW(),
             :performed_by
         )
     ");
@@ -313,19 +403,11 @@ try {
     $log->execute([
         ":id" => generateId(),
         ":examination_id" => $examination_id,
-        ":action" => "EXAMINATION_SUBMITTED",
-        ":previous_status" => "IN_PROGRESS",
-        ":new_status" => "PENDING_REVIEW",
-        ":description" => "Examination submitted for review for container {$examination->container_no}.",
-        ":metadata" => json_encode([
-            "container_id" => $examination->container_id,
-            "container_no" => $examination->container_no,
-            "container_status" => "UNDER_EXAMINATION",
-            "checklist_count" => count($checklist),
-            "findings_count" => count($findings),
-            "has_report" => $report !== "",
-            "has_remarks" => $remarks !== ""
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        ":action" => $log_action,
+        ":previous_status" => $previous_status,
+        ":new_status" => $new_status,
+        ":description" => $log_description,
+        ":metadata" => $log_metadata,
         ":performed_by" => $my_details->id
     ]);
 
@@ -333,13 +415,16 @@ try {
 
     echo json_encode([
         "error" => false,
-        "data" => "Examination submitted successfully and is awaiting review.",
+        "data" => $response_message,
         "code" => [
             "examination_id" => $examination_id,
-            "status" => "PENDING_REVIEW",
-            "container_status" => "UNDER_EXAMINATION",
-            "shipment_status_updated" => $update_shipment->rowCount() > 0,
+            "action" => $action,
+            "status" => $new_status,
+            "previous_status" => $previous_status,
+            "container_status" => $examination->container_status,
+            "shipment_status_updated" => $shipment_updated,
             "checklist_count" => count($checklist),
+            "checklist_complete" => $checklist_complete,
             "findings_count" => count($findings)
         ]
     ]);
@@ -353,7 +438,7 @@ try {
     http_response_code(500);
     echo json_encode([
         "error" => true,
-        "data" => "Could not submit examination.",
+        "data" => "Could not process examination.",
         "code" => null
     ]);
     exit;

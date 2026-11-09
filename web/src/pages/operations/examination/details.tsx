@@ -17,8 +17,10 @@ import { http, type Resp } from "@/lib/httpClient";
 import { AnimatePresence, motion } from "framer-motion";
 import {
 	ArrowLeft,
+	AlertCircle,
 	CalendarDays,
 	Check,
+	CheckCircle2,
 	ChevronRight,
 	Clock3,
 	Container,
@@ -29,9 +31,12 @@ import {
 	Ship,
 	ShieldCheck,
 	UserRound,
-	AlertCircle,
 	MapPin,
 	Activity,
+	XCircle,
+	ClipboardCheck,
+	ClipboardList,
+	MessageSquareText,
 } from "lucide-react";
 
 type ExaminationStatus =
@@ -41,9 +46,35 @@ type ExaminationStatus =
 	| "PENDING_REVIEW"
 	| "APPROVED"
 	| "CHANGES_REQUESTED"
+	| "REJECTED"
 	| "CANCELLED"
 	| "DISCREPANCY_FOUND"
 	| "FURTHER_EXAMINATION";
+
+type ChecklistResult = "PASS" | "ISSUE" | "PENDING" | "NA" | string;
+
+type ChecklistItem = {
+	id: string;
+	label: string;
+	description: string;
+	result: ChecklistResult;
+	remarks: string;
+};
+
+type Finding = {
+	id?: string;
+	title: string;
+	description: string;
+	severity: string;
+	remarks: string;
+};
+
+type Person = {
+	id: string;
+	name: string;
+	email: string;
+	phone?: string;
+};
 
 type ExaminationLog = {
 	id: string;
@@ -110,33 +141,95 @@ type Examination = {
 		description: string;
 		kind: string;
 	};
-	officer: {
-		id: string;
-		name: string;
-		email: string;
-		phone: string;
-	};
-	reviewer: {
-		id: string;
-		name: string;
-		email: string;
-	};
+	officer: Person;
+	reviewer: Person;
 	created_by: {
 		id: string;
 		name: string;
 	};
-	checklist: any[];
-	findings_list: any[];
+	checklist: ChecklistItem[];
+	findings_list: Finding[];
 	report: {
 		findings: string;
 		remarks: string;
 		completed_at: string;
 	};
+	review: {
+		status: string;
+		decision: string | null;
+		remarks: string;
+		reviewed_at: string;
+		reviewer: Person;
+	};
+	is_examination_officer: boolean;
+	can_edit_report: boolean;
+	can_resubmit: boolean;
 	logs: ExaminationLog[];
 };
 
+type TimelineEvent = {
+	id: string;
+	title: string;
+	description: string;
+	date: string;
+	actor: string;
+	done: boolean;
+};
+
 function getString(value: unknown, fallback = ""): string {
-	return typeof value === "string" ? value : fallback;
+	if (typeof value === "string") return value;
+	if (typeof value === "number") return String(value);
+	return fallback;
+}
+
+function formatStatus(status: string) {
+	return status
+		? status
+				.toLowerCase()
+				.split("_")
+				.map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+				.join(" ")
+		: "Not recorded";
+}
+
+function formatDate(value: string) {
+	if (!value) return "Not recorded";
+
+	const date = new Date(value.replace(" ", "T"));
+
+	if (Number.isNaN(date.getTime())) return value;
+
+	return date.toLocaleString("en-GB", {
+		day: "2-digit",
+		month: "short",
+		year: "numeric",
+		hour: "2-digit",
+		minute: "2-digit",
+	});
+}
+
+function normalizeChecklist(value: unknown): ChecklistItem[] {
+	if (!Array.isArray(value)) return [];
+
+	return value.map((item: any, index) => ({
+		id: getString(item?.id, String(index)),
+		label: getString(item?.label, "Checklist item"),
+		description: getString(item?.description),
+		result: getString(item?.result, "PENDING"),
+		remarks: getString(item?.remarks),
+	}));
+}
+
+function normalizeFindings(value: unknown): Finding[] {
+	if (!Array.isArray(value)) return [];
+
+	return value.map((item: any, index) => ({
+		id: getString(item?.id, String(index)),
+		title: getString(item?.title, `Finding ${index + 1}`),
+		description: getString(item?.description),
+		severity: getString(item?.severity),
+		remarks: getString(item?.remarks),
+	}));
 }
 
 function normalizeExamination(code: any): Examination {
@@ -148,6 +241,63 @@ function normalizeExamination(code: any): Examination {
 	const reviewer = record.reviewer ?? {};
 	const createdBy = record.created_by ?? {};
 	const report = code?.report ?? {};
+	const review = code?.review ?? record.review ?? {};
+
+	const rawFindings = record.findings ?? code?.findings;
+	let savedFindings: any = {};
+
+	if (typeof rawFindings === "string" && rawFindings.trim()) {
+		try {
+			savedFindings = JSON.parse(rawFindings);
+		} catch {
+			savedFindings = {
+				report: rawFindings,
+			};
+		}
+	} else if (rawFindings && typeof rawFindings === "object") {
+		savedFindings = rawFindings;
+	}
+
+	const checklist = normalizeChecklist(
+		Array.isArray(code?.checklist)
+			? code.checklist
+			: savedFindings.checklist,
+	);
+
+	const findings = normalizeFindings(
+		Array.isArray(code?.findings_list)
+			? code.findings_list
+			: Array.isArray(code?.findings)
+				? code.findings
+				: savedFindings.findings,
+	);
+
+	const apiReport = getString(report.findings).trim();
+	let apiReportText = apiReport;
+
+	if (apiReport) {
+		try {
+			const parsedApiReport = JSON.parse(apiReport);
+			if (parsedApiReport && typeof parsedApiReport === "object") {
+				apiReportText = getString(
+					parsedApiReport.report,
+					getString(parsedApiReport.findings),
+				);
+			}
+		} catch {
+			apiReportText = apiReport;
+		}
+	}
+
+	const reportText = getString(
+		savedFindings.report,
+		apiReportText,
+	);
+
+	const officerRemarks = getString(
+		report.remarks,
+		getString(record.remarks),
+	);
 
 	const logs: ExaminationLog[] = Array.isArray(code?.logs)
 		? code.logs.map((log: any) => ({
@@ -165,6 +315,8 @@ function normalizeExamination(code: any): Examination {
 			}))
 		: [];
 
+	const reviewReviewer = review?.reviewer ?? reviewer;
+
 	return {
 		id: getString(record.id),
 		reference: getString(record.reference) || getString(record.id),
@@ -174,13 +326,19 @@ function normalizeExamination(code: any): Examination {
 		scheduled_date: getString(record.scheduled_date),
 		scheduled_time: getString(record.scheduled_time),
 		instructions: getString(record.instructions),
-		findings: getString(record.findings) || getString(report.findings),
-		remarks: getString(record.remarks) || getString(report.remarks),
-		completed_at:
-			getString(record.completed_at) || getString(report.completed_at),
-		reviewed_at: getString(record.reviewed_at),
+		findings: reportText,
+		remarks: officerRemarks,
+		completed_at: getString(
+			record.completed_at,
+			getString(report.completed_at),
+		),
+		reviewed_at: getString(
+			review.reviewed_at,
+			getString(record.reviewed_at),
+		),
 		created_at: getString(record.created_at),
 		updated_at: getString(record.updated_at),
+
 		shipment: {
 			id: getString(shipment.id),
 			reference: getString(shipment.shipment_reference),
@@ -203,6 +361,7 @@ function normalizeExamination(code: any): Examination {
 			gross_weight: getString(shipment.gross_weight),
 			status: getString(shipment.status),
 		},
+
 		container: {
 			id: getString(container.id),
 			number: getString(container.container_no),
@@ -213,6 +372,7 @@ function normalizeExamination(code: any): Examination {
 			status: getString(container.status),
 			current_location_id: getString(container.current_location_id),
 		},
+
 		location: {
 			id: getString(location.id),
 			code: getString(location.code),
@@ -220,28 +380,49 @@ function normalizeExamination(code: any): Examination {
 			description: getString(location.description),
 			kind: getString(location.kind),
 		},
+
 		officer: {
 			id: getString(officer.id),
 			name: getString(officer.name),
 			email: getString(officer.email),
 			phone: getString(officer.phone),
 		},
+
 		reviewer: {
 			id: getString(reviewer.id),
 			name: getString(reviewer.name),
 			email: getString(reviewer.email),
 		},
+
 		created_by: {
 			id: getString(createdBy.id),
 			name: getString(createdBy.name),
 		},
-		checklist: Array.isArray(code?.checklist) ? code.checklist : [],
-		findings_list: Array.isArray(code?.findings) ? code.findings : [],
+
+		checklist,
+		findings_list: findings,
+
 		report: {
-			findings: getString(report.findings),
-			remarks: getString(report.remarks),
+			findings: reportText,
+			remarks: officerRemarks,
 			completed_at: getString(report.completed_at),
 		},
+
+		review: {
+			status: getString(review.status, getString(record.status)),
+			decision: getString(review.decision) || null,
+			remarks: getString(review.remarks),
+			reviewed_at: getString(review.reviewed_at),
+			reviewer: {
+				id: getString(reviewReviewer.id),
+				name: getString(reviewReviewer.name),
+				email: getString(reviewReviewer.email),
+			},
+		},
+
+		is_examination_officer: code?.is_examination_officer === true,
+		can_edit_report: code?.can_edit_report === true,
+		can_resubmit: code?.can_resubmit === true,
 		logs,
 	};
 }
@@ -280,7 +461,7 @@ function Detail({
 	value,
 }: {
 	label: string;
-	value?: string | number | null;
+	value?: string | number | null | undefined;
 }) {
 	return (
 		<div className="min-w-0">
@@ -294,18 +475,68 @@ function Detail({
 	);
 }
 
-function formatStatus(status: string) {
-	return status ? status.replaceAll("_", " ") : "Not recorded";
+function ChecklistResultBadge({ result }: { result: string }) {
+	const styles: Record<string, string> = {
+		PASS: "border-emerald-200 bg-emerald-50 text-emerald-700",
+		ISSUE: "border-red-200 bg-red-50 text-red-700",
+		PENDING: "border-amber-200 bg-amber-50 text-amber-700",
+		NA: "border-slate-200 bg-slate-50 text-slate-600",
+	};
+
+	const icons: Record<string, ReactNode> = {
+		PASS: <CheckCircle2 size={13} />,
+		ISSUE: <XCircle size={13} />,
+		PENDING: <Clock3 size={13} />,
+	};
+
+	return (
+		<span
+			className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
+				styles[result] ?? "border-line bg-sand text-ink-soft"
+			}`}
+		>
+			{icons[result]}
+			{formatStatus(result)}
+		</span>
+	);
 }
-
-function formatDate(value: string) {
-	if (!value) return "Not recorded";
-
-	const date = new Date(value.replace(" ", "T"));
-
-	if (Number.isNaN(date.getTime())) return value;
-
-	return date.toLocaleString();
+function getReviewMessage(status: ExaminationStatus) {
+	switch (status) {
+		case "CHANGES_REQUESTED":
+			return {
+				title: "Changes requested",
+				description:
+					"The reviewer has returned this report for correction. Review the feedback below, update the report and resubmit it.",
+				className: "border-amber-200 bg-amber-50 text-amber-900",
+				icon: AlertCircle,
+			};
+		case "REJECTED":
+			return {
+				title: "Examination rejected",
+				description:
+					"This examination report has been rejected and is read-only. An authorised supervisor must decide whether a new examination should be scheduled.",
+				className: "border-red-200 bg-red-50 text-red-900",
+				icon: XCircle,
+			};
+		case "APPROVED":
+			return {
+				title: "Examination approved",
+				description:
+					"The examination report has been approved. This approval does not automatically authorise cargo release.",
+				className: "border-emerald-200 bg-emerald-50 text-emerald-900",
+				icon: CheckCircle2,
+			};
+		case "PENDING_REVIEW":
+			return {
+				title: "Awaiting review",
+				description:
+					"The officer has submitted the examination report. It is awaiting an authorised reviewer.",
+				className: "border-blue-200 bg-blue-50 text-blue-900",
+				icon: Clock3,
+			};
+		default:
+			return null;
+	}
 }
 
 export default function ExaminationDetailsPage() {
@@ -336,24 +567,18 @@ export default function ExaminationDetailsPage() {
 
 				if (resp.error) {
 					throw new Error(
-						getString(
-							resp.data,
-							"Could not load examination details.",
-						),
+						getString(resp.data, "Could not load examination details."),
 					);
 				}
 
 				const code = resp.code as any;
-				const record = code?.examination;
 
-				if (!record?.id) {
+				if (!code?.examination?.id) {
 					throw new Error("Examination record was not found.");
 				}
 
-				const normalized = normalizeExamination(code);
-
 				if (mounted) {
-					setExamination(normalized);
+					setExamination(normalizeExamination(code));
 				}
 			} catch (error: any) {
 				if (mounted) {
@@ -369,9 +594,7 @@ export default function ExaminationDetailsPage() {
 					);
 				}
 			} finally {
-				if (mounted) {
-					setLoading(false);
-				}
+				if (mounted) setLoading(false);
 			}
 		}
 
@@ -382,7 +605,7 @@ export default function ExaminationDetailsPage() {
 		};
 	}, [id, retry]);
 
-	const timeline = useMemo(() => {
+	const timeline = useMemo<TimelineEvent[]>(() => {
 		if (!examination) return [];
 
 		if (examination.logs.length > 0) {
@@ -401,16 +624,21 @@ export default function ExaminationDetailsPage() {
 		}
 
 		const status = examination.status;
-
 		const started = status !== "SCHEDULED";
+
 		const submitted = [
 			"COMPLETED",
 			"PENDING_REVIEW",
 			"APPROVED",
 			"CHANGES_REQUESTED",
+			"REJECTED",
 		].includes(status);
 
-		const reviewed = ["APPROVED", "CHANGES_REQUESTED"].includes(status);
+		const reviewed = [
+			"APPROVED",
+			"CHANGES_REQUESTED",
+			"REJECTED",
+		].includes(status);
 
 		return [
 			{
@@ -425,38 +653,49 @@ export default function ExaminationDetailsPage() {
 				id: "started",
 				title: "Examination started",
 				description: "Officer commenced the examination.",
-				date: started ? "Started" : "Awaiting",
-				actor: "",
+				date: started ? examination.completed_at || "Started" : "Awaiting",
+				actor: examination.officer.name,
 				done: started,
 			},
 			{
 				id: "submitted",
 				title: "Examination submitted",
 				description: "Examination findings submitted for review.",
-				date: submitted ? "Submitted" : "Awaiting",
-				actor: "",
+				date: submitted ? examination.completed_at : "Awaiting",
+				actor: examination.officer.name,
 				done: submitted,
 			},
 			{
 				id: "reviewed",
 				title: "Review decision",
 				description: "Authorised reviewer decision.",
-				date:
-					status === "APPROVED"
-						? "Approved"
-						: status === "CHANGES_REQUESTED"
-							? "Changes requested"
-							: "Awaiting",
+				date: reviewed ? formatStatus(status) : "Awaiting",
 				actor: examination.reviewer.name,
 				done: reviewed,
 			},
 		];
 	}, [examination]);
 
-	const canConduct =
-		examination?.status === "SCHEDULED" ||
-		examination?.status === "IN_PROGRESS" ||
-		examination?.status === "CHANGES_REQUESTED";
+	const checklistCounts = useMemo(() => {
+		const items = examination?.checklist ?? [];
+
+		return {
+			total: items.length,
+			pass: items.filter((item) => item.result === "PASS").length,
+			issue: items.filter((item) => item.result === "ISSUE").length,
+			pending: items.filter((item) => item.result === "PENDING").length,
+		};
+	}, [examination]);
+
+	const reviewMessage = examination
+		? getReviewMessage(examination.status)
+		: null;
+
+	const canStart = examination?.status === "SCHEDULED";
+
+	const canCorrect =
+		examination?.status === "CHANGES_REQUESTED" &&
+		examination.can_edit_report;
 
 	if (loading) {
 		return (
@@ -550,33 +789,90 @@ export default function ExaminationDetailsPage() {
 							</div>
 
 							<p className="mt-1 text-sm text-ink-soft">
-								Examination record and assignment information.
+								Examination record, checklist, findings and review information.
 							</p>
 						</div>
 
-						{canConduct && (
-							<Link
-								to={`/operations/examinations/start/${examination.id}`}
-								className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-deep"
-							>
-								<Play size={15} />
-								{examination.status === "SCHEDULED"
-									? "Start examination"
-									: "Continue examination"}
-							</Link>
-						)}
+						<div className="flex flex-wrap gap-2">
+							{canStart && (
+								<Link
+									to={`/operations/examinations/start/${examination.id}`}
+									className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-deep"
+								>
+									<Play size={15} />
+									Start examination
+								</Link>
+							)}
 
-						{examination.status === "PENDING_REVIEW" && (
-							<Link
-								to={`/operations/examinations/review/${examination.id}`}
-								className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-deep"
-							>
-								<ShieldCheck size={15} />
-								Review examination
-							</Link>
-						)}
+							{canCorrect && (
+								<Link
+									to={`/operations/examinations/start/${examination.id}`}
+									className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-deep"
+								>
+									<FileText size={15} />
+									Correct examination report
+								</Link>
+							)}
+
+							{examination.status === "PENDING_REVIEW" && (
+								<Link
+									to={`/operations/examinations/review/${examination.id}`}
+									className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-deep"
+								>
+									<ShieldCheck size={15} />
+									Review examination
+								</Link>
+							)}
+						</div>
 					</div>
 				</div>
+
+				{reviewMessage && (
+					<motion.div
+						initial={{ opacity: 0, y: -8 }}
+						animate={{ opacity: 1, y: 0 }}
+						className={`rounded-xl border p-4 ${reviewMessage.className}`}
+					>
+						<div className="flex items-start gap-3">
+							<reviewMessage.icon size={20} className="mt-0.5 shrink-0" />
+							<div className="min-w-0 flex-1">
+								<p className="text-sm font-semibold">
+									{reviewMessage.title}
+								</p>
+								<p className="mt-1 text-xs leading-5">
+									{reviewMessage.description}
+								</p>
+
+								{examination.review.remarks && (
+									<div className="mt-3 rounded-lg border border-current/10 bg-white/70 p-3">
+										<p className="text-[10px] font-semibold uppercase tracking-wider">
+											Reviewer feedback
+										</p>
+										<p className="mt-1 whitespace-pre-wrap text-sm leading-6">
+											{examination.review.remarks}
+										</p>
+										{examination.review.reviewer.name && (
+											<p className="mt-2 text-[10px]">
+												Reviewed by {examination.review.reviewer.name}
+												{examination.review.reviewed_at
+													? ` · ${formatDate(examination.review.reviewed_at)}`
+													: ""}
+											</p>
+										)}
+									</div>
+								)}
+
+								{examination.status === "CHANGES_REQUESTED" &&
+									!examination.can_edit_report && (
+										<p className="mt-2 text-xs font-medium">
+											Only the assigned examination officer can correct and
+											resubmit this report.
+										</p>
+									)}
+							</div>
+						</div>
+					</motion.div>
+				)}
 
 				<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 					<Metric
@@ -600,7 +896,6 @@ export default function ExaminationDetailsPage() {
 						icon={Clock3}
 					/>
 				</div>
-
 				<div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
 					<div className="min-w-0 space-y-5">
 						<Section
@@ -609,82 +904,25 @@ export default function ExaminationDetailsPage() {
 							icon={Ship}
 						>
 							<div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-								<Detail
-									label="Shipment reference"
-									value={examination.shipment.reference}
-								/>
-								<Detail
-									label="Bill of lading"
-									value={examination.shipment.bill_of_lading}
-								/>
-								<Detail
-									label="Booking number"
-									value={examination.shipment.booking_number}
-								/>
-								<Detail
-									label="Vessel"
-									value={examination.shipment.vessel}
-								/>
-								<Detail
-									label="Voyage number"
-									value={examination.shipment.voyage}
-								/>
-								<Detail
-									label="Shipping line"
-									value={examination.shipment.shipping_line}
-								/>
-								<Detail
-									label="Origin country"
-									value={examination.shipment.origin_country}
-								/>
-								<Detail
-									label="Origin port"
-									value={examination.shipment.origin_port}
-								/>
-								<Detail
-									label="Destination port"
-									value={examination.shipment.destination_port}
-								/>
-								<Detail
-									label="Expected arrival"
-									value={examination.shipment.expected_arrival}
-								/>
-								<Detail
-									label="Consignee"
-									value={examination.shipment.consignee}
-								/>
-								<Detail
-									label="Consignee email"
-									value={examination.shipment.consignee_email}
-								/>
-								<Detail
-									label="Consignee phone"
-									value={examination.shipment.consignee_phone}
-								/>
-								<Detail
-									label="Cargo category"
-									value={examination.shipment.cargo_category}
-								/>
-								<Detail
-									label="Package type"
-									value={examination.shipment.package_type}
-								/>
-								<Detail
-									label="Package count"
-									value={examination.shipment.package_count}
-								/>
-								<Detail
-									label="Shipment gross weight"
-									value={examination.shipment.gross_weight}
-								/>
-								<Detail
-									label="Shipment status"
-									value={formatStatus(examination.shipment.status)}
-								/>
-								<Detail
-									label="Cargo description"
-									value={examination.shipment.cargo_description}
-								/>
+								<Detail label="Shipment reference" value={examination.shipment.reference} />
+								<Detail label="Bill of lading" value={examination.shipment.bill_of_lading} />
+								<Detail label="Booking number" value={examination.shipment.booking_number} />
+								<Detail label="Vessel" value={examination.shipment.vessel} />
+								<Detail label="Voyage number" value={examination.shipment.voyage} />
+								<Detail label="Shipping line" value={examination.shipment.shipping_line} />
+								<Detail label="Origin country" value={examination.shipment.origin_country} />
+								<Detail label="Origin port" value={examination.shipment.origin_port} />
+								<Detail label="Destination port" value={examination.shipment.destination_port} />
+								<Detail label="Expected arrival" value={examination.shipment.expected_arrival} />
+								<Detail label="Consignee" value={examination.shipment.consignee} />
+								<Detail label="Consignee email" value={examination.shipment.consignee_email} />
+								<Detail label="Consignee phone" value={examination.shipment.consignee_phone} />
+								<Detail label="Cargo category" value={examination.shipment.cargo_category} />
+								<Detail label="Package type" value={examination.shipment.package_type} />
+								<Detail label="Package count" value={examination.shipment.package_count} />
+								<Detail label="Shipment gross weight" value={examination.shipment.gross_weight} />
+								<Detail label="Shipment status" value={formatStatus(examination.shipment.status)} />
+								<Detail label="Cargo description" value={examination.shipment.cargo_description} />
 							</div>
 						</Section>
 
@@ -694,34 +932,13 @@ export default function ExaminationDetailsPage() {
 							icon={Container}
 						>
 							<div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-								<Detail
-									label="Container number"
-									value={examination.container.number}
-								/>
-								<Detail
-									label="Container size"
-									value={examination.container.size}
-								/>
-								<Detail
-									label="Seal number"
-									value={examination.container.seal}
-								/>
-								<Detail
-									label="Container gross weight"
-									value={examination.container.weight}
-								/>
-								<Detail
-									label="Cargo description"
-									value={examination.container.cargo_description}
-								/>
-								<Detail
-									label="Container status"
-									value={formatStatus(examination.container.status)}
-								/>
-								<Detail
-									label="Current location ID"
-									value={examination.container.current_location_id}
-								/>
+								<Detail label="Container number" value={examination.container.number} />
+								<Detail label="Container size" value={examination.container.size} />
+								<Detail label="Seal number" value={examination.container.seal} />
+								<Detail label="Container gross weight" value={examination.container.weight} />
+								<Detail label="Cargo description" value={examination.container.cargo_description} />
+								<Detail label="Container status" value={formatStatus(examination.container.status)} />
+								<Detail label="Current location ID" value={examination.container.current_location_id} />
 							</div>
 						</Section>
 
@@ -731,50 +948,17 @@ export default function ExaminationDetailsPage() {
 							icon={CalendarDays}
 						>
 							<div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-								<Detail
-									label="Examination reference"
-									value={examination.reference}
-								/>
-								<Detail
-									label="Examination type"
-									value={formatStatus(examination.type)}
-								/>
-								<Detail
-									label="Examination location"
-									value={examination.location.name}
-								/>
-								<Detail
-									label="Location code"
-									value={examination.location.code}
-								/>
-								<Detail
-									label="Location type"
-									value={formatStatus(examination.location.kind)}
-								/>
-								<Detail
-									label="Examination officer"
-									value={examination.officer.name}
-								/>
-								<Detail
-									label="Officer email"
-									value={examination.officer.email}
-								/>
-								<Detail
-									label="Officer phone"
-									value={examination.officer.phone}
-								/>
-								<Detail
-									label="Scheduled date"
-									value={examination.scheduled_date}
-								/>
-								<Detail
-									label="Scheduled time"
-									value={examination.scheduled_time}
-								/>
-								<Detail
-									label="Priority"
-									value={formatStatus(examination.priority)}
-								/>
+								<Detail label="Examination reference" value={examination.reference} />
+								<Detail label="Examination type" value={formatStatus(examination.type)} />
+								<Detail label="Examination location" value={examination.location.name} />
+								<Detail label="Location code" value={examination.location.code} />
+								<Detail label="Location type" value={formatStatus(examination.location.kind)} />
+								<Detail label="Examination officer" value={examination.officer.name} />
+								<Detail label="Officer email" value={examination.officer.email} />
+								<Detail label="Officer phone" value={examination.officer.phone} />
+								<Detail label="Scheduled date" value={examination.scheduled_date} />
+								<Detail label="Scheduled time" value={examination.scheduled_time} />
+								<Detail label="Priority" value={formatStatus(examination.priority)} />
 							</div>
 
 							{examination.location.description && (
@@ -792,45 +976,241 @@ export default function ExaminationDetailsPage() {
 								<p className="text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
 									Instructions
 								</p>
-								<p className="mt-2 text-sm leading-6 text-ink">
+								<p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink">
 									{examination.instructions || "No special instructions."}
 								</p>
 							</div>
 						</Section>
 
 						<Section
-							title="Examination report"
-							description="Findings and remarks recorded for this examination."
+							title="Examination checklist"
+							description="Inspection checks and their recorded results."
+							icon={ClipboardCheck}
+						>
+							{examination.checklist.length === 0 ? (
+								<div className="rounded-xl border border-dashed border-line px-4 py-8 text-center">
+									<ClipboardList size={25} className="mx-auto text-ink-soft" />
+									<p className="mt-3 text-sm font-medium text-ink">
+										No checklist recorded
+									</p>
+									<p className="mt-1 text-xs text-ink-soft">
+										The officer has not recorded any checklist results.
+									</p>
+								</div>
+							) : (
+								<>
+									<div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+										<div className="rounded-xl border border-line bg-sand/40 p-3">
+											<p className="text-[10px] text-ink-soft">Total checks</p>
+											<p className="mt-1 text-2xl font-semibold text-ink">
+												{checklistCounts.total}
+											</p>
+										</div>
+										<div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
+											<p className="text-[10px] text-emerald-700">Passed</p>
+											<p className="mt-1 text-2xl font-semibold text-emerald-800">
+												{checklistCounts.pass}
+											</p>
+										</div>
+										<div className="rounded-xl border border-red-100 bg-red-50 p-3">
+											<p className="text-[10px] text-red-700">Issues</p>
+											<p className="mt-1 text-2xl font-semibold text-red-800">
+												{checklistCounts.issue}
+											</p>
+										</div>
+										<div className="rounded-xl border border-amber-100 bg-amber-50 p-3">
+											<p className="text-[10px] text-amber-700">Pending</p>
+											<p className="mt-1 text-2xl font-semibold text-amber-800">
+												{checklistCounts.pending}
+											</p>
+										</div>
+									</div>
+
+									<div className="space-y-3">
+										{examination.checklist.map((item, index) => (
+											<div
+												key={item.id || index}
+												className="rounded-xl border border-line p-4 transition-colors hover:border-orange/30"
+											>
+												<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+													<div className="flex min-w-0 gap-3">
+														<div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sand text-xs font-semibold text-ink-soft">
+															{String(index + 1).padStart(2, "0")}
+														</div>
+														<div className="min-w-0">
+															<p className="text-sm font-semibold text-ink">
+																{item.label}
+															</p>
+															<p className="mt-1 text-xs leading-5 text-ink-soft">
+																{item.description || "No description provided."}
+															</p>
+														</div>
+													</div>
+													<ChecklistResultBadge result={item.result} />
+												</div>
+
+												{item.remarks && (
+													<div className="mt-3 rounded-lg border border-line bg-sand/40 px-3 py-2.5">
+														<p className="text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
+															Check remarks
+														</p>
+														<p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-ink">
+															{item.remarks}
+														</p>
+													</div>
+												)}
+											</div>
+										))}
+									</div>
+								</>
+							)}
+						</Section>
+												<Section
+							title="Examination findings"
+							description="Issues, observations and discoveries recorded during inspection."
+							icon={Search}
+						>
+							{examination.findings_list.length === 0 ? (
+								<div className="rounded-xl border border-dashed border-line px-4 py-8 text-center">
+									<CheckCircle2 size={26} className="mx-auto text-emerald-600" />
+									<p className="mt-3 text-sm font-medium text-ink">
+										No additional findings
+									</p>
+									<p className="mt-1 text-xs text-ink-soft">
+										The officer did not record any separate findings.
+									</p>
+								</div>
+							) : (
+								<div className="space-y-3">
+									{examination.findings_list.map((finding, index) => (
+										<div
+											key={finding.id || index}
+											className="rounded-xl border border-line p-4"
+										>
+											<div className="flex flex-wrap items-center justify-between gap-2">
+												<div className="flex items-center gap-2">
+													<div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange/10 text-orange">
+														<Search size={15} />
+													</div>
+													<p className="text-sm font-semibold text-ink">
+														{finding.title || `Finding ${index + 1}`}
+													</p>
+												</div>
+
+												{finding.severity && (
+													<StatusBadge
+														label={formatStatus(finding.severity)}
+														tone={statusTone(finding.severity)}
+													/>
+												)}
+											</div>
+
+											<p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-ink">
+												{finding.description || "No description provided."}
+											</p>
+
+											{finding.remarks && (
+												<div className="mt-3 rounded-lg bg-sand/60 p-3">
+													<p className="text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
+														Additional remarks
+													</p>
+													<p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-ink">
+														{finding.remarks}
+													</p>
+												</div>
+											)}
+										</div>
+									))}
+								</div>
+							)}
+						</Section>
+
+						<Section
+							title="Officer's report"
+							description="Overall examination summary and officer remarks."
 							icon={FileText}
 						>
 							<div className="space-y-5">
 								<div>
-									<p className="text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
-										Findings
-									</p>
-									<p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink">
-										{examination.findings || "No findings recorded."}
-									</p>
+									<div className="flex items-center gap-2">
+										<FileText size={15} className="text-orange" />
+										<p className="text-xs font-semibold text-ink">
+											Examination summary
+										</p>
+									</div>
+									<div className="mt-3 rounded-xl bg-sand/50 p-4">
+										<p className="whitespace-pre-wrap text-sm leading-7 text-ink">
+											{examination.report.findings ||
+												"No examination summary provided."}
+										</p>
+									</div>
 								</div>
 
 								<div className="border-t border-line pt-4">
-									<p className="text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
-										Remarks
-									</p>
-									<p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-ink">
-										{examination.remarks || "No remarks recorded."}
-									</p>
+									<div className="flex items-center gap-2">
+										<MessageSquareText size={15} className="text-orange" />
+										<p className="text-xs font-semibold text-ink">
+											Officer remarks
+										</p>
+									</div>
+									<div className="mt-3 rounded-xl border border-line p-4">
+										<p className="whitespace-pre-wrap text-sm leading-7 text-ink">
+											{examination.report.remarks ||
+												"No additional remarks provided."}
+										</p>
+									</div>
 								</div>
 
 								<div className="grid gap-5 border-t border-line pt-4 sm:grid-cols-2">
 									<Detail
-										label="Completed at"
-										value={examination.completed_at}
+										label="Submitted by"
+										value={examination.officer.name}
 									/>
 									<Detail
-										label="Reviewed at"
-										value={examination.reviewed_at}
+										label="Completed at"
+										value={formatDate(examination.report.completed_at)}
 									/>
+								</div>
+							</div>
+						</Section>
+
+						<Section
+							title="Review information"
+							description="Decision and feedback from the authorised reviewer."
+							icon={ShieldCheck}
+						>
+							<div className="grid gap-5 sm:grid-cols-2">
+								<Detail
+									label="Review status"
+									value={formatStatus(examination.review.status)}
+								/>
+								<Detail
+									label="Decision"
+									value={
+										examination.review.decision
+											? formatStatus(examination.review.decision)
+											: "No decision yet"
+									}
+								/>
+								<Detail
+									label="Reviewer"
+									value={examination.review.reviewer.name}
+								/>
+								<Detail
+									label="Reviewed at"
+									value={formatDate(examination.review.reviewed_at)}
+								/>
+							</div>
+
+							<div className="mt-5 border-t border-line pt-4">
+								<p className="text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
+									Reviewer remarks
+								</p>
+								<div className="mt-2 rounded-xl bg-sand/50 p-4">
+									<p className="whitespace-pre-wrap text-sm leading-6 text-ink">
+										{examination.review.remarks ||
+											"No reviewer feedback recorded."}
+									</p>
 								</div>
 							</div>
 						</Section>
@@ -841,26 +1221,11 @@ export default function ExaminationDetailsPage() {
 							icon={FileText}
 						>
 							<div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-								<Detail
-									label="Created at"
-									value={formatDate(examination.created_at)}
-								/>
-								<Detail
-									label="Last updated"
-									value={formatDate(examination.updated_at)}
-								/>
-								<Detail
-									label="Created by"
-									value={examination.created_by.name}
-								/>
-								<Detail
-									label="Reviewer"
-									value={examination.reviewer.name}
-								/>
-								<Detail
-									label="Reviewer email"
-									value={examination.reviewer.email}
-								/>
+								<Detail label="Created at" value={formatDate(examination.created_at)} />
+								<Detail label="Last updated" value={formatDate(examination.updated_at)} />
+								<Detail label="Created by" value={examination.created_by.name} />
+								<Detail label="Reviewer" value={examination.reviewer.name} />
+								<Detail label="Reviewer email" value={examination.reviewer.email} />
 							</div>
 						</Section>
 					</div>
@@ -992,8 +1357,9 @@ export default function ExaminationDetailsPage() {
 							</div>
 							<p className="mt-2 text-xs leading-5 text-ink-soft">
 								The examination officer records checklist results, findings
-								and the examination report from the conduct examination
-								workspace. The submitted report must be reviewed separately.
+								and the examination report. Submitted reports are read-only
+								while awaiting review. Only the assigned officer can correct
+								a returned report. Rejected reports cannot be resubmitted.
 							</p>
 						</div>
 
