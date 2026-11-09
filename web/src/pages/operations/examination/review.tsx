@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@/components/router-link";
 import { AppShell, Metric, StatusBadge, statusTone } from "@/components/auth-shell";
+import { http, type Resp } from "@/lib/httpClient";
 import {
 	Activity,
 	ArrowLeft,
@@ -9,71 +10,42 @@ import {
 	Clock3,
 	FileText,
 	Filter,
+	RefreshCw,
 	Search,
 	ShieldCheck,
 } from "lucide-react";
 
-type ReviewStatus = "PENDING_REVIEW" | "APPROVED" | "CHANGES_REQUESTED";
+type ReviewStatus =
+	| "PENDING_REVIEW"
+	| "APPROVED"
+	| "CHANGES_REQUESTED";
 
 type Examination = {
 	id: string;
 	reference: string;
-	shipment_reference: string;
-	container_no: string;
-	bill_of_lading: string;
 	examination_type: string;
-	examination_date: string;
+	location_id: string;
+	officer_id: string;
+	scheduled_date: string;
+	scheduled_time: string;
+	completed_at: string | null;
+	status: ReviewStatus;
+	findings: string | null;
+	remarks: string | null;
+	container_id: string;
+	container_no: string;
+	container_size: string;
+	seal_no: string | null;
+	shipment_id: string;
+	shipment_reference: string;
+	bill_of_lading: string;
+	vessel_name: string;
+	voyage_number: string;
+	shipping_line: string;
+	consignee: string;
 	officer: string;
 	location: string;
-	findings: string;
-	report: string;
-	status: ReviewStatus;
 };
-
-const examinations: Examination[] = [
-	{
-		id: "1",
-		reference: "TRN-EXM-2026-00031",
-		shipment_reference: "TRN-SHP-2026-5D1F6F38F193",
-		container_no: "JHN-93849",
-		bill_of_lading: "KSBK-87384",
-		examination_type: "Physical Examination",
-		examination_date: "08 Nov 2026",
-		officer: "Mathias Jacobs",
-		location: "Examination Bay 01",
-		findings: "Cargo description and declared quantities verified. No major discrepancies recorded.",
-		report: "The examination was completed successfully. Container contents were inspected and compared with the submitted declaration.",
-		status: "PENDING_REVIEW",
-	},
-	{
-		id: "2",
-		reference: "TRN-EXM-2026-00030",
-		shipment_reference: "TRN-SHP-2026-84B6D102",
-		container_no: "MSCU-738291",
-		bill_of_lading: "MSC-738291-04",
-		examination_type: "Document Examination",
-		examination_date: "07 Nov 2026",
-		officer: "Samuel Peters",
-		location: "Examination Bay 02",
-		findings: "Supporting documentation reviewed. One declared item requires clarification.",
-		report: "Documents were reviewed against the shipment declaration. Clarification is required before final clearance.",
-		status: "PENDING_REVIEW",
-	},
-	{
-		id: "3",
-		reference: "TRN-EXM-2026-00029",
-		shipment_reference: "TRN-SHP-2026-91D8A421",
-		container_no: "TGHU-629381",
-		bill_of_lading: "MAEU-629381",
-		examination_type: "Physical Examination",
-		examination_date: "06 Nov 2026",
-		officer: "Daniel James",
-		location: "Examination Bay 01",
-		findings: "Declared package count differs from the inspected package count.",
-		report: "A discrepancy was identified during the physical examination. The declaration requires correction.",
-		status: "PENDING_REVIEW",
-	},
-];
 
 const statusLabel: Record<ReviewStatus, string> = {
 	PENDING_REVIEW: "Pending review",
@@ -82,8 +54,38 @@ const statusLabel: Record<ReviewStatus, string> = {
 };
 
 export default function ExaminationReviewPage() {
+	const [examinations, setExaminations] = useState<Examination[]>([]);
 	const [search, setSearch] = useState("");
 	const [filter, setFilter] = useState("PENDING_REVIEW");
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState(false);
+
+	const fetchExaminations = useCallback(async () => {
+		setLoading(true);
+		setError(false);
+
+		try {
+			const response = await http.get("/operator/examination/review/");
+			const resp = response.data as Resp;
+
+			if (resp.error) {
+				throw new Error("Could not load examinations.");
+			}
+
+			setExaminations(
+				(resp.code?.examinations ?? []) as Examination[]
+			);
+		} catch (error) {
+			console.error("Could not load examinations:", error);
+			setError(true);
+		} finally {
+			setLoading(false);
+		}
+	}, []);
+
+	useEffect(() => {
+		fetchExaminations();
+	}, [fetchExaminations]);
 
 	const pendingCount = examinations.filter(
 		(item) => item.status === "PENDING_REVIEW"
@@ -101,7 +103,8 @@ export default function ExaminationReviewPage() {
 		const value = search.trim().toLowerCase();
 
 		return examinations.filter((item) => {
-			const matchesFilter = filter === "ALL" || item.status === filter;
+			const matchesFilter =
+				filter === "ALL" || item.status === filter;
 
 			const matchesSearch = [
 				item.reference,
@@ -109,11 +112,28 @@ export default function ExaminationReviewPage() {
 				item.container_no,
 				item.bill_of_lading,
 				item.officer,
-			].some((field) => field.toLowerCase().includes(value));
+				item.examination_type,
+			].some((field) =>
+				String(field ?? "").toLowerCase().includes(value)
+			);
 
 			return matchesFilter && matchesSearch;
 		});
-	}, [filter, search]);
+	}, [examinations, filter, search]);
+
+	const formatDate = (date: string) => {
+		if (!date) return "—";
+
+		const parsed = new Date(`${date}T00:00:00`);
+
+		if (Number.isNaN(parsed.getTime())) return date;
+
+		return parsed.toLocaleDateString("en-GB", {
+			day: "2-digit",
+			month: "short",
+			year: "numeric",
+		});
+	};
 
 	return (
 		<AppShell title="Examination Review" eyebrow="Operations">
@@ -216,10 +236,18 @@ export default function ExaminationReviewPage() {
 									onChange={(e) => setFilter(e.target.value)}
 									className="h-10 w-full cursor-pointer appearance-none rounded-md border border-line bg-white pl-9 pr-8 text-xs text-ink outline-none focus:border-orange sm:w-48"
 								>
-									<option value="PENDING_REVIEW">Awaiting review</option>
-									<option value="APPROVED">Approved</option>
-									<option value="CHANGES_REQUESTED">Returned</option>
-									<option value="ALL">All examinations</option>
+									<option value="PENDING_REVIEW">
+										Awaiting review
+									</option>
+									<option value="APPROVED">
+										Approved
+									</option>
+									<option value="CHANGES_REQUESTED">
+										Returned
+									</option>
+									<option value="ALL">
+										All examinations
+									</option>
 								</select>
 							</div>
 						</div>
@@ -240,65 +268,107 @@ export default function ExaminationReviewPage() {
 							</thead>
 
 							<tbody className="divide-y divide-line">
-								{filteredExaminations.map((item) => (
-									<tr
-										key={item.id}
-										className="transition-colors hover:bg-sand-2/40"
-									>
-										<td className="px-5 py-4">
-											<p className="font-mono text-xs font-semibold text-ink">
-												{item.reference}
-											</p>
-
-											<p className="mt-1 text-[10px] text-ink-soft">
-												{item.shipment_reference}
-											</p>
-										</td>
-
-										<td className="px-5 py-4">
-											<p className="text-xs font-semibold text-ink">
-												{item.container_no}
-											</p>
-
-											<p className="mt-1 text-[10px] text-ink-soft">
-												{item.bill_of_lading}
-											</p>
-										</td>
-
-										<td className="px-5 py-4 text-xs text-ink">
-											{item.examination_type}
-										</td>
-
-										<td className="px-5 py-4 text-xs text-ink">
-											{item.officer}
-										</td>
-
-										<td className="px-5 py-4 text-xs text-ink-soft">
-											{item.examination_date}
-										</td>
-
-										<td className="px-5 py-4">
-											<StatusBadge
-												label={statusLabel[item.status]}
-												tone={statusTone(item.status)}
-											/>
-										</td>
-
-										<td className="px-5 py-4 text-right">
-											<Link
-												to={`/operations/examinations/review/${item.id}`}
-												className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-line px-3 py-2 text-[11px] font-semibold text-ink transition hover:border-orange hover:text-orange"
-											>
-												Review
-												<ArrowRight size={14} />
-											</Link>
+								{loading ? (
+									<tr>
+										<td
+											colSpan={7}
+											className="px-5 py-16 text-center text-xs text-ink-soft"
+										>
+											<div className="flex items-center justify-center gap-2">
+												<RefreshCw size={15} className="animate-spin" />
+												Loading examinations...
+											</div>
 										</td>
 									</tr>
-								))}
+								) : error ? (
+									<tr>
+										<td colSpan={7} className="px-5 py-16 text-center">
+											<div className="flex flex-col items-center">
+												<div className="grid size-11 place-items-center rounded-lg bg-red-50">
+													<RefreshCw size={19} className="text-red-500" />
+												</div>
+
+												<p className="mt-3 text-sm font-semibold text-ink">
+													Unable to load examinations
+												</p>
+
+												<p className="mt-1 text-xs text-ink-soft">
+													Check your connection and try again.
+												</p>
+
+												<button
+													type="button"
+													onClick={fetchExaminations}
+													disabled={loading}
+													className="mt-4 inline-flex items-center gap-2 rounded-md bg-orange px-4 py-2 text-xs font-semibold text-white transition hover:bg-orange-deep disabled:cursor-not-allowed disabled:opacity-60"
+												>
+													<RefreshCw size={14} />
+													Retry
+												</button>
+											</div>
+										</td>
+									</tr>
+								) : (
+									filteredExaminations.map((item) => (
+										<tr
+											key={item.id}
+											className="transition-colors hover:bg-sand-2/40"
+										>
+											<td className="px-5 py-4">
+												<p className="font-mono text-xs font-semibold text-ink">
+													{item.reference}
+												</p>
+
+												<p className="mt-1 text-[10px] text-ink-soft">
+													{item.shipment_reference || "—"}
+												</p>
+											</td>
+
+											<td className="px-5 py-4">
+												<p className="text-xs font-semibold text-ink">
+													{item.container_no || "—"}
+												</p>
+
+												<p className="mt-1 text-[10px] text-ink-soft">
+													{item.bill_of_lading || "—"}
+												</p>
+											</td>
+
+											<td className="px-5 py-4 text-xs text-ink">
+												{item.examination_type || "—"}
+											</td>
+
+											<td className="px-5 py-4 text-xs text-ink">
+												{item.officer || "—"}
+											</td>
+
+											<td className="px-5 py-4 text-xs text-ink-soft">
+												{formatDate(item.scheduled_date)}
+											</td>
+
+											<td className="px-5 py-4">
+												<StatusBadge
+													label={statusLabel[item.status] ?? item.status}
+													tone={statusTone(item.status)}
+												/>
+											</td>
+
+											<td className="px-5 py-4 text-right">
+												<Link
+													to={`/operations/examinations/review/${item.id}`}
+													className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-line px-3 py-2 text-[11px] font-semibold text-ink transition hover:border-orange hover:text-orange"
+												>
+													Review
+													<ArrowRight size={14} />
+												</Link>
+											</td>
+										</tr>
+									))
+								)}
 							</tbody>
 						</table>
 
-						{filteredExaminations.length === 0 && (
+						{!loading && !error && filteredExaminations.length === 0 && (
 							<div className="px-6 py-16 text-center">
 								<div className="mx-auto grid size-11 place-items-center rounded-lg bg-sand-2">
 									<Search size={19} className="text-ink-soft" />

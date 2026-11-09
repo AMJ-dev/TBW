@@ -42,11 +42,15 @@
             LEFT JOIN users u
                 ON u.id = e.officer_id
 
+            WHERE e.officer_id = :officer_id
+
             ORDER BY e.scheduled_date DESC, e.scheduled_time DESC
         ";
 
         $stmt = $conn->prepare($sql);
-        $stmt->execute();
+        $stmt->execute([
+            ":officer_id" => $my_details->id
+        ]);
 
         $examinations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -58,7 +62,7 @@
 
         echo json_encode([
             "error" => false,
-            "data" => "Examinations loaded successfully.",
+            "data" => "Your assigned examinations loaded successfully.",
             "code" => [
                 "examinations" => $examinations,
                 "total" => count($examinations)
@@ -70,7 +74,7 @@
 
         echo json_encode([
             "error" => true,
-            "data" => "Could not load examinations.",
+            "data" => "Could not load your assigned examinations.",
             "code" => null
         ]);
     }

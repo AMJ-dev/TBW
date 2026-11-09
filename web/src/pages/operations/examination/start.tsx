@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useParams } from "react-router-dom";
@@ -285,7 +284,9 @@ function StatusPill({ status }: { status: string }) {
 	const tone =
 		status === "COMPLETED" || status === "APPROVED" || status === "PASS"
 			? "bg-green-50 text-green-700"
-			: status === "CANCELLED" || status === "DISCREPANCY_FOUND" || status === "ISSUE"
+			: status === "CANCELLED" ||
+				  status === "DISCREPANCY_FOUND" ||
+				  status === "ISSUE"
 				? "bg-red-50 text-red-700"
 				: status === "IN_PROGRESS"
 					? "bg-blue-50 text-blue-700"
@@ -336,24 +337,23 @@ export default function ConductExaminationPage() {
 		(item) => item.result === "ISSUE",
 	);
 
+	const checklistIssuesExplained = checklist
+		.filter((item) => item.result === "ISSUE")
+		.every((item) => item.remarks.trim().length > 0);
+
 	const canSubmit =
 		!!examination &&
 		examination.status === "IN_PROGRESS" &&
 		!isReadOnly &&
 		checklistComplete &&
-		report.trim().length > 0 &&
-		(findings.length > 0 || remarks.trim().length > 0) &&
+		checklistIssuesExplained &&
 		!submitting;
 
 	const progress = useMemo(() => {
-		const total = checklist.length + 2;
-		let completed = completedChecklist;
+		if (checklist.length === 0) return 0;
 
-		if (findings.length > 0) completed += 1;
-		if (report.trim()) completed += 1;
-
-		return Math.round((completed / total) * 100);
-	}, [checklist.length, completedChecklist, findings.length, report]);
+		return Math.round((completedChecklist / checklist.length) * 100);
+	}, [checklist.length, completedChecklist]);
 
 	const loadExamination = useCallback(async () => {
 		if (!id) {
@@ -420,10 +420,10 @@ export default function ConductExaminationPage() {
 			setReport(
 				getString(code?.report?.findings, getString(record.findings)),
 			);
+
 			setRemarks(
 				getString(code?.report?.remarks, getString(record.remarks)),
 			);
-
 
 			setLogs(Array.isArray(code?.logs) ? code.logs : []);
 		} catch (error) {
@@ -537,13 +537,12 @@ export default function ConductExaminationPage() {
 			return;
 		}
 
-		if (!report.trim()) {
-			toast.error("Enter the examination report before submitting.");
-			return;
-		}
+		const unexplainedIssues = checklist.filter(
+			(item) => item.result === "ISSUE" && !item.remarks.trim(),
+		);
 
-		if (findings.length === 0 && !remarks.trim()) {
-			toast.error("Add a finding or provide examination remarks.");
+		if (unexplainedIssues.length > 0) {
+			toast.error("Provide remarks for every checklist item marked as an issue.");
 			return;
 		}
 
@@ -555,6 +554,7 @@ export default function ConductExaminationPage() {
 			formData.append("examination_id", id);
 			formData.append("report", report.trim());
 			formData.append("remarks", remarks.trim());
+
 			formData.append(
 				"checklist",
 				JSON.stringify(
@@ -563,10 +563,11 @@ export default function ConductExaminationPage() {
 						label: item.label,
 						description: item.description,
 						result: item.result,
-						remarks: item.remarks,
+						remarks: item.remarks.trim(),
 					})),
 				),
 			);
+
 			formData.append(
 				"findings",
 				JSON.stringify(
@@ -721,7 +722,10 @@ export default function ConductExaminationPage() {
 					icon={ClipboardList}
 				>
 					<div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-						<InfoItem label="Examination reference" value={examination.reference} />
+						<InfoItem
+							label="Examination reference"
+							value={examination.reference}
+						/>
 						<InfoItem
 							label="Examination type"
 							value={getStatusLabel(examination.examination_type)}
@@ -734,10 +738,22 @@ export default function ConductExaminationPage() {
 							label="Scheduled date"
 							value={formatDate(examination.scheduled_date)}
 						/>
-						<InfoItem label="Scheduled time" value={examination.scheduled_time} />
-						<InfoItem label="Assigned officer" value={examination.officer?.name} />
-						<InfoItem label="Examination location" value={examination.location?.name} />
-						<InfoItem label="Location code" value={examination.location?.code} />
+						<InfoItem
+							label="Scheduled time"
+							value={examination.scheduled_time}
+						/>
+						<InfoItem
+							label="Assigned officer"
+							value={examination.officer?.name}
+						/>
+						<InfoItem
+							label="Examination location"
+							value={examination.location?.name}
+						/>
+						<InfoItem
+							label="Location code"
+							value={examination.location?.code}
+						/>
 					</div>
 
 					{examination.instructions && (
@@ -758,9 +774,18 @@ export default function ConductExaminationPage() {
 					icon={Container}
 				>
 					<div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
-						<InfoItem label="Container number" value={examination.container?.container_no} />
-						<InfoItem label="Container size" value={examination.container?.size} />
-						<InfoItem label="Seal number" value={examination.container?.seal_no} />
+						<InfoItem
+							label="Container number"
+							value={examination.container?.container_no}
+						/>
+						<InfoItem
+							label="Container size"
+							value={examination.container?.size}
+						/>
+						<InfoItem
+							label="Seal number"
+							value={examination.container?.seal_no}
+						/>
 						<InfoItem
 							label="Container weight"
 							value={
@@ -777,11 +802,26 @@ export default function ConductExaminationPage() {
 							label="Bill of lading"
 							value={examination.shipment?.bill_of_lading}
 						/>
-						<InfoItem label="Vessel" value={examination.shipment?.vessel_name} />
-						<InfoItem label="Voyage number" value={examination.shipment?.voyage_number} />
-						<InfoItem label="Shipping line" value={examination.shipment?.shipping_line} />
-						<InfoItem label="Consignee" value={examination.shipment?.consignee} />
-						<InfoItem label="Cargo category" value={examination.shipment?.cargo_category} />
+						<InfoItem
+							label="Vessel"
+							value={examination.shipment?.vessel_name}
+						/>
+						<InfoItem
+							label="Voyage number"
+							value={examination.shipment?.voyage_number}
+						/>
+						<InfoItem
+							label="Shipping line"
+							value={examination.shipment?.shipping_line}
+						/>
+						<InfoItem
+							label="Consignee"
+							value={examination.shipment?.consignee}
+						/>
+						<InfoItem
+							label="Cargo category"
+							value={examination.shipment?.cargo_category}
+						/>
 						<InfoItem
 							label="Package count"
 							value={
@@ -854,13 +894,15 @@ export default function ConductExaminationPage() {
 											Examination progress
 										</p>
 										<p className="mt-1 text-xs text-ink-soft">
-											Complete the checklist, findings and report.
+											Complete every checklist item. Findings and reports are
+											optional.
 										</p>
 									</div>
 									<p className="text-lg font-bold tabular-nums text-orange">
 										{progress}%
 									</p>
 								</div>
+
 								<div className="mt-4 h-2 overflow-hidden rounded-full bg-surface">
 									<motion.div
 										initial={{ width: 0 }}
@@ -869,12 +911,17 @@ export default function ConductExaminationPage() {
 										className="h-full rounded-full bg-orange"
 									/>
 								</div>
+
 								<div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-ink-soft">
 									<span>
 										{completedChecklist}/{checklist.length} checklist items
 									</span>
 									<span>{findings.length} findings recorded</span>
-									<span>{report.trim() ? "Report entered" : "Report pending"}</span>
+									<span>
+										{checklistIssuesExplained
+											? "Issue explanations complete"
+											: "Issue explanations pending"}
+									</span>
 								</div>
 							</div>
 						)}
@@ -929,7 +976,11 @@ export default function ConductExaminationPage() {
 													value={item.result}
 													disabled={isReadOnly}
 													onChange={(event) =>
-														updateChecklist(item.id, "result", event.target.value)
+														updateChecklist(
+															item.id,
+															"result",
+															event.target.value,
+														)
 													}
 													className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-orange disabled:opacity-60"
 												>
@@ -939,17 +990,33 @@ export default function ConductExaminationPage() {
 													<option value="NA">Not applicable</option>
 												</select>
 											</div>
+
 											<div>
-												<FieldLabel>Inspection remarks</FieldLabel>
+												<FieldLabel required={item.result === "ISSUE"}>
+													Inspection remarks
+												</FieldLabel>
 												<input
 													value={item.remarks}
 													disabled={isReadOnly}
 													onChange={(event) =>
-														updateChecklist(item.id, "remarks", event.target.value)
+														updateChecklist(
+															item.id,
+															"remarks",
+															event.target.value,
+														)
 													}
-													placeholder="Enter observations..."
+													placeholder={
+														item.result === "ISSUE"
+															? "Explain the issue identified..."
+															: "Optional observations..."
+													}
 													className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft/60 focus:border-orange disabled:opacity-60"
 												/>
+												{item.result === "ISSUE" && !item.remarks.trim() && (
+													<p className="mt-1.5 text-xs text-red-600">
+														An explanation is required for this issue.
+													</p>
+												)}
 											</div>
 										</div>
 									</div>
@@ -959,19 +1026,23 @@ export default function ConductExaminationPage() {
 
 						<SectionCard
 							title="Examination findings"
-							description="Record discrepancies, damage, seal issues or other observations."
+							description="Record discrepancies, damage, seal issues or other observations. This section is optional."
 							icon={Flag}
 						>
 							{!isReadOnly && (
 								<div className="rounded-xl border border-line bg-surface/50 p-4 sm:p-5">
-									<h3 className="text-sm font-semibold text-ink">Add a finding</h3>
+									<h3 className="text-sm font-semibold text-ink">
+										Add a finding
+									</h3>
 
 									<div className="mt-4 grid gap-4 md:grid-cols-2">
 										<div>
 											<FieldLabel required>Finding title</FieldLabel>
 											<input
 												value={findingTitle}
-												onChange={(event) => setFindingTitle(event.target.value)}
+												onChange={(event) =>
+													setFindingTitle(event.target.value)
+												}
 												placeholder="e.g. Seal number mismatch"
 												className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none placeholder:text-ink-soft/60 focus:border-orange"
 											/>
@@ -982,7 +1053,9 @@ export default function ConductExaminationPage() {
 											<select
 												value={findingSeverity}
 												onChange={(event) =>
-													setFindingSeverity(event.target.value as FindingSeverity)
+													setFindingSeverity(
+														event.target.value as FindingSeverity,
+													)
 												}
 												className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-orange"
 											>
@@ -1027,7 +1100,8 @@ export default function ConductExaminationPage() {
 											No findings recorded
 										</p>
 										<p className="mt-1 text-xs text-ink-soft">
-											Add a finding above if an issue or observation was identified.
+											No additional findings have been recorded for this
+											examination.
 										</p>
 									</div>
 								) : (
@@ -1085,17 +1159,17 @@ export default function ConductExaminationPage() {
 
 						<SectionCard
 							title="Examination report"
-							description="Provide the overall assessment and final remarks."
+							description="Provide an overall assessment or additional remarks if necessary. Both fields are optional."
 							icon={FileText}
 						>
 							<div>
-								<FieldLabel required>Examination report</FieldLabel>
+								<FieldLabel>Examination report</FieldLabel>
 								<textarea
 									rows={6}
 									value={report}
 									disabled={isReadOnly}
 									onChange={(event) => setReport(event.target.value)}
-									placeholder="Write the examination report, including the inspection outcome and observations..."
+									placeholder="Enter an overall examination assessment (optional)..."
 									className="w-full resize-y rounded-xl border border-line bg-paper px-4 py-3 text-sm leading-6 text-ink outline-none placeholder:text-ink-soft/60 focus:border-orange disabled:opacity-60"
 								/>
 							</div>
@@ -1107,21 +1181,24 @@ export default function ConductExaminationPage() {
 									value={remarks}
 									disabled={isReadOnly}
 									onChange={(event) => setRemarks(event.target.value)}
-									placeholder="Add additional remarks or recommendations..."
+									placeholder="Add any additional remarks or recommendations (optional)..."
 									className="w-full resize-y rounded-xl border border-line bg-paper px-4 py-3 text-sm leading-6 text-ink outline-none placeholder:text-ink-soft/60 focus:border-orange disabled:opacity-60"
 								/>
 							</div>
 
 							{hasChecklistIssues && (
 								<div className="mt-5 flex items-start gap-3 rounded-xl border border-orange/20 bg-orange/5 p-4">
-									<Flag size={18} className="mt-0.5 shrink-0 text-orange" />
+									<Flag
+										size={18}
+										className="mt-0.5 shrink-0 text-orange"
+									/>
 									<div>
 										<p className="text-sm font-semibold text-ink">
 											Checklist issues identified
 										</p>
 										<p className="mt-1 text-xs leading-5 text-ink-soft">
-											One or more checklist items have been marked as an issue.
-											Ensure the findings and report explain these observations.
+											Every checklist item marked as an issue must have an
+											explanation in its inspection remarks.
 										</p>
 									</div>
 								</div>
@@ -1168,9 +1245,10 @@ export default function ConductExaminationPage() {
 											Ready to submit?
 										</h2>
 										<p className="mt-1 max-w-2xl text-sm leading-6 text-ink-soft">
-											Review the checklist, findings and examination report before submitting.
-											Once submitted, the examination will move to the next review
-											step.
+											Complete every checklist item before submitting. Findings,
+											the examination report and additional remarks are optional.
+											Any checklist item marked as an issue must include an
+											explanation.
 										</p>
 										<div className="mt-3 flex flex-wrap gap-3 text-xs text-ink-soft">
 											<span>
@@ -1178,7 +1256,9 @@ export default function ConductExaminationPage() {
 											</span>
 											<span>{findings.length} findings</span>
 											<span>
-												{report.trim() ? "Report entered" : "Report missing"}
+												{checklistIssuesExplained
+													? "Issue explanations complete"
+													: "Issue explanations pending"}
 											</span>
 										</div>
 									</div>
@@ -1196,8 +1276,11 @@ export default function ConductExaminationPage() {
 
 								{!canSubmit && (
 									<p className="mt-4 border-t border-line pt-4 text-xs text-ink-soft">
-										Complete every checklist item, enter the examination report,
-										and add a finding or additional remarks to enable submission.
+										{!checklistComplete
+											? "Complete every checklist item to enable submission."
+											: !checklistIssuesExplained
+												? "Provide an explanation for every checklist item marked as an issue."
+												: "You can submit the examination."}
 									</p>
 								)}
 							</div>
@@ -1208,4 +1291,3 @@ export default function ConductExaminationPage() {
 		</AppShell>
 	);
 }
-

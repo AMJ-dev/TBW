@@ -568,7 +568,7 @@ export default function ExaminationDetailsPage() {
 
 						{examination.status === "PENDING_REVIEW" && (
 							<Link
-								to={`/operations/examinations/${examination.id}/review`}
+								to={`/operations/examinations/review/${examination.id}`}
 								className="inline-flex items-center justify-center gap-2 rounded-lg bg-orange px-4 py-2.5 text-xs font-semibold text-white shadow-sm transition hover:bg-orange-deep"
 							>
 								<ShieldCheck size={15} />
