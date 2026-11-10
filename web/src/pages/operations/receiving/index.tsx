@@ -810,6 +810,9 @@ export default function OperationsReceivingRoute() {
                       <th className="px-4 py-3">
                         <span className={labelClass}>Received at</span>
                       </th>
+                      <th className="px-4 py-3 text-right">
+                        <span className={labelClass}>Action</span>
+                      </th>
                     </tr>
                   </thead>
 
@@ -824,25 +827,7 @@ export default function OperationsReceivingRoute() {
                             record.receiving_reference ||
                             `${record.container_no}-${index}`
                           }
-                          onClick={() => {
-                            if (record.id) {
-                              navigate(`/operations/receiving/details/${record.id}`);
-                            }
-                          }}
-                          onKeyDown={(event) => {
-                            if (
-                              record.id &&
-                              (event.key === "Enter" || event.key === " ")
-                            ) {
-                              event.preventDefault();
-                              navigate(`/operations/receiving/details/${record.id}`);
-                            }
-                          }}
-                          tabIndex={record.id ? 0 : undefined}
-                          role={record.id ? "link" : undefined}
-                          className={`transition-colors hover:bg-sand/40 ${
-                            record.id ? "cursor-pointer focus:outline-none focus:ring-2 focus:ring-inset focus:ring-ink/20" : ""
-                          }`}
+                          className="transition-colors hover:bg-sand/40"
                         >
                           <td className="px-4 py-4">
                             <p className="font-mono text-xs font-semibold text-ink">
@@ -932,6 +917,26 @@ export default function OperationsReceivingRoute() {
                                 record.received_at ?? record.created_at,
                               )}
                             </span>
+                          </td>
+
+                          <td className="px-4 py-4 text-right">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={!record.id}
+                              onClick={() => {
+                                if (record.id) {
+                                  navigate(
+                                    `/operations/receiving/details/${record.id}`,
+                                  );
+                                }
+                              }}
+                              className="border-line bg-paper text-ink hover:bg-sand"
+                            >
+                              View
+                              <ArrowUpRight className="size-3.5" />
+                            </Button>
                           </td>
                         </tr>
                       );
