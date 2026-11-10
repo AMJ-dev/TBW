@@ -2,8 +2,6 @@
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
-    header("Content-Type: application/json; charset=utf-8");
-
     if ($_SERVER["REQUEST_METHOD"] !== "GET") {
     
         echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
@@ -39,6 +37,9 @@
                 v.status AS vehicle_status,
                 v.insurance_expiry,
                 v.roadworthiness_expiry,
+                v.insurance_certificate,
+                v.roadworthiness_certificate,
+
                 d.id AS driver_id,
                 d.name AS driver_name,
                 d.phone AS driver_phone,
@@ -48,6 +49,8 @@
                 d.transporter AS driver_transporter,
                 d.notes AS driver_notes,
                 d.licence_expiry,
+                d.licence_document AS driver_licence_document,
+
                 (
                     SELECT GROUP_CONCAT(
                         ac.container_no
@@ -102,9 +105,18 @@
                 ON v.id = p.vehicle_id
             LEFT JOIN gate_drivers d
                 ON d.id = p.driver_id
-            WHERE a.appointment_date = CURDATE()
-            AND p.type IN ('Terminal Entry', 'Collection')
-            ORDER BY a.slot_time ASC, p.issued_at DESC
+            WHERE p.type IN ('Terminal Entry', 'Collection')
+            AND (
+                LOWER(TRIM(p.status)) = 'redeemed'
+                OR EXISTS (
+                    SELECT 1
+                    FROM gate_movement_records gm
+                    WHERE gm.gate_pass_id = p.id
+                    AND gm.direction = 'in'
+                    AND gm.decision = 'ADMIT'
+                )
+            )
+            ORDER BY a.appointment_date DESC, a.slot_time DESC, p.issued_at DESC
         ";
 
         $stmt = $conn->prepare($sql);
@@ -226,6 +238,8 @@
                 "transporter" => $row["transporter"] ?? null,
                 "status" => $row["vehicle_status"] ?? null,
                 "insurance_expiry" => $row["insurance_expiry"] ?? null,
+                "roadworthiness_expiry" => $row["roadworthiness_expiry"],
+                "roadworthiness_certificate" => $row["roadworthiness_certificate"],
                 "roadworthiness_expiry" => $row["roadworthiness_expiry"] ?? null
             ];
 
@@ -238,6 +252,7 @@
                 "licence_expiry" => $row["licence_expiry"] ?? null,
                 "status" => $row["driver_status"] ?? null,
                 "transporter" => $row["driver_transporter"] ?? null,
+                "licence_document" => $row["driver_licence_document"],
                 "notes" => $row["driver_notes"] ?? null
             ];
 

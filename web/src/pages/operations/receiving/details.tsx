@@ -1841,42 +1841,6 @@ export default function OperationsReceivingDetailsPage() {
             <ArrowLeft className="size-4" />
             Back to receiving register
           </Button>
-
-          {getText(record, "shipment_id") && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                navigate(
-                  `/operations/shipments/${encodeURIComponent(
-                    getText(record, "shipment_id"),
-                  )}`,
-                )
-              }
-              className="border-line bg-paper text-ink hover:bg-sand"
-            >
-              <Package className="size-4" />
-              View shipment
-            </Button>
-          )}
-
-          {getText(record, "gate_pass_id") && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                navigate(
-                  `/operations/gate/passes/${encodeURIComponent(
-                    getText(record, "gate_pass_id"),
-                  )}`,
-                )
-              }
-              className="border-line bg-paper text-ink hover:bg-sand"
-            >
-              <Truck className="size-4" />
-              View gate pass
-            </Button>
-          )}
         </div>
       </div>
     </AppShell>

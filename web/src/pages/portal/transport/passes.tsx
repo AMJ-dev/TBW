@@ -204,17 +204,9 @@ export default function GatePassesRoute() {
     });
   }, [passes, searchQuery, statusFilter]);
 
-  const activeCount = passes.filter(
-    (pass) => pass.status.toLowerCase() === "active",
-  ).length;
-
-  const redeemedCount = passes.filter(
-    (pass) => pass.status.toLowerCase() === "redeemed",
-  ).length;
-
-  const expiredCount = passes.filter(
-    (pass) => pass.status.toLowerCase() === "expired",
-  ).length;
+  const activeCount = passes.filter(pass => pass.status.toLowerCase() === "active").length;
+  const redeemedCount = passes.filter(pass => pass.status.toLowerCase() === "redeemed").length;
+  const expiredCount = passes.filter(pass => pass.status.toLowerCase() === "expired").length;
 
   const exportCsv = () => {
     const rows = [
