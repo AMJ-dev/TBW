@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
 	ArrowLeft,
@@ -12,6 +12,7 @@ import {
 	FileText,
 	Filter,
 	FolderOpen,
+	MoreHorizontal,
 	Plus,
 	Search,
 	ShieldCheck,
@@ -24,18 +25,24 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 type DocumentStatus = "Verified" | "Pending review" | "Missing" | "Rejected";
-type ShipmentStatus = "Awaiting documents" | "Under review" | "Documents complete" | "Returned";
+type ShipmentStatus =
+	| "Awaiting documents"
+	| "Under review"
+	| "Documents complete"
+	| "Returned"
+	| "Rejected";
 
 type CargoDocument = {
 	id: string;
 	name: string;
 	category: string;
 	reference: string;
-	fileName?: string;
+	fileName?: string | undefined;
+	fileSize?: string | undefined;
 	uploadedAt: string;
 	status: DocumentStatus;
 	required: boolean;
-	reviewNote?: string;
+	reviewNote?: string | undefined;
 };
 
 type Shipment = {
@@ -65,10 +72,10 @@ const initialShipments: Shipment[] = [
 		storedAt: "03 Nov 2026, 09:42",
 		status: "Under review",
 		documents: [
-			{ id: "d1", name: "Bill of Lading", category: "Shipping document", reference: "MAEU-ABJ-784512", fileName: "bill-of-lading.pdf", uploadedAt: "03 Nov 2026 · 09:51", status: "Verified", required: true },
-			{ id: "d2", name: "Commercial Invoice", category: "Commercial document", reference: "INV-NS-2026-441", fileName: "commercial-invoice.pdf", uploadedAt: "03 Nov 2026 · 09:54", status: "Pending review", required: true },
-			{ id: "d3", name: "Packing List", category: "Cargo details", reference: "PL-NS-2026-441", fileName: "packing-list.pdf", uploadedAt: "03 Nov 2026 · 09:55", status: "Verified", required: true },
-			{ id: "d4", name: "Import Permit", category: "Regulatory document", reference: "IMP-2026-0931", fileName: "import-permit.pdf", uploadedAt: "03 Nov 2026 · 09:58", status: "Pending review", required: true },
+			{ id: "d1", name: "Bill of Lading", category: "Shipping document", reference: "MAEU-ABJ-784512", fileName: "bill-of-lading.pdf", fileSize: "1.8 MB", uploadedAt: "03 Nov 2026 · 09:51", status: "Verified", required: true },
+			{ id: "d2", name: "Commercial Invoice", category: "Commercial document", reference: "INV-NS-2026-441", fileName: "commercial-invoice.pdf", fileSize: "842 KB", uploadedAt: "03 Nov 2026 · 09:54", status: "Pending review", required: true },
+			{ id: "d3", name: "Packing List", category: "Cargo details", reference: "PL-NS-2026-441", fileName: "packing-list.pdf", fileSize: "624 KB", uploadedAt: "03 Nov 2026 · 09:55", status: "Verified", required: true },
+			{ id: "d4", name: "Import Permit", category: "Regulatory document", reference: "IMP-2026-0931", fileName: "import-permit.pdf", fileSize: "1.1 MB", uploadedAt: "03 Nov 2026 · 09:58", status: "Pending review", required: true },
 			{ id: "d5", name: "Insurance Certificate", category: "Supporting document", reference: "—", uploadedAt: "—", status: "Missing", required: false },
 		],
 	},
@@ -102,9 +109,9 @@ const initialShipments: Shipment[] = [
 		storedAt: "02 Nov 2026, 16:30",
 		status: "Documents complete",
 		documents: [
-			{ id: "d10", name: "Bill of Lading", category: "Shipping document", reference: "OOLU-ABJ-610382", fileName: "bol-apex.pdf", uploadedAt: "02 Nov 2026 · 16:42", status: "Verified", required: true },
-			{ id: "d11", name: "Commercial Invoice", category: "Commercial document", reference: "APX-INV-8871", fileName: "invoice-apex.pdf", uploadedAt: "02 Nov 2026 · 16:43", status: "Verified", required: true },
-			{ id: "d12", name: "Packing List", category: "Cargo details", reference: "APX-PL-8871", fileName: "packing-apex.pdf", uploadedAt: "02 Nov 2026 · 16:44", status: "Verified", required: true },
+			{ id: "d10", name: "Bill of Lading", category: "Shipping document", reference: "OOLU-ABJ-610382", fileName: "bol-apex.pdf", fileSize: "1.2 MB", uploadedAt: "02 Nov 2026 · 16:42", status: "Verified", required: true },
+			{ id: "d11", name: "Commercial Invoice", category: "Commercial document", reference: "APX-INV-8871", fileName: "invoice-apex.pdf", fileSize: "756 KB", uploadedAt: "02 Nov 2026 · 16:43", status: "Verified", required: true },
+			{ id: "d12", name: "Packing List", category: "Cargo details", reference: "APX-PL-8871", fileName: "packing-apex.pdf", fileSize: "518 KB", uploadedAt: "02 Nov 2026 · 16:44", status: "Verified", required: true },
 		],
 	},
 	{
@@ -119,9 +126,25 @@ const initialShipments: Shipment[] = [
 		storedAt: "02 Nov 2026, 13:05",
 		status: "Returned",
 		documents: [
-			{ id: "d13", name: "Bill of Lading", category: "Shipping document", reference: "HLCU-ABJ-501729", fileName: "crestline-bol.pdf", uploadedAt: "02 Nov 2026 · 13:21", status: "Verified", required: true },
-			{ id: "d14", name: "Commercial Invoice", category: "Commercial document", reference: "CR-INV-2026-102", fileName: "crestline-invoice.pdf", uploadedAt: "02 Nov 2026 · 13:22", status: "Rejected", required: true, reviewNote: "Invoice total does not match the declared cargo value." },
+			{ id: "d13", name: "Bill of Lading", category: "Shipping document", reference: "HLCU-ABJ-501729", fileName: "crestline-bol.pdf", fileSize: "1.4 MB", uploadedAt: "02 Nov 2026 · 13:21", status: "Verified", required: true },
+			{ id: "d14", name: "Commercial Invoice", category: "Commercial document", reference: "CR-INV-2026-102", fileName: "crestline-invoice.pdf", fileSize: "690 KB", uploadedAt: "02 Nov 2026 · 13:22", status: "Rejected", required: true, reviewNote: "Invoice total does not match the declared cargo value." },
 			{ id: "d15", name: "Packing List", category: "Cargo details", reference: "CR-PL-2026-102", fileName: "crestline-packing.pdf", uploadedAt: "02 Nov 2026 · 13:23", status: "Verified", required: true },
+		],
+	},
+	{
+		id: "5",
+		reference: "TRN-SHP-2026-001238",
+		billOfLading: "MSCU-ABJ-119832",
+		consignee: "Westbridge Engineering Ltd",
+		organisation: "Westbridge Logistics",
+		cargo: "Industrial machinery",
+		containers: 2,
+		storageLocation: "Yard D · D-011 / D-012",
+		storedAt: "01 Nov 2026, 11:20",
+		status: "Rejected",
+		documents: [
+			{ id: "d16", name: "Bill of Lading", category: "Shipping document", reference: "MSCU-ABJ-119832", fileName: "westbridge-bol.pdf", fileSize: "1.3 MB", uploadedAt: "01 Nov 2026 · 11:31", status: "Verified", required: true },
+			{ id: "d17", name: "Commercial Invoice", category: "Commercial document", reference: "WB-INV-2026-81", fileName: "westbridge-invoice.pdf", fileSize: "910 KB", uploadedAt: "01 Nov 2026 · 11:32", status: "Rejected", required: true, reviewNote: "Submitted invoice appears to belong to a different consignee." },
 		],
 	},
 ];
@@ -131,6 +154,7 @@ const shipmentTone: Record<ShipmentStatus, ReturnType<typeof statusTone>> = {
 	"Under review": "info",
 	"Documents complete": "success",
 	Returned: "critical",
+	Rejected: "critical",
 };
 
 const documentTone: Record<DocumentStatus, ReturnType<typeof statusTone>> = {
@@ -140,7 +164,14 @@ const documentTone: Record<DocumentStatus, ReturnType<typeof statusTone>> = {
 	Rejected: "critical",
 };
 
-const labelClass = "block font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft";
+const labelClass = "block text-[10px] font-semibold uppercase tracking-[0.13em] text-ink-soft";
+const inputClass = "h-10 w-full rounded-lg border border-line bg-paper px-3 text-sm text-ink outline-none transition placeholder:text-ink-soft/70 focus:border-orange focus:ring-2 focus:ring-orange/15";
+
+function formatFileSize(bytes: number) {
+	if (bytes < 1024) return `${bytes} B`;
+	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export default function OperationsDocumentationRoute() {
 	const [shipments, setShipments] = useState(initialShipments);
@@ -149,90 +180,108 @@ export default function OperationsDocumentationRoute() {
 	const [search, setSearch] = useState("");
 	const [statusFilter, setStatusFilter] = useState("ALL");
 	const [showUpload, setShowUpload] = useState(false);
-	const [uploadName, setUploadName] = useState("");
 	const [uploadType, setUploadType] = useState("Commercial Invoice");
 	const [uploadReference, setUploadReference] = useState("");
+	const [uploadFile, setUploadFile] = useState<File | null>(null);
 	const [rejectingId, setRejectingId] = useState<string | null>(null);
 	const [reviewNote, setReviewNote] = useState("");
+	const [previewDocument, setPreviewDocument] = useState<CargoDocument | null>(null);
+	const [requiredUpload, setRequiredUpload] = useState(true);
+	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const selected = shipments.find((shipment) => shipment.id === selectedShipmentId) ?? null;
 
 	const allDocuments = useMemo(
 		() => shipments.flatMap((shipment) => shipment.documents.map((document) => ({ document, shipment }))),
-		[shipments]
+		[shipments],
 	);
 
 	const pendingCount = allDocuments.filter(({ document }) => document.status === "Pending review").length;
 	const verifiedCount = allDocuments.filter(({ document }) => document.status === "Verified").length;
 	const rejectedCount = allDocuments.filter(({ document }) => document.status === "Rejected").length;
+	const missingCount = allDocuments.filter(({ document }) => document.status === "Missing" && document.required).length;
 	const readyCount = shipments.filter((shipment) => shipment.status === "Documents complete").length;
 
-	const filteredShipments = shipments.filter((shipment) => {
-		const query = search.toLowerCase();
-		const matchesSearch = `${shipment.reference} ${shipment.billOfLading} ${shipment.consignee} ${shipment.organisation}`.toLowerCase().includes(query);
-		return matchesSearch && (statusFilter === "ALL" || shipment.status === statusFilter);
-	});
+	const filteredShipments = useMemo(() => {
+		const query = search.trim().toLowerCase();
+		return shipments.filter((shipment) => {
+			const matchesSearch = !query || [
+				shipment.reference,
+				shipment.billOfLading,
+				shipment.consignee,
+				shipment.organisation,
+				shipment.cargo,
+			].some((value) => value.toLowerCase().includes(query));
+			return matchesSearch && (statusFilter === "ALL" || shipment.status === statusFilter);
+		});
+	}, [shipments, search, statusFilter]);
 
-	const filteredDocuments = allDocuments.filter(({ document, shipment }) => {
-		const query = search.toLowerCase();
-		const matchesSearch = `${document.name} ${document.reference} ${document.fileName ?? ""} ${shipment.reference} ${shipment.consignee}`.toLowerCase().includes(query);
-		return matchesSearch && (statusFilter === "ALL" || document.status === statusFilter);
-	});
+	const filteredDocuments = useMemo(() => {
+		const query = search.trim().toLowerCase();
+		return allDocuments.filter(({ document, shipment }) => {
+			const matchesSearch = !query || [
+				document.name,
+				document.reference,
+				document.fileName ?? "",
+				shipment.reference,
+				shipment.consignee,
+			].some((value) => value.toLowerCase().includes(query));
+			return matchesSearch && (statusFilter === "ALL" || document.status === statusFilter);
+		});
+	}, [allDocuments, search, statusFilter]);
 
 	const recalculateStatus = (documents: CargoDocument[]): ShipmentStatus => {
 		const required = documents.filter((document) => document.required);
 		if (required.length && required.every((document) => document.status === "Verified")) return "Documents complete";
 		if (required.some((document) => document.status === "Rejected")) return "Returned";
-		if (required.every((document) => document.status === "Missing")) return "Awaiting documents";
+		if (required.length && required.every((document) => document.status === "Missing")) return "Awaiting documents";
 		return "Under review";
 	};
 
 	const updateDocument = (documentId: string, status: DocumentStatus, note = "") => {
 		if (!selected) return;
-
 		setShipments((current) =>
 			current.map((shipment) => {
 				if (shipment.id !== selected.id) return shipment;
 				const documents = shipment.documents.map((document) =>
 					document.id === documentId
-						? { ...document, status, ...(note ? { reviewNote: note } : {}) }
-						: document
+						? { ...document, status, reviewNote: status === "Rejected" ? note : undefined }
+						: document,
 				);
 				return { ...shipment, documents, status: recalculateStatus(documents) };
-			})
+			}),
 		);
-
 		setRejectingId(null);
 		setReviewNote("");
-		toast.success(status === "Verified" ? "Document verified." : "Document rejected.");
+		toast.success(status === "Verified" ? "Document marked as verified." : "Document returned for correction.");
 	};
 
 	const addDocument = () => {
-		if (!selected || !uploadName) return;
-
+		if (!selected || !uploadFile) return;
 		const document: CargoDocument = {
 			id: `new-${Date.now()}`,
 			name: uploadType,
 			category: "Uploaded document",
-			reference: uploadReference || "Not provided",
-			fileName: uploadName,
+			reference: uploadReference.trim() || "Not provided",
+			fileName: uploadFile.name,
+			fileSize: formatFileSize(uploadFile.size),
 			uploadedAt: "Just now",
 			status: "Pending review",
-			required: true,
+			required: requiredUpload,
 		};
-
 		setShipments((current) =>
 			current.map((shipment) =>
 				shipment.id === selected.id
 					? { ...shipment, documents: [...shipment.documents, document], status: "Under review" }
-					: shipment
-			)
+					: shipment,
+			),
 		);
-
-		setUploadName("");
+		setUploadFile(null);
 		setUploadReference("");
+		setUploadType("Commercial Invoice");
+		setRequiredUpload(true);
 		setShowUpload(false);
-		toast.success("Document added to register.");
+		toast.success("Document added to the local preview.");
 	};
 
 	const openShipment = (id: string) => {
@@ -252,86 +301,114 @@ export default function OperationsDocumentationRoute() {
 		if (!selected || !canClear) return;
 		setShipments((current) =>
 			current.map((shipment) =>
-				shipment.id === selected.id ? { ...shipment, status: "Documents complete" } : shipment
-			)
+				shipment.id === selected.id ? { ...shipment, status: "Documents complete" } : shipment,
+			),
 		);
-		toast.success("Documentation complete. Shipment is ready for Examination.");
+		toast.success("Documentation marked complete in this preview.");
 		setSelectedShipmentId(null);
+	};
+
+	const exportRegister = () => {
+		const rows = [
+			["Shipment reference", "Bill of lading", "Consignee", "Organisation", "Shipment status", "Document", "Document reference", "File", "Document status", "Required"],
+			...allDocuments.map(({ document, shipment }) => [
+				shipment.reference,
+				shipment.billOfLading,
+				shipment.consignee,
+				shipment.organisation,
+				shipment.status,
+				document.name,
+				document.reference,
+				document.fileName ?? "",
+				document.status,
+				document.required ? "Yes" : "No",
+			]),
+		];
+		const csv = rows.map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",")).join("\n");
+		const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+		const anchor = document.createElement("a");
+		anchor.href = url;
+		anchor.download = "trinu-document-register.csv";
+		anchor.click();
+		URL.revokeObjectURL(url);
+		toast.success("Document register exported.");
 	};
 
 	return (
 		<AppShell title="Document Management" eyebrow="Operations · Document Control">
-			<div className="space-y-5">
+			<div className="space-y-5 pb-8">
 				{selected ? (
 					<>
 						<div className="flex flex-wrap items-center justify-between gap-3">
 							<Button variant="outline" className="border-line" onClick={() => setSelectedShipmentId(null)}>
-								<ArrowLeft className="mr-2 size-4" />
-								Back to documents
+								<ArrowLeft className="mr-2 size-4" /> Back to documents
 							</Button>
 							<StatusBadge label={selected.status} tone={shipmentTone[selected.status]} />
 						</div>
 
-						<div className="rounded-xl border border-line bg-paper p-4 sm:p-5">
-							<div className="flex flex-wrap items-start justify-between gap-4">
-								<div>
+						<section className="rounded-xl border border-line bg-paper p-4 shadow-sm sm:p-5">
+							<div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+								<div className="min-w-0">
 									<p className={labelClass}>Shipment documentation file</p>
-									<h2 className="mt-1 font-display text-xl font-bold text-ink">{selected.reference}</h2>
-									<p className="mt-1 text-xs text-ink-soft">B/L: {selected.billOfLading} · Stored {selected.storedAt}</p>
+									<h2 className="mt-1 break-all font-display text-xl font-bold text-ink">{selected.reference}</h2>
+									<p className="mt-2 text-xs text-ink-soft">Bill of Lading: {selected.billOfLading}</p>
 								</div>
-								<div className="w-full max-w-xs">
-									<div className="flex justify-between text-xs">
-										<span className="font-medium text-ink">Required documents</span>
-										<span className="font-mono font-semibold text-orange-deep">{selectedCompletion}%</span>
+								<div className="w-full lg:max-w-xs">
+									<div className="flex items-center justify-between text-xs">
+										<span className="font-semibold text-ink">Required document clearance</span>
+										<span className="font-mono font-bold text-orange-deep">{selectedCompletion}%</span>
 									</div>
 									<div className="mt-2 h-2 overflow-hidden rounded-full bg-sand">
-										<div className="h-full rounded-full bg-orange" style={{ width: `${selectedCompletion}%` }} />
+										<div className="h-full rounded-full bg-orange transition-all" style={{ width: `${selectedCompletion}%` }} />
 									</div>
-									<p className="mt-1 text-[10px] text-ink-soft">{selectedVerified} of {selectedRequired.length} verified</p>
+									<p className="mt-1.5 text-[11px] text-ink-soft">{selectedVerified} of {selectedRequired.length} required documents verified</p>
 								</div>
 							</div>
-
 							<div className="mt-5 grid gap-4 border-t border-line pt-4 sm:grid-cols-2 xl:grid-cols-4">
-								<div><p className={labelClass}>Organisation</p><p className="mt-1 text-xs font-semibold text-ink">{selected.organisation}</p></div>
-								<div><p className={labelClass}>Consignee</p><p className="mt-1 text-xs font-semibold text-ink">{selected.consignee}</p></div>
-								<div><p className={labelClass}>Cargo</p><p className="mt-1 text-xs font-semibold text-ink">{selected.cargo}</p></div>
-								<div><p className={labelClass}>Storage location</p><p className="mt-1 text-xs font-semibold text-ink">{selected.storageLocation}</p></div>
+								<div><p className={labelClass}>Organisation</p><p className="mt-1 text-sm font-semibold text-ink">{selected.organisation}</p></div>
+								<div><p className={labelClass}>Consignee</p><p className="mt-1 text-sm font-semibold text-ink">{selected.consignee}</p></div>
+								<div><p className={labelClass}>Cargo description</p><p className="mt-1 text-sm font-semibold text-ink">{selected.cargo}</p></div>
+								<div><p className={labelClass}>Storage location</p><p className="mt-1 text-sm font-semibold text-ink">{selected.storageLocation}</p></div>
 							</div>
-						</div>
+							<div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-line pt-4 text-xs text-ink-soft">
+								<span><strong className="text-ink">{selected.containers}</strong> container(s)</span>
+								<span>Received into storage: <strong className="text-ink">{selected.storedAt}</strong></span>
+							</div>
+						</section>
 
-						<div className="flex flex-wrap items-center justify-between gap-3">
+						<div className="flex flex-wrap items-end justify-between gap-3">
 							<div>
 								<h3 className="font-display text-lg font-bold text-ink">Document verification</h3>
-								<p className="mt-1 text-xs text-ink-soft">Review and verify each submitted document.</p>
+								<p className="mt-1 text-xs text-ink-soft">Review each submitted file and record its verification outcome.</p>
 							</div>
 							<Button onClick={() => setShowUpload(true)} className="bg-orange text-white hover:bg-orange-deep">
 								<Plus className="mr-1.5 size-4" /> Add document
 							</Button>
 						</div>
 
-						<div className="overflow-hidden rounded-xl border border-line bg-paper">
-							<div className="hidden grid-cols-[1.2fr_1fr_1fr_120px_180px] gap-3 border-b border-line bg-sand/60 px-4 py-3 font-mono text-[9px] uppercase tracking-wider text-ink-soft md:grid">
+						<section className="overflow-hidden rounded-xl border border-line bg-paper shadow-sm">
+							<div className="hidden grid-cols-[1.15fr_1fr_1fr_120px_190px] gap-3 border-b border-line bg-sand/60 px-4 py-3 font-mono text-[9px] uppercase tracking-wider text-ink-soft lg:grid">
 								<span>Document</span><span>Reference / File</span><span>Submitted</span><span>Status</span><span>Actions</span>
 							</div>
 							{selected.documents.map((document) => (
 								<div key={document.id} className="border-b border-line p-4 last:border-0">
-									<div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr_120px_180px] md:items-center">
-										<div className="flex items-center gap-3">
-											<span className="flex size-9 items-center justify-center rounded-lg bg-sand text-ink-soft"><FileText className="size-4" /></span>
-											<div>
-												<p className="text-xs font-semibold text-ink">{document.name}{document.required && <span className="ml-1 text-orange">*</span>}</p>
-												<p className="text-[10px] text-ink-soft">{document.category}</p>
+									<div className="grid gap-3 lg:grid-cols-[1.15fr_1fr_1fr_120px_190px] lg:items-center">
+										<div className="flex min-w-0 items-center gap-3">
+											<span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-sand text-ink-soft"><FileText className="size-4" /></span>
+											<div className="min-w-0">
+												<p className="text-sm font-semibold text-ink">{document.name}{document.required && <span className="ml-1 text-orange">*</span>}</p>
+												<p className="text-[11px] text-ink-soft">{document.category}{document.required ? " · Required" : " · Optional"}</p>
 											</div>
 										</div>
-										<div>
-											<p className="text-xs text-ink">{document.reference}</p>
-											<p className="text-[10px] text-ink-soft">{document.fileName ?? "No file submitted"}</p>
+										<div className="min-w-0">
+											<p className="break-all text-xs text-ink">{document.reference}</p>
+											<p className="truncate text-[11px] text-ink-soft">{document.fileName ?? "No file submitted"}{document.fileSize ? ` · ${document.fileSize}` : ""}</p>
 										</div>
-										<p className="text-[11px] text-ink">{document.uploadedAt}</p>
-										<StatusBadge label={document.status} tone={documentTone[document.status]} />
+										<p className="text-xs text-ink">{document.uploadedAt}</p>
+										<div><StatusBadge label={document.status} tone={documentTone[document.status]} /></div>
 										<div className="flex flex-wrap gap-1.5">
 											{document.fileName && (
-												<Button size="sm" variant="outline" className="h-8 border-line" onClick={() => toast.info(`Previewing ${document.fileName}`)}>
+												<Button size="sm" variant="outline" className="h-8 border-line" onClick={() => setPreviewDocument(document)}>
 													<Eye className="mr-1 size-3" /> View
 												</Button>
 											)}
@@ -341,44 +418,46 @@ export default function OperationsDocumentationRoute() {
 												</Button>
 											)}
 											{document.fileName && document.status !== "Rejected" && document.status !== "Verified" && (
-												<Button size="sm" variant="outline" className="h-8 border-rose-200 text-rose-700" onClick={() => setRejectingId(document.id)}>
-													<X className="mr-1 size-3" /> Reject
+												<Button size="sm" variant="outline" className="h-8 border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => { setRejectingId(document.id); setReviewNote(""); }}>
+													<X className="mr-1 size-3" /> Return
 												</Button>
 											)}
 										</div>
 									</div>
-
 									{document.reviewNote && (
-										<div className="mt-3 rounded-md bg-rose-50 px-3 py-2 text-[11px] text-rose-700">
-											<span className="font-semibold">Review note:</span> {document.reviewNote}
+										<div className="mt-3 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2.5 text-xs text-rose-800">
+											<strong>Review note:</strong> {document.reviewNote}
 										</div>
 									)}
-
 									{rejectingId === document.id && (
-										<div className="mt-3 rounded-lg border border-rose-200 bg-rose-50/60 p-3">
-											<label className={labelClass}>Reason for rejection</label>
-											<textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} rows={2} className="mt-2 w-full rounded-md border border-rose-200 bg-paper px-3 py-2 text-xs text-ink outline-none" placeholder="Explain what needs to be corrected..." />
-											<div className="mt-2 flex justify-end gap-2">
-												<Button size="sm" variant="outline" onClick={() => setRejectingId(null)}>Cancel</Button>
-												<Button size="sm" disabled={!reviewNote.trim()} className="bg-rose-700 text-white" onClick={() => updateDocument(document.id, "Rejected", reviewNote.trim())}>Confirm rejection</Button>
+										<div className="mt-3 rounded-lg border border-rose-200 bg-rose-50/50 p-3">
+											<label className={labelClass}>Reason for returning document <span className="text-rose-600">*</span></label>
+											<textarea value={reviewNote} onChange={(event) => setReviewNote(event.target.value)} rows={3} maxLength={1000} className="mt-2 w-full resize-y rounded-lg border border-rose-200 bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:ring-2 focus:ring-rose-200" placeholder="Explain the issue and what the organisation needs to correct..." />
+											<div className="mt-2 flex items-center justify-between gap-3">
+												<span className="text-[10px] text-ink-soft">{reviewNote.length}/1000 characters</span>
+												<div className="flex gap-2">
+													<Button size="sm" variant="outline" onClick={() => setRejectingId(null)}>Cancel</Button>
+													<Button size="sm" disabled={!reviewNote.trim()} className="bg-rose-700 text-white hover:bg-rose-800" onClick={() => updateDocument(document.id, "Rejected", reviewNote.trim())}>Confirm return</Button>
+												</div>
 											</div>
 										</div>
 									)}
 								</div>
 							))}
-						</div>
+							{selected.documents.length === 0 && <div className="p-10 text-center text-sm text-ink-soft">No documents have been added to this shipment.</div>}
+						</section>
 
-						<div className="rounded-xl border border-line bg-paper p-4">
-							<div className="flex flex-wrap items-center justify-between gap-3">
+						<section className="rounded-xl border border-line bg-paper p-4 shadow-sm sm:p-5">
+							<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 								<div className="flex items-start gap-3">
-									<ShieldCheck className="mt-1 size-5 text-orange-deep" />
+									<ShieldCheck className="mt-0.5 size-5 shrink-0 text-orange-deep" />
 									<div>
 										<h3 className="text-sm font-semibold text-ink">Documentation clearance</h3>
-										<p className="mt-1 max-w-2xl text-xs leading-5 text-ink-soft">All required documents must be verified before this shipment can proceed to Examination.</p>
+										<p className="mt-1 max-w-2xl text-xs leading-5 text-ink-soft">Every required document must be verified before documentation can be marked complete and the shipment can proceed to the next operational stage.</p>
 									</div>
 								</div>
-								<span className={cn("text-xs font-semibold", canClear ? "text-emerald-700" : "text-orange-deep")}>
-									{canClear ? "Ready for Examination" : "Verification outstanding"}
+								<span className={cn("shrink-0 text-xs font-semibold", canClear ? "text-emerald-700" : "text-orange-deep")}>
+									{canClear ? "Ready for clearance" : "Verification outstanding"}
 								</span>
 							</div>
 							<div className="mt-4 flex justify-end">
@@ -386,35 +465,35 @@ export default function OperationsDocumentationRoute() {
 									<BadgeCheck className="mr-2 size-4" /> Complete verification <ArrowRight className="ml-2 size-4" />
 								</Button>
 							</div>
-						</div>
+						</section>
 					</>
 				) : (
 					<>
-						<div className="flex flex-wrap items-end justify-between gap-4">
+						<div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
 							<div>
-								<p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-soft">Terminal operations · Document control</p>
-								<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">Document Management & Verification</h2>
-								<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">Manage shipment documents, track submissions and verify records before cargo proceeds to Examination.</p>
+								<p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-soft">Terminal operations · Document control</p>
+								<h2 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink sm:text-3xl">Document Management</h2>
+								<p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">Manage shipment documents, review submissions and track documentation clearance before cargo proceeds to the next stage.</p>
 							</div>
-							<Button variant="outline" className="border-line" onClick={() => toast.success("Document register exported in this UI preview.")}>
-								<Download className="mr-2 size-4" /> Export
+							<Button variant="outline" className="w-full border-line sm:w-auto" onClick={exportRegister}>
+								<Download className="mr-2 size-4" /> Export register
 							</Button>
 						</div>
 
 						<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-							<Metric label="Shipments in storage" value={String(shipments.length)} detail="Cargo documentation files" tone="info" icon={FolderOpen} />
-							<Metric label="Documents received" value={String(allDocuments.length)} detail="Across stored shipments" tone="default" icon={FileText} />
-							<Metric label="Awaiting verification" value={String(pendingCount)} detail="Submitted documents" tone="warning" icon={Clock3} />
-							<Metric label="Verified documents" value={String(verifiedCount)} detail={`${readyCount} shipments cleared for Examination`} tone="success" icon={FileCheck2} />
+							<Metric label="Shipments in register" value={String(shipments.length)} detail="Shipment documentation files" tone="info" icon={FolderOpen} />
+							<Metric label="Pending verification" value={String(pendingCount)} detail="Submitted documents awaiting review" tone="warning" icon={Clock3} />
+							<Metric label="Verified documents" value={String(verifiedCount)} detail={`${readyCount} shipments documentation-complete`} tone="success" icon={FileCheck2} />
+							<Metric label="Rejected / missing" value={String(rejectedCount + missingCount)} detail={`${rejectedCount} returned · ${missingCount} required missing`} tone="critical" icon={ShieldCheck} />
 						</div>
 
 						<div className="flex flex-wrap items-center justify-between gap-3 border-b border-line">
-							<div className="flex gap-6">
-								<button onClick={() => { setActiveTab("management"); setSearch(""); setStatusFilter("ALL"); }} className={cn("border-b-2 px-1 pb-3 text-xs font-semibold", activeTab === "management" ? "border-orange text-orange-deep" : "border-transparent text-ink-soft")}>
-									Document Management
+							<div className="flex gap-5 sm:gap-7">
+								<button onClick={() => { setActiveTab("management"); setSearch(""); setStatusFilter("ALL"); }} className={cn("border-b-2 px-1 pb-3 text-xs font-semibold transition-colors", activeTab === "management" ? "border-orange text-orange-deep" : "border-transparent text-ink-soft hover:text-ink")}>
+									Shipment register
 								</button>
-								<button onClick={() => { setActiveTab("verification"); setSearch(""); setStatusFilter("ALL"); }} className={cn("border-b-2 px-1 pb-3 text-xs font-semibold", activeTab === "verification" ? "border-orange text-orange-deep" : "border-transparent text-ink-soft")}>
-									Document Verification <span className="ml-1 rounded bg-sand px-1.5 py-0.5 font-mono text-[9px]">{pendingCount + rejectedCount}</span>
+								<button onClick={() => { setActiveTab("verification"); setSearch(""); setStatusFilter("ALL"); }} className={cn("border-b-2 px-1 pb-3 text-xs font-semibold transition-colors", activeTab === "verification" ? "border-orange text-orange-deep" : "border-transparent text-ink-soft hover:text-ink")}>
+									Verification queue <span className="ml-1 rounded-md bg-sand px-1.5 py-0.5 font-mono text-[9px]">{pendingCount + rejectedCount}</span>
 								</button>
 							</div>
 						</div>
@@ -422,15 +501,17 @@ export default function OperationsDocumentationRoute() {
 						<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 							<div className="relative w-full sm:max-w-md">
 								<Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
-								<Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search shipment, document, reference..." className="pl-9" />
+								<Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={activeTab === "management" ? "Search shipment, B/L, consignee..." : "Search document, file, shipment..."} className="pl-9" />
+								{search && <button aria-label="Clear search" onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-soft hover:text-ink"><X className="size-4" /></button>}
 							</div>
 							<div className="flex items-center gap-2">
 								<Filter className="size-4 text-ink-soft" />
-								<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-9 rounded-md border border-line bg-paper px-3 text-xs text-ink outline-none focus:ring-2 focus:ring-orange/25">
+								<label htmlFor="document-status-filter" className="sr-only">Filter by status</label>
+								<select id="document-status-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="h-10 min-w-44 rounded-lg border border-line bg-paper px-3 text-xs text-ink outline-none focus:border-orange focus:ring-2 focus:ring-orange/15">
 									<option value="ALL">All statuses</option>
 									{activeTab === "management" ? (
 										<>
-											<option>Awaiting documents</option><option>Under review</option><option>Documents complete</option><option>Returned</option>
+											<option>Awaiting documents</option><option>Under review</option><option>Documents complete</option><option>Returned</option><option>Rejected</option>
 										</>
 									) : (
 										<>
@@ -442,29 +523,30 @@ export default function OperationsDocumentationRoute() {
 						</div>
 
 						{activeTab === "management" ? (
-							<div className="overflow-hidden rounded-xl border border-line bg-paper">
-								<div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+							<section className="overflow-hidden rounded-xl border border-line bg-paper shadow-sm">
+								<div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3.5">
 									<div>
 										<h3 className="text-sm font-semibold text-ink">Shipment document register</h3>
-										<p className="mt-1 text-[11px] text-ink-soft">All shipments currently in Storage and their documentation records.</p>
+										<p className="mt-1 text-[11px] text-ink-soft">Shipments currently recorded in terminal document control.</p>
 									</div>
-									<span className="rounded-md bg-orange/10 px-2 py-1 font-mono text-[10px] font-semibold text-orange-deep">{filteredShipments.length} SHIPMENTS</span>
+									<span className="rounded-md bg-orange/10 px-2.5 py-1 font-mono text-[10px] font-semibold text-orange-deep">{filteredShipments.length} SHIPMENTS</span>
 								</div>
-								<div className="hidden grid-cols-[1.2fr_1fr_1fr_110px_130px] gap-3 border-b border-line bg-sand/60 px-4 py-3 font-mono text-[9px] uppercase tracking-wider text-ink-soft md:grid">
-									<span>Shipment / B/L</span><span>Consignee / Organisation</span><span>Storage location</span><span>Documents</span><span>Status</span>
+								<div className="hidden grid-cols-[1.25fr_1.1fr_1fr_120px_145px] gap-3 border-b border-line bg-sand/60 px-4 py-3 font-mono text-[9px] uppercase tracking-wider text-ink-soft lg:grid">
+									<span>Shipment / B/L</span><span>Consignee / Organisation</span><span>Storage location</span><span>Required docs</span><span>Status</span>
 								</div>
 								{filteredShipments.map((shipment) => {
 									const required = shipment.documents.filter((document) => document.required);
 									const verified = required.filter((document) => document.status === "Verified").length;
+									const progress = required.length ? Math.round((verified / required.length) * 100) : 0;
 									return (
-										<button key={shipment.id} onClick={() => openShipment(shipment.id)} className="grid w-full gap-3 border-b border-line px-4 py-4 text-left transition hover:bg-sand/40 last:border-0 md:grid-cols-[1.2fr_1fr_1fr_110px_130px] md:items-center">
-											<div>
-												<p className="font-mono text-xs font-bold text-ink">{shipment.reference}</p>
+										<button key={shipment.id} onClick={() => openShipment(shipment.id)} className="grid w-full gap-3 border-b border-line px-4 py-4 text-left transition hover:bg-sand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange last:border-0 lg:grid-cols-[1.25fr_1.1fr_1fr_120px_145px] lg:items-center">
+											<div className="min-w-0">
+												<p className="break-all font-mono text-xs font-bold text-ink">{shipment.reference}</p>
 												<p className="mt-1 text-[10px] text-ink-soft">B/L: {shipment.billOfLading} · {shipment.containers} container(s)</p>
 											</div>
-											<div>
-												<p className="text-xs font-medium text-ink">{shipment.consignee}</p>
-												<p className="mt-1 text-[10px] text-ink-soft">{shipment.organisation}</p>
+											<div className="min-w-0">
+												<p className="truncate text-xs font-medium text-ink">{shipment.consignee}</p>
+												<p className="mt-1 truncate text-[10px] text-ink-soft">{shipment.organisation}</p>
 											</div>
 											<div>
 												<p className="text-xs text-ink">{shipment.storageLocation}</p>
@@ -472,8 +554,8 @@ export default function OperationsDocumentationRoute() {
 											</div>
 											<div>
 												<p className="text-xs font-semibold text-ink">{verified}/{required.length} verified</p>
-												<div className="mt-1 h-1.5 overflow-hidden rounded-full bg-sand">
-													<div className="h-full rounded-full bg-orange" style={{ width: `${required.length ? (verified / required.length) * 100 : 0}%` }} />
+												<div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-sand">
+													<div className="h-full rounded-full bg-orange transition-all" style={{ width: `${progress}%` }} />
 												</div>
 											</div>
 											<div className="flex items-center justify-between gap-2">
@@ -483,50 +565,44 @@ export default function OperationsDocumentationRoute() {
 										</button>
 									);
 								})}
-								{filteredShipments.length === 0 && <div className="p-12 text-center text-xs text-ink-soft">No shipments found.</div>}
-								<div className="border-t border-line px-4 py-3 font-mono text-[10px] text-ink-soft">Showing {filteredShipments.length} of {shipments.length} shipments</div>
-							</div>
+								{filteredShipments.length === 0 && <div className="p-12 text-center"><FolderOpen className="mx-auto size-8 text-ink-soft/60" /><p className="mt-3 text-sm font-semibold text-ink">No shipments found</p><p className="mt-1 text-xs text-ink-soft">Try changing your search or status filter.</p></div>}
+								<div className="border-t border-line px-4 py-3 text-[10px] text-ink-soft">Showing {filteredShipments.length} of {shipments.length} shipments</div>
+							</section>
 						) : (
-							<div className="overflow-hidden rounded-xl border border-line bg-paper">
-								<div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+							<section className="overflow-hidden rounded-xl border border-line bg-paper shadow-sm">
+								<div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3.5">
 									<div>
 										<h3 className="text-sm font-semibold text-ink">Document verification queue</h3>
-										<p className="mt-1 text-[11px] text-ink-soft">Review submitted documents and resolve outstanding verification.</p>
+										<p className="mt-1 text-[11px] text-ink-soft">Submitted documents requiring review or follow-up.</p>
 									</div>
-									<span className="rounded-md bg-orange/10 px-2 py-1 font-mono text-[10px] font-semibold text-orange-deep">{filteredDocuments.length} DOCUMENTS</span>
+									<span className="rounded-md bg-orange/10 px-2.5 py-1 font-mono text-[10px] font-semibold text-orange-deep">{filteredDocuments.length} DOCUMENTS</span>
 								</div>
-								<div className="hidden grid-cols-[1.1fr_1fr_1.2fr_120px_130px] gap-3 border-b border-line bg-sand/60 px-4 py-3 font-mono text-[9px] uppercase tracking-wider text-ink-soft md:grid">
+								<div className="hidden grid-cols-[1.1fr_1fr_1.2fr_130px_125px] gap-3 border-b border-line bg-sand/60 px-4 py-3 font-mono text-[9px] uppercase tracking-wider text-ink-soft lg:grid">
 									<span>Document</span><span>Reference / File</span><span>Shipment / Consignee</span><span>Submitted</span><span>Status</span>
 								</div>
 								{filteredDocuments.map(({ document, shipment }) => (
-									<button key={`${shipment.id}-${document.id}`} onClick={() => openShipment(shipment.id)} className="grid w-full gap-3 border-b border-line px-4 py-3.5 text-left transition hover:bg-sand/40 last:border-0 md:grid-cols-[1.1fr_1fr_1.2fr_120px_130px] md:items-center">
-										<div className="flex items-center gap-2.5">
+									<button key={`${shipment.id}-${document.id}`} onClick={() => openShipment(shipment.id)} className="grid w-full gap-3 border-b border-line px-4 py-3.5 text-left transition hover:bg-sand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-orange last:border-0 lg:grid-cols-[1.1fr_1fr_1.2fr_130px_125px] lg:items-center">
+										<div className="flex min-w-0 items-center gap-2.5">
 											<FileText className="size-4 shrink-0 text-ink-soft" />
-											<div>
-												<p className="text-xs font-semibold text-ink">{document.name}</p>
-												<p className="text-[10px] text-ink-soft">{document.fileName ?? "No file submitted"}</p>
-											</div>
+											<div className="min-w-0"><p className="text-xs font-semibold text-ink">{document.name}</p><p className="truncate text-[10px] text-ink-soft">{document.fileName ?? "No file submitted"}</p></div>
 										</div>
-										<p className="text-[11px] text-ink">{document.reference}</p>
-										<div>
-											<p className="font-mono text-[10px] font-semibold text-ink">{shipment.reference}</p>
-											<p className="text-[10px] text-ink-soft">{shipment.consignee}</p>
-										</div>
+										<div className="min-w-0"><p className="break-all text-[11px] text-ink">{document.reference}</p><p className="truncate text-[10px] text-ink-soft">{document.fileSize ?? ""}</p></div>
+										<div className="min-w-0"><p className="break-all font-mono text-[10px] font-semibold text-ink">{shipment.reference}</p><p className="truncate text-[10px] text-ink-soft">{shipment.consignee}</p></div>
 										<p className="text-[10px] text-ink-soft">{document.uploadedAt}</p>
-										<StatusBadge label={document.status} tone={documentTone[document.status]} />
+										<div><StatusBadge label={document.status} tone={documentTone[document.status]} /></div>
 									</button>
 								))}
-								{filteredDocuments.length === 0 && <div className="p-12 text-center text-xs text-ink-soft">No documents found.</div>}
-								<div className="border-t border-line px-4 py-3 font-mono text-[10px] text-ink-soft">Showing {filteredDocuments.length} of {allDocuments.length} documents</div>
-							</div>
+								{filteredDocuments.length === 0 && <div className="p-12 text-center"><FileCheck2 className="mx-auto size-8 text-ink-soft/60" /><p className="mt-3 text-sm font-semibold text-ink">No documents found</p><p className="mt-1 text-xs text-ink-soft">There are no documents matching the selected filters.</p></div>}
+								<div className="border-t border-line px-4 py-3 text-[10px] text-ink-soft">Showing {filteredDocuments.length} of {allDocuments.length} documents</div>
+							</section>
 						)}
 
-						<div className="flex flex-col justify-between gap-3 rounded-xl bg-paper p-4 ring-1 ring-line sm:flex-row sm:items-center">
+						<div className="flex flex-col justify-between gap-3 rounded-xl border border-line bg-paper p-4 sm:flex-row sm:items-center">
 							<div className="flex items-start gap-3">
 								<span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-orange/10 text-orange-deep"><FileCheck2 className="size-4" /></span>
 								<div>
-									<p className="text-xs font-semibold text-ink">Next stage: Examination</p>
-									<p className="mt-1 text-[11px] leading-5 text-ink-soft">Only shipments with all required documents verified should proceed to Examination.</p>
+									<p className="text-xs font-semibold text-ink">Documentation clearance</p>
+									<p className="mt-1 text-[11px] leading-5 text-ink-soft">Only shipments with all required documents verified should proceed to the next operational stage.</p>
 								</div>
 							</div>
 							<div className="flex items-center gap-2 text-xs font-semibold text-orange-deep">{readyCount} shipments cleared <ArrowRight className="size-4" /></div>
@@ -536,33 +612,47 @@ export default function OperationsDocumentationRoute() {
 			</div>
 
 			{showUpload && selected && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={() => setShowUpload(false)}>
-					<div className="w-full max-w-md rounded-xl bg-paper p-5 shadow-2xl ring-1 ring-line" onClick={(event) => event.stopPropagation()}>
-						<div className="flex items-center justify-between">
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowUpload(false); }}>
+					<div role="dialog" aria-modal="true" aria-labelledby="add-document-title" className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-paper p-5 shadow-2xl sm:p-6">
+						<div className="flex items-start justify-between gap-3">
+							<div><h3 id="add-document-title" className="text-base font-bold text-ink">Add shipment document</h3><p className="mt-1 text-xs text-ink-soft">Add a document to {selected.reference}.</p></div>
+							<Button variant="ghost" size="icon" aria-label="Close dialog" onClick={() => setShowUpload(false)}><X className="size-4" /></Button>
+						</div>
+						<div className="mt-5 space-y-4">
+							<div><label className={labelClass}>Document type <span className="text-orange">*</span></label><select value={uploadType} onChange={(event) => setUploadType(event.target.value)} className={cn(inputClass, "mt-1.5")}><option>Bill of Lading</option><option>Commercial Invoice</option><option>Packing List</option><option>Import Permit</option><option>Regulatory Approval</option><option>Insurance Certificate</option><option>Customs Declaration</option><option>Other supporting document</option></select></div>
+							<div><label className={labelClass}>Document reference</label><Input value={uploadReference} onChange={(event) => setUploadReference(event.target.value)} placeholder="Enter document reference" className="mt-1.5" /></div>
 							<div>
-								<h3 className="text-base font-semibold text-ink">Add document</h3>
-								<p className="mt-1 text-xs text-ink-soft">Add a document to {selected.reference}.</p>
+								<label className={labelClass}>Document file <span className="text-orange">*</span></label>
+								<input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.doc,.docx" className="hidden" onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)} />
+								<button type="button" onClick={() => fileInputRef.current?.click()} className="mt-1.5 flex w-full flex-col items-center rounded-xl border border-dashed border-line bg-sand/40 px-4 py-7 text-center transition hover:border-orange hover:bg-orange/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange">
+									<UploadCloud className="size-7 text-orange" />
+									<span className="mt-2 text-sm font-semibold text-ink">{uploadFile ? uploadFile.name : "Choose a file to attach"}</span>
+									<span className="mt-1 text-[11px] text-ink-soft">{uploadFile ? `${formatFileSize(uploadFile.size)} · Selected` : "PDF, image, Excel or Word · Maximum 10 MB"}</span>
+								</button>
+								{uploadFile && <button type="button" onClick={() => { setUploadFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="mt-2 text-xs font-medium text-rose-700 hover:underline">Remove selected file</button>}
 							</div>
-							<Button variant="ghost" size="icon" onClick={() => setShowUpload(false)}><X className="size-4" /></Button>
+							<label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-line p-3"><input type="checkbox" checked={requiredUpload} onChange={(event) => setRequiredUpload(event.target.checked)} className="mt-0.5 size-4 accent-orange" /><span><span className="block text-xs font-semibold text-ink">Required document</span><span className="mt-0.5 block text-[11px] text-ink-soft">Include this document in the shipment clearance checklist.</span></span></label>
+							<p className="text-[10px] leading-5 text-ink-soft">This screen is a UI preview. Selecting a file does not upload it to a server or persist it after the page is refreshed.</p>
 						</div>
-						<label className={cn(labelClass, "mt-5")}>Document type</label>
-						<select value={uploadType} onChange={(event) => setUploadType(event.target.value)} className="mt-1.5 h-10 w-full rounded-md border border-line bg-sand px-3 text-xs text-ink">
-							<option>Bill of Lading</option><option>Commercial Invoice</option><option>Packing List</option><option>Import Permit</option><option>Regulatory Approval</option><option>Insurance Certificate</option><option>Other supporting document</option>
-						</select>
-						<label className={cn(labelClass, "mt-4")}>Document reference</label>
-						<Input value={uploadReference} onChange={(event) => setUploadReference(event.target.value)} placeholder="Enter document reference" className="mt-1.5" />
-						<label className={cn(labelClass, "mt-4")}>Select file</label>
-						<label className="mt-1.5 flex cursor-pointer flex-col items-center rounded-lg border border-dashed border-line bg-sand/50 px-4 py-7 text-center hover:border-orange">
-							<UploadCloud className="size-6 text-orange" />
-							<span className="mt-2 text-xs font-semibold text-ink">Choose a file</span>
-							<span className="mt-1 text-[10px] text-ink-soft">PDF, JPG or PNG · UI preview only</span>
-							<input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={(event) => setUploadName(event.target.files?.[0]?.name ?? "")} />
-						</label>
-						{uploadName && <p className="mt-2 truncate text-[11px] font-medium text-emerald-700">Selected: {uploadName}</p>}
-						<div className="mt-5 flex gap-2">
-							<Button variant="outline" className="flex-1 border-line" onClick={() => setShowUpload(false)}>Cancel</Button>
-							<Button className="flex-1 bg-orange text-white hover:bg-orange-deep disabled:opacity-50" disabled={!uploadName} onClick={addDocument}>Add to register</Button>
+						<div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+							<Button variant="outline" className="border-line" onClick={() => setShowUpload(false)}>Cancel</Button>
+							<Button disabled={!uploadFile || uploadFile.size > 10 * 1024 * 1024} className="bg-orange text-white hover:bg-orange-deep disabled:opacity-50" onClick={addDocument}>Add to register</Button>
 						</div>
+					</div>
+				</div>
+			)}
+
+			{previewDocument && (
+				<div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/50 p-4 backdrop-blur-[2px]" onMouseDown={(event) => { if (event.target === event.currentTarget) setPreviewDocument(null); }}>
+					<div role="dialog" aria-modal="true" aria-labelledby="preview-document-title" className="w-full max-w-md rounded-2xl border border-line bg-paper p-5 shadow-2xl">
+						<div className="flex items-start justify-between gap-3">
+							<div><h3 id="preview-document-title" className="text-base font-bold text-ink">Document details</h3><p className="mt-1 text-xs text-ink-soft">Preview information for the selected file.</p></div>
+							<Button variant="ghost" size="icon" aria-label="Close preview" onClick={() => setPreviewDocument(null)}><X className="size-4" /></Button>
+						</div>
+						<div className="mt-5 flex items-center gap-3 rounded-xl bg-sand/60 p-3"><span className="flex size-10 items-center justify-center rounded-lg bg-paper text-orange-deep"><FileText className="size-5" /></span><div className="min-w-0"><p className="truncate text-sm font-semibold text-ink">{previewDocument.fileName}</p><p className="text-[11px] text-ink-soft">{previewDocument.fileSize ?? "File size unavailable"}</p></div></div>
+						<dl className="mt-4 space-y-3 text-xs"><div className="flex justify-between gap-4"><dt className="text-ink-soft">Document type</dt><dd className="text-right font-medium text-ink">{previewDocument.name}</dd></div><div className="flex justify-between gap-4"><dt className="text-ink-soft">Reference</dt><dd className="text-right font-medium text-ink">{previewDocument.reference}</dd></div><div className="flex justify-between gap-4"><dt className="text-ink-soft">Submitted</dt><dd className="text-right font-medium text-ink">{previewDocument.uploadedAt}</dd></div><div className="flex justify-between gap-4"><dt className="text-ink-soft">Status</dt><dd><StatusBadge label={previewDocument.status} tone={documentTone[previewDocument.status]} /></dd></div></dl>
+						<p className="mt-4 rounded-lg border border-line bg-sand/40 p-3 text-[11px] leading-5 text-ink-soft">Actual file preview will be available when document storage and the file-view endpoint are connected.</p>
+						<div className="mt-5 flex justify-end"><Button onClick={() => setPreviewDocument(null)}>Close</Button></div>
 					</div>
 				</div>
 			)}

@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Calendar, Loader2, User } from "lucide-react";
+import { ArrowLeft, ArrowRight, Calendar, FileText, Loader2, Upload, User } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,8 @@ export default function GateDriverFormPage() {
 	const [licenceNumber, setLicenceNumber] = useState("");
 	const [licenceClass, setLicenceClass] = useState("Class G · Heavy goods");
 	const [licenceExpiry, setLicenceExpiry] = useState("");
+	const [licenceFile, setLicenceFile] = useState<File | null>(null);
+	const [existingLicenceDocument, setExistingLicenceDocument] = useState("");
 	const [assignedVehicle, setAssignedVehicle] = useState("");
 	const [transporter, setTransporter] = useState("");
 	const [notes, setNotes] = useState("");
@@ -64,6 +66,10 @@ export default function GateDriverFormPage() {
 				setLicenceExpiry(
 					String(record.licence_expiry ?? record.licenceExpiry ?? "")
 				);
+				setExistingLicenceDocument(
+					String(record.licence_document ?? record.driver_licence ?? "")
+				);
+				setLicenceFile(null);
 				setAssignedVehicle(
 					String(
 						record.assigned_vehicle ??
@@ -100,6 +106,23 @@ export default function GateDriverFormPage() {
 			return;
 		}
 
+		if (!isEditing && !licenceFile) {
+			toast.error("Please upload the Driver Licence.");
+			return;
+		}
+
+		if (licenceFile) {
+			const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+			if (!allowedTypes.includes(licenceFile.type)) {
+				toast.error("Driver Licence must be a PDF, JPG, PNG, or WEBP file.");
+				return;
+			}
+			if (licenceFile.size > 10 * 1024 * 1024) {
+				toast.error("Driver Licence must not exceed 10MB.");
+				return;
+			}
+		}
+
 		setSubmitting(true);
 		try {
 			const formData = new FormData();
@@ -108,6 +131,7 @@ export default function GateDriverFormPage() {
 			formData.append("licence_number", licenceNumber.trim());
 			formData.append("licence_class", licenceClass.trim());
 			formData.append("licence_expiry", licenceExpiry);
+			if (licenceFile) formData.append("licence_document", licenceFile);
 			formData.append("assigned_vehicle", assignedVehicle.trim());
 			formData.append("transporter", transporter.trim());
 			formData.append("notes", notes.trim());
@@ -248,6 +272,50 @@ export default function GateDriverFormPage() {
 									onChange={setLicenceExpiry}
 									mono
 								/>
+
+								<div className="rounded-xl border border-line bg-sand/60 p-4">
+									<div className="flex items-start gap-3">
+										<span className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
+											<FileText className="size-4" />
+										</span>
+										<div className="min-w-0 flex-1">
+											<p className={labelClass}>Driver Licence <span className="text-coral">*</span></p>
+											<p className="mt-1 text-xs leading-5 text-ink-soft">
+												Upload a clear copy of the driver's licence. PDF, JPG, PNG or WEBP, maximum 10MB.
+											</p>
+											{existingLicenceDocument && !licenceFile && (
+												<p className="mt-2 truncate text-xs font-medium text-ink">
+													Current document: {existingLicenceDocument.split("/").pop()}
+												</p>
+											)}
+											{licenceFile && (
+												<p className="mt-2 truncate text-xs font-medium text-ink">
+													Selected: {licenceFile.name}
+												</p>
+											)}
+											<label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-paper px-3 py-2 text-xs font-semibold text-ink transition hover:border-orange/50">
+												<Upload className="size-3.5" />
+												{licenceFile || existingLicenceDocument ? "Replace document" : "Choose document"}
+												<input
+													type="file"
+													accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+													className="sr-only"
+													 disabled={submitting}
+													onChange={(event) => setLicenceFile(event.target.files?.[0] ?? null)}
+												/>
+											</label>
+											{licenceFile && (
+												<button
+													type="button"
+													onClick={() => setLicenceFile(null)}
+													className="ml-2 text-xs font-medium text-coral hover:underline"
+												>
+													Remove selection
+												</button>
+											)}
+										</div>
+									</div>
+								</div>
 
 								<div className="grid gap-4 sm:grid-cols-2">
 									<Field

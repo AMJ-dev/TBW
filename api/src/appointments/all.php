@@ -1,11 +1,9 @@
-
 <?php
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 header("Content-Type: application/json; charset=utf-8");
 
 if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-   
     echo json_encode([
         "error" => true,
         "data" => "Method not allowed.",
@@ -22,6 +20,9 @@ try {
             a.appointment_date,
             a.slot_time,
             a.status,
+            a.lane_id,
+            l.name AS lane_name,
+            l.lane_code,
             v.plate AS vehicle_plate,
             d.name AS driver_name,
             d.phone AS driver_phone,
@@ -37,18 +38,20 @@ try {
             ) AS container_nos
         FROM gate_appointments a
         INNER JOIN gate_vehicles v ON v.id = a.vehicle_id
-        INNER JOIN gate_drivers d ON d.id = a.driver_id        
+        INNER JOIN gate_drivers d ON d.id = a.driver_id
+        LEFT JOIN gate_lanes l ON l.id = a.lane_id
         LEFT JOIN gate_passes p ON p.appointment_id = a.id
-
         WHERE a.organisation_id = :organisation_id
         ORDER BY
             a.appointment_date DESC,
             a.slot_time ASC,
             a.created_at DESC
     ";
-    // gate_passes gp gate_appointments
+
     $stmt = $conn->prepare($sql);
-    $stmt->execute([":organisation_id" => $my_details->organisation_id]);
+    $stmt->execute([
+        ":organisation_id" => $my_details->organisation_id
+    ]);
 
     $appointments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -58,8 +61,15 @@ try {
             : [];
 
         $appointment["cargo_ref"] = null;
-        $appointment["assigned_lane"] = null;
+        $appointment["assigned_lane"] = $appointment["lane_name"]
+            ? [
+                "id" => $appointment["lane_id"],
+                "name" => $appointment["lane_name"],
+                "code" => $appointment["lane_code"]
+            ]
+            : null;
     }
+
     unset($appointment);
 
     echo json_encode([
@@ -68,7 +78,6 @@ try {
         "code" => $appointments
     ]);
 } catch (Throwable $e) {
-    
     echo json_encode([
         "error" => true,
         "data" => "Could not load appointments.",

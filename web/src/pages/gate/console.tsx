@@ -34,6 +34,8 @@ import {
   BadgeCheck,
   Activity,
   MapPin,
+  Paperclip,
+  Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -368,6 +370,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
   const [active, setActive] = useState<QueuedTruck | null>(null);
   const [decision, setDecision] = useState<GateDecision | null>(null);
   const [decisionReason, setDecisionReason] = useState("");
+  const [gateEvidence, setGateEvidence] = useState<File[]>([]);
   const [overrideReason, setOverrideReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -479,6 +482,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
     setDecision(null);
     setDecisionReason("");
     setOverrideReason("");
+    setGateEvidence([]);
     setLookupError(null);
   };
 
@@ -505,6 +509,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
       setDecision(null);
       setDecisionReason("");
       setOverrideReason("");
+      setGateEvidence([]);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Could not verify the gate pass.";
       setLookupError(message);
@@ -521,6 +526,10 @@ function GateConsole({ direction }: { direction: GateDirection }) {
       toast.error("Select a gate lane before recording the decision.");
       return;
     }
+    if (isGateIn && decision === "ADMIT" && gateEvidence.length === 0) {
+      toast.error("Upload at least one Gate-In Evidence file before admitting the vehicle.");
+      return;
+    }
     if ((decision === "REFER" || decision === "REJECT") && decisionReason.trim().length < 5) {
       toast.error("Provide a reason of at least 5 characters.");
       return;
@@ -535,7 +544,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
     setSubmitting(true);
 
     try {
-      const response = await http.post("gate/decision/", {
+      const decisionData = {
         direction,
         record_id: active.id,
         gate_pass_id: active.gatePassId,
@@ -544,7 +553,19 @@ function GateConsole({ direction }: { direction: GateDirection }) {
         decision,
         reason: decisionReason.trim(),
         override_reason: overrideReason.trim(),
-      });
+      };
+
+      const response = isGateIn && decision === "ADMIT"
+        ? await (() => {
+            const payload = new FormData();
+            Object.entries(decisionData).forEach(([key, value]) => payload.append(key, String(value)));
+            payload.append("document_type", "GATE_IN_EVIDENCE");
+            gateEvidence.forEach((file) => payload.append("gate_in_evidence[]", file));
+            return http.post("gate/decision/", payload, {
+              headers: { "Content-Type": "multipart/form-data" },
+            });
+          })()
+        : await http.post("gate/decision/", decisionData);
       const resp: Resp = response.data;
       if (resp.error) throw new Error(String(resp.data || "The gate decision was not accepted."));
       
@@ -553,6 +574,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
       setDecision(null);
       setDecisionReason("");
       setOverrideReason("");
+      setGateEvidence([]);
       await loadQueue(true);
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Could not record the gate decision.");
@@ -855,6 +877,74 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                         </div>
                       </div>
 
+                      {isGateIn && decision === "ADMIT" && (
+                        <div className="space-y-3 rounded-xl border border-line bg-sand/40 p-4">
+                          <div className="flex items-start gap-2">
+                            <Paperclip className="mt-0.5 size-4 shrink-0 text-orange-deep" />
+                            <div>
+                              <p className="text-sm font-semibold text-ink">Gate-In Evidence</p>
+                              <p className="mt-1 text-xs leading-5 text-ink-soft">
+                                Upload photographs or documents showing the vehicle and cargo entering the terminal. At least one file is required to admit this movement.
+                              </p>
+                            </div>
+                          </div>
+                          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-orange/40 bg-paper px-4 py-5 text-center transition hover:border-orange hover:bg-orange/5">
+                            <FileText className="mb-2 size-6 text-orange-deep" />
+                            <span className="text-sm font-semibold text-ink">Choose evidence files</span>
+                            <span className="mt-1 text-xs text-ink-soft">JPG, PNG, WEBP or PDF · Maximum 10 MB per file</span>
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,application/pdf"
+                              multiple
+                              disabled={submitting}
+                              className="sr-only"
+                              onChange={(event) => {
+                                const selected = Array.from(event.target.files ?? []);
+                                const valid = selected.filter((file) => {
+                                  const allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type);
+                                  if (!allowed) toast.error(`${file.name}: unsupported file type.`);
+                                  if (file.size > 10 * 1024 * 1024) toast.error(`${file.name}: file exceeds 10 MB.`);
+                                  return allowed && file.size <= 10 * 1024 * 1024;
+                                });
+                                setGateEvidence((current) => {
+                                  const combined = [...current];
+                                  valid.forEach((file) => {
+                                    if (!combined.some((item) => item.name === file.name && item.size === file.size && item.lastModified === file.lastModified)) combined.push(file);
+                                  });
+                                  return combined;
+                                });
+                                event.target.value = "";
+                              }}
+                            />
+                          </label>
+                          {gateEvidence.length > 0 && (
+                            <div className="space-y-2">
+                              {gateEvidence.map((file, index) => (
+                                <div key={`${file.name}-${file.lastModified}-${index}`} className="flex items-center gap-3 rounded-lg border border-line bg-paper px-3 py-2">
+                                  <FileText className="size-4 shrink-0 text-orange-deep" />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-xs font-medium text-ink">{file.name}</p>
+                                    <p className="text-[10px] text-ink-soft">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    disabled={submitting}
+                                    onClick={() => setGateEvidence((current) => current.filter((_, fileIndex) => fileIndex !== index))}
+                                    className="rounded-md p-2 text-ink-soft transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                                    aria-label={`Remove ${file.name}`}
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <p className="text-[10px] leading-4 text-ink-soft">
+                            Evidence is attached to this Gate-In movement and should also be linked to its shipment and containers by the server.
+                          </p>
+                        </div>
+                      )}
+
                       {(decision === "REFER" || decision === "REJECT") && (
                         <label className="block">
                           <span className="text-xs font-semibold text-ink">{decision === "REFER" ? "Reason for referral" : "Reason for rejection"}</span>
@@ -884,7 +974,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                         </div>
                       )}
 
-                      <Button className={cn("h-11 w-full text-white", decision === "REJECT" ? "bg-coral hover:bg-coral/90" : decision === "REFER" ? "bg-orange hover:bg-orange-deep" : "bg-teal-deep hover:bg-teal-deep/90")} disabled={!decision || !selectedGateLaneId || submitting || lanesLoading || (decision === "REFER" && decisionReason.trim().length < 5) || (decision === "REJECT" && decisionReason.trim().length < 5) || (decision === "ADMIT" && active.readiness !== "Ready" && active.readiness !== "Active" && overrideReason.trim().length < 5)} onClick={() => void submitDecision()}>
+                      <Button className={cn("h-11 w-full text-white", decision === "REJECT" ? "bg-coral hover:bg-coral/90" : decision === "REFER" ? "bg-orange hover:bg-orange-deep" : "bg-teal-deep hover:bg-teal-deep/90")} disabled={!decision || !selectedGateLaneId || submitting || lanesLoading || (decision === "REFER" && decisionReason.trim().length < 5) || (decision === "REJECT" && decisionReason.trim().length < 5) || (decision === "ADMIT" && active.readiness !== "Ready" && active.readiness !== "Active" && overrideReason.trim().length < 5) || (isGateIn && decision === "ADMIT" && gateEvidence.length === 0)} onClick={() => void submitDecision()}>
                         {submitting ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <ArrowRight className="mr-2 size-4" />}
                         {submitting ? "Recording decision..." : decision ? `Confirm ${decision}` : "Select a decision"}
                       </Button>

@@ -6,6 +6,8 @@ import {
 	Calendar,
 	LoaderCircle,
 	Truck,
+	UploadCloud,
+	X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/auth-shell";
@@ -119,6 +121,8 @@ export default function GateVehicleFormPage() {
 	const [loading, setLoading] = useState(isEditing);
 	const [submitting, setSubmitting] = useState(false);
 	const [loadError, setLoadError] = useState("");
+	const [insuranceCertificate, setInsuranceCertificate] = useState<File | null>(null);
+	const [roadworthinessCertificate, setRoadworthinessCertificate] = useState<File | null>(null);
 
 	const updateField = <K extends keyof VehicleForm>(
 		field: K,
@@ -214,6 +218,11 @@ export default function GateVehicleFormPage() {
 			return;
 		}
 
+		if (!isEditing && (!insuranceCertificate || !roadworthinessCertificate)) {
+			toast.error("Upload both the vehicle insurance and roadworthiness certificates.");
+			return;
+		}
+
 		if (
 			payload.year !== null &&
 			(!Number.isInteger(payload.year) ||
@@ -228,7 +237,21 @@ export default function GateVehicleFormPage() {
 
 		try {
 			const url = isEditing ? `/vehicles/update/${id}/` : "/vehicles/add/";
-			const response = await http.post(url, payload);
+			const formData = new FormData();
+
+			Object.entries(payload).forEach(([key, value]) => {
+				formData.append(key, value == null ? "" : String(value));
+			});
+
+			if (insuranceCertificate) {
+				formData.append("insurance_certificate", insuranceCertificate);
+			}
+
+			if (roadworthinessCertificate) {
+				formData.append("roadworthiness_certificate", roadworthinessCertificate);
+			}
+
+			const response = await http.post(url, formData);
 
 			const resp: Resp = response.data;
 
@@ -466,6 +489,31 @@ export default function GateVehicleFormPage() {
 								disabled={submitting}
 							/>
 						</div>
+ 
+						<div className="space-y-4 border-t border-line pt-5">
+							<div>
+								<p className={labelClass}>Required vehicle documents</p>
+								<p className="mt-1 text-xs leading-5 text-ink-soft">
+									Upload clear copies of both certificates. These documents are used during gate verification.
+								</p>
+							</div>
+							<div className="grid gap-4 sm:grid-cols-2">
+								<DocumentUpload
+									label="Vehicle Insurance Certificate"
+									file={insuranceCertificate}
+									onChange={setInsuranceCertificate}
+									required={!isEditing}
+									disabled={submitting}
+								/>
+								<DocumentUpload
+									label="Vehicle Roadworthiness Certificate"
+									file={roadworthinessCertificate}
+									onChange={setRoadworthinessCertificate}
+									required={!isEditing}
+									disabled={submitting}
+								/>
+							</div>
+						</div>
 					</div>
 				</section>
 
@@ -591,5 +639,70 @@ function Field({
 				)}
 			/>
 		</label>
+	);
+}
+
+function DocumentUpload({
+	label,
+	file,
+	onChange,
+	required,
+	disabled,
+}: {
+	label: string;
+	file: File | null;
+	onChange: (file: File | null) => void;
+	required?: boolean;
+	disabled?: boolean;
+}) {
+	const inputId = label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+	return (
+		<div className="rounded-xl border border-dashed border-line bg-sand/60 p-4">
+			<div className="flex items-start gap-3">
+				<span className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
+					<UploadCloud className="size-4" />
+				</span>
+				<div className="min-w-0 flex-1">
+					<label htmlFor={inputId} className="block cursor-pointer">
+						<span className="text-xs font-semibold text-ink">{label}</span>
+						{required && <span className="ml-1 text-coral">*</span>}
+						<span className="mt-1 block text-[11px] leading-5 text-ink-soft">
+							PDF, JPG, PNG or WEBP · Maximum 10MB
+						</span>
+					</label>
+					<input
+						id={inputId}
+						type="file"
+						accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+						disabled={disabled}
+						className="sr-only"
+						onChange={(event) => {
+							const selected = event.target.files?.[0] ?? null;
+							if (selected && selected.size > 10 * 1024 * 1024) {
+								toast.error("Each certificate must be 10MB or smaller.");
+								event.target.value = "";
+								return;
+							}
+							onChange(selected);
+						}}
+					/>
+					{file && (
+						<div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-paper px-3 py-2 ring-1 ring-line">
+							<p className="min-w-0 truncate text-xs font-medium text-ink">{file.name}</p>
+							<button
+								type="button"
+								onClick={() => onChange(null)}
+								disabled={disabled}
+								aria-label={`Remove ${label}`}
+								className="grid size-7 shrink-0 place-items-center rounded-md text-ink-soft transition hover:bg-sand hover:text-coral"
+							>
+								<X className="size-4" />
+							</button>
+						</div>
+					)}
+				</div>
+			</div>
+		</div>
 	);
 }

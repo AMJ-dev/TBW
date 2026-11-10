@@ -5,6 +5,8 @@ import {
 	ArrowLeft,
 	Check,
 	Download,
+	ExternalLink,
+	FileText,
 	Filter,
 	Loader2,
 	Pencil,
@@ -25,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
+import { resolveSrc } from "@/lib/functions";
 
 type DriverStatus =
 	| "Approved"
@@ -44,6 +47,8 @@ interface AssignedVehicle {
 	capacity: string;
 	transporter: string;
 	status: string;
+	insuranceCertificate: string;
+	roadworthinessCertificate: string;
 }
 
 interface Driver {
@@ -53,6 +58,7 @@ interface Driver {
 	licenceNumber: string;
 	licenceClass: string;
 	licenceExpiry: string;
+	licenceDocument: string;
 	transporter: string;
 	status: DriverStatus;
 	lastVisit: string;
@@ -129,6 +135,8 @@ const normalizeDriver = (raw: any): Driver => {
 					capacity: String(raw?.vehicle_capacity ?? "—"),
 					transporter: String(raw?.vehicle_transporter ?? "—"),
 					status: String(raw?.vehicle_status ?? "—"),
+					insuranceCertificate: String(raw?.insurance_certificate ?? ""),
+					roadworthinessCertificate: String(raw?.roadworthiness_certificate ?? ""),
 			  }
 			: null;
 
@@ -144,6 +152,9 @@ const normalizeDriver = (raw: any): Driver => {
 		),
 		licenceExpiry: String(
 			raw?.licence_expiry ?? raw?.licenceExpiry ?? "—"
+		),
+		licenceDocument: String(
+			raw?.licence_document ?? raw?.driver_licence_document ?? ""
 		),
 		transporter: String(raw?.transporter ?? "—"),
 		status: normalizeStatus(raw?.status),
@@ -775,6 +786,9 @@ function DriverDetail({
 				<p className="mt-2 font-mono text-[11px] text-ink-soft">
 					Expires {driver.licenceExpiry}
 				</p>
+				<div className="mt-4 border-t border-line pt-4">
+					<DocumentLink label="Driver licence document" path={driver.licenceDocument} />
+				</div>
 			</div>
 
 			<div className="rounded-2xl bg-paper p-5 ring-1 ring-line sm:p-6">
@@ -834,8 +848,12 @@ function DriverDetail({
 										{v.kind} · {v.make} {v.model} · {v.year}
 									</p>
 									<p className="mt-0.5 font-mono text-[11px] text-ink-soft">
-										{v.capacity} · {v.transporter} {driver.status}
+										{v.capacity} · {v.transporter}
 									</p>
+									<div className="mt-3 grid gap-2 sm:grid-cols-2">
+										<DocumentLink label="Insurance certificate" path={v.insuranceCertificate} />
+										<DocumentLink label="Roadworthiness certificate" path={v.roadworthinessCertificate} />
+									</div>
 								</div>
 							</li>
 						))}
@@ -967,6 +985,40 @@ function DriverDetail({
 				/>
 			)}
 		</div>
+	);
+}
+
+
+function DocumentLink({ label, path }: { label: string; path: string }) {
+	if (!path) {
+		return (
+			<div className="flex items-center gap-2 rounded-lg border border-dashed border-line bg-sand/50 p-3">
+				<FileText className="size-4 shrink-0 text-ink-soft" />
+				<div className="min-w-0">
+					<p className="text-[11px] font-semibold text-ink">{label}</p>
+					<p className="text-[10px] text-ink-soft">No document uploaded</p>
+				</div>
+			</div>
+		);
+	}
+
+	const href = resolveSrc(path);
+	const filename = path.split("/").pop() || label;
+
+	return (
+		<a
+			href={href}
+			target="_blank"
+			rel="noreferrer"
+			className="flex min-w-0 items-center gap-2 rounded-lg border border-line bg-sand p-3 transition-colors hover:border-orange/40 hover:bg-orange/5"
+		>
+			<FileText className="size-4 shrink-0 text-orange-deep" />
+			<span className="min-w-0 flex-1">
+				<span className="block text-[11px] font-semibold text-ink">{label}</span>
+				<span className="block truncate text-[10px] text-ink-soft">{filename}</span>
+			</span>
+			<ExternalLink className="size-3.5 shrink-0 text-ink-soft" />
+		</a>
 	);
 }
 

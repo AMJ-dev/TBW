@@ -5,9 +5,10 @@ import { api_url } from "@/lib/constants";
 import { toast } from "sonner";
 
 export const check_login = ()=>{
-	const {login} = useContext(UserContext);
+	const { auth } = useContext(UserContext);
 	return new Promise((resolve, reject)=>{
-		resolve(true);
+		if (auth) resolve(true);
+        else reject()
 	})
 }
 export const get_token = ()=>{

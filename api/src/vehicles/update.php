@@ -1,5 +1,7 @@
+
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
+
     $organisation_id = $my_details->organisation_id ?? null;
 
     $id = trim($_POST["id"] ?? "");
@@ -16,6 +18,24 @@
     $notes = trim($_POST["notes"] ?? "");
 
     $allowedKinds = ["Flatbed", "Container", "Reefer", "Box", "Tanker"];
+
+    $acceptedFiles = [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    ];
+
+    $uploadedPaths = [];
+
+    if (!$organisation_id) {
+        echo json_encode([
+            "error" => true,
+            "data" => "Organisation not found.",
+            "code" => null
+        ]);
+        exit;
+    }
 
     if ($id === "" || $plate === "" || $kind === "") {
         echo json_encode([
@@ -60,12 +80,38 @@
     }
 
     try {
+        $stmt = $conn->prepare("
+            SELECT *
+            FROM gate_vehicles
+            WHERE id = :id AND organisation_id = :organisation_id
+            LIMIT 1
+        ");
+
+        $stmt->execute([
+            ":id" => $id,
+            ":organisation_id" => $organisation_id
+        ]);
+
+        $existingVehicle = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$existingVehicle) {
+            echo json_encode([
+                "error" => true,
+                "data" => "Vehicle not found.",
+                "code" => null
+            ]);
+            exit;
+        }
+
         $check = $conn->prepare("
             SELECT id
             FROM gate_vehicles
-            WHERE plate = :plate AND id <> :id AND organisation_id = :organisation_id
+            WHERE plate = :plate
+            AND id <> :id
+            AND organisation_id = :organisation_id
             LIMIT 1
         ");
+
         $check->execute([
             ":plate" => $plate,
             ":id" => $id,
@@ -81,6 +127,65 @@
             exit;
         }
 
+        $insuranceCertificate = $existingVehicle["insurance_certificate"] ?? null;
+        $roadworthinessCertificate = $existingVehicle["roadworthiness_certificate"] ?? null;
+
+        $documentFields = [
+            "insurance_certificate" => [
+                "label" => "Vehicle Insurance Certificate",
+                "column" => "insurance_certificate"
+            ],
+            "roadworthiness_certificate" => [
+                "label" => "Vehicle Roadworthiness Certificate",
+                "column" => "roadworthiness_certificate"
+            ]
+        ];
+
+        foreach ($documentFields as $field => $document) {
+            if (!isset($_FILES[$field])) {
+                continue;
+            }
+
+            $file = $_FILES[$field];
+
+            if ($file["error"] === UPLOAD_ERR_NO_FILE) {
+                continue;
+            }
+
+            if ($file["error"] !== UPLOAD_ERR_OK) {
+                throw new Exception("Could not upload " . $document["label"] . ".");
+            }
+
+            if ($file["size"] > 10 * 1024 * 1024) {
+                throw new Exception($document["label"] . " must not exceed 10MB.");
+            }
+
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = $finfo->file($file["tmp_name"]);
+
+            if (!in_array($mime, $acceptedFiles, true)) {
+                throw new Exception("Invalid file format for " . $document["label"] . ".");
+            }
+
+            $file["type"] = $mime;
+
+            $upload = upload_files($file, $acceptedFiles);
+
+            if ($upload["error"]) {
+                throw new Exception($document["label"] . ": " . $upload["data"]);
+            }
+
+            $uploadedPaths[] = $upload["data"];
+
+            if ($field === "insurance_certificate") {
+                $insuranceCertificate = $upload["data"];
+            }
+
+            if ($field === "roadworthiness_certificate") {
+                $roadworthinessCertificate = $upload["data"];
+            }
+        }
+
         $stmt = $conn->prepare("
             UPDATE gate_vehicles
             SET
@@ -94,8 +199,10 @@
                 transporter = :transporter,
                 insurance_expiry = :insurance_expiry,
                 roadworthiness_expiry = :roadworthiness_expiry,
+                insurance_certificate = :insurance_certificate,
+                roadworthiness_certificate = :roadworthiness_certificate,
                 notes = :notes,
-                updated_by = :actor_id,
+                updated_by = :actor_id
             WHERE id = :id AND organisation_id = :organisation_id
         ");
 
@@ -110,11 +217,37 @@
             ":transporter" => $transporter ?: null,
             ":insurance_expiry" => $insuranceExpiry ?: null,
             ":roadworthiness_expiry" => $roadworthinessExpiry ?: null,
+            ":insurance_certificate" => $insuranceCertificate,
+            ":roadworthiness_certificate" => $roadworthinessCertificate,
             ":notes" => $notes ?: null,
             ":id" => $id,
             ":organisation_id" => $organisation_id,
             ":actor_id" => $my_details->id
         ]);
+
+        if (
+            isset($_FILES["insurance_certificate"]) &&
+            $_FILES["insurance_certificate"]["error"] === UPLOAD_ERR_OK &&
+            !empty($existingVehicle["insurance_certificate"])
+        ) {
+            $oldPath = dirname(__DIR__, 1) . "/" . $existingVehicle["insurance_certificate"];
+
+            if (is_file($oldPath)) {
+                unlink($oldPath);
+            }
+        }
+
+        if (
+            isset($_FILES["roadworthiness_certificate"]) &&
+            $_FILES["roadworthiness_certificate"]["error"] === UPLOAD_ERR_OK &&
+            !empty($existingVehicle["roadworthiness_certificate"])
+        ) {
+            $oldPath = dirname(__DIR__, 1) . "/" . $existingVehicle["roadworthiness_certificate"];
+
+            if (is_file($oldPath)) {
+                unlink($oldPath);
+            }
+        }
 
         $stmt = $conn->prepare("
             SELECT *
@@ -122,30 +255,33 @@
             WHERE id = :id AND organisation_id = :organisation_id
             LIMIT 1
         ");
+
         $stmt->execute([
             ":id" => $id,
             ":organisation_id" => $organisation_id
         ]);
-        $vehicle = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$vehicle) {
-            echo json_encode([
-                "error" => true,
-                "data" => "Vehicle not found.",
-                "code" => null
-            ]);
-            exit;
-        }
+        $vehicle = $stmt->fetch(PDO::FETCH_ASSOC);
 
         echo json_encode([
             "error" => false,
             "data" => "Vehicle updated successfully.",
             "code" => $vehicle
         ]);
-    } catch (PDOException $e) {
+    } catch (Throwable $e) {
+        foreach ($uploadedPaths as $path) {
+            $fullPath = dirname(__DIR__, 1) . "/" . $path;
+
+            if (is_file($fullPath)) {
+                unlink($fullPath);
+            }
+        }
+
         echo json_encode([
             "error" => true,
-            "data" => "Could not update vehicle.",
+            "data" => $e instanceof PDOException
+                ? "Could not update vehicle."
+                : $e->getMessage(),
             "code" => null
         ]);
     }
