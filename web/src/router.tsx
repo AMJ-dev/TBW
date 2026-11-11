@@ -38,7 +38,7 @@ const EditProfilePage = lazy(() => import("@/pages/profile/edit"));
 
 const AdminPage = lazy(() => import("@/pages/admin"));
 const AdminAuditPage = lazy(() => import("@/pages/admin/audit"));
-const AdminConfigurationPage = lazy(() => import("@/pages/admin/configuration/index"));
+const AdminConfigurationPage = lazy(() => import("@/pages/admin/configuration/"));
 const AdminOrganisationsPage = lazy(() => import("@/pages/admin/organisations"));
 const AdminOrganisationDetailsPage = lazy(() => import("@/pages/admin/organisation-details"));
 const AdminRolesPage = lazy(() => import("@/pages/admin/roles"));
@@ -95,11 +95,11 @@ const TransportVehicleDetailsPage = lazy(() => import("@/pages/portal/transport/
 
 const OperationsDashboardPage = lazy(() => import("@/pages/operations/dashboard"));
 const OperationsHoldsPage = lazy(() => import("@/pages/operations/holds"));
-const OperationsReceivingPage = lazy(() => import("@/pages/operations/receiving/index"));
+const OperationsReceivingPage = lazy(() => import("@/pages/operations/receiving/"));
 const OperationsReceivingNewPage = lazy(() => import("@/pages/operations/receiving/new"));
 const OperationsReceivingDetailsPage = lazy(() => import("@/pages/operations/receiving/details"));
 
-const ExaminationsPage = lazy(() => import("@/pages/operations/examination/index"));
+const ExaminationsPage = lazy(() => import("@/pages/operations/examination/"));
 const ScheduleExaminationPage = lazy(() => import("@/pages/operations/examination/schedule"));
 const ExaminationReviewPage = lazy(() => import("@/pages/operations/examination/review"));
 const ExaminationDetailsPage = lazy(() => import("@/pages/operations/examination/details"));
@@ -119,7 +119,8 @@ const OperationsCycleCountPage = lazy(() => import("@/pages/operations/cycle-cou
 const OperationsValueAddedPage = lazy(() => import("@/pages/operations/value-added"));
 const OperationsReviewPage = lazy(() => import("@/pages/shipment/review"));
 const OperationsShipmentReviewPage = lazy(() => import("@/pages/shipment/shipment-review-details"));
-const OperationDocumentationPage = lazy(()=>import("@/pages/operations/documentation"))
+const OperationDocumentationPage = lazy(()=>import("@/pages/operations/documentation/"))
+const OperationDocumentDetailsationPage = lazy(()=>import("@/pages/operations/documentation/details"))
 const OperationsOverstayPage = lazy(()=>import("@/pages/operations/overstay"))
 const OperationsTransferPage = lazy(()=>import("@/pages/operations/transfer"))
 
@@ -142,7 +143,7 @@ const PortalShipmentDetailsPage = lazy(() => import("@/pages/portal/shipment/det
 const DelegationPage = lazy(() => import("@/pages/portal/delegation"));
 const PortalUsersPage = lazy(() => import("@/pages/portal/users"));
 
-const ReportsPage = lazy(() => import("@/pages/reports/index"));
+const ReportsPage = lazy(() => import("@/pages/reports/"));
 const ReportsOperationsPage = lazy(() => import("@/pages/reports/operations"));
 const ReportsFinancialPage = lazy(() => import("@/pages/reports/financial"));
 const ReportsCompliancePage = lazy(() => import("@/pages/reports/compliance"));
@@ -258,9 +259,11 @@ export default function Routers() {
 						<Route path="/operations/examinations/:id" element={<ExaminationDetailsPage />} />
 						<Route path="/operations/examinations/review/:id" element={<ExaminationReviewDetailsPage />} />
 
+						<Route path="/operations/documentation" element={<OperationDocumentationPage />} />
+						<Route path="/operations/documentation/:id" element={<OperationDocumentDetailsationPage />} />
+
 						<Route path="/operations/warehouse" element={<OperationsWarehousePage />} />
 						<Route path="/operations/yard" element={<OperationsYardPage />} />
-						<Route path="/operations/documentation" element={<OperationDocumentationPage />} />
 						<Route path="/operations/manifest" element={<OperationsManifestPage />} />
 						<Route path="/operations/seals" element={<OperationsSealsPage />} />
 						<Route path="/operations/inventory" element={<OperationsInventoryPage />} />
