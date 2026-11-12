@@ -63,6 +63,7 @@ const documentStatusLabels: Record<string, string> = {
 	VERIFIED: "Verified",
 	CHANGES_REQUESTED: "Changes Requested",
 	REJECTED: "Rejected",
+	ACTION_REQUIRED: "Action Required",
 };
 
 const documentStatusTones: Record<string, ReturnType<typeof statusTone>> = {
@@ -71,6 +72,7 @@ const documentStatusTones: Record<string, ReturnType<typeof statusTone>> = {
 	VERIFIED: "success",
 	CHANGES_REQUESTED: "critical",
 	REJECTED: "critical",
+	ACTION_REQUIRED: "critical",
 };
 
 const lifecycleStatusLabel = (status: string) =>

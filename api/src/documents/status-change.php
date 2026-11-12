@@ -1,4 +1,3 @@
-
 <?php
 
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
@@ -65,6 +64,53 @@ $allowedStatuses = [
     "CHANGES_REQUESTED"
 ];
 
+$requestId = generateId();
+
+$saveDocumentLog = function (array $entry) use ($conn, $my_details, $requestId) {
+    $stmt = $conn->prepare("
+        INSERT INTO portal_shipment_document_logs (
+            id,
+            request_id,
+            shipment_id,
+            document_id,
+            action,
+            old_status,
+            new_status,
+            reason,
+            performed_by,
+            metadata,
+            created_at
+        ) VALUES (
+            :id,
+            :request_id,
+            :shipment_id,
+            :document_id,
+            :action,
+            :old_status,
+            :new_status,
+            :reason,
+            :performed_by,
+            :metadata,
+            NOW()
+        )
+    ");
+
+    $stmt->execute([
+        "id" => generateId(),
+        "request_id" => $requestId,
+        "shipment_id" => $entry["shipment_id"],
+        "document_id" => $entry["document_id"] ?? null,
+        "action" => $entry["action"],
+        "old_status" => $entry["old_status"] ?? null,
+        "new_status" => $entry["new_status"] ?? null,
+        "reason" => $entry["reason"] ?? null,
+        "performed_by" => $my_details->id,
+        "metadata" => isset($entry["metadata"])
+            ? json_encode($entry["metadata"], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            : null
+    ]);
+};
+
 try {
     $conn->beginTransaction();
 
@@ -90,6 +136,17 @@ try {
         ]);
         exit;
     }
+
+    $saveDocumentLog([
+        "shipment_id" => $shipment_id,
+        "action" => "BULK_UPDATE_STARTED",
+        "old_status" => $shipment["document_status"],
+        "new_status" => $shipment["document_status"],
+        "metadata" => [
+            "status_changes_count" => count($statusChanges),
+            "missing_documents_count" => count($missingDocuments)
+        ]
+    ]);
 
     $updatedDocuments = [];
     $createdMissingDocuments = [];
@@ -131,18 +188,10 @@ try {
             throw new RuntimeException("One of the submitted documents does not belong to this shipment.");
         }
 
-        if ($document["status"] !== "PENDING_REVIEW") {
-            throw new RuntimeException("Only documents pending review can have their status changed.");
-        }
-
         $stmt = $conn->prepare("
             UPDATE portal_shipment_documents
-            SET
-                status = :status,
-                review_reason = :reason
-            WHERE id = :id
-            AND shipment_id = :shipment_id
-            AND status = 'PENDING_REVIEW'
+            SET status = :status, review_reason = :reason
+            WHERE id = :id AND shipment_id = :shipment_id
         ");
 
         $stmt->execute([
@@ -152,38 +201,38 @@ try {
             "shipment_id" => $shipment_id
         ]);
 
-        if ($stmt->rowCount() !== 1) {
-            throw new RuntimeException("A document status could not be changed. Please refresh and try again.");
-        }
+        $saveDocumentLog([
+            "shipment_id" => $shipment_id,
+            "document_id" => $document_id,
+            "action" => "DOCUMENT_STATUS_CHANGED",
+            "old_status" => $document["status"],
+            "new_status" => $status,
+            "reason" => $reason !== "" ? $reason : null
+        ]);
 
         $updatedDocuments[] = $document_id;
     }
 
     foreach ($missingDocuments as $item) {
-        $document_key = trim($item["document_key"] ?? "");
         $document_type = trim($item["document_type"] ?? "");
         $reason = trim($item["reason"] ?? "");
 
-        if ($document_key === "" || $document_type === "") {
-            throw new RuntimeException("Document key and document type are required for missing documents.");
-        }
-
-        if ($reason === "") {
-            throw new RuntimeException("A reason is required for each missing document.");
+        if ($document_type === "") {
+            throw new RuntimeException("Document type is required for missing documents.");
         }
 
         $stmt = $conn->prepare("
             SELECT id, status
             FROM portal_shipment_documents
             WHERE shipment_id = :shipment_id
-            AND document_key = :document_key
+            AND document_type = :document_type
             LIMIT 1
             FOR UPDATE
         ");
 
         $stmt->execute([
             "shipment_id" => $shipment_id,
-            "document_key" => $document_key
+            "document_type" => $document_type
         ]);
 
         $existing = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -206,8 +255,20 @@ try {
 
             $stmt->execute([
                 "document_type" => $document_type,
-                "reason" => $reason,
+                "reason" => $reason !== "" ? $reason : null,
                 "id" => $existing["id"]
+            ]);
+
+            $saveDocumentLog([
+                "shipment_id" => $shipment_id,
+                "document_id" => $existing["id"],
+                "action" => "MISSING_DOCUMENT_REQUEST_UPDATED",
+                "old_status" => "MISSING",
+                "new_status" => "MISSING",
+                "reason" => $reason,
+                "metadata" => [
+                    "document_type" => $document_type
+                ]
             ]);
 
             $createdMissingDocuments[] = $existing["id"];
@@ -220,7 +281,6 @@ try {
             INSERT INTO portal_shipment_documents (
                 id,
                 shipment_id,
-                document_key,
                 reference_code,
                 document_type,
                 original_name,
@@ -234,7 +294,6 @@ try {
             ) VALUES (
                 :id,
                 :shipment_id,
-                :document_key,
                 NULL,
                 :document_type,
                 'Not uploaded',
@@ -251,9 +310,20 @@ try {
         $stmt->execute([
             "id" => $missing_id,
             "shipment_id" => $shipment_id,
-            "document_key" => $document_key,
             "document_type" => $document_type,
-            "reason" => $reason
+            "reason" => $reason !== "" ? $reason : null
+        ]);
+
+        $saveDocumentLog([
+            "shipment_id" => $shipment_id,
+            "document_id" => $missing_id,
+            "action" => "MISSING_DOCUMENT_REQUESTED",
+            "old_status" => null,
+            "new_status" => "MISSING",
+            "reason" => $reason !== "" ? $reason : null,
+            "metadata" => [
+                "document_type" => $document_type
+            ]
         ]);
 
         $createdMissingDocuments[] = $missing_id;
@@ -306,13 +376,40 @@ try {
         "id" => $shipment_id
     ]);
 
+    if ($shipment["document_status"] !== $documentStatus) {
+        $saveDocumentLog([
+            "shipment_id" => $shipment_id,
+            "action" => "SHIPMENT_DOCUMENT_STATUS_CHANGED",
+            "old_status" => $shipment["document_status"],
+            "new_status" => $documentStatus
+        ]);
+    }
+
+    $saveDocumentLog([
+        "shipment_id" => $shipment_id,
+        "action" => "BULK_UPDATE_COMPLETED",
+        "old_status" => $shipment["document_status"],
+        "new_status" => $documentStatus,
+        "metadata" => [
+            "updated_document_ids" => $updatedDocuments,
+            "missing_document_ids" => $createdMissingDocuments,
+            "summary" => [
+                "total" => $total,
+                "verified" => $verified,
+                "pending" => $pending,
+                "correction_requested" => $correctionRequested,
+                "rejected" => $rejected,
+                "missing" => $missing
+            ]
+        ]
+    ]);
+
     $conn->commit();
 
     $stmt = $conn->prepare("
         SELECT
             id,
             shipment_id,
-            document_key,
             reference_code,
             document_type,
             original_name,

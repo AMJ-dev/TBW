@@ -23,6 +23,7 @@ try {
             s.consignee,
             s.cargo_description,
             s.status,
+            s.document_status,
             s.organisation_id,
             o.organisation_name AS organisation_name,
             (

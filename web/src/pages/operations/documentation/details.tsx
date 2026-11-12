@@ -5,17 +5,11 @@ import { toast } from "sonner";
 import {
     ArrowLeft,
     Check,
-    CheckCircle2,
-    ChevronDown,
-    Clock,
     Eye,
-    FileCheck2,
     FileText,
     Loader2,
-    RefreshCw,
     ShieldCheck,
     X,
-    XCircle,
 } from "lucide-react";
 import { AppShell, StatusBadge, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
@@ -102,23 +96,6 @@ const formatStatus = (status?: string) => {
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
         .join(" ");
 };
-
-const normalize = (value?: string | null) =>
-    (value || "").trim().toLowerCase().replace(/[_\s-]+/g, "");
-
-const getExpectedLabel = (item: ExpectedDocument) =>
-    item.document_type ||
-    item.document_name ||
-    item.label ||
-    item.name ||
-    item.document_key ||
-    "Document";
-
-const isRequired = (item: ExpectedDocument) =>
-    item.required === true ||
-    item.required === 1 ||
-    item.is_required === true ||
-    item.is_required === 1;
 
 const formatDate = (value?: string) => {
     if (!value) return "—";
@@ -227,73 +204,31 @@ export default function OperationDocumentDetailsPage() {
         loadDetails();
     }, [loadDetails]);
 
-    const expectedDocuments = useMemo(() => {
-        return types.map((type, index) => {
-            const label = getExpectedLabel(type);
-
-            const matchingDocuments = documents.filter(
-                (document) =>
-                    normalize(document.document_type) === normalize(label)
-            );
-
-            let status: DocumentStatus = "MISSING";
-
-            if (matchingDocuments.length > 0) {
-                if (
-                    matchingDocuments.some(
-                        (document) => document.status === "REJECTED"
-                    )
-                ) {
-                    status = "REJECTED";
-                } else if (
-                    matchingDocuments.some(
-                        (document) =>
-                            document.status === "CHANGES_REQUESTED"
-                    )
-                ) {
-                    status = "CHANGES_REQUESTED";
-                } else if (
-                    matchingDocuments.every(
-                        (document) => document.status === "VERIFIED"
-                    )
-                ) {
-                    status = "VERIFIED";
-                } else {
-                    status = "PENDING_REVIEW";
-                }
-            }
-
-            return {
-                ...type,
-                key: type.document_key || `${label}-${index}`,
-                label,
-                matchingDocuments,
-                status,
-            };
-        });
-    }, [types, documents]);
-
     const counts = useMemo(
         () => ({
-            total: expectedDocuments.length,
-            verified: expectedDocuments.filter(
-                (item) => item.status === "VERIFIED"
+            total: documents.length,
+            verified: documents.filter(
+                (document) => document.status === "VERIFIED"
             ).length,
-            pending: expectedDocuments.filter(
-                (item) => item.status === "PENDING_REVIEW"
+            pending: documents.filter(
+                (document) => document.status === "PENDING_REVIEW"
             ).length,
-            missing: expectedDocuments.filter(
-                (item) => item.status === "MISSING"
+            missing: documents.filter(
+                (document) => document.status === "MISSING"
             ).length,
-            rejected: expectedDocuments.filter(
-                (item) => item.status === "REJECTED"
+            rejected: documents.filter(
+                (document) => document.status === "REJECTED"
             ).length,
-            changes: expectedDocuments.filter(
-                (item) => item.status === "CHANGES_REQUESTED"
+            changes: documents.filter(
+                (document) => document.status === "CHANGES_REQUESTED"
             ).length,
         }),
-        [expectedDocuments]
+        [documents]
     );
+
+    const verificationProgress = counts.total > 0
+        ? Math.min(100, Math.round((counts.verified / counts.total) * 100))
+        : 0;
 
     const openDocument = (document: ShipmentDocument) => {
         if (!document.file_path) {
@@ -376,15 +311,6 @@ export default function OperationDocumentDetailsPage() {
             (item) => requestedMissing[item.document_key || ""]
         );
 
-        for (const item of selectedMissing) {
-            const key = item.document_key || "";
-
-            if (!missingReasons[key]?.trim()) {
-                toast.error(`Enter a reason for requesting ${item.label || key}.`);
-                return;
-            }
-        }
-
         setSubmittingReview(true);
 
         try {
@@ -408,7 +334,7 @@ export default function OperationDocumentDetailsPage() {
                         return {
                             document_key: key,
                             document_type: item.label || key || "Document",
-                            reason: missingReasons[key]!.trim(),
+                            reason: missingReasons[key]?.trim() || "",
                         };
                     }),
                 }
@@ -523,26 +449,14 @@ export default function OperationDocumentDetailsPage() {
                                     Document verification
                                 </span>
                                 <span className="font-mono font-bold text-orange-deep">
-                                    {counts.total
-                                        ? Math.round(
-                                              (counts.verified / counts.total) *
-                                                  100
-                                          )
-                                        : 0}
-                                    %
+                                    {verificationProgress}%
                                 </span>
                             </div>
                             <div className="mt-2 h-2 overflow-hidden rounded-full bg-sand">
                                 <div
                                     className="h-full rounded-full bg-orange transition-all"
                                     style={{
-                                        width: `${
-                                            counts.total
-                                                ? (counts.verified /
-                                                      counts.total) *
-                                                  100
-                                                : 0
-                                        }%`,
+                                        width: `${verificationProgress}%`,
                                     }}
                                 />
                             </div>
@@ -584,7 +498,7 @@ export default function OperationDocumentDetailsPage() {
                 <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
                     {[
                         ["Expected", counts.total, "text-ink"],
-                        ["Verified", counts.verified, "text-emerald-700"],
+                        ["Verified", counts.verified, "text-orange"],
                         ["Pending", counts.pending, "text-orange-deep"],
                         ["Missing", counts.missing, "text-ink-soft"],
                         [
@@ -677,18 +591,20 @@ export default function OperationDocumentDetailsPage() {
                         ))
                     )}
 
-                    <div className="border-t border-line bg-sand/20 p-4">
-                        <Button
-                            className="h-11 w-full bg-orange text-white hover:bg-orange-deep sm:w-auto"
-                            onClick={openReview}
-                        >
-                            <ShieldCheck className="mr-2 size-4" />
-                            Review Documents
-                            <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">
-                                {documents.length}
-                            </span>
-                        </Button>
-                    </div>
+                    {shipment.document_status === "PENDING_REVIEW" && (
+                        <div className="border-t border-line bg-sand/20 p-4">
+                            <Button
+                                className="h-11 w-full bg-orange text-white hover:bg-orange-deep sm:w-auto"
+                                onClick={openReview}
+                            >
+                                <ShieldCheck className="mr-2 size-4" />
+                                Review Documents
+                                <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs">
+                                    {documents.length}
+                                </span>
+                            </Button>
+                        </div>
+                    )}
                 </section>
             </div>
 
@@ -976,7 +892,7 @@ export default function OperationDocumentDetailsPage() {
                                                         </button>
                                                     </div>
                                                     <label className="mt-3 block text-xs font-semibold text-ink">
-                                                        Request reason *
+                                                        Request reason (optional)
                                                     </label>
                                                     <textarea
                                                         rows={3}
@@ -988,7 +904,7 @@ export default function OperationDocumentDetailsPage() {
                                                                 [key]: event.target.value,
                                                             }))
                                                         }
-                                                        placeholder={`Explain why ${label} is required...`}
+                                                        placeholder={`Add a reason for requesting ${label} (optional)...`}
                                                         className="mt-2 w-full resize-y rounded-lg border border-line bg-paper px-3 py-2.5 text-sm text-ink outline-none focus:border-orange focus:ring-2 focus:ring-orange/15"
                                                     />
                                                 </div>

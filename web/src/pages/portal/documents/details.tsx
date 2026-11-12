@@ -28,7 +28,8 @@ type DocumentStatus =
   | "PENDING_REVIEW"
   | "VERIFIED"
   | "CHANGES_REQUESTED"
-  | "REJECTED";
+  | "REJECTED"
+  | "MISSING";
 
 interface DocumentType {
   document_key: string;
@@ -48,6 +49,7 @@ interface DocumentItem {
   file_size: number;
   uploaded_at: string;
   status: DocumentStatus;
+  review_reason?: string | null;
 }
 
 interface DocumentDetailsResponse {
@@ -65,7 +67,7 @@ const formatFileSize = (bytes: number) => {
     Math.floor(Math.log(bytes) / Math.log(1024)),
     units.length - 1
   );
-
+ 
   return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 };
 
@@ -91,6 +93,7 @@ const statusLabel = (status: DocumentStatus) => {
     VERIFIED: "Verified",
     CHANGES_REQUESTED: "Changes Requested",
     REJECTED: "Rejected",
+    MISSING: "Missing",
   };
 
   return labels[status] ?? status;
@@ -204,7 +207,7 @@ const [pageView, setPageView] = useState<PageView>("LIST");
 
   const pendingCount = docs.filter(doc => doc.status === "PENDING_REVIEW").length;
 
-  const attentionCount = docs.filter(doc => doc.status === "CHANGES_REQUESTED" || doc.status === "REJECTED").length;
+  const attentionCount = docs.filter(doc => doc.status === "MISSING" || doc.status === "CHANGES_REQUESTED" || doc.status === "REJECTED").length;
 
   const openDocument = (doc: DocumentItem) => {
     if (!doc.file_path) {
@@ -623,10 +626,26 @@ const [pageView, setPageView] = useState<PageView>("LIST");
                           </td>
 
                           <td className="px-4 py-3.5">
-                            <StatusBadge
-                              label={statusLabel(doc.status)}
-                              tone={getStatusTone(doc.status)}
-                            />
+                            <div className="space-y-1.5">
+                              <StatusBadge
+                                label={statusLabel(doc.status)}
+                                tone={getStatusTone(doc.status)}
+                              />
+                              {(doc.status === "MISSING" ||
+                                doc.status === "REJECTED" ||
+                                doc.status === "CHANGES_REQUESTED") && (
+                                <p className="max-w-[280px] whitespace-normal text-[11px] leading-5 text-rose-700">
+                                  <span className="font-semibold">
+                                    {doc.status === "MISSING"
+                                      ? "Missing document reason:"
+                                      : doc.status === "REJECTED"
+                                        ? "Rejection reason:"
+                                        : "Required changes:"}
+                                  </span>{" "}
+                                  {doc.review_reason?.trim() || "No reason provided."}
+                                </p>
+                              )}
+                            </div>
                           </td>
 
                           <td className="px-4 py-3.5">
@@ -664,7 +683,7 @@ const [pageView, setPageView] = useState<PageView>("LIST");
                                   </Button>
                                 </>
                               ) : (
-                                <span className="flex items-center gap-1 px-2 text-[10px] font-medium text-emerald-700">
+                                <span className="flex items-center gap-1 px-2 text-[10px] font-medium text-orange">
                                   <ShieldCheck className="size-3.5" />
                                   "Locked"
                                 </span>
