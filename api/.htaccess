@@ -101,10 +101,11 @@ RewriteRule ^portal/user/remove/$ src/portal/remove-user.php [NC]
 RewriteRule ^portal/direct-intake/$ src/portal/direct-intake.php [NC]
 RewriteRule ^portal/user/invite/resend/$ src/portal/resend-invite.php [NC]
 
-RewriteRule ^operator/documents/$ src/documents/all.php [NC,L]
+RewriteRule ^operations/documents/$ src/documents/all.php [NC,L]
 RewriteRule ^portal/documents/remove/$ src/documents/remove.php [NC,L]
 RewriteRule ^portal/documents/$ src/documents/organisations.php [NC,L]
 RewriteRule ^portal/documents/uploads/$ src/documents/uploads.php [NC,L]
+RewriteRule ^operations/documents/status-change/$ src/documents/status-change.php [NC,L]
 RewriteRule ^portal/documents/([0-9a-zA-Z-]+)/?$ src/documents/org-details.php?id=$1 [NC,L]
 RewriteRule ^operations/documents/([0-9a-zA-Z-]+)/?$ src/documents/op-details.php?id=$1 [NC,L]
 

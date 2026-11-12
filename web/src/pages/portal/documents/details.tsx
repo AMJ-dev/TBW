@@ -4,7 +4,8 @@ import { useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
   AlertCircle,
-  CheckCircle2,
+  ArrowLeft,
+  ChevronRight,
   Eye,
   FileCheck,
   FileText,
@@ -16,6 +17,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
+import {useNavigate} from "react-router-dom"
 import { AppShell, StatusBadge, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,6 +54,8 @@ interface DocumentDetailsResponse {
   types: DocumentType[];
   documents: DocumentItem[];
 }
+
+type PageView = "LIST" | "UPLOAD" | "DELETE";
 
 const formatFileSize = (bytes: number) => {
   if (!bytes) return "Unknown size";
@@ -100,12 +104,13 @@ const getStatusTone = (
   return "warning";
 };
 
-const canManageDocument = (status: DocumentStatus) =>
-  status !== "VERIFIED";
+const canManageDocument = (status: DocumentStatus) => status !== "VERIFIED";
 
 export default function PortalDocumentDetailsPage() {
+  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
 
+const [pageView, setPageView] = useState<PageView>("LIST");
   const [docs, setDocs] = useState<DocumentItem[]>([]);
   const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -372,6 +377,49 @@ export default function PortalDocumentDetailsPage() {
       title="Shipment Documents"
       eyebrow="Portal · Document Management"
     >
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <nav className="flex flex-wrap items-center gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => navigate("/portal")}
+            className="text-ink-soft transition-colors hover:text-orange"
+          >
+            Portal
+          </button>
+
+          <ChevronRight className="size-3.5 text-ink-soft" />
+
+          <button
+            type="button"
+            onClick={() => navigate("/portal/documents")}
+            className="text-ink-soft transition-colors hover:text-orange"
+          >
+            Documents
+          </button>
+
+          <ChevronRight className="size-3.5 text-ink-soft" />
+
+          <span className="font-semibold text-ink">
+            {pageView === "UPLOAD"
+              ? replacingDocument
+                ? "Replace Document"
+                : "Upload Document"
+              : pageView === "DELETE"
+                ? "Delete Document"
+                : "Shipment Details"}
+          </span>
+        </nav>
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => navigate("/portal/documents")}
+          className="border-line bg-paper"
+        >
+          <ArrowLeft className="mr-2 size-4" />
+          Back to Documents
+        </Button>
+      </div>
       <div className="space-y-5">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
