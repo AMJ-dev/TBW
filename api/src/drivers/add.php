@@ -198,27 +198,52 @@ try {
     ]);
 
     $stmt = $conn->prepare("
-        INSERT INTO gate_driver_action_logs (
+        INSERT INTO activity_logs (
             id,
-            driver_id,
+            actor_id,
+            category,
             action,
-            new_status,
-            actor_id
+            entity_type,
+            entity_id,
+            description,
+            old_values,
+            new_values,
+            metadata,
+            severity,
+            created_at
         ) VALUES (
             :id,
-            :driver_id,
+            :actor_id,
+            :category,
             :action,
-            :new_status,
-            :actor_id
+            :entity_type,
+            :entity_id,
+            :description,
+            :old_values,
+            :new_values,
+            :metadata,
+            :severity,
+            NOW()
         )
     ");
 
     $stmt->execute([
         ":id" => generateId(),
-        ":driver_id" => $id,
-        ":action" => "created",
-        ":new_status" => "Pending review",
-        ":actor_id" => $actor
+        ":actor_id" => $actor,
+        ":category" => "GATE",
+        ":action" => "DRIVER_CREATED",
+        ":entity_type" => "DRIVER",
+        ":entity_id" => $id,
+        ":description" => "New driver created and submitted for review.",
+        ":old_values" => null,
+        ":new_values" => json_encode([
+            "status" => "Pending review"
+        ], JSON_THROW_ON_ERROR),
+        ":metadata" => json_encode([
+            "source_table" => "gate_driver_action_logs",
+            "driver_id" => $id
+        ], JSON_THROW_ON_ERROR),
+        ":severity" => "INFO"
     ]);
 
     $conn->commit();

@@ -856,24 +856,27 @@ try {
     $logsQuery = $conn->prepare("
         SELECT
             l.id,
-            l.receiving_id,
-            l.receiving_container_id,
-            l.shipment_id,
-            l.container_id,
+            JSON_UNQUOTE(JSON_EXTRACT(l.metadata, '$.receiving_id')) AS receiving_id,
+            JSON_UNQUOTE(JSON_EXTRACT(l.metadata, '$.receiving_container_id')) AS receiving_container_id,
+            JSON_UNQUOTE(JSON_EXTRACT(l.metadata, '$.shipment_id')) AS shipment_id,
+            l.entity_id AS container_id,
             l.action,
-            l.previous_status,
-            l.new_status,
+            JSON_UNQUOTE(JSON_EXTRACT(l.old_values, '$.status')) AS previous_status,
+            JSON_UNQUOTE(JSON_EXTRACT(l.new_values, '$.status')) AS new_status,
             l.description,
             l.metadata,
-            l.performed_by,
+            l.actor_id AS performed_by,
             u.full_name AS performed_by_name,
             u.email AS performed_by_email,
-            l.performed_at
-        FROM portal_receiving_logs l
+            l.created_at AS performed_at
+        FROM activity_logs l
         LEFT JOIN users u
-            ON BINARY u.id = BINARY l.performed_by
-        WHERE BINARY l.receiving_id = BINARY :receiving_id
-        ORDER BY l.performed_at DESC
+            ON BINARY u.id = BINARY l.actor_id
+        WHERE
+            l.category = 'RECEIVING'
+            AND l.action = 'CONTAINER_RECEIVED'
+            AND BINARY JSON_UNQUOTE(JSON_EXTRACT(l.metadata, '$.receiving_id')) = BINARY :receiving_id
+        ORDER BY l.created_at DESC
     ");
 
     $logsQuery->execute([

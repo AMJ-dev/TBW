@@ -52,11 +52,55 @@
         $stmt->execute([":actor" => $actor, ":id" => $id, ":organisation_id" => $organisation_id]);
 
         $stmt = $conn->prepare("
-            INSERT INTO gate_driver_action_logs
-            (id, driver_id, action, previous_status, new_status, actor_id)
-            VALUES (:id, :driver_id, 'activated', 'Suspended', 'Approved', :actor_id)
+            INSERT INTO activity_logs (
+                id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                NOW()
+            )
         ");
-        $stmt->execute([":id" => generateId(), ":driver_id" => $id, ":actor_id" => $actor]);
+
+        $stmt->execute([
+            ":id" => generateId(),
+            ":actor_id" => $actor,
+            ":category" => "GATE",
+            ":action" => "DRIVER_ACTIVATED",
+            ":entity_type" => "DRIVER",
+            ":entity_id" => $id,
+            ":description" => "Driver activated and approved.",
+            ":old_values" => json_encode([
+                "status" => "Suspended"
+            ], JSON_THROW_ON_ERROR),
+            ":new_values" => json_encode([
+                "status" => "Approved"
+            ], JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "gate_driver_action_logs",
+                "driver_id" => $id
+            ], JSON_THROW_ON_ERROR),
+            ":severity" => "INFO"
+        ]);
 
         $conn->commit();
 

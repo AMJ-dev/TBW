@@ -204,28 +204,34 @@ try {
     ");
 
     $log_stmt = $conn->prepare("
-        INSERT INTO terminal_yard_movement_logs (
+        INSERT INTO activity_logs (
             id,
-            movement_id,
-            shipment_id,
-            container_id,
+            actor_id,
+            category,
             action,
-            previous_location_id,
-            new_location_id,
+            entity_type,
+            entity_id,
+            entity_reference,
             description,
+            old_values,
+            new_values,
             metadata,
-            performed_by
+            severity,
+            created_at
         ) VALUES (
             :id,
-            :movement_id,
-            :shipment_id,
-            :container_id,
+            :actor_id,
+            :category,
             :action,
-            :previous_location_id,
-            :new_location_id,
+            :entity_type,
+            :entity_id,
+            :entity_reference,
             :description,
+            :old_values,
+            :new_values,
             :metadata,
-            :performed_by
+            :severity,
+            NOW()
         )
     ");
 
@@ -443,30 +449,48 @@ try {
         $description = "Container {$container["container_no"]} moved from "
             . $from_name
             . " to {$destination["name"]}.";
+            
+        $new_container_status = in_array(
+            $container_status,
+            ["RECEIVED", "IN_WAREHOUSE"],
+            true
+        ) ? "IN_YARD" : $container_status;
 
-        $log_stmt->bindValue(":id", generateId());
-        $log_stmt->bindValue(":movement_id", $movement_id);
-        $log_stmt->bindValue(":shipment_id", $shipment_id);
-        $log_stmt->bindValue(":container_id", $container_id);
-        $log_stmt->bindValue(":action", "MOVEMENT_COMPLETED");
-
-        $log_stmt->bindValue(
-            ":previous_location_id",
-            $from_location_id,
-            $from_location_id ? PDO::PARAM_STR : PDO::PARAM_NULL
-        );
-
-        $log_stmt->bindValue(":new_location_id", $to_location_id);
-        $log_stmt->bindValue(":description", $description);
-        $log_stmt->bindValue(":metadata", json_encode($metadata));
-
-        $log_stmt->bindValue(
-            ":performed_by",
-            $performed_by,
-            $performed_by ? PDO::PARAM_STR : PDO::PARAM_NULL
-        );
-
-        $log_stmt->execute();
+        $log_stmt->execute([
+            ":id" => generateId(),
+            ":actor_id" => $performed_by,
+            ":category" => "YARD",
+            ":action" => "YARD_MOVEMENT_COMPLETED",
+            ":entity_type" => "CONTAINER",
+            ":entity_id" => $container_id,
+            ":entity_reference" => $movement_reference,
+            ":description" => $description,
+            ":old_values" => json_encode([
+                "location_id" => $from_location_id,
+                "location_name" => $from_name,
+                "status" => $container_status
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":new_values" => json_encode([
+                "location_id" => $to_location_id,
+                "location_name" => $destination["name"],
+                "status" => $new_container_status
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "terminal_yard_movement_logs",
+                "movement_id" => $movement_id,
+                "movement_reference" => $movement_reference,
+                "shipment_id" => $shipment_id,
+                "container_id" => $container_id,
+                "container_no" => $container["container_no"],
+                "shipment_reference" => $container["shipment_reference"],
+                "receiving_reference" => $receiving["receiving_reference"] ?? null,
+                "previous_location" => $metadata["from_location"],
+                "destination" => $metadata["to_location"],
+                "equipment" => $metadata["equipment"],
+                "remarks" => $remarks
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":severity" => "INFO"
+        ]);
 
         $update_container_stmt->bindValue(":location_id", $to_location_id);
         $update_container_stmt->bindValue(":container_id", $container_id);

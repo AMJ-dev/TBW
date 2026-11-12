@@ -346,24 +346,58 @@
         }
 
         $q = $conn->prepare("
-            INSERT INTO maintenance_audit_logs (
-                id, actor_id, action, change_reason, details
+            INSERT INTO activity_logs (
+                id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                reason,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
             ) VALUES (
-                :id, :actor_id, :action, :change_reason, :details
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :reason,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                CURRENT_TIMESTAMP
             )
         ");
 
         $q->execute([
             ":id" => generateId(),
             ":actor_id" => $actorId,
-            ":action" => "maintenance_configuration_updated",
-            ":change_reason" => $changeReason,
-            ":details" => json_encode([
-                "old_config" => $oldConfig,
-                "new_config" => $newConfig,
-                "old_notices" => $oldNotices,
-                "new_notices" => $notices
-            ], JSON_THROW_ON_ERROR)
+            ":category" => "CONFIGURATION",
+            ":action" => "MAINTENANCE_CONFIGURATION_UPDATED",
+            ":entity_type" => "MAINTENANCE_CONFIGURATION",
+            ":entity_id" => null,
+            ":description" => "Maintenance configuration and notices updated.",
+            ":reason" => $changeReason,
+            ":old_values" => json_encode([
+                "config" => $oldConfig,
+                "notices" => $oldNotices
+            ], JSON_THROW_ON_ERROR),
+            ":new_values" => json_encode([
+                "config" => $newConfig,
+                "notices" => $notices
+            ], JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "maintenance_audit_logs"
+            ], JSON_THROW_ON_ERROR),
+            ":severity" => "INFO"
         ]);
 
         $conn->commit();

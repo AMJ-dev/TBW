@@ -205,41 +205,64 @@ try {
         "change_reason" => $changeReason
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
+    $ipAddress = $_SERVER["REMOTE_ADDR"] ?? null;
+
     $q = $conn->prepare("
-        INSERT INTO terminal_configuration_audit (
+        INSERT INTO activity_logs (
             id,
             actor_id,
+            category,
             action,
-            before_data,
-            after_data,
+            entity_type,
+            entity_id,
+            description,
+            old_values,
+            new_values,
+            metadata,
             ip_address,
-            user_agent
+            user_agent,
+            severity,
+            created_at
         ) VALUES (
             :id,
             :actor_id,
+            :category,
             :action,
-            :before_data,
-            :after_data,
+            :entity_type,
+            :entity_id,
+            :description,
+            :old_values,
+            :new_values,
+            :metadata,
             :ip_address,
-            :user_agent
+            :user_agent,
+            :severity,
+            NOW()
         )
     ");
 
     $q->bindValue(":id", generateId(), PDO::PARAM_STR);
     $q->bindValue(":actor_id", (string) $my_details->id, PDO::PARAM_STR);
-    $q->bindValue(":action", "terminal_configuration_updated", PDO::PARAM_STR);
-    $q->bindValue(":before_data", $beforeData, PDO::PARAM_STR);
-    $q->bindValue(":after_data", $afterData, PDO::PARAM_STR);
+    $q->bindValue(":category", "CONFIGURATION", PDO::PARAM_STR);
+    $q->bindValue(":action", "TERMINAL_CONFIGURATION_UPDATED", PDO::PARAM_STR);
+    $q->bindValue(":entity_type", "TERMINAL_CONFIGURATION", PDO::PARAM_STR);
+    $q->bindValue(":entity_id", null, PDO::PARAM_NULL);
+    $q->bindValue(":description", "Terminal configuration updated.", PDO::PARAM_STR);
+    $q->bindValue(":old_values", $beforeData, PDO::PARAM_STR);
+    $q->bindValue(":new_values", $afterData, PDO::PARAM_STR);
+    $q->bindValue(":metadata", json_encode([
+        "source_table" => "terminal_configuration_audit"
+    ], JSON_THROW_ON_ERROR), PDO::PARAM_STR);
 
-    $ipAddress = $_SERVER["REMOTE_ADDR"] ?? null;
-
-    if ($ipAddress === null) {
-        $q->bindValue(":ip_address", null, PDO::PARAM_NULL);
-    } else {
-        $q->bindValue(":ip_address", $ipAddress, PDO::PARAM_STR);
-    }
+    $q->bindValue(
+        ":ip_address",
+        $ipAddress,
+        $ipAddress === null ? PDO::PARAM_NULL : PDO::PARAM_STR
+    );
 
     $q->bindValue(":user_agent", substr($_SERVER["HTTP_USER_AGENT"] ?? "", 0, 500), PDO::PARAM_STR);
+    $q->bindValue(":severity", "INFO", PDO::PARAM_STR);
+
     $q->execute();
 
     $conn->commit();

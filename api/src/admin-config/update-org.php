@@ -236,15 +236,60 @@
             $q->execute();
         }
 
-        $q = $conn->prepare("INSERT INTO organisation_audit_logs (id, organisation_id, user_id, action, details, ip_address, user_agent) VALUES (:id, :org_id, :user_id, :action, :details, :ip, :agent)");
-        $q->bindValue(":id", generateId());
-        $q->bindValue(":org_id", $id);
-        $q->bindValue(":user_id", $my_details->id);
-        $q->bindValue(":action", "organisation.configuration_updated");
-        $q->bindValue(":details", json_encode(["legal_name" => $legal, "uploaded_files" => count($uploads)], JSON_UNESCAPED_SLASHES));
-        $q->bindValue(":ip", $_SERVER["REMOTE_ADDR"] ?? null);
-        $q->bindValue(":agent", substr($_SERVER["HTTP_USER_AGENT"] ?? "", 0, 500));
-        $q->execute();
+        $q = $conn->prepare("
+            INSERT INTO activity_logs (
+                id,
+                organisation_id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                new_values,
+                metadata,
+                ip_address,
+                user_agent,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :organisation_id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :new_values,
+                :metadata,
+                :ip_address,
+                :user_agent,
+                :severity,
+                CURRENT_TIMESTAMP
+            )
+        ");
+
+        $q->execute([
+            ":id" => generateId(),
+            ":organisation_id" => $id,
+            ":actor_id" => $my_details->id,
+            ":category" => "ORGANISATION",
+            ":action" => "ORGANISATION_CONFIGURATION_UPDATED",
+            ":entity_type" => "ORGANISATION",
+            ":entity_id" => $id,
+            ":description" => "Organisation configuration updated.",
+            ":new_values" => json_encode([
+                "legal_name" => $legal,
+                "uploaded_files_count" => count($uploads)
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "organisation_audit_logs"
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
+            ":user_agent" => substr($_SERVER["HTTP_USER_AGENT"] ?? "", 0, 500),
+            ":severity" => "INFO"
+        ]);
 
         $conn->commit();
 

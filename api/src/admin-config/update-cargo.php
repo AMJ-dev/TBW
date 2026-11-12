@@ -474,17 +474,55 @@ try {
     $ipAddress = substr((string)($_SERVER["REMOTE_ADDR"] ?? ""), 0, 45);
     $userAgent = substr((string)($_SERVER["HTTP_USER_AGENT"] ?? ""), 0, 500);
 
-    $q = $conn->prepare("INSERT INTO cargo_config_audit (id, config_version_id, actor_id, action, change_reason, before_json, after_json, request_id, ip_address, user_agent) VALUES (:id, :config_version_id, :actor_id, :action, :change_reason, :before_json, :after_json, :request_id, :ip_address, :user_agent)");
+    $q = $conn->prepare("
+        INSERT INTO activity_logs (
+            id,
+            request_id,
+            actor_id,
+            category,
+            action,
+            entity_type,
+            entity_id,
+            description,
+            reason,
+            old_values,
+            new_values,
+            ip_address,
+            user_agent,
+            severity
+        ) VALUES (
+            :id,
+            :request_id,
+            :actor_id,
+            :category,
+            :action,
+            :entity_type,
+            :entity_id,
+            :description,
+            :reason,
+            :old_values,
+            :new_values,
+            :ip_address,
+            :user_agent,
+            :severity
+        )
+    ");
+
     $q->bindValue(":id", generateId(), PDO::PARAM_STR);
-    $q->bindValue(":config_version_id", $versionId, PDO::PARAM_STR);
-    $q->bindValue(":actor_id", $actorId, PDO::PARAM_STR);
-    $q->bindValue(":action", "CARGO_CONFIGURATION_UPDATED", PDO::PARAM_STR);
-    $q->bindValue(":change_reason", $changeReason, PDO::PARAM_STR);
-    $q->bindValue(":before_json", $beforeJson, PDO::PARAM_STR);
-    $q->bindValue(":after_json", $afterJson, PDO::PARAM_STR);
     $q->bindValue(":request_id", $requestId, PDO::PARAM_STR);
+    $q->bindValue(":actor_id", $actorId, PDO::PARAM_STR);
+    $q->bindValue(":category", "CONFIGURATION", PDO::PARAM_STR);
+    $q->bindValue(":action", "CARGO_CONFIGURATION_UPDATED", PDO::PARAM_STR);
+    $q->bindValue(":entity_type", "CARGO_CONFIGURATION", PDO::PARAM_STR);
+    $q->bindValue(":entity_id", $versionId, PDO::PARAM_STR);
+    $q->bindValue(":description", "Cargo configuration updated.", PDO::PARAM_STR);
+    $q->bindValue(":reason", $changeReason, PDO::PARAM_STR);
+    $q->bindValue(":old_values", $beforeJson, PDO::PARAM_STR);
+    $q->bindValue(":new_values", $afterJson, PDO::PARAM_STR);
     $q->bindValue(":ip_address", $ipAddress, PDO::PARAM_STR);
     $q->bindValue(":user_agent", $userAgent, PDO::PARAM_STR);
+    $q->bindValue(":severity", "INFO", PDO::PARAM_STR);
+
     $q->execute();
 
     $conn->commit();

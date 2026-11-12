@@ -128,13 +128,47 @@ try {
         $settingsId
     ]);
 
-    $q = $conn->prepare("INSERT INTO security_config_audit_logs (id, actor_id, action, details, created_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)");
+    $q = $conn->prepare("
+        INSERT INTO activity_logs (
+            id,
+            actor_id,
+            category,
+            action,
+            entity_type,
+            entity_id,
+            description,
+            new_values,
+            metadata,
+            severity,
+            created_at
+        ) VALUES (
+            :id,
+            :actor_id,
+            :category,
+            :action,
+            :entity_type,
+            :entity_id,
+            :description,
+            :new_values,
+            :metadata,
+            :severity,
+            CURRENT_TIMESTAMP
+        )
+    ");
 
     $q->execute([
-        generateId(),
-        $actorId,
-        "security_configuration_updated",
-        json_encode($settings, JSON_THROW_ON_ERROR)
+        ":id" => generateId(),
+        ":actor_id" => $actorId,
+        ":category" => "SECURITY",
+        ":action" => "SECURITY_CONFIGURATION_UPDATED",
+        ":entity_type" => "SECURITY_CONFIGURATION",
+        ":entity_id" => null,
+        ":description" => "Security configuration updated.",
+        ":new_values" => json_encode($settings, JSON_THROW_ON_ERROR),
+        ":metadata" => json_encode([
+            "source_table" => "security_config_audit_logs"
+        ], JSON_THROW_ON_ERROR),
+        ":severity" => "WARNING"
     ]);
 
     $conn->commit();

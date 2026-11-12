@@ -474,15 +474,37 @@
             WHERE id = :container_id AND shipment_id = :shipment_id
         ");
 
-        $insertLog = $conn->prepare("
-            INSERT INTO portal_receiving_logs (
-                id, receiving_id, receiving_container_id, shipment_id, container_id,
-                action, previous_status, new_status, description, metadata, performed_by
-            ) VALUES (
-                :id, :receiving_id, :receiving_container_id, :shipment_id, :container_id,
-                :action, :previous_status, :new_status, :description, :metadata, :performed_by
-            )
-        ");
+    $insertLog = $conn->prepare("
+        INSERT INTO activity_logs (
+            id,
+            actor_id,
+            category,
+            action,
+            entity_type,
+            entity_id,
+            entity_reference,
+            description,
+            old_values,
+            new_values,
+            metadata,
+            severity,
+            created_at
+        ) VALUES (
+            :id,
+            :actor_id,
+            :category,
+            :action,
+            :entity_type,
+            :entity_id,
+            :entity_reference,
+            :description,
+            :old_values,
+            :new_values,
+            :metadata,
+            :severity,
+            NOW()
+        )
+    ");
 
         foreach ($preparedContainers as $item) {
             $receiving_container_id = generateId();
@@ -513,17 +535,28 @@
             ]);
 
             $insertLog->execute([
-                "id" => generateId(),
-                "receiving_id" => $receiving_id,
-                "receiving_container_id" => $receiving_container_id,
-                "shipment_id" => $shipment_id,
-                "container_id" => $item["id"],
-                "action" => "CONTAINER_RECEIVED",
-                "previous_status" => "ENTERED",
-                "new_status" => "RECEIVED",
-                "description" => "Physical receiving inspection recorded for container " . $item["container_no"] . ".",
-                "metadata" => json_encode([
+                ":id" => generateId(),
+                ":actor_id" => $performed_by,
+                ":category" => "RECEIVING",
+                ":action" => "CONTAINER_RECEIVED",
+                ":entity_type" => "CONTAINER",
+                ":entity_id" => $item["id"],
+                ":entity_reference" => $item["container_no"],
+                ":description" => "Physical receiving inspection recorded for container " . $item["container_no"] . ".",
+                ":old_values" => json_encode([
+                    "status" => "ENTERED"
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+                ":new_values" => json_encode([
+                    "status" => "RECEIVED"
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+                ":metadata" => json_encode([
+                    "source_table" => "portal_receiving_logs",
+                    "receiving_id" => $receiving_id,
+                    "receiving_container_id" => $receiving_container_id,
+                    "shipment_id" => $shipment_id,
+                    "container_id" => $item["id"],
                     "container_no" => $item["container_no"],
+                    "gate_pass_number" => $item["gate_pass_number"],
                     "expected_seal_no" => $item["expected_seal_no"],
                     "actual_seal_no" => $item["actual_seal_no"],
                     "condition_status" => $item["condition"],
@@ -532,8 +565,10 @@
                     "receiving_location_id" => $item["receiving_location_id"],
                     "damage_proof" => $item["damage_proof"],
                     "remarks" => $item["remarks"]
-                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-                "performed_by" => $performed_by
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+                ":severity" => !empty($item["damage_proof"]) || $item["condition"] !== "GOOD"
+                    ? "WARNING"
+                    : "INFO"
             ]);
         }
 

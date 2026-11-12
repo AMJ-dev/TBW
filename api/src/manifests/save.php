@@ -280,27 +280,65 @@
         }
 
         $event = $conn->prepare("
-            INSERT INTO operation_manifest_events
-            (
-                id, manifest_id, actor_id, action,
-                from_status, to_status, details
-            )
-            VALUES
-            (
-                :event_id, :id, :actor, :action,
-                NULL, :status, :details
+            INSERT INTO activity_logs (
+                id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                CURRENT_TIMESTAMP
             )
         ");
 
+        $action = $shipment !== null
+            ? "CREATED_AND_LINKED"
+            : "CREATED_UNMATCHED";
+
+        $details = $shipment !== null
+            ? trim($notes . "\nLinked shipment: " . (string) ($shipment["shipment_reference"] ?? $matchedShipmentId))
+            : trim($notes . "\nAwaiting an organisation shipment declaration.");
+
         $event->execute([
-            ":event_id" => generateId(),
-            ":id" => $id,
-            ":actor" => (string) $my_details->id,
-            ":action" => $shipment !== null ? "CREATED_AND_LINKED" : "CREATED_UNMATCHED",
-            ":status" => $status,
-            ":details" => $shipment !== null
-                ? trim($notes . "\nLinked shipment: " . (string) ($shipment["shipment_reference"] ?? $matchedShipmentId))
-                : trim($notes . "\nAwaiting an organisation shipment declaration.")
+            ":id" => generateId(),
+            ":actor_id" => (string) $my_details->id,
+            ":category" => "MANIFEST",
+            ":action" => $action,
+            ":entity_type" => "MANIFEST",
+            ":entity_id" => $id,
+            ":description" => $shipment !== null
+                ? "Manifest created and linked to an existing shipment."
+                : "Manifest created without a matching shipment.",
+            ":old_values" => null,
+            ":new_values" => json_encode([
+                "status" => $status
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "operation_manifest_events",
+                "manifest_id" => $id,
+                "shipment_id" => $matchedShipmentId,
+                "shipment_reference" => $shipment["shipment_reference"] ?? null,
+                "details" => $details
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":severity" => "INFO"
         ]);
 
         $conn->commit();

@@ -171,18 +171,21 @@
             SELECT
                 log.id,
                 log.action,
-                log.previous_status,
-                log.new_status,
+                JSON_UNQUOTE(JSON_EXTRACT(log.old_values, '$.examination_status')) AS previous_status,
+                JSON_UNQUOTE(JSON_EXTRACT(log.new_values, '$.examination_status')) AS new_status,
                 log.description,
                 log.metadata,
-                log.performed_at,
-                log.performed_by,
+                log.created_at AS performed_at,
+                log.actor_id AS performed_by,
                 u.full_name AS performed_by_name
-            FROM terminal_examination_logs log
+            FROM activity_logs log
             LEFT JOIN users u
-                ON u.id = log.performed_by
-            WHERE log.examination_id = :examination_id
-            ORDER BY log.performed_at ASC
+                ON u.id = log.actor_id
+            WHERE
+                log.entity_type = 'EXAMINATION'
+                AND log.entity_id = :examination_id
+                AND log.category = 'EXAMINATION'
+            ORDER BY log.created_at ASC
         ");
 
         $logStmt->execute([

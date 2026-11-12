@@ -274,26 +274,62 @@ try {
     );
 
     $q = $conn->prepare("
-        INSERT INTO document_config_audit
-            (id, config_version_id, actor_id, action, change_reason,
-             before_json, after_json, request_id, ip_address, user_agent, details)
-        VALUES
-            (:id, :config_version_id, :actor_id, :action, :change_reason,
-             :before_json, :after_json, :request_id, :ip_address, :user_agent, :details)
+        INSERT INTO activity_logs (
+            id,
+            request_id,
+            actor_id,
+            category,
+            action,
+            entity_type,
+            entity_id,
+            description,
+            reason,
+            old_values,
+            new_values,
+            metadata,
+            ip_address,
+            user_agent,
+            severity,
+            created_at
+        ) VALUES (
+            :id,
+            :request_id,
+            :actor_id,
+            :category,
+            :action,
+            :entity_type,
+            :entity_id,
+            :description,
+            :reason,
+            :old_values,
+            :new_values,
+            :metadata,
+            :ip_address,
+            :user_agent,
+            :severity,
+            CURRENT_TIMESTAMP
+        )
     ");
 
     $q->execute([
         ":id" => generateId(),
-        ":config_version_id" => $configId,
-        ":actor_id" => $my_details->id,
-        ":action" => "update",
-        ":change_reason" => trim($_POST["change_reason"] ?? "Document configuration updated"),
-        ":before_json" => json_encode($before),
-        ":after_json" => json_encode($after),
         ":request_id" => $requestId,
-        ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? "",
+        ":actor_id" => $my_details->id,
+        ":category" => "CONFIGURATION",
+        ":action" => "DOCUMENT_CONFIGURATION_UPDATED",
+        ":entity_type" => "DOCUMENT_CONFIGURATION",
+        ":entity_id" => $configId,
+        ":description" => "Document types and upload location rules updated.",
+        ":reason" => trim($_POST["change_reason"] ?? "Document configuration updated"),
+        ":old_values" => json_encode($before),
+        ":new_values" => json_encode($after),
+        ":metadata" => json_encode([
+            "details" => "Document types and upload location rules updated",
+            "source_table" => "document_config_audit"
+        ]),
+        ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
         ":user_agent" => substr($_SERVER["HTTP_USER_AGENT"] ?? "", 0, 500),
-        ":details" => "Document types and upload location rules updated"
+        ":severity" => "INFO"
     ]);
 
     $conn->commit();

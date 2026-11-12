@@ -200,29 +200,55 @@
             ]);
 
             $stmt = $conn->prepare("
-                INSERT INTO gate_driver_action_logs (
+                INSERT INTO activity_logs (
                     id,
-                    driver_id,
+                    actor_id,
+                    category,
                     action,
-                    previous_status,
-                    new_status,
-                    actor_id
+                    entity_type,
+                    entity_id,
+                    description,
+                    old_values,
+                    new_values,
+                    metadata,
+                    severity,
+                    created_at
                 ) VALUES (
                     :id,
-                    :driver_id,
-                    'updated_existing_licence',
-                    :previous_status,
-                    :new_status,
-                    :actor_id
+                    :actor_id,
+                    :category,
+                    :action,
+                    :entity_type,
+                    :entity_id,
+                    :description,
+                    :old_values,
+                    :new_values,
+                    :metadata,
+                    :severity,
+                    NOW()
                 )
             ");
 
             $stmt->execute([
                 ":id" => generateId(),
-                ":driver_id" => $target_id,
-                ":previous_status" => $existing["status"],
-                ":new_status" => $existing["status"],
-                ":actor_id" => $actor
+                ":actor_id" => $actor,
+                ":category" => "GATE",
+                ":action" => "DRIVER_LICENCE_UPDATED",
+                ":entity_type" => "DRIVER",
+                ":entity_id" => $target_id,
+                ":description" => "Existing driver's licence details updated.",
+                ":old_values" => json_encode([
+                    "status" => $existing["status"]
+                ], JSON_THROW_ON_ERROR),
+                ":new_values" => json_encode([
+                    "status" => $existing["status"]
+                ], JSON_THROW_ON_ERROR),
+                ":metadata" => json_encode([
+                    "source_table" => "gate_driver_action_logs",
+                    "driver_id" => $target_id,
+                    "change_type" => "EXISTING_LICENCE_UPDATED"
+                ], JSON_THROW_ON_ERROR),
+                ":severity" => "INFO"
             ]);
 
             $conn->commit();
@@ -285,29 +311,55 @@
         ]);
 
         $stmt = $conn->prepare("
-            INSERT INTO gate_driver_action_logs (
+            INSERT INTO activity_logs (
                 id,
-                driver_id,
+                actor_id,
+                category,
                 action,
-                previous_status,
-                new_status,
-                actor_id
+                entity_type,
+                entity_id,
+                description,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
             ) VALUES (
                 :id,
-                :driver_id,
-                'updated',
-                :previous_status,
-                :new_status,
-                :actor_id
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                NOW()
             )
         ");
 
         $stmt->execute([
             ":id" => generateId(),
-            ":driver_id" => $id,
-            ":previous_status" => $driver["status"],
-            ":new_status" => $driver["status"],
-            ":actor_id" => $actor
+            ":actor_id" => $actor,
+            ":category" => "GATE",
+            ":action" => "DRIVER_UPDATED",
+            ":entity_type" => "DRIVER",
+            ":entity_id" => $id,
+            ":description" => "Driver details updated.",
+            ":old_values" => json_encode([
+                "status" => $driver["status"]
+            ], JSON_THROW_ON_ERROR),
+            ":new_values" => json_encode([
+                "status" => $driver["status"]
+            ], JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "gate_driver_action_logs",
+                "driver_id" => $id,
+                "change_type" => "DRIVER_DETAILS_UPDATED"
+            ], JSON_THROW_ON_ERROR),
+            ":severity" => "INFO"
         ]);
 
         $conn->commit();

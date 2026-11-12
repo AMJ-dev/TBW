@@ -73,8 +73,57 @@
         $containerMatch = $conn->prepare('UPDATE operation_manifest_containers mc INNER JOIN portal_shipment_containers sc ON UPPER(TRIM(sc.container_no))=UPPER(TRIM(mc.container_no)) AND sc.shipment_id=? SET mc.matched_shipment_id=?, mc.matched_shipment_container_id=sc.id WHERE mc.manifest_id=?');
         $containerMatch->execute([$shipmentId,$shipmentId,$manifestId]);
         $details = 'Linked shipment '.$shipment['shipment_reference'].($reason !== '' ? '. Operator note: '.$reason : '.');
-        $event = $conn->prepare('INSERT INTO operation_manifest_events (id,manifest_id,actor_id,action,from_status,to_status,details) VALUES (?,?,?,?,?,?,?)');
-        $event->execute([generateId(),$manifestId,(string)$my_details->id,'SHIPMENT_LINKED',$manifest['status'],$manifest['status'],$details]);
+        $event = $conn->prepare("
+            INSERT INTO activity_logs (
+                id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                CURRENT_TIMESTAMP
+            )
+        ");
+
+        $event->execute([
+            ":id" => generateId(),
+            ":actor_id" => (string) $my_details->id,
+            ":category" => "MANIFEST",
+            ":action" => "SHIPMENT_LINKED",
+            ":entity_type" => "MANIFEST",
+            ":entity_id" => $manifestId,
+            ":description" => "Shipment linked to manifest.",
+            ":old_values" => json_encode([
+                "status" => $manifest["status"]
+            ], JSON_THROW_ON_ERROR),
+            ":new_values" => json_encode([
+                "status" => $manifest["status"]
+            ], JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "operation_manifest_events",
+                "manifest_id" => $manifestId,
+                "details" => $details
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":severity" => "INFO"
+        ]);
         $conn->commit();
         echo json_encode(['error'=>false,'data'=>'Shipment linked to manifest.','code'=>['manifest_id'=>$manifestId,'shipment_id'=>$shipmentId,'shipment_reference'=>$shipment['shipment_reference']]]);
     } catch (Throwable $e) {

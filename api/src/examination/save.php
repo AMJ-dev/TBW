@@ -287,30 +287,37 @@ try {
 	]);
 
 	$logStmt = $conn->prepare("
-		INSERT INTO terminal_examination_logs (
+		INSERT INTO activity_logs (
 			id,
-			examination_id,
+			actor_id,
+			category,
 			action,
-			previous_status,
-			new_status,
+			entity_type,
+			entity_id,
 			description,
+			old_values,
+			new_values,
 			metadata,
-			performed_by,
-			performed_at
+			severity,
+			created_at
 		) VALUES (
 			:id,
-			:examination_id,
-			'EXAMINATION_SCHEDULED',
-			NULL,
-			'SCHEDULED',
+			:actor_id,
+			:category,
+			:action,
+			:entity_type,
+			:entity_id,
 			:description,
+			:old_values,
+			:new_values,
 			:metadata,
-			:performed_by,
+			:severity,
 			NOW()
 		)
 	");
 
 	$metadata = json_encode([
+		"source_table" => "terminal_examination_logs",
 		"container_id" => $container["id"],
 		"container_no" => $container["container_no"],
 		"shipment_id" => $container["shipment_id"],
@@ -321,14 +328,24 @@ try {
 		"scheduled_date" => $scheduled_date,
 		"scheduled_time" => $scheduled_time,
 		"priority" => $priority
-	], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+	], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
 	$logStmt->execute([
 		":id" => $log_id,
-		":examination_id" => $examination_id,
+		":actor_id" => $performed_by,
+		":category" => "EXAMINATION",
+		":action" => "EXAMINATION_SCHEDULED",
+		":entity_type" => "EXAMINATION",
+		":entity_id" => $examination_id,
 		":description" => "Examination scheduled and assigned to " . $officer["full_name"] . ".",
+		":old_values" => json_encode([
+			"status" => null
+		], JSON_THROW_ON_ERROR),
+		":new_values" => json_encode([
+			"status" => "SCHEDULED"
+		], JSON_THROW_ON_ERROR),
 		":metadata" => $metadata,
-		":performed_by" => $performed_by
+		":severity" => "INFO"
 	]);
 
 	$updateContainerStmt = $conn->prepare("

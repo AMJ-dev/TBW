@@ -350,17 +350,21 @@
             $eventStmt = $conn->prepare("
                 SELECT
                     e.id,
-                    e.manifest_id,
+                    e.entity_id AS manifest_id,
                     e.actor_id,
                     u.full_name AS actor_name,
                     e.action,
-                    e.from_status,
-                    e.to_status,
-                    e.details,
+                    JSON_UNQUOTE(JSON_EXTRACT(e.old_values, '$.status')) AS from_status,
+                    JSON_UNQUOTE(JSON_EXTRACT(e.new_values, '$.status')) AS to_status,
+                    JSON_UNQUOTE(JSON_EXTRACT(e.metadata, '$.details')) AS details,
                     e.created_at
-                FROM operation_manifest_events e
-                LEFT JOIN users u ON u.id = e.actor_id
-                WHERE e.manifest_id IN ($placeholders)
+                FROM activity_logs e
+                LEFT JOIN users u
+                    ON BINARY u.id = BINARY e.actor_id
+                WHERE
+                    e.category = 'MANIFEST'
+                    AND e.entity_type = 'MANIFEST'
+                    AND e.entity_id IN ($placeholders)
                 ORDER BY e.created_at DESC
             ");
 

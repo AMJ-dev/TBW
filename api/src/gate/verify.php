@@ -558,34 +558,59 @@
         );
 
         $conn->beginTransaction();
-
+        
         $audit = $conn->prepare("
-            INSERT INTO gate_movement_audit (
+            INSERT INTO activity_logs (
                 id,
-                appointment_id,
-                gate_pass_id,
-                operator_id,
-                event_type,
-                event_data
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                new_values,
+                metadata,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :new_values,
+                :metadata,
+                :severity,
+                NOW()
+            )
         ");
 
         $audit->execute([
-            generateId(),
-            $pass["appointment_id"],
-            $pass["gate_pass_id"],
-            $my_details->id ?? null,
-            "PASS_VERIFIED",
-            json_encode([
+            ":id" => generateId(),
+            ":actor_id" => $my_details->id ?? null,
+            ":category" => "GATE",
+            ":action" => "PASS_VERIFIED",
+            ":entity_type" => "GATE_PASS",
+            ":entity_id" => $pass["gate_pass_id"],
+            ":description" => "Gate pass verified for vehicle " . $pass["vehicle"]["plate"] . ".",
+            ":new_values" => json_encode([
                 "direction" => $direction,
+                "used" => $used,
+                "status_label" => $statusLabel
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "gate_movement_audit",
+                "appointment_id" => $pass["appointment_id"],
+                "gate_pass_id" => $pass["gate_pass_id"],
                 "pass_code" => $pass["pass_code"],
                 "plate" => $pass["vehicle"]["plate"],
                 "organisation_id" => $pass["organisation_id"],
-                "used" => $used,
-                "status_label" => $statusLabel,
                 "checks" => $checks,
                 "holds" => $holds
-            ], JSON_UNESCAPED_SLASHES)
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":severity" => !empty($holds) ? "WARNING" : "INFO"
         ]);
 
         $conn->commit();

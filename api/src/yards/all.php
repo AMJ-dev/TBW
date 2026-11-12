@@ -100,23 +100,33 @@ try {
 
             (
                 SELECT COUNT(*)
-                FROM terminal_yard_movement_logs yml
-                WHERE yml.movement_id = ym.id
+                FROM activity_logs al
+                WHERE
+                    al.category = 'YARD'
+                    AND al.action = 'YARD_MOVEMENT_COMPLETED'
+                    AND al.entity_reference = ym.movement_reference
             ) AS log_count
 
         FROM terminal_yard_movements ym
 
-        INNER JOIN portal_shipments ps ON ps.id = ym.shipment_id
+        INNER JOIN portal_shipments ps
+            ON ps.id = ym.shipment_id
 
-        INNER JOIN portal_shipment_containers psc ON psc.id = ym.container_id
+        INNER JOIN portal_shipment_containers psc
+            ON psc.id = ym.container_id
 
-        LEFT JOIN terminal_locations tl_from ON tl_from.id = ym.from_location_id
+        LEFT JOIN terminal_locations tl_from
+            ON tl_from.id = ym.from_location_id
 
-        INNER JOIN terminal_locations tl_to ON tl_to.id = ym.to_location_id
+        INNER JOIN terminal_locations tl_to
+            ON tl_to.id = ym.to_location_id
 
-        LEFT JOIN terminal_equipment te ON te.id = ym.equipment_id
+        LEFT JOIN terminal_equipment te
+            ON te.id = ym.equipment_id
 
-        LEFT JOIN users u ON u.id = ym.moved_by
+        LEFT JOIN users u
+            ON u.id = ym.moved_by
+
         {$where_sql}
 
         ORDER BY ym.completed_at DESC
@@ -144,26 +154,29 @@ try {
 
         $log_sql = "
             SELECT
-                yml.id,
-                yml.movement_id,
-                yml.shipment_id,
-                yml.container_id,
-                yml.action,
-                yml.previous_location_id,
-                yml.new_location_id,
-                yml.description,
-                yml.metadata,
-                yml.performed_by,
-                yml.performed_at,
+                al.id,
+                JSON_UNQUOTE(JSON_EXTRACT(al.metadata, '$.movement_id')) AS movement_id,
+                JSON_UNQUOTE(JSON_EXTRACT(al.metadata, '$.shipment_id')) AS shipment_id,
+                al.entity_id AS container_id,
+                al.action,
+                JSON_UNQUOTE(JSON_EXTRACT(al.old_values, '$.location_id')) AS previous_location_id,
+                JSON_UNQUOTE(JSON_EXTRACT(al.new_values, '$.location_id')) AS new_location_id,
+                al.description,
+                al.metadata,
+                al.actor_id AS performed_by,
+                al.created_at AS performed_at,
                 previous_location.name AS previous_location_name,
                 new_location.name AS new_location_name
-            FROM terminal_yard_movement_logs yml
+            FROM activity_logs al
             LEFT JOIN terminal_locations previous_location
-                ON previous_location.id = yml.previous_location_id
+                ON previous_location.id = JSON_UNQUOTE(JSON_EXTRACT(al.old_values, '$.location_id'))
             LEFT JOIN terminal_locations new_location
-                ON new_location.id = yml.new_location_id
-            WHERE yml.movement_id IN ({$placeholders})
-            ORDER BY yml.performed_at DESC
+                ON new_location.id = JSON_UNQUOTE(JSON_EXTRACT(al.new_values, '$.location_id'))
+            WHERE
+                al.category = 'YARD'
+                AND al.action = 'YARD_MOVEMENT_COMPLETED'
+                AND JSON_UNQUOTE(JSON_EXTRACT(al.metadata, '$.movement_id')) IN ({$placeholders})
+            ORDER BY al.created_at DESC
         ";
 
         $log_stmt = $conn->prepare($log_sql);

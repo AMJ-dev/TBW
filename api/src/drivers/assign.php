@@ -132,16 +132,56 @@
             $stmt->execute([":actor_id" => $actor_id, ":id" => $current["id"]]);
 
             $stmt = $conn->prepare("
-                INSERT INTO gate_driver_assignment_logs
-                    (id, driver_id, vehicle_id, action, actor_id, details)
-                VALUES (:id, :driver_id, :vehicle_id, 'reassigned_from', :actor_id, :details)
+                INSERT INTO activity_logs (
+                    id,
+                    actor_id,
+                    category,
+                    action,
+                    entity_type,
+                    entity_id,
+                    description,
+                    old_values,
+                    new_values,
+                    metadata,
+                    severity,
+                    created_at
+                ) VALUES (
+                    :id,
+                    :actor_id,
+                    :category,
+                    :action,
+                    :entity_type,
+                    :entity_id,
+                    :description,
+                    :old_values,
+                    :new_values,
+                    :metadata,
+                    :severity,
+                    NOW()
+                )
             ");
+
             $stmt->execute([
                 ":id" => generateId(),
-                ":driver_id" => $driver_id,
-                ":vehicle_id" => $current["vehicle_id"],
                 ":actor_id" => $actor_id,
-                ":details" => json_encode(["new_vehicle_id" => $vehicle_id])
+                ":category" => "GATE",
+                ":action" => "DRIVER_REASSIGNED_FROM_VEHICLE",
+                ":entity_type" => "DRIVER",
+                ":entity_id" => $driver_id,
+                ":description" => "Driver reassigned from a vehicle.",
+                ":old_values" => json_encode([
+                    "vehicle_id" => $current["vehicle_id"]
+                ], JSON_THROW_ON_ERROR),
+                ":new_values" => json_encode([
+                    "vehicle_id" => $vehicle_id
+                ], JSON_THROW_ON_ERROR),
+                ":metadata" => json_encode([
+                    "source_table" => "gate_driver_assignment_logs",
+                    "driver_id" => $driver_id,
+                    "previous_vehicle_id" => $current["vehicle_id"],
+                    "new_vehicle_id" => $vehicle_id
+                ], JSON_THROW_ON_ERROR),
+                ":severity" => "INFO"
             ]);
         }
 
@@ -155,16 +195,59 @@
         $stmt->execute([":id" => $assignment_id, ":driver_id" => $driver_id, ":vehicle_id" => $vehicle_id, ":assigned_by" => $actor_id]);
 
         $stmt = $conn->prepare("
-            INSERT INTO gate_driver_assignment_logs
-                (id, driver_id, vehicle_id, action, actor_id, details)
-            VALUES (:id, :driver_id, :vehicle_id, 'assigned', :actor_id, :details)
+            INSERT INTO activity_logs (
+                id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                NOW()
+            )
         ");
+
         $stmt->execute([
             ":id" => generateId(),
-            ":driver_id" => $driver_id,
-            ":vehicle_id" => $vehicle_id,
             ":actor_id" => $actor_id,
-            ":details" => json_encode(["assignment_id" => $assignment_id, "plate" => $vehicle["plate"]])
+            ":category" => "GATE",
+            ":action" => "DRIVER_ASSIGNED_TO_VEHICLE",
+            ":entity_type" => "DRIVER",
+            ":entity_id" => $driver_id,
+            ":description" => "Driver assigned to vehicle " . $vehicle["plate"] . ".",
+            ":old_values" => json_encode([
+                "vehicle_id" => null
+            ], JSON_THROW_ON_ERROR),
+            ":new_values" => json_encode([
+                "vehicle_id" => $vehicle_id,
+                "assignment_id" => $assignment_id,
+                "plate" => $vehicle["plate"]
+            ], JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "gate_driver_assignment_logs",
+                "driver_id" => $driver_id,
+                "vehicle_id" => $vehicle_id,
+                "assignment_id" => $assignment_id,
+                "plate" => $vehicle["plate"]
+            ], JSON_THROW_ON_ERROR),
+            ":severity" => "INFO"
         ]);
 
         $conn->commit();

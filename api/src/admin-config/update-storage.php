@@ -268,16 +268,36 @@
         }
 
         $audit = $conn->prepare("
-            INSERT INTO storage_config_audit (
-                config_id, actor_id, change_reason, previous_values, new_values
+            INSERT INTO activity_logs (
+                id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                reason,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
             ) VALUES (
-                :config_id, :actor_id, :change_reason, :previous_values, :new_values
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :reason,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                CURRENT_TIMESTAMP
             )
         ");
-
-        $audit->bindValue(":config_id", $configId, PDO::PARAM_INT);
-        $audit->bindValue(":actor_id", (string)$my_details->id, PDO::PARAM_STR);
-        $audit->bindValue(":change_reason", $changeReason, PDO::PARAM_STR);
 
         $previousJson = $previousValues === null
             ? null
@@ -289,9 +309,23 @@
             throw new RuntimeException("Unable to encode configuration audit data.");
         }
 
-        $audit->bindValue(":previous_values", $previousJson, $previousJson === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
-        $audit->bindValue(":new_values", $newJson, PDO::PARAM_STR);
-        $audit->execute();
+        $audit->execute([
+            ":id" => generateId(),
+            ":actor_id" => (string) $my_details->id,
+            ":category" => "CONFIGURATION",
+            ":action" => "STORAGE_CONFIGURATION_UPDATED",
+            ":entity_type" => "STORAGE_CONFIGURATION",
+            ":entity_id" => (string) $configId,
+            ":description" => "Storage configuration updated.",
+            ":reason" => $changeReason,
+            ":old_values" => $previousJson,
+            ":new_values" => $newJson,
+            ":metadata" => json_encode([
+                "source_table" => "storage_config_audit",
+                "config_id" => $configId
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":severity" => "INFO"
+        ]);
 
         $conn->commit();
 

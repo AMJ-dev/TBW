@@ -108,9 +108,31 @@
         ");
 
         $saveAudit = $conn->prepare("
-            INSERT INTO integration_audit_logs
-                (id, actor_id, action, integration_id, details, created_at)
-            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO activity_logs (
+                id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                new_values,
+                metadata,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :new_values,
+                :metadata,
+                :severity,
+                CURRENT_TIMESTAMP
+            )
         ");
 
         $seenIntegrationIds = [];
@@ -171,14 +193,22 @@
             ]);
 
             $saveAudit->execute([
-                generateId(),
-                $actorId,
-                "integration_updated",
-                $integrationId,
-                json_encode([
+                ":id" => generateId(),
+                ":actor_id" => $actorId,
+                ":category" => "INTEGRATION",
+                ":action" => "INTEGRATION_UPDATED",
+                ":entity_type" => "INTEGRATION",
+                ":entity_id" => $integrationId,
+                ":description" => "Integration configuration updated.",
+                ":new_values" => json_encode([
                     "enabled" => $enabled,
                     "environment" => $environment
-                ], JSON_THROW_ON_ERROR)
+                ], JSON_THROW_ON_ERROR),
+                ":metadata" => json_encode([
+                    "source_table" => "integration_audit_logs",
+                    "integration_id" => $integrationId
+                ], JSON_THROW_ON_ERROR),
+                ":severity" => "INFO"
             ]);
         }
 
@@ -299,15 +329,24 @@
                 $actorId
             ]);
 
-            $saveAudit->execute([
-                generateId(),
-                $actorId,
-                "credential_updated",
-                $integrationId,
-                json_encode([
+           $saveAudit->execute([
+                ":id" => generateId(),
+                ":actor_id" => $actorId,
+                ":category" => "INTEGRATION",
+                ":action" => "INTEGRATION_CREDENTIAL_UPDATED",
+                ":entity_type" => "INTEGRATION",
+                ":entity_id" => $integrationId,
+                ":description" => "Integration credential updated.",
+                ":new_values" => json_encode([
                     "field_key" => $fieldKey,
                     "credential_updated" => true
-                ], JSON_THROW_ON_ERROR)
+                ], JSON_THROW_ON_ERROR),
+                ":metadata" => json_encode([
+                    "source_table" => "integration_audit_logs",
+                    "integration_id" => $integrationId,
+                    "field_key" => $fieldKey
+                ], JSON_THROW_ON_ERROR),
+                ":severity" => "INFO"
             ]);
         }
 

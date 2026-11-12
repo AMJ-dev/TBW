@@ -377,38 +377,55 @@ try {
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
     $log = $conn->prepare("
-        INSERT INTO terminal_examination_logs (
+        INSERT INTO activity_logs (
             id,
-            examination_id,
+            actor_id,
+            category,
             action,
-            previous_status,
-            new_status,
+            entity_type,
+            entity_id,
             description,
+            old_values,
+            new_values,
             metadata,
-            performed_at,
-            performed_by
+            severity,
+            created_at
         ) VALUES (
             :id,
-            :examination_id,
+            :actor_id,
+            :category,
             :action,
-            :previous_status,
-            :new_status,
+            :entity_type,
+            :entity_id,
             :description,
+            :old_values,
+            :new_values,
             :metadata,
-            NOW(),
-            :performed_by
+            :severity,
+            NOW()
         )
     ");
 
     $log->execute([
         ":id" => generateId(),
-        ":examination_id" => $examination_id,
+        ":actor_id" => $my_details->id,
+        ":category" => "EXAMINATION",
         ":action" => $log_action,
-        ":previous_status" => $previous_status,
-        ":new_status" => $new_status,
+        ":entity_type" => "EXAMINATION",
+        ":entity_id" => $examination_id,
         ":description" => $log_description,
-        ":metadata" => $log_metadata,
-        ":performed_by" => $my_details->id
+        ":old_values" => json_encode([
+            "status" => $previous_status
+        ], JSON_THROW_ON_ERROR),
+        ":new_values" => json_encode([
+            "status" => $new_status
+        ], JSON_THROW_ON_ERROR),
+        ":metadata" => json_encode([
+            "source_table" => "terminal_examination_logs",
+            "examination_id" => $examination_id,
+            "details" => $log_metadata
+        ], JSON_THROW_ON_ERROR),
+        ":severity" => "INFO"
     ]);
 
     $conn->commit();

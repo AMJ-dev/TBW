@@ -47,11 +47,55 @@
         $stmt = $conn->prepare("UPDATE gate_vehicles SET `status` = 'Approved', approved_by = :actor_id, approved_at = NOW() WHERE id = :id AND organisation_id=:organisation_id");
         if ($stmt->execute([":id" => $id, ":actor_id" => $actor_id, ":organisation_id" => $organisation_id])) {
             $log = $conn->prepare("
-                INSERT INTO gate_vehicle_action_logs (
-                    id, vehicle_id, action, previous_status, new_status, actor_id
-                ) VALUES (:id, :vehicle_id, 'approved', 'Pending review', 'Approved', :actor_id)
+                INSERT INTO activity_logs (
+                    id,
+                    actor_id,
+                    category,
+                    action,
+                    entity_type,
+                    entity_id,
+                    description,
+                    old_values,
+                    new_values,
+                    metadata,
+                    severity,
+                    created_at
+                ) VALUES (
+                    :id,
+                    :actor_id,
+                    :category,
+                    :action,
+                    :entity_type,
+                    :entity_id,
+                    :description,
+                    :old_values,
+                    :new_values,
+                    :metadata,
+                    :severity,
+                    NOW()
+                )
             ");
-            $log->execute([":id" => generateId(), ":vehicle_id" => $id, ":actor_id" => $actor_id]);
+
+            $log->execute([
+                ":id" => generateId(),
+                ":actor_id" => $actor_id,
+                ":category" => "GATE",
+                ":action" => "VEHICLE_APPROVED",
+                ":entity_type" => "VEHICLE",
+                ":entity_id" => $id,
+                ":description" => "Vehicle approved after review.",
+                ":old_values" => json_encode([
+                    "status" => "Pending review"
+                ], JSON_THROW_ON_ERROR),
+                ":new_values" => json_encode([
+                    "status" => "Approved"
+                ], JSON_THROW_ON_ERROR),
+                ":metadata" => json_encode([
+                    "source_table" => "gate_vehicle_action_logs",
+                    "vehicle_id" => $id
+                ], JSON_THROW_ON_ERROR),
+                ":severity" => "INFO"
+            ]);
             
             echo json_encode([
                 "error" => false,
