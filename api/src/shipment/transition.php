@@ -198,15 +198,11 @@ try {
         $requiredDocs = $requiredDocsStmt->fetchAll(PDO::FETCH_COLUMN);
 
         if ($requiredDocs) {
-            $uploadedStmt = $conn->prepare("
-                SELECT document_type FROM portal_shipment_documents WHERE shipment_id = :shipment_id
-            ");
+            $uploadedStmt = $conn->prepare("SELECT document_type FROM portal_shipment_documents WHERE shipment_id = :shipment_id");
             $uploadedStmt->execute([":shipment_id" => $shipmentId]);
             $uploaded = array_fill_keys(array_map("strval", $uploadedStmt->fetchAll(PDO::FETCH_COLUMN)), true);
             foreach ($requiredDocs as $label) {
-                if (!isset($uploaded[(string) $label])) {
-                    respond(422, true, "Missing required document: " . $label . ".");
-                }
+                if (!isset($uploaded[(string) $label])) respond(422, true, "Missing required document: " . $label . ".");
             }
         }
     }

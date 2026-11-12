@@ -66,8 +66,7 @@ try {
         }
 
         $q = $conn->prepare("
-            SELECT d.id, d.shipment_id, d.document_type, d.original_name, d.stored_name,
-                   d.file_path, d.mime_type, d.file_size, d.uploaded_at, dt.label AS document_label
+            SELECT d.id, d.shipment_id, d.document_type, d.original_name, d.stored_name, d.file_path, d.mime_type, d.file_size, d.uploaded_at, dt.label AS document_label
             FROM portal_shipment_documents d
             LEFT JOIN document_types dt ON dt.document_key = d.document_type
             WHERE d.shipment_id IN ($placeholders)

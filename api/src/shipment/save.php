@@ -638,10 +638,10 @@ try {
 
     $documentInsert = $conn->prepare("
         INSERT INTO portal_shipment_documents (
-            id, shipment_id, document_type, original_name,
+            id, shipment_id, reference_code, document_type, original_name,
             stored_name, file_path, mime_type, file_size
         ) VALUES (
-            :id, :shipment_id, :document_type, :original_name,
+            :id, :shipment_id, :reference_code, :document_type, :original_name,
             :stored_name, :file_path, :mime_type, :file_size
         )
     ");
@@ -719,9 +719,11 @@ try {
 
         $createdFiles[] = $targetPath;
         $storedName = basename($targetPath);
+        $reference_code = generate_ref(clean_type($documentLabel));
 
         $documentInsert->bindValue(":id", generateId());
         $documentInsert->bindValue(":shipment_id", $shipmentId);
+        $documentInsert->bindValue(":reference_code", $reference_code);
         $documentInsert->bindValue(":document_type", $documentLabel);
         $documentInsert->bindValue(":original_name", $originalName);
         $documentInsert->bindValue(":stored_name", $storedName);

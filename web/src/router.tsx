@@ -120,7 +120,7 @@ const OperationsValueAddedPage = lazy(() => import("@/pages/operations/value-add
 const OperationsReviewPage = lazy(() => import("@/pages/shipment/review"));
 const OperationsShipmentReviewPage = lazy(() => import("@/pages/shipment/shipment-review-details"));
 const OperationDocumentationPage = lazy(()=>import("@/pages/operations/documentation/"))
-const OperationDocumentDetailsationPage = lazy(()=>import("@/pages/operations/documentation/details"))
+const OperationDocumentDetailsPage = lazy(()=>import("@/pages/operations/documentation/details"))
 const OperationsOverstayPage = lazy(()=>import("@/pages/operations/overstay"))
 const OperationsTransferPage = lazy(()=>import("@/pages/operations/transfer"))
 
@@ -131,7 +131,8 @@ const ContainerDetailPage = lazy(() => import("@/pages/portal/cargo/container"))
 const PackageDetailPage = lazy(() => import("@/pages/portal/cargo/package"));
 const ServiceRequestPage = lazy(() => import("@/pages/portal/cargo/service-request"));
 const DiscrepancyClaimPage = lazy(() => import("@/pages/portal/cargo/claim"));
-const PortalDocumentsPage = lazy(() => import("@/pages/portal/documents"));
+const PortalDocumentsPage = lazy(() => import("@/pages/portal/documents/"));
+const PortalDocumentDetailsPage = lazy(() => import("@/pages/portal/documents/details"));
 const PortalInvoicesPage = lazy(() => import("@/pages/portal/invoices"));
 const PortalPaymentsPage = lazy(() => import("@/pages/portal/payments"));
 const InvoiceDisputePage = lazy(() => import("@/pages/portal/payments/dispute"));
@@ -260,7 +261,7 @@ export default function Routers() {
 						<Route path="/operations/examinations/review/:id" element={<ExaminationReviewDetailsPage />} />
 
 						<Route path="/operations/documentation" element={<OperationDocumentationPage />} />
-						<Route path="/operations/documentation/:id" element={<OperationDocumentDetailsationPage />} />
+						<Route path="/operations/documentation/:id" element={<OperationDocumentDetailsPage />} />
 
 						<Route path="/operations/warehouse" element={<OperationsWarehousePage />} />
 						<Route path="/operations/yard" element={<OperationsYardPage />} />
@@ -307,6 +308,7 @@ export default function Routers() {
 						<Route path="/portal/cargo/:id/service-request" element={<ServiceRequestPage />} />
 						<Route path="/portal/cargo/:id/claim" element={<DiscrepancyClaimPage />} />
 						<Route path="/portal/documents" element={<PortalDocumentsPage />} />
+						<Route path="/portal/documents/:id" element={<PortalDocumentDetailsPage />} />
 						<Route path="/portal/invoices" element={<PortalInvoicesPage />} />
 						<Route path="/portal/payments" element={<PortalPaymentsPage />} />
 						<Route path="/portal/payments/dispute" element={<InvoiceDisputePage />} />

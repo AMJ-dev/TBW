@@ -39,7 +39,7 @@ const toneClasses: Record<string, string> = {
     neutral: "bg-ink/5 text-ink-soft ring-line",
 };
 
-export function StatusBadge({ label, tone = "neutral" }: { label: string; tone?: string }) {
+export function StatusBadge({ label, tone = "neutral" }: { label: string; tone?: string | undefined }) {
     return (
         <span className={cn(
             "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.08em] ring-1",
