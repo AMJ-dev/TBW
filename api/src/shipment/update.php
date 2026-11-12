@@ -853,6 +853,7 @@
             INSERT INTO portal_shipment_documents (
                 id,
                 shipment_id,
+                reference_code,
                 document_type,
                 original_name,
                 stored_name,
@@ -862,6 +863,7 @@
             ) VALUES (
                 :id,
                 :shipment_id,
+                :reference_code,
                 :document_type,
                 :original_name,
                 :stored_name,
@@ -971,10 +973,12 @@
 
             $createdFiles[] = $targetPath;
             $storedName = basename($targetPath);
+            $reference_code = generate_ref(clean_type($documentLabel));
 
             $documentInsert->execute([
                 ":id" => generateId(),
                 ":shipment_id" => $shipmentId,
+                ":reference_code" => $reference_code,
                 ":document_type" => $documentLabel,
                 ":original_name" => $originalName,
                 ":stored_name" => $storedName,

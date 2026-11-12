@@ -315,8 +315,7 @@ try {
     }
 
     $shipmentId = generateId();
-    $shipmentReference = "TRN-SHP-" . date("Y") . "-" .
-        strtoupper(bin2hex(random_bytes(6)));
+    $shipmentReference = generate_ref();
 
     $totalPackages = 0;
     $totalWeight = 0;
@@ -526,6 +525,7 @@ try {
         INSERT INTO portal_shipment_documents (
             id,
             shipment_id,
+            reference_code,
             document_type,
             original_name,
             stored_name,
@@ -535,6 +535,7 @@ try {
         ) VALUES (
             :id,
             :shipment_id,
+            :reference_code,
             :document_type,
             :original_name,
             :stored_name,
@@ -545,9 +546,11 @@ try {
     ");
 
     foreach ($uploadedDocuments as $document) {
+        $reference_code = generate_ref(clean_type($document["document_type"]));
         $documentInsert->execute([
             ":id" => $document["id"],
             ":shipment_id" => $shipmentId,
+            ":reference_code" => $reference_code,
             ":document_type" => $document["document_type"],
             ":original_name" => $document["original_name"],
             ":stored_name" => $document["stored_name"],

@@ -45,6 +45,14 @@
     function rm_special_char($char){
         return preg_replace("/[^a-zA-Z0-9\.]/", "1", $char);
     }
+    function generate_ref($type="SHP"){
+        return "TRN-".$type."-".date("Y")."-".strtoupper(bin2hex(random_bytes(6)));
+    }
+    function clean_type($name){
+        $clean = preg_replace('/[^a-zA-Z0-9\s]/', '', $name);
+        $words = array_filter(explode(' ', $clean));
+        return implode('', array_map(fn($w) => strtoupper($w[0]), $words));
+    }
     function gen_filename($filename){
         $file_name = rm_special_char($filename);
         $bytes = bin2hex(openssl_random_pseudo_bytes(5));

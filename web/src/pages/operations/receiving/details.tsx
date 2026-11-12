@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -16,7 +16,6 @@ import {
   Package,
   RefreshCw,
   Scale,
-  ShieldCheck,
   Truck,
   Warehouse,
   XCircle,
@@ -29,6 +28,7 @@ import {
 } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { http, type Resp } from "@/lib/httpClient";
+import { resolveSrc } from "@/lib/functions";
 
 type DataRecord = Record<string, unknown>;
 
@@ -582,68 +582,6 @@ function PhotoGallery({
   );
 }
 
-function DetailList({
-  title,
-  record,
-  exclude = [],
-}: {
-  title: string;
-  record: DataRecord;
-  exclude?: string[];
-}) {
-  const excluded = new Set([
-    ...exclude,
-    "id",
-    "created_at",
-    "updated_at",
-    "deleted_at",
-    "containers",
-    "photos",
-    "images",
-    "attachments",
-    "damage_photos",
-    "damaged_goods_photos",
-    "damaged_goods_pictures",
-    "damage_images",
-    "condition_photos",
-    "inspection_photos",
-    "receiving_photos",
-  ]);
-
-  const fields = Object.entries(record).filter(([key, value]) => {
-    if (excluded.has(key.toLowerCase())) return false;
-    if (value === null || value === undefined || value === "") return false;
-    if (typeof value === "object") return false;
-
-    return true;
-  });
-
-  if (!fields.length) return null;
-
-  return (
-    <section className={cardClass}>
-      <div className="border-b border-line px-4 py-4 sm:px-5">
-        <h2 className={sectionTitleClass}>{title}</h2>
-      </div>
-
-      <div className="grid gap-5 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-3">
-        {fields.map(([key, value]) => (
-          <Field
-            key={key}
-            label={formatLabel(key)}
-            value={String(value)}
-            mono={
-              key.toLowerCase().includes("reference") ||
-              key.toLowerCase().endsWith("_id") ||
-              key.toLowerCase().includes("number")
-            }
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
 export default function OperationsReceivingDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -719,19 +657,10 @@ export default function OperationsReceivingDetailsPage() {
     );
   }, [record]);
 
-  const expectedWeightTotal = containers.reduce((total, container) => {
-    const value = getNumber(container, "expected_weight", "gross_weight");
-    return total + (value ?? 0);
-  }, 0);
-
   const actualWeightTotal = containers.reduce((total, container) => {
     const value = getNumber(container, "actual_weight", "verified_weight");
     return total + (value ?? 0);
   }, 0);
-
-  const hasExpectedWeight = containers.some(
-    (container) => getNumber(container, "expected_weight", "gross_weight") !== null,
-  );
 
   const hasActualWeight = containers.some(
     (container) => getNumber(container, "actual_weight", "verified_weight") !== null,
@@ -769,9 +698,6 @@ export default function OperationsReceivingDetailsPage() {
     .map((container) => getText(container, "condition_status", "cargo_condition"))
     .filter(Boolean))].join(", ");
 
-  const discrepancyStatuses = [...new Set(containers
-    .map((container) => getText(container, "discrepancy_status", "receiving_status", "condition_status"))
-    .filter(Boolean))].join(", ");
 
   const topLevelPhotos = useMemo(
     () => (record ? extractPhotos(record) : []),
@@ -813,16 +739,42 @@ export default function OperationsReceivingDetailsPage() {
       )
     : "";
 
-  const damageStatus = record
-    ? normalizeStatus(
-        getValue(
-          record,
-          "cargo_condition",
-          "condition_status",
-          "damage_status",
-        ),
-      )
-    : "";
+  const root = record ?? {};
+  const shipment = isRecord(root["shipment"]) ? root["shipment"] : {};
+  const organisation = isRecord(root["organisation"])
+    ? root["organisation"]
+    : isRecord(root["organization"])
+      ? root["organization"]
+      : {};
+  const gatePass = isRecord(root["gate_pass"])
+    ? root["gate_pass"]
+    : isRecord(root["gatePass"])
+      ? root["gatePass"]
+      : {};
+  const appointment = isRecord(gatePass["appointment"])
+    ? gatePass["appointment"]
+    : isRecord(root["appointment"])
+      ? root["appointment"]
+      : {};
+  const vehicle = isRecord(gatePass["vehicle"])
+    ? gatePass["vehicle"]
+    : isRecord(root["vehicle"])
+      ? root["vehicle"]
+      : {};
+  const driver = isRecord(gatePass["driver"])
+    ? gatePass["driver"]
+    : isRecord(root["driver"])
+      ? root["driver"]
+      : {};
+  const movements = extractArray(root, "movements").length
+    ? extractArray(root, "movements")
+    : extractArray(gatePass, "movements");
+  const documents = extractArray(root, "documents");
+  const logs = extractArray(root, "logs", "history");
+  const cargoVerification = isRecord(root["cargo_verification"])
+    ? root["cargo_verification"]
+    : {};
+  const summary = isRecord(root["summary"]) ? root["summary"] : {};
 
   const totalContainers =
     getNumber(record ?? {}, "total_containers", "container_count") ??
@@ -877,7 +829,7 @@ export default function OperationsReceivingDetailsPage() {
             Loading receiving details
           </p>
           <p className="mt-1 text-xs text-ink-soft">
-            Retrieving shipment, container and inspection information.
+            Retrieving shipment, container and receiving information.
           </p>
         </div>
       </AppShell>
@@ -956,22 +908,12 @@ export default function OperationsReceivingDetailsPage() {
                 ) || "Receiving details"}
               </h1>
 
-              <p className="mt-2 break-all font-mono text-xs text-ink-soft">
-                Record ID: {getText(record, "id", "receiving_id") || id}
-              </p>
-
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <StatusBadge
                   label={displayStatus(status)}
                   tone={getStatusTone(status)}
                 />
 
-                {damageStatus && damageStatus !== "UNKNOWN" && (
-                  <StatusBadge
-                    label={displayStatus(damageStatus)}
-                    tone={getStatusTone(damageStatus)}
-                  />
-                )}
               </div>
             </div>
           </div>
@@ -1055,11 +997,6 @@ export default function OperationsReceivingDetailsPage() {
             mono
           />
           <Field
-            label="Receiving ID"
-            value={getText(record, "id", "receiving_id") || id}
-            mono
-          />
-          <Field
             label="Status"
             value={displayStatus(status)}
           />
@@ -1089,6 +1026,12 @@ export default function OperationsReceivingDetailsPage() {
               getValue(record, "received_at", "received_on"),
             )}
           />
+          <Field label="Started by" value={getText(record, "started_by_name")} />
+          <Field label="Started at" value={formatDate(getValue(record, "started_at"))} />
+          <Field label="Completed by" value={getText(record, "completed_by_name")} />
+          <Field label="Completed at" value={formatDate(getValue(record, "completed_at"))} />
+          <Field label="Gate-in time" value={formatDate(getValue(record, "gate_in_time"))} />
+          <Field label="Gate-out time" value={formatDate(getValue(record, "gate_out_time"))} />
           <Field
             label="Created at"
             value={formatDate(getValue(record, "created_at"))}
@@ -1117,11 +1060,6 @@ export default function OperationsReceivingDetailsPage() {
               "shipment_reference",
               "shipment_ref",
             )}
-            mono
-          />
-          <Field
-            label="Shipment ID"
-            value={getText(record, "shipment_id")}
             mono
           />
           <Field
@@ -1201,11 +1139,6 @@ export default function OperationsReceivingDetailsPage() {
             mono
           />
           <Field
-            label="Gate pass ID"
-            value={getText(record, "gate_pass_id")}
-            mono
-          />
-          <Field
             label="Appointment reference"
             value={getText(
               record,
@@ -1264,9 +1197,189 @@ export default function OperationsReceivingDetailsPage() {
         </InfoSection>
 
         <InfoSection
-          title="Cargo and weight verification"
+          title="Organisation information"
+          icon={Warehouse}
+          description="Organisation details associated with this shipment."
+        >
+          <Field label="Organisation name" value={getText(organisation, "organisation_name", "name", "trading_name")} />
+          <Field label="Trading name" value={getText(organisation, "trading_name")} />
+          <Field label="RC number" value={getText(organisation, "rc_number")} mono />
+          <Field label="TIN" value={getText(organisation, "tin")} mono />
+          <Field label="Organisation type" value={getText(organisation, "organisation_type", "type")} />
+          <Field label="Verification status" value={displayStatus(normalizeStatus(getText(organisation, "verification_status")))} />
+          <Field label="Registered address" value={getText(organisation, "registered_address")} />
+          <Field label="Contact person" value={getText(organisation, "contact_person")} />
+          <Field label="Contact email" value={getText(organisation, "contact_email")} />
+          <Field label="Contact phone" value={getText(organisation, "contact_phone")} />
+        </InfoSection>
+
+        <InfoSection
+          title="Shipment declaration"
+          icon={Package}
+          description="Cargo, consignee and customs information from the shipment declaration."
+        >
+          <Field label="Shipment type" value={getText(shipment, "shipment_type")} />
+          <Field label="Booking number" value={getText(shipment, "booking_number")} mono />
+          <Field label="Origin country" value={getText(shipment, "origin_country")} />
+          <Field label="Expected arrival" value={formatDate(getValue(shipment, "expected_arrival"))} />
+          <Field label="Consignee" value={getText(shipment, "consignee")} />
+          <Field label="Consignee contact person" value={getText(shipment, "consignee_contact_person")} />
+          <Field label="Consignee email" value={getText(shipment, "consignee_email")} />
+          <Field label="Consignee phone" value={getText(shipment, "consignee_phone")} />
+          <Field label="Consignee address" value={getText(shipment, "consignee_address")} />
+          <Field label="Consignee country" value={getText(shipment, "consignee_country")} />
+          <Field label="Consignee type" value={getText(shipment, "consignee_type")} />
+          <Field label="Consignee status" value={getText(shipment, "consignee_status")} />
+          <Field label="Cargo description" value={getText(shipment, "cargo_description")} />
+          <Field label="Cargo category" value={getText(shipment, "cargo_category")} />
+          <Field label="Package type" value={getText(shipment, "package_type")} />
+          <Field label="Declared package count" value={getText(shipment, "package_count")} />
+          <Field label="Declared gross weight" value={formatWeight(getValue(shipment, "gross_weight"))} />
+          <Field label="Cargo volume" value={getText(shipment, "volume")} />
+          <Field label="Dangerous goods" value={getText(shipment, "dangerous_goods")} />
+          <Field label="Temperature controlled" value={getText(shipment, "temperature_controlled")} />
+          <Field label="Temperature" value={getText(shipment, "temperature")} />
+          <Field label="Customs reference" value={getText(shipment, "customs_reference")} mono />
+          <Field label="Special instructions" value={getText(shipment, "special_instructions")} />
+        </InfoSection>
+
+        <InfoSection
+          title="Gate pass and appointment"
+          icon={ClipboardCheck}
+          description="Gate pass status, appointment booking and issuance details."
+        >
+          <Field label="Pass code" value={getText(gatePass, "pass_code")} mono />
+          <Field label="Gate pass type" value={getText(gatePass, "type")} />
+          <Field label="Gate pass status" value={displayStatus(normalizeStatus(getText(gatePass, "status")))} />
+          <Field label="Issued by" value={getText(gatePass, "issued_by_name")} />
+          <Field label="Issued at" value={formatDate(getValue(gatePass, "issued_at"))} />
+          <Field label="Appointment reference" value={getText(appointment, "appointment_reference", "booking_ref")} mono />
+          <Field label="Appointment date" value={formatDate(getValue(appointment, "appointment_date"))} />
+          <Field label="Appointment time" value={getText(appointment, "slot_time")} />
+          <Field label="Appointment status" value={displayStatus(normalizeStatus(getText(appointment, "status")))} />
+          <Field label="Gate-in officer" value={getText(record, "gate_officer_name")} />
+        </InfoSection>
+
+        <InfoSection
+          title="Vehicle and driver"
+          icon={Truck}
+          description="Transport details recorded against the gate pass."
+        >
+          <Field label="Vehicle registration" value={getText(vehicle, "plate", "registration", "registration_number", "vehicle_registration") || getText(record, "vehicle_registration")} mono />
+          <Field label="Vehicle type" value={getText(vehicle, "kind", "type")} />
+          <Field label="Make" value={getText(vehicle, "make")} />
+          <Field label="Model" value={getText(vehicle, "model")} />
+          <Field label="Year" value={getText(vehicle, "year")} />
+          <Field label="Capacity" value={getText(vehicle, "capacity")} />
+          <Field label="Vehicle owner" value={getText(vehicle, "owner")} />
+          <Field label="Transporter" value={getText(vehicle, "transporter") || getText(driver, "transporter")} />
+          <Field label="Insurance expiry" value={formatDate(getValue(vehicle, "insurance_expiry"))} />
+          <Field label="Roadworthiness expiry" value={formatDate(getValue(vehicle, "roadworthiness_expiry"))} />
+          <Field label="Driver name" value={getText(driver, "name", "full_name") || getText(record, "driver_name")} />
+          <Field label="Driver phone" value={getText(driver, "phone", "phone_number") || getText(record, "driver_phone")} />
+          <Field label="Licence number" value={getText(driver, "licence_number")} mono />
+          <Field label="Licence class" value={getText(driver, "licence_class")} />
+          <Field label="Licence expiry" value={formatDate(getValue(driver, "licence_expiry"))} />
+          <Field label="Driver status" value={displayStatus(normalizeStatus(getText(driver, "status")))} />
+        </InfoSection>
+
+        {movements.length > 0 && (
+          <section className={cardClass}>
+            <div className="border-b border-line px-4 py-4 sm:px-5">
+              <h2 className={sectionTitleClass}>Gate movement history</h2>
+              <p className="mt-1 text-xs text-ink-soft">Recorded gate admission and exit decisions.</p>
+            </div>
+            <div className="divide-y divide-line">
+              {movements.map((movement, index) => (
+                <div key={`${getText(movement, "movement_at", "created_at")}-${index}`} className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <Field label="Direction" value={displayStatus(normalizeStatus(getText(movement, "direction")))} />
+                  <Field label="Decision" value={displayStatus(normalizeStatus(getText(movement, "decision")))} />
+                  <Field label="Officer" value={getText(movement, "operator_name", "gate_officer_name")} />
+                  <Field label="Movement time" value={formatDate(getValue(movement, "movement_at", "created_at"))} />
+                  <div className="sm:col-span-2 lg:col-span-4"><Field label="Reason" value={getText(movement, "reason")} /></div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {documents.length > 0 && (
+          <section className={cardClass}>
+            <div className="flex items-center justify-between border-b border-line px-4 py-4 sm:px-5">
+              <div>
+                <h2 className={sectionTitleClass}>Receiving documents</h2>
+                <p className="mt-1 text-xs text-ink-soft">{documents.length} uploaded document{documents.length === 1 ? "" : "s"} attached to this receiving record.</p>
+              </div>
+              <FileText className="size-5 text-ink-soft" />
+            </div>
+            <div className="divide-y divide-line">
+              {documents.map((document, index) => {
+                const filePath = getText(document, "file_url", "document_url", "file_path", "path");
+                const fileUrl = filePath ? resolveSrc(filePath) : "";
+                const fileSize = getNumber(document, "file_size");
+                return (
+                  <div key={`${getText(document, "document_key")}-${index}`} className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sand"><FileText className="size-4 text-ink" /></div>
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-semibold text-ink">{getText(document, "document_type", "document_key") || "Receiving document"}</p>
+                        <p className="mt-1 break-all text-xs text-ink-soft">{getText(document, "original_name", "stored_name")}</p>
+                        <p className="mt-1 text-xs text-ink-soft">Uploaded by {getText(document, "uploaded_by_name") || "—"} · {formatDate(getValue(document, "uploaded_at"))}{fileSize !== null ? ` · ${(fileSize / 1024 / 1024).toFixed(2)} MB` : ""}</p>
+                      </div>
+                    </div>
+                    {fileUrl && <a href={fileUrl} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-ink underline">Open document <ExternalLink className="size-3" /></a>}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        <InfoSection
+          title="Cargo verification summary"
           icon={Scale}
-          description="Declared cargo quantities, expected weights and actual measurements."
+          description="Summary values calculated from the receiving and container records."
+        >
+          <Field label="Container count" value={getText(cargoVerification, "container_count") || getText(summary, "total_containers")} />
+          <Field label="Expected package count" value={getText(cargoVerification, "expected_package_count")} />
+          <Field label="Declared gross weight" value={formatWeight(getValue(cargoVerification, "declared_gross_weight"))} />
+          <Field label="Actual weight total" value={formatWeight(getValue(cargoVerification, "actual_weight_total") ?? getValue(summary, "actual_weight_total"))} />
+          <Field label="Containers with actual weight" value={getText(cargoVerification, "container_count_with_weight") || getText(summary, "containers_with_weight")} />
+          <Field label="Containers with seal mismatch" value={getText(cargoVerification, "container_count_with_seal_mismatch") || getText(summary, "containers_with_seal_mismatch")} />
+          <Field label="Documents uploaded" value={getText(summary, "documents_count") || getText(record, "documents_count")} />
+          <Field label="Containers returned" value={getText(summary, "containers_returned")} />
+        </InfoSection>
+
+        {logs.length > 0 && (
+          <section className={cardClass}>
+            <div className="border-b border-line px-4 py-4 sm:px-5">
+              <h2 className={sectionTitleClass}>Receiving activity</h2>
+              <p className="mt-1 text-xs text-ink-soft">A timeline of actions performed on this receiving record.</p>
+            </div>
+            <div className="divide-y divide-line">
+              {logs.map((log, index) => (
+                <div key={`${getText(log, "action")}-${index}`} className="grid gap-3 p-4 sm:grid-cols-[1fr_2fr_1fr]">
+                  <div>
+                    <p className={labelClass}>Action</p>
+                    <p className="mt-1 text-sm font-semibold text-ink">{formatLabel(getText(log, "action") || "Activity")}</p>
+                    <p className="mt-1 text-xs text-ink-soft">{formatDate(getValue(log, "performed_at"))}</p>
+                  </div>
+                  <div>
+                    <p className={labelClass}>Activity details</p>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-sm text-ink">{getText(log, "description") || "—"}</p>
+                    <p className="mt-1 text-xs text-ink-soft">{getText(log, "previous_status") ? `${displayStatus(normalizeStatus(getText(log, "previous_status")))} → ` : ""}{displayStatus(normalizeStatus(getText(log, "new_status")))}</p>
+                  </div>
+                  <Field label="Performed by" value={getText(log, "performed_by_name")} />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <InfoSection
+          title="Cargo details"
+          icon={Scale}
+          description="Container identifiers, seal details, package quantities and actual measurements."
         >
           <Field
             label="Container number"
@@ -1289,34 +1402,10 @@ export default function OperationsReceivingDetailsPage() {
             mono
           />
           <Field
-            label="Expected weight"
-            value={hasExpectedWeight
-              ? formatWeight(expectedWeightTotal)
-              : formatWeight(getValue(record, "expected_weight", "gross_weight", "declared_weight"))}
-          />
-          <Field
             label="Actual weight"
             value={hasActualWeight
               ? formatWeight(actualWeightTotal)
               : formatWeight(getValue(record, "actual_weight", "verified_weight", "measured_weight"))}
-          />
-          <Field
-            label="Weight difference"
-            value={(() => {
-              const expected = hasExpectedWeight
-                ? expectedWeightTotal
-                : getNumber(record, "expected_weight", "gross_weight", "declared_weight");
-
-              const actual = hasActualWeight
-                ? actualWeightTotal
-                : getNumber(record, "actual_weight", "verified_weight", "measured_weight");
-
-              if (expected === null || actual === null) {
-                return "—";
-              }
-
-              return formatWeight(actual - expected);
-            })()}
           />
           <Field
             label="Package count"
@@ -1332,118 +1421,6 @@ export default function OperationsReceivingDetailsPage() {
             label="Cargo condition"
             value={cargoConditions || getText(record, "cargo_condition", "condition_status", "condition")}
           />
-          <Field
-            label="Discrepancy status"
-            value={discrepancyStatuses || getText(record, "discrepancy_status", "damage_status")}
-          />
-        </InfoSection>
-
-        <InfoSection
-          title="Inspection and damage assessment"
-          icon={ShieldCheck}
-          description="Condition checks, damaged-goods information and inspection remarks."
-        >
-          <Field
-            label="Inspection status"
-            value={getText(
-              record,
-              "inspection_status",
-              "inspection_result",
-            )}
-          />
-          <Field
-            label="Inspector"
-            value={getText(
-              record,
-              "inspector_name",
-              "inspected_by_name",
-              "inspected_by",
-            )}
-          />
-          <Field
-            label="Inspection date"
-            value={formatDate(
-              getValue(
-                record,
-                "inspection_at",
-                "inspected_at",
-                "inspection_date",
-              ),
-            )}
-          />
-          <Field
-            label="Damage reported"
-            value={getText(
-              record,
-              "damage_reported",
-              "has_damage",
-              "damaged",
-            )}
-          />
-          <Field
-            label="Damage type"
-            value={getText(
-              record,
-              "damage_type",
-              "damage_category",
-            )}
-          />
-          <Field
-            label="Damage description"
-            value={getText(
-              record,
-              "damage_description",
-              "damage_details",
-            )}
-          />
-          <Field
-            label="Seal condition"
-            value={getText(
-              record,
-              "seal_condition",
-              "seal_status",
-            )}
-          />
-          <Field
-            label="Packaging condition"
-            value={getText(
-              record,
-              "packaging_condition",
-              "package_condition",
-            )}
-          />
-          <Field
-            label="Inspection remarks"
-            value={getText(
-              record,
-              "inspection_remarks",
-              "inspection_notes",
-            )}
-          />
-          <Field
-            label="Damage quantity"
-            value={getText(
-              record,
-              "damaged_quantity",
-              "damaged_packages",
-            )}
-          />
-          <Field
-            label="Damage location"
-            value={getText(
-              record,
-              "damage_location",
-              "affected_area",
-            )}
-          />
-          <Field
-            label="Reported by"
-            value={getText(
-              record,
-              "damage_reported_by",
-              "reported_by",
-            )}
-          />
         </InfoSection>
 
         {containers.length > 0 && (
@@ -1455,11 +1432,10 @@ export default function OperationsReceivingDetailsPage() {
 
               <div>
                 <h2 className={sectionTitleClass}>
-                  Container inspection details
+                  Container receiving details
                 </h2>
                 <p className="mt-1 text-xs leading-5 text-ink-soft">
-                  Container-level receiving status, seal verification,
-                  actual weight, condition and damage evidence.
+                  Container identity, seal verification, actual weight and receiving location.
                 </p>
               </div>
             </div>
@@ -1516,9 +1492,6 @@ export default function OperationsReceivingDetailsPage() {
                           ) || "Container number unavailable"}
                         </h3>
 
-                        <p className="mt-1 break-all text-xs text-ink-soft">
-                          ID: {getText(container, "id", "container_id") || "—"}
-                        </p>
                       </div>
 
                       <div className="flex flex-wrap gap-2">
@@ -1568,16 +1541,6 @@ export default function OperationsReceivingDetailsPage() {
                         mono
                       />
                       <Field
-                        label="Expected weight"
-                        value={formatWeight(
-                          getValue(
-                            container,
-                            "expected_weight",
-                            "gross_weight",
-                          ),
-                        )}
-                      />
-                      <Field
                         label="Actual weight"
                         value={formatWeight(
                           getValue(
@@ -1608,38 +1571,6 @@ export default function OperationsReceivingDetailsPage() {
                         label="Received at"
                         value={formatDate(
                           getValue(container, "received_at", "received_on"),
-                        )}
-                      />
-                      <Field
-                        label="Damage type"
-                        value={getText(
-                          container,
-                          "damage_type",
-                          "damage_category",
-                        )}
-                      />
-                      <Field
-                        label="Damaged quantity"
-                        value={getText(
-                          container,
-                          "damaged_quantity",
-                          "damaged_packages",
-                        )}
-                      />
-                      <Field
-                        label="Inspection status"
-                        value={getText(
-                          container,
-                          "inspection_status",
-                          "inspection_result",
-                        )}
-                      />
-                      <Field
-                        label="Inspected by"
-                        value={getText(
-                          container,
-                          "inspector_name",
-                          "inspected_by",
                         )}
                       />
                     </div>
@@ -1677,7 +1608,7 @@ export default function OperationsReceivingDetailsPage() {
 
         {allPhotos.length > 0 ? (
           <PhotoGallery
-            title="Damaged goods photos and evidence"
+            title="Receiving photos and evidence"
             photos={allPhotos}
           />
         ) : (
@@ -1689,83 +1620,18 @@ export default function OperationsReceivingDetailsPage() {
 
               <div>
                 <h2 className={sectionTitleClass}>
-                  Damage photos and attachments
+                  Receiving photos and attachments
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-ink-soft">
-                  No photos were found in the image and attachment fields
-                  returned by the receiving details API.
+                  No photos were found in the receiving photo fields returned by the API.
                 </p>
                 <p className="mt-2 text-xs leading-5 text-ink-soft">
-                  If photos exist in your database, ensure the API returns
-                  their URLs in fields such as{" "}
-                  <code>damage_photos</code>, <code>damage_images</code>,{" "}
-                  <code>photos</code>, or the relevant container records.
+                  Upload receiving photographs through the receiving documents section.
                 </p>
               </div>
             </div>
           </section>
         )}
-
-        <DetailList
-          title="Additional receiving data"
-          record={record}
-          exclude={[
-            "status",
-            "receiving_status",
-            "receiving_reference",
-            "reference",
-            "receiving_id",
-            "shipment_reference",
-            "shipment_ref",
-            "shipment_id",
-            "bill_of_lading",
-            "bill_of_lading_number",
-            "bl_number",
-            "gate_pass_number",
-            "gate_pass",
-            "gate_pass_reference",
-            "container_no",
-            "container_number",
-            "seal_number",
-            "seal_no",
-            "observed_seal_number",
-            "observed_seal",
-            "shipping_line",
-            "carrier_name",
-            "vessel_name",
-            "vessel",
-            "origin_port",
-            "port_of_origin",
-            "expected_weight",
-            "gross_weight",
-            "declared_weight",
-            "actual_weight",
-            "verified_weight",
-            "measured_weight",
-            "receiving_location",
-            "receiving_bay",
-            "received_bay",
-            "cargo_condition",
-            "condition_status",
-            "condition",
-            "discrepancy_notes",
-            "discrepancy_reason",
-            "remarks",
-            "notes",
-            "received_at",
-            "received_on",
-            "created_at",
-            "updated_at",
-            "modified_at",
-            "total_containers",
-            "container_count",
-            "received_containers",
-            "containers_received",
-            "discrepancy_containers",
-            "damaged_containers",
-            "containers_with_discrepancies",
-          ]}
-        />
 
         <section className="rounded-xl bg-paper p-4 ring-1 ring-line sm:p-5">
           <div className="flex items-start gap-3">
@@ -1841,42 +1707,6 @@ export default function OperationsReceivingDetailsPage() {
             <ArrowLeft className="size-4" />
             Back to receiving register
           </Button>
-
-          {getText(record, "shipment_id") && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                navigate(
-                  `/operations/shipments/${encodeURIComponent(
-                    getText(record, "shipment_id"),
-                  )}`,
-                )
-              }
-              className="border-line bg-paper text-ink hover:bg-sand"
-            >
-              <Package className="size-4" />
-              View shipment
-            </Button>
-          )}
-
-          {getText(record, "gate_pass_id") && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                navigate(
-                  `/operations/gate/passes/${encodeURIComponent(
-                    getText(record, "gate_pass_id"),
-                  )}`,
-                )
-              }
-              className="border-line bg-paper text-ink hover:bg-sand"
-            >
-              <Truck className="size-4" />
-              View gate pass
-            </Button>
-          )}
         </div>
       </div>
     </AppShell>

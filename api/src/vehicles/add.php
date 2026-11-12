@@ -1,3 +1,4 @@
+
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
@@ -15,6 +16,23 @@
     $notes = trim($_POST["notes"] ?? "");
 
     $allowedKinds = ["Flatbed", "Container", "Reefer", "Box", "Tanker"];
+    $acceptedFiles = [
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    ];
+
+    $uploadedPaths = [];
+
+    if (!$organisation_id) {
+        echo json_encode([
+            "error" => true,
+            "data" => "Organisation not found.",
+            "code" => null
+        ]);
+        exit;
+    }
 
     if ($plate === "" || $kind === "") {
         echo json_encode([
@@ -58,13 +76,56 @@
         }
     }
 
+    $documents = [
+        "insurance_certificate" => "Vehicle Insurance Certificate",
+        "roadworthiness_certificate" => "Vehicle Roadworthiness Certificate"
+    ];
+
+    foreach ($documents as $field => $label) {
+        if (
+            !isset($_FILES[$field]) ||
+            $_FILES[$field]["error"] !== UPLOAD_ERR_OK
+        ) {
+            echo json_encode([
+                "error" => true,
+                "data" => $label . " is required.",
+                "code" => null
+            ]);
+            exit;
+        }
+
+        if ($_FILES[$field]["size"] > 10 * 1024 * 1024) {
+            echo json_encode([
+                "error" => true,
+                "data" => $label . " must not exceed 10MB.",
+                "code" => null
+            ]);
+            exit;
+        }
+
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($_FILES[$field]["tmp_name"]);
+
+        if (!in_array($mime, $acceptedFiles, true)) {
+            echo json_encode([
+                "error" => true,
+                "data" => "Invalid file format for " . $label . ".",
+                "code" => null
+            ]);
+            exit;
+        }
+
+        $_FILES[$field]["type"] = $mime;
+    }
+
     try {
         $check = $conn->prepare("
             SELECT id
             FROM gate_vehicles
-            WHERE plate = :plate && organisation_id = :organisation_id
+            WHERE plate = :plate AND organisation_id = :organisation_id
             LIMIT 1
         ");
+
         $check->execute([
             ":plate" => $plate,
             ":organisation_id" => $organisation_id
@@ -78,6 +139,28 @@
             ]);
             exit;
         }
+
+        $insuranceUpload = upload_files(
+            $_FILES["insurance_certificate"],
+            $acceptedFiles
+        );
+
+        if ($insuranceUpload["error"]) {
+            throw new Exception("Vehicle Insurance Certificate: " . $insuranceUpload["data"]);
+        }
+
+        $uploadedPaths[] = $insuranceUpload["data"];
+
+        $roadworthinessUpload = upload_files(
+            $_FILES["roadworthiness_certificate"],
+            $acceptedFiles
+        );
+
+        if ($roadworthinessUpload["error"]) {
+            throw new Exception("Vehicle Roadworthiness Certificate: " . $roadworthinessUpload["data"]);
+        }
+
+        $uploadedPaths[] = $roadworthinessUpload["data"];
 
         $id = generateId();
 
@@ -95,10 +178,30 @@
                 transporter,
                 insurance_expiry,
                 roadworthiness_expiry,
+                insurance_certificate,
+                roadworthiness_certificate,
                 notes,
                 status,
                 created_by
-            ) VALUES (:id, :organisation_id, :plate, :kind, :make, :model, :year, :capacity, :owner, :transporter, :insurance_expiry, :roadworthiness_expiry, :notes, :status, :actor_id)
+            ) VALUES (
+                :id,
+                :organisation_id,
+                :plate,
+                :kind,
+                :make,
+                :model,
+                :year,
+                :capacity,
+                :owner,
+                :transporter,
+                :insurance_expiry,
+                :roadworthiness_expiry,
+                :insurance_certificate,
+                :roadworthiness_certificate,
+                :notes,
+                :status,
+                :actor_id
+            )
         ");
 
         $stmt->execute([
@@ -114,9 +217,11 @@
             ":transporter" => $transporter ?: null,
             ":insurance_expiry" => $insuranceExpiry ?: null,
             ":roadworthiness_expiry" => $roadworthinessExpiry ?: null,
+            ":insurance_certificate" => $insuranceUpload["data"],
+            ":roadworthiness_certificate" => $roadworthinessUpload["data"],
             ":notes" => $notes ?: null,
             ":status" => "Pending review",
-            ":created_by" => $my_details->id
+            ":actor_id" => $my_details->id
         ]);
 
         $stmt = $conn->prepare("
@@ -125,6 +230,7 @@
             WHERE id = ?
             LIMIT 1
         ");
+
         $stmt->execute([$id]);
 
         echo json_encode([
@@ -132,10 +238,20 @@
             "data" => "Vehicle registered successfully and is pending review.",
             "code" => $stmt->fetch(PDO::FETCH_ASSOC)
         ]);
-    } catch (PDOException $e) {
+    } catch (Exception $e) {
+        foreach ($uploadedPaths as $path) {
+            $fullPath = dirname(__DIR__, 1) . "/" . $path;
+
+            if (is_file($fullPath)) {
+                unlink($fullPath);
+            }
+        }
+
         echo json_encode([
             "error" => true,
-            "data" => "Could not register vehicle.",
+            "data" => $e instanceof PDOException
+                ? "Could not register vehicle."
+                : $e->getMessage(),
             "code" => null
         ]);
     }

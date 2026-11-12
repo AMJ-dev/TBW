@@ -34,6 +34,8 @@ import {
   BadgeCheck,
   Activity,
   MapPin,
+  Paperclip,
+  Trash2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -42,6 +44,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
+import { resolveSrc } from "@/lib/functions";
 
 type GateDirection = "in" | "out";
 type GateDecision = "ADMIT" | "REFER" | "REJECT";
@@ -368,6 +371,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
   const [active, setActive] = useState<QueuedTruck | null>(null);
   const [decision, setDecision] = useState<GateDecision | null>(null);
   const [decisionReason, setDecisionReason] = useState("");
+  const [gateEvidence, setGateEvidence] = useState<File | null>(null);
   const [overrideReason, setOverrideReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -376,6 +380,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
   const [gateLanes, setGateLanes] = useState<GateLane[]>([]);
   const [selectedGateLaneId, setSelectedGateLaneId] = useState("");
   const [lanesLoading, setLanesLoading] = useState(false);
+  
   
   const requestRef = useRef(0);
   const submitLock = useRef(false);
@@ -479,6 +484,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
     setDecision(null);
     setDecisionReason("");
     setOverrideReason("");
+    setGateEvidence(null);
     setLookupError(null);
   };
 
@@ -505,6 +511,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
       setDecision(null);
       setDecisionReason("");
       setOverrideReason("");
+      setGateEvidence(null);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Could not verify the gate pass.";
       setLookupError(message);
@@ -535,7 +542,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
     setSubmitting(true);
 
     try {
-      const response = await http.post("gate/decision/", {
+      const decisionData = {
         direction,
         record_id: active.id,
         gate_pass_id: active.gatePassId,
@@ -544,7 +551,19 @@ function GateConsole({ direction }: { direction: GateDirection }) {
         decision,
         reason: decisionReason.trim(),
         override_reason: overrideReason.trim(),
-      });
+      };
+
+      const response = isGateIn && decision === "ADMIT"
+        ? await (() => {
+            const payload = new FormData();
+            Object.entries(decisionData).forEach(([key, value]) => payload.append(key, String(value)));
+            payload.append("document_type", "GATE_IN_EVIDENCE");
+            if (gateEvidence) payload.append("gate_in_evidence", gateEvidence);
+            return http.post("gate/decision/", payload, {
+              headers: { "Content-Type": "multipart/form-data" },
+            });
+          })()
+        : await http.post("gate/decision/", decisionData);
       const resp: Resp = response.data;
       if (resp.error) throw new Error(String(resp.data || "The gate decision was not accepted."));
       
@@ -553,6 +572,7 @@ function GateConsole({ direction }: { direction: GateDirection }) {
       setDecision(null);
       setDecisionReason("");
       setOverrideReason("");
+      setGateEvidence(null);
       await loadQueue(true);
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : "Could not record the gate decision.");
@@ -710,6 +730,27 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                     </div>
                   </div>
 
+                  <div className="rounded-xl border border-line p-4">
+                    <h4 className="mb-3 flex items-center gap-2 font-semibold text-ink">
+                      <FileText className="size-4 text-orange-deep" />
+                      Verification Documents
+                    </h4>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <DocumentLink
+                        label="Driver's Licence"
+                        path={getString(active.driverDetails, "licence_document")}
+                      />
+                      <DocumentLink
+                        label="Insurance Certificate"
+                        path={getString(active.vehicleDetails, "insurance_certificate")}
+                      />
+                      <DocumentLink
+                        label="Roadworthiness Certificate"
+                        path={getString(active.vehicleDetails, "roadworthiness_certificate")}
+                      />
+                    </div>
+                  </div>
+
                   {/* Appointment Section */}
                   <div className="rounded-xl border border-line p-4">
                     <h4 className="mb-3 flex items-center gap-2 font-semibold text-ink">
@@ -855,6 +896,71 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                         </div>
                       </div>
 
+                      {isGateIn && decision === "ADMIT" && (
+                        <div className="space-y-3 rounded-xl border border-line bg-sand/40 p-4">
+                          <div className="flex items-start gap-2">
+                            <Paperclip className="mt-0.5 size-4 shrink-0 text-orange-deep" />
+                            <div>
+                              <p className="text-sm font-semibold text-ink">Gate-In Evidence</p>
+                              <p className="mt-1 text-xs leading-5 text-ink-soft">
+                                Upload photographs or documents showing the vehicle and cargo entering the terminal. This is optional and does not affect admission.
+                              </p>
+                            </div>
+                          </div>
+                          <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-orange/40 bg-paper px-4 py-5 text-center transition hover:border-orange hover:bg-orange/5">
+                            <FileText className="mb-2 size-6 text-orange-deep" />
+                            <span className="text-sm font-semibold text-ink">{gateEvidence ? "Replace evidence file" : "Choose one evidence file"}</span>
+                            <span className="mt-1 text-xs text-ink-soft">JPG, PNG, WEBP or PDF · Maximum 10 MB</span>
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp,application/pdf"
+                              disabled={submitting}
+                              className="sr-only"
+                              onChange={(event) => {
+                                const file = event.target.files?.[0] ?? null;
+                                if (file) {
+                                  const allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf"].includes(file.type);
+                                  if (!allowed) {
+                                    toast.error(`${file.name}: unsupported file type.`);
+                                    event.target.value = "";
+                                    return;
+                                  }
+                                  if (file.size > 10 * 1024 * 1024) {
+                                    toast.error(`${file.name}: file exceeds 10 MB.`);
+                                    event.target.value = "";
+                                    return;
+                                  }
+                                  setGateEvidence(file);
+                                }
+                                event.target.value = "";
+                              }}
+                            />
+                          </label>
+                          {gateEvidence && (
+                            <div className="flex items-center gap-3 rounded-lg border border-line bg-paper px-3 py-2">
+                              <FileText className="size-4 shrink-0 text-orange-deep" />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-xs font-medium text-ink">{gateEvidence.name}</p>
+                                <p className="text-[10px] text-ink-soft">{(gateEvidence.size / 1024 / 1024).toFixed(2)} MB</p>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={submitting}
+                                onClick={() => setGateEvidence(null)}
+                                className="rounded-md p-2 text-ink-soft transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                                aria-label={`Remove ${gateEvidence.name}`}
+                              >
+                                <Trash2 className="size-4" />
+                              </button>
+                            </div>
+                          )}
+
+                          <p className="text-[10px] leading-4 text-ink-soft">
+                            Evidence is attached to this Gate-In movement and should also be linked to its shipment and containers by the server.
+                          </p>
+                        </div>
+                      )}
+
                       {(decision === "REFER" || decision === "REJECT") && (
                         <label className="block">
                           <span className="text-xs font-semibold text-ink">{decision === "REFER" ? "Reason for referral" : "Reason for rejection"}</span>
@@ -984,6 +1090,28 @@ function Detail({ label, value, mono = false }: { label: string; value?: string 
     <div>
       <p className="text-[10px] font-medium uppercase tracking-wider text-ink-soft">{label}</p>
       <p className={cn("mt-1 break-words text-[13px] font-medium text-ink", mono && "font-mono")}>{value || "—"}</p>
+    </div>
+  );
+}
+
+function DocumentLink({ label, path }: { label: string; path: string }) {
+  return (
+    <div className="rounded-lg border border-line bg-sand/40 p-3">
+      <p className="text-[10px] font-medium uppercase tracking-wider text-ink-soft">{label}</p>
+      {path ? (
+        <a
+          href={resolveSrc(path)}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-orange-deep transition hover:underline"
+        >
+          <FileText className="size-4 shrink-0" />
+          View document
+          <ArrowRight className="size-3.5" />
+        </a>
+      ) : (
+        <p className="mt-2 text-xs text-ink-soft">Not uploaded</p>
+      )}
     </div>
   );
 }

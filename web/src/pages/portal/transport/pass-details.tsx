@@ -19,7 +19,6 @@ import {
   FileText,
   BadgeCheck,
   Hash,
-  Ship,
   Package,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -374,11 +373,6 @@ export default function GatePassDetailsPage() {
                   </h2>
                 </div>
               </div>
-
-              <StatusBadge
-                label={pass.status || "Unknown"}
-                tone={statusTone(pass.status || "unknown")}
-              />
             </div>
 
             <div className="grid gap-0 lg:grid-cols-[1fr_260px]">

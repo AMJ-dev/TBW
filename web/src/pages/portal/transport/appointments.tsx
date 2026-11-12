@@ -273,7 +273,6 @@ export default function GateAppointmentsRoute() {
 				"Containers",
 				"Cargo Reference",
 				"Status",
-				"Assigned Lane",
 			],
 			...filteredAppointments.map((item) => [
 				item.id,
@@ -285,7 +284,6 @@ export default function GateAppointmentsRoute() {
 				item.containerNos.join(", "),
 				item.cargoRef,
 				item.status,
-				item.lane,
 			]),
 		];
 
@@ -441,7 +439,6 @@ export default function GateAppointmentsRoute() {
 								<th className="px-4 py-3 font-medium">Truck Plate</th>
 								<th className="px-4 py-3 font-medium">Driver / Phone</th>
 								<th className="px-4 py-3 font-medium">Container No.</th>
-								<th className="px-4 py-3 font-medium">Assigned Lane</th>
 								<th className="px-4 py-3 font-medium">Status</th>
 								<th className="px-4 py-3 font-medium">Actions</th>
 							</tr>
@@ -506,10 +503,6 @@ export default function GateAppointmentsRoute() {
 											{appointment.containerNos.length
 												? appointment.containerNos.join(", ")
 												: "—"}
-										</td>
-
-										<td className="px-4 py-3.5 text-xs text-ink-soft">
-											{appointment.lane || "—"}
 										</td>
 
 										<td className="px-4 py-3.5">

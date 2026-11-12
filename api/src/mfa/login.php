@@ -1,6 +1,7 @@
 <?php
     use \Firebase\JWT\JWT;
     require_once dirname(__DIR__, 2) . "/include/set-header.php";
+    require_once dirname(__DIR__, 2) . "/include/rate-limit/non-auth.php";
 
     function base32Decode($input){
         $input = strtoupper(preg_replace("/[^A-Z2-7]/", "", $input));

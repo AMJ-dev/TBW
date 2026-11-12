@@ -63,6 +63,8 @@
                 v.insurance_expiry,
                 v.roadworthiness_expiry,
                 v.notes AS vehicle_notes,
+                v.insurance_certificate,
+                v.roadworthiness_certificate,
 
                 d.id AS driver_id,
                 d.name AS driver_name,
@@ -73,6 +75,7 @@
                 d.status AS driver_status,
                 d.transporter AS driver_transporter,
                 d.notes AS driver_notes,
+                d.licence_document AS driver_licence_document,
 
                 (
                     SELECT GROUP_CONCAT(
@@ -484,7 +487,9 @@
             "transporter" => $pass["transporter"],
             "status" => $pass["vehicle_status"],
             "insurance_expiry" => $pass["insurance_expiry"],
+            "insurance_certificate" => $pass["insurance_certificate"],
             "roadworthiness_expiry" => $pass["roadworthiness_expiry"],
+            "roadworthiness_certificate" => $pass["roadworthiness_certificate"],
             "notes" => $pass["vehicle_notes"]
         ];
 
@@ -495,6 +500,7 @@
             "licence_number" => $pass["driver_licence_number"],
             "licence_class" => $pass["driver_licence_class"],
             "licence_expiry" => $pass["licence_expiry"],
+            "licence_document" => $pass["driver_licence_document"],
             "status" => $pass["driver_status"],
             "transporter" => $pass["driver_transporter"],
             "notes" => $pass["driver_notes"]
@@ -545,7 +551,10 @@
             $pass["latest_gate_in_decision"],
             $pass["latest_gate_in_reason"],
             $pass["latest_gate_in_at"],
-            $pass["assignment_eligible"]
+            $pass["assignment_eligible"],
+            $pass["insurance_certificate"],
+            $pass["roadworthiness_certificate"],
+            $pass["driver_licence_document"],
         );
 
         $conn->beginTransaction();

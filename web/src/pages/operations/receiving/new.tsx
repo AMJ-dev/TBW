@@ -59,6 +59,23 @@ type Shipment = {
   containers: ContainerRecord[];
 };
 
+type ReceivingDocumentType = {
+  document_key: string;
+  label: string;
+  required: boolean;
+  allow_multiple: boolean;
+  sort_order: number;
+};
+
+type ReceivingUploadConfig = {
+  location_key: string;
+  label: string;
+  description: string;
+  required: boolean;
+  allow_multiple: boolean;
+  document_types: ReceivingDocumentType[];
+};
+
 const lookupOptions: {
   value: LookupType;
   label: string;
@@ -232,6 +249,11 @@ export default function OperationsReceivingNewPage() {
   const [damageProofs, setDamageProofs] = useState<
     Record<string, File | null>
   >({});
+  const [receivingUploadConfig, setReceivingUploadConfig] =
+    useState<ReceivingUploadConfig | null>(null);
+  const [receivingDocuments, setReceivingDocuments] = useState<
+    Record<string, File[]>
+  >({});
 
   const selectedLookup = lookupOptions.find(
     (option) => option.value === lookupType
@@ -260,13 +282,62 @@ export default function OperationsReceivingNewPage() {
   useEffect(() => {
     let active = true;
 
+    const loadShipmentConfig = async () => {
+      try {
+        const response = await http.get("/portal/shipment/config/");
+        const resp: Resp = response.data;
+
+        if (resp.error) {
+          throw new Error(
+            typeof resp.data === "string"
+              ? resp.data
+              : "Could not load shipment configuration."
+          );
+        }
+
+        const payload = (resp.code ?? {}) as {
+          upload_locations?: ReceivingUploadConfig[];
+        };
+
+        const receivingConfig = payload.upload_locations?.find(
+          (location) => location.location_key === "receiving_tally"
+        );
+
+        if (active && receivingConfig) {
+          setReceivingUploadConfig({
+            ...receivingConfig,
+            document_types: [...(receivingConfig.document_types ?? [])].sort(
+              (a, b) => a.sort_order - b.sort_order
+            ),
+          });
+        }
+      } catch (error: unknown) {
+        if (active) {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Could not load receiving document configuration."
+          );
+        }
+      }
+    };
+
+    void loadShipmentConfig();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+  useEffect(() => {
+    let active = true;
+
     const loadReceivingLocations = async () => {
       setLocationsLoading(true);
       setLocationsError("");
 
       try {
         const response = await http.post("/admin/config/search-location/", {
-          q: "RECEIVING",
+          q: "YARD",
         });
 
         const resp: Resp = response.data;
@@ -284,11 +355,12 @@ export default function OperationsReceivingNewPage() {
         }
       } catch (error: unknown) {
         if (active) {
-          setLocationsError(
+          const message =
             error instanceof Error
               ? error.message
-              : "Could not load receiving locations."
-          );
+              : "Could not load receiving locations.";
+          setLocationsError(message);
+          toast.error(message);
         }
       } finally {
         if (active) {
@@ -327,6 +399,7 @@ export default function OperationsReceivingNewPage() {
 
     if (!lookupValue.trim()) {
       setLoadError("Enter a reference number to find the shipment.");
+      toast.error("Enter a reference number to find the shipment.");
       return;
     }
 
@@ -338,6 +411,7 @@ export default function OperationsReceivingNewPage() {
     setSaved(false);
     setStep(1);
     setDamageProofs({});
+    setReceivingDocuments({});
 
     try {
       const response = await http.post("/operator/receiving/search/", {
@@ -378,11 +452,12 @@ export default function OperationsReceivingNewPage() {
         toast.error("No gate pass number was returned for this shipment. Verify the gate-entry details before proceeding.");
       }
     } catch (error: unknown) {
-      setLoadError(
+      const message =
         error instanceof Error
           ? error.message
-          : "Could not find the shipment. Please try again."
-      );
+          : "Could not find the shipment. Please try again.";
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -410,6 +485,7 @@ export default function OperationsReceivingNewPage() {
   const continueToVerification = () => {
     if (!selectedContainers.length) {
       setSaveError("Select at least one eligible container.");
+      toast.error("Select at least one eligible container.");
       return;
     }
 
@@ -435,9 +511,22 @@ export default function OperationsReceivingNewPage() {
     });
 
     if (invalidContainer) {
-      setSaveError(
-        `Complete the condition, receiving location, and required seal details for ${invalidContainer.container_no}.`
-      );
+      const message = `Complete the condition, receiving location, and required seal details for ${invalidContainer.container_no}.`;
+      setSaveError(message);
+      toast.error(message);
+      return;
+    }
+
+    const missingReceivingDocument = receivingUploadConfig?.document_types.find(
+      (documentType) =>
+        documentType.required &&
+        !(receivingDocuments[documentType.document_key]?.length)
+    );
+
+    if (missingReceivingDocument) {
+      const message = `${missingReceivingDocument.label} is required before confirming receiving.`;
+      setSaveError(message);
+      toast.error(message);
       return;
     }
 
@@ -456,9 +545,9 @@ export default function OperationsReceivingNewPage() {
     );
 
     if (sealMismatchWithoutCondition) {
-      setSaveError(
-        `The actual seal for ${sealMismatchWithoutCondition.container_no} differs from the expected seal. Select Seal mismatch and verify the observed seal number.`
-      );
+      const message = `The actual seal for ${sealMismatchWithoutCondition.container_no} differs from the expected seal. Select Seal mismatch and verify the observed seal number.`;
+      setSaveError(message);
+      toast.error(message);
       return;
     }
 
@@ -468,6 +557,7 @@ export default function OperationsReceivingNewPage() {
       const formData = new FormData();
 
       formData.append("shipment_id", shipment.id);
+      formData.append("location_key", "receiving_tally");
 
       formData.append(
         "containers",
@@ -493,12 +583,22 @@ export default function OperationsReceivingNewPage() {
         }
       });
 
+      receivingUploadConfig?.document_types.forEach((documentType) => {
+        const files = receivingDocuments[documentType.document_key] ?? [];
+
+        files.forEach((file) => {
+          formData.append(
+            `documents[${documentType.document_key}]${documentType.allow_multiple ? "[]" : ""}`,
+            file
+          );
+        });
+      });
+
       const response = await http.post("/operator/receiving/save/", formData);
 
       const resp: Resp = response.data;
 
       if (resp.error) {
-        console.log(resp.data)
         throw new Error(String(resp.data || "Could not save receiving."));
       }
 
@@ -506,6 +606,7 @@ export default function OperationsReceivingNewPage() {
       toast.success("Receiving was saved successfully. The shipment has been refreshed with its latest receiving progress.");
       setStep(1);
       setDamageProofs({});
+      setReceivingDocuments({});
 
       const refreshResponse = await http.post("/operator/receiving/search/", {
         type: lookupType,
@@ -527,11 +628,12 @@ export default function OperationsReceivingNewPage() {
         }
       }
     } catch (error: unknown) {
-      setSaveError(
+      const message =
         error instanceof Error
           ? error.message
-          : "Could not save receiving. Please try again."
-      );
+          : "Could not save receiving. Please try again.";
+      setSaveError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -546,6 +648,19 @@ export default function OperationsReceivingNewPage() {
     setSaved(false);
     setStep(1);
     setDamageProofs({});
+    setReceivingDocuments({});
+  };
+
+  const updateReceivingDocuments = (
+    documentKey: string,
+    files: File[],
+    allowMultiple: boolean
+  ) => {
+    setReceivingDocuments((current) => ({
+      ...current,
+      [documentKey]: allowMultiple ? files : files.slice(0, 1),
+    }));
+    setSaveError("");
   };
 
   return (
@@ -991,6 +1106,7 @@ export default function OperationsReceivingNewPage() {
                                         const file = event.target.files?.[0] ?? null;
                                         if (file && file.size > 10 * 1024 * 1024) {
                                           setSaveError("File size must not exceed 10 MB.");
+                                          toast.error("File size must not exceed 10 MB.");
                                           event.target.value = "";
                                           return;
                                         }
@@ -1092,6 +1208,97 @@ export default function OperationsReceivingNewPage() {
                       </div>
                     );
                   })}
+
+                  {receivingUploadConfig && receivingUploadConfig.document_types.length > 0 && (
+                    <section className="rounded-2xl border border-line bg-sand/20 p-4 sm:p-5">
+                      <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-ink">
+                          Upload Cargo Documents & Images
+                        </h3>
+                        <p className="mt-1 text-xs leading-5 text-ink-soft">
+                          Attach the cargo receipts, tally records, weight notes, photographs, and discrepancy reports for this receiving. Required documents are marked, and some document types allow multiple files.
+                        </p>
+                      </div>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {receivingUploadConfig.document_types.map((documentType) => {
+                          const files = receivingDocuments[documentType.document_key] ?? [];
+
+                          return (
+                            <div key={documentType.document_key} className="rounded-xl border border-line bg-paper p-3">
+                              <label className={labelClass}>
+                                {documentType.label}
+                                {documentType.required ? " *" : " (Optional)"}
+                                {documentType.allow_multiple ? " · Multiple files" : " · One file"}
+                              </label>
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,application/pdf"
+                                multiple={documentType.allow_multiple}
+                                disabled={saving}
+                                onChange={(event) => {
+                                  const selected = Array.from(event.target.files ?? []);
+                                  const valid = selected.filter((file) => {
+                                    const allowed = [
+                                      "image/jpeg",
+                                      "image/png",
+                                      "image/webp",
+                                      "application/pdf",
+                                    ].includes(file.type);
+
+                                    if (!allowed) {
+                                      toast.error(`${file.name}: unsupported file type.`);
+                                    }
+
+                                    if (file.size > 10 * 1024 * 1024) {
+                                      toast.error(`${file.name}: file exceeds 10 MB.`);
+                                    }
+
+                                    return allowed && file.size <= 10 * 1024 * 1024;
+                                  });
+
+                                  updateReceivingDocuments(
+                                    documentType.document_key,
+                                    documentType.allow_multiple ? valid : valid.slice(0, 1),
+                                    documentType.allow_multiple
+                                  );
+                                  event.target.value = "";
+                                }}
+                                className="block w-full text-xs text-ink-soft file:mr-3 file:rounded-lg file:border-0 file:bg-sand file:px-3 file:py-2 file:text-xs file:font-semibold file:text-ink"
+                              />
+                              {files.length > 0 && (
+                                <div className="mt-3 space-y-2">
+                                  {files.map((file, index) => (
+                                    <div
+                                      key={`${file.name}-${file.lastModified}-${index}`}
+                                      className="flex items-center justify-between gap-2 rounded-lg bg-sand/60 px-3 py-2"
+                                    >
+                                      <span className="min-w-0 truncate text-xs font-medium text-ink">
+                                        {file.name}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          updateReceivingDocuments(
+                                            documentType.document_key,
+                                            files.filter((_, fileIndex) => fileIndex !== index),
+                                            documentType.allow_multiple
+                                          )
+                                        }
+                                        className="shrink-0 text-xs font-semibold text-coral hover:underline"
+                                      >
+                                        Remove
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
 
                   {saveError && (
                     <div className="rounded-xl border border-coral/20 bg-coral/5 p-4 text-sm text-coral">

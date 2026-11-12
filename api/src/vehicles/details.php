@@ -1,3 +1,4 @@
+
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
@@ -8,7 +9,7 @@
         $is_organisation = isset($_GET["role"]) && $_GET["role"] === "portal";
         $where = $is_organisation ? " AND v.organisation_id = :organisation_id " : "";
 
-        $id = $_GET["id"] ?? null; 
+        $id = $_GET["id"] ?? null;
 
         $stmt = $conn->prepare("
             SELECT
@@ -24,6 +25,8 @@
                 v.transporter,
                 v.insurance_expiry,
                 v.roadworthiness_expiry,
+                v.insurance_certificate,
+                v.roadworthiness_certificate,
                 v.notes,
                 v.status,
                 v.submitted_at,
@@ -42,6 +45,7 @@
                 d.licence_number AS driver_licence_number,
                 d.licence_class AS driver_licence_class,
                 d.licence_expiry AS driver_licence_expiry,
+                d.licence_document AS driver_licence_document,
                 d.transporter AS driver_transporter,
                 d.status AS driver_status,
                 d.submitted_at AS driver_submitted_at,
@@ -62,11 +66,13 @@
         ");
 
         $stmt->bindValue(":id", $id);
+
         if ($is_organisation) {
             $stmt->bindValue(":organisation_id", $organisation_id);
         }
+
         $stmt->execute();
-        
+
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         if (empty($rows)) {
@@ -108,6 +114,8 @@
                     "transporter" => $row["transporter"],
                     "insurance_expiry" => $row["insurance_expiry"],
                     "roadworthiness_expiry" => $row["roadworthiness_expiry"],
+                    "insurance_certificate" => $row["insurance_certificate"],
+                    "roadworthiness_certificate" => $row["roadworthiness_certificate"],
                     "notes" => $row["notes"],
                     "status" => $status,
                     "submitted_at" => $row["submitted_at"],
@@ -142,6 +150,7 @@
                     "licence_number" => $row["driver_licence_number"],
                     "licence_class" => $row["driver_licence_class"],
                     "licence_expiry" => $row["driver_licence_expiry"],
+                    "licence_document" => $row["driver_licence_document"],
                     "transporter" => $row["driver_transporter"],
                     "status" => $driverStatus,
                     "submitted_at" => $row["driver_submitted_at"],
@@ -159,7 +168,7 @@
         echo json_encode([
             "error" => false,
             "data" => "Vehicle loaded successfully.",
-            "code" => $vehicle 
+            "code" => $vehicle
         ]);
 
     } catch (Throwable $e) {

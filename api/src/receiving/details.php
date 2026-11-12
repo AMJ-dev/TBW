@@ -1,3 +1,4 @@
+
 <?php
 
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
@@ -16,6 +17,15 @@ try {
 
     $id = trim($_GET["id"] ?? "");
 
+    if ($id === "") {
+        echo json_encode([
+            "error" => true,
+            "data" => "Receiving ID is required.",
+            "code" => 400
+        ]);
+        exit;
+    }
+
     $receivingQuery = $conn->prepare("
         SELECT
             r.id,
@@ -33,12 +43,10 @@ try {
             r.remarks,
             r.created_at,
             r.updated_at,
-
             starter.full_name AS started_by_name,
             starter.email AS started_by_email,
             completer.full_name AS completed_by_name,
             completer.email AS completed_by_email,
-
             s.shipment_reference,
             s.user_id AS shipment_user_id,
             s.organisation_id,
@@ -78,7 +86,6 @@ try {
             s.status AS shipment_status,
             s.created_at AS shipment_created_at,
             s.updated_at AS shipment_updated_at,
-
             o.organisation_name,
             o.trading_name,
             o.rc_number,
@@ -89,23 +96,16 @@ try {
             o.contact_email AS organisation_email,
             o.contact_phone AS organisation_phone,
             o.contact_person AS organisation_contact_person
-
         FROM portal_receiving r
-
         INNER JOIN portal_shipments s
-            ON s.id = r.shipment_id
-
+            ON BINARY s.id = BINARY r.shipment_id
         LEFT JOIN organisations o
-            ON o.id = s.organisation_id
-
+            ON BINARY o.id = BINARY s.organisation_id
         LEFT JOIN users starter
-            ON starter.id = r.started_by
-
+            ON BINARY starter.id = BINARY r.started_by
         LEFT JOIN users completer
-            ON completer.id = r.completed_by
-
-        WHERE r.id = :id
-
+            ON BINARY completer.id = BINARY r.completed_by
+        WHERE BINARY r.id = BINARY :id
         LIMIT 1
     ");
 
@@ -154,15 +154,9 @@ try {
         "cargo_description" => $row["cargo_description"],
         "cargo_category" => $row["cargo_category"],
         "package_type" => $row["package_type"],
-        "package_count" => $row["package_count"] !== null
-            ? (float) $row["package_count"]
-            : null,
-        "gross_weight" => $row["gross_weight"] !== null
-            ? (float) $row["gross_weight"]
-            : null,
-        "volume" => $row["volume"] !== null
-            ? (float) $row["volume"]
-            : null,
+        "package_count" => $row["package_count"] !== null ? (float) $row["package_count"] : null,
+        "gross_weight" => $row["gross_weight"] !== null ? (float) $row["gross_weight"] : null,
+        "volume" => $row["volume"] !== null ? (float) $row["volume"] : null,
         "dangerous_goods" => $row["dangerous_goods"],
         "temperature_controlled" => $row["temperature_controlled"],
         "temperature" => $row["temperature"],
@@ -227,7 +221,7 @@ try {
     $appointment = null;
     $vehicle = null;
     $driver = null;
-    $movement = null;
+    $movement = [];
 
     $passNumber = trim((string) ($row["gate_pass_number"] ?? ""));
 
@@ -249,8 +243,8 @@ try {
                 issuer.email AS issued_by_email
             FROM gate_passes gp
             LEFT JOIN users issuer
-                ON issuer.id = gp.issued_by
-            WHERE gp.pass_code = :pass_code
+                ON BINARY issuer.id = BINARY gp.issued_by
+            WHERE BINARY gp.pass_code = BINARY :pass_code
             LIMIT 1
         ");
 
@@ -279,144 +273,150 @@ try {
                 "updated_at" => $gatePassRow["updated_at"]
             ];
 
-            $appointmentQuery = $conn->prepare("
-                SELECT
-                    ga.id,
-                    ga.organisation_id,
-                    ga.vehicle_id,
-                    ga.driver_id,
-                    ga.booking_ref,
-                    ga.appointment_date,
-                    ga.slot_time,
-                    ga.status,
-                    ga.created_by,
-                    ga.created_at,
-                    ga.updated_at,
-                    creator.full_name AS created_by_name
-                FROM gate_appointments ga
-                LEFT JOIN users creator
-                    ON creator.id = ga.created_by
-                WHERE ga.id = :appointment_id
-                LIMIT 1
-            ");
+            if (!empty($gatePassRow["appointment_id"])) {
+                $appointmentQuery = $conn->prepare("
+                    SELECT
+                        ga.id,
+                        ga.organisation_id,
+                        ga.vehicle_id,
+                        ga.driver_id,
+                        ga.booking_ref,
+                        ga.appointment_date,
+                        ga.slot_time,
+                        ga.status,
+                        ga.created_by,
+                        ga.created_at,
+                        ga.updated_at,
+                        creator.full_name AS created_by_name
+                    FROM gate_appointments ga
+                    LEFT JOIN users creator
+                        ON BINARY creator.id = BINARY ga.created_by
+                    WHERE BINARY ga.id = BINARY :appointment_id
+                    LIMIT 1
+                ");
 
-            $appointmentQuery->execute([
-                ":appointment_id" => $gatePassRow["appointment_id"]
-            ]);
+                $appointmentQuery->execute([
+                    ":appointment_id" => $gatePassRow["appointment_id"]
+                ]);
 
-            $appointmentRow = $appointmentQuery->fetch(PDO::FETCH_ASSOC);
+                $appointmentRow = $appointmentQuery->fetch(PDO::FETCH_ASSOC);
 
-            if ($appointmentRow) {
-                $appointment = [
-                    "id" => $appointmentRow["id"],
-                    "appointment_id" => $appointmentRow["id"],
-                    "organisation_id" => $appointmentRow["organisation_id"],
-                    "vehicle_id" => $appointmentRow["vehicle_id"],
-                    "driver_id" => $appointmentRow["driver_id"],
-                    "booking_ref" => $appointmentRow["booking_ref"],
-                    "appointment_reference" => $appointmentRow["booking_ref"],
-                    "appointment_date" => $appointmentRow["appointment_date"],
-                    "slot_time" => $appointmentRow["slot_time"],
-                    "status" => $appointmentRow["status"],
-                    "created_by" => $appointmentRow["created_by"],
-                    "created_by_name" => $appointmentRow["created_by_name"],
-                    "created_at" => $appointmentRow["created_at"],
-                    "updated_at" => $appointmentRow["updated_at"]
-                ];
+                if ($appointmentRow) {
+                    $appointment = [
+                        "id" => $appointmentRow["id"],
+                        "appointment_id" => $appointmentRow["id"],
+                        "organisation_id" => $appointmentRow["organisation_id"],
+                        "vehicle_id" => $appointmentRow["vehicle_id"],
+                        "driver_id" => $appointmentRow["driver_id"],
+                        "booking_ref" => $appointmentRow["booking_ref"],
+                        "appointment_reference" => $appointmentRow["booking_ref"],
+                        "appointment_date" => $appointmentRow["appointment_date"],
+                        "slot_time" => $appointmentRow["slot_time"],
+                        "status" => $appointmentRow["status"],
+                        "created_by" => $appointmentRow["created_by"],
+                        "created_by_name" => $appointmentRow["created_by_name"],
+                        "created_at" => $appointmentRow["created_at"],
+                        "updated_at" => $appointmentRow["updated_at"]
+                    ];
+                }
             }
 
-            $vehicleQuery = $conn->prepare("
-                SELECT
-                    id,
-                    plate,
-                    kind,
-                    make,
-                    model,
-                    year,
-                    capacity,
-                    owner,
-                    transporter,
-                    insurance_expiry,
-                    roadworthiness_expiry,
-                    notes,
-                    status,
-                    organisation_id
-                FROM gate_vehicles
-                WHERE id = :vehicle_id
-                LIMIT 1
-            ");
+            if (!empty($gatePassRow["vehicle_id"])) {
+                $vehicleQuery = $conn->prepare("
+                    SELECT
+                        id,
+                        plate,
+                        kind,
+                        make,
+                        model,
+                        year,
+                        capacity,
+                        owner,
+                        transporter,
+                        insurance_expiry,
+                        roadworthiness_expiry,
+                        notes,
+                        status,
+                        organisation_id
+                    FROM gate_vehicles
+                    WHERE BINARY id = BINARY :vehicle_id
+                    LIMIT 1
+                ");
 
-            $vehicleQuery->execute([
-                ":vehicle_id" => $gatePassRow["vehicle_id"]
-            ]);
+                $vehicleQuery->execute([
+                    ":vehicle_id" => $gatePassRow["vehicle_id"]
+                ]);
 
-            $vehicleRow = $vehicleQuery->fetch(PDO::FETCH_ASSOC);
+                $vehicleRow = $vehicleQuery->fetch(PDO::FETCH_ASSOC);
 
-            if ($vehicleRow) {
-                $vehicle = [
-                    "id" => $vehicleRow["id"],
-                    "vehicle_id" => $vehicleRow["id"],
-                    "plate" => $vehicleRow["plate"],
-                    "registration" => $vehicleRow["plate"],
-                    "registration_number" => $vehicleRow["plate"],
-                    "vehicle_registration" => $vehicleRow["plate"],
-                    "kind" => $vehicleRow["kind"],
-                    "type" => $vehicleRow["kind"],
-                    "make" => $vehicleRow["make"],
-                    "model" => $vehicleRow["model"],
-                    "year" => $vehicleRow["year"],
-                    "capacity" => $vehicleRow["capacity"],
-                    "owner" => $vehicleRow["owner"],
-                    "transporter" => $vehicleRow["transporter"],
-                    "insurance_expiry" => $vehicleRow["insurance_expiry"],
-                    "roadworthiness_expiry" => $vehicleRow["roadworthiness_expiry"],
-                    "notes" => $vehicleRow["notes"],
-                    "status" => $vehicleRow["status"],
-                    "organisation_id" => $vehicleRow["organisation_id"]
-                ];
+                if ($vehicleRow) {
+                    $vehicle = [
+                        "id" => $vehicleRow["id"],
+                        "vehicle_id" => $vehicleRow["id"],
+                        "plate" => $vehicleRow["plate"],
+                        "registration" => $vehicleRow["plate"],
+                        "registration_number" => $vehicleRow["plate"],
+                        "vehicle_registration" => $vehicleRow["plate"],
+                        "kind" => $vehicleRow["kind"],
+                        "type" => $vehicleRow["kind"],
+                        "make" => $vehicleRow["make"],
+                        "model" => $vehicleRow["model"],
+                        "year" => $vehicleRow["year"],
+                        "capacity" => $vehicleRow["capacity"],
+                        "owner" => $vehicleRow["owner"],
+                        "transporter" => $vehicleRow["transporter"],
+                        "insurance_expiry" => $vehicleRow["insurance_expiry"],
+                        "roadworthiness_expiry" => $vehicleRow["roadworthiness_expiry"],
+                        "notes" => $vehicleRow["notes"],
+                        "status" => $vehicleRow["status"],
+                        "organisation_id" => $vehicleRow["organisation_id"]
+                    ];
+                }
             }
 
-            $driverQuery = $conn->prepare("
-                SELECT
-                    id,
-                    organisation_id,
-                    name,
-                    phone,
-                    licence_number,
-                    licence_class,
-                    licence_expiry,
-                    assigned_vehicle,
-                    transporter,
-                    notes,
-                    status
-                FROM gate_drivers
-                WHERE id = :driver_id
-                LIMIT 1
-            ");
+            if (!empty($gatePassRow["driver_id"])) {
+                $driverQuery = $conn->prepare("
+                    SELECT
+                        id,
+                        organisation_id,
+                        name,
+                        phone,
+                        licence_number,
+                        licence_class,
+                        licence_expiry,
+                        assigned_vehicle,
+                        transporter,
+                        notes,
+                        status
+                    FROM gate_drivers
+                    WHERE BINARY id = BINARY :driver_id
+                    LIMIT 1
+                ");
 
-            $driverQuery->execute([
-                ":driver_id" => $gatePassRow["driver_id"]
-            ]);
+                $driverQuery->execute([
+                    ":driver_id" => $gatePassRow["driver_id"]
+                ]);
 
-            $driverRow = $driverQuery->fetch(PDO::FETCH_ASSOC);
+                $driverRow = $driverQuery->fetch(PDO::FETCH_ASSOC);
 
-            if ($driverRow) {
-                $driver = [
-                    "id" => $driverRow["id"],
-                    "driver_id" => $driverRow["id"],
-                    "name" => $driverRow["name"],
-                    "full_name" => $driverRow["name"],
-                    "phone" => $driverRow["phone"],
-                    "phone_number" => $driverRow["phone"],
-                    "licence_number" => $driverRow["licence_number"],
-                    "licence_class" => $driverRow["licence_class"],
-                    "licence_expiry" => $driverRow["licence_expiry"],
-                    "assigned_vehicle" => $driverRow["assigned_vehicle"],
-                    "transporter" => $driverRow["transporter"],
-                    "notes" => $driverRow["notes"],
-                    "status" => $driverRow["status"],
-                    "organisation_id" => $driverRow["organisation_id"]
-                ];
+                if ($driverRow) {
+                    $driver = [
+                        "id" => $driverRow["id"],
+                        "driver_id" => $driverRow["id"],
+                        "name" => $driverRow["name"],
+                        "full_name" => $driverRow["name"],
+                        "phone" => $driverRow["phone"],
+                        "phone_number" => $driverRow["phone"],
+                        "licence_number" => $driverRow["licence_number"],
+                        "licence_class" => $driverRow["licence_class"],
+                        "licence_expiry" => $driverRow["licence_expiry"],
+                        "assigned_vehicle" => $driverRow["assigned_vehicle"],
+                        "transporter" => $driverRow["transporter"],
+                        "notes" => $driverRow["notes"],
+                        "status" => $driverRow["status"],
+                        "organisation_id" => $driverRow["organisation_id"]
+                    ];
+                }
             }
 
             $movementQuery = $conn->prepare("
@@ -438,8 +438,8 @@ try {
                     operator.email AS operator_email
                 FROM gate_movement_records gm
                 LEFT JOIN users operator
-                    ON operator.id = gm.operator_id
-                WHERE gm.gate_pass_id = :gate_pass_id
+                    ON BINARY operator.id = BINARY gm.operator_id
+                WHERE BINARY gm.gate_pass_id = BINARY :gate_pass_id
                 ORDER BY gm.movement_at DESC, gm.created_at DESC
             ");
 
@@ -448,7 +448,6 @@ try {
             ]);
 
             $movementRows = $movementQuery->fetchAll(PDO::FETCH_ASSOC);
-            $movement = [];
 
             foreach ($movementRows as $movementRow) {
                 $movement[] = [
@@ -477,36 +476,24 @@ try {
             $gatePass["driver"] = $driver;
             $gatePass["movements"] = $movement;
 
-            $gatePass["appointment_reference"] =
-                $appointment["booking_ref"] ?? null;
-
-            $gatePass["vehicle_registration"] =
-                $vehicle["plate"] ?? null;
-
-            $gatePass["driver_name"] =
-                $driver["name"] ?? null;
-
-            $gatePass["driver_phone"] =
-                $driver["phone"] ?? null;
-
+            $gatePass["appointment_reference"] = $appointment["booking_ref"] ?? null;
+            $gatePass["vehicle_registration"] = $vehicle["plate"] ?? null;
+            $gatePass["driver_name"] = $driver["name"] ?? null;
+            $gatePass["driver_phone"] = $driver["phone"] ?? null;
             $gatePass["gate_in_time"] = null;
             $gatePass["gate_out_time"] = null;
             $gatePass["gate_officer_name"] = null;
 
             foreach ($movement as $movementItem) {
-                if (
-                    strtolower(trim((string) ($movementItem["direction"] ?? ""))) === "in" &&
-                    $receiving["gate_in_time"] === null
-                ) {
+                $direction = strtolower(trim((string) ($movementItem["direction"] ?? "")));
+
+                if ($direction === "in" && $receiving["gate_in_time"] === null) {
                     $receiving["gate_in_time"] = $movementItem["movement_at"];
                     $gatePass["gate_in_time"] = $movementItem["movement_at"];
                     $gatePass["gate_officer_name"] = $movementItem["gate_officer_name"];
                 }
 
-                if (
-                    strtolower(trim((string) ($movementItem["direction"] ?? ""))) === "out" &&
-                    $gatePass["gate_out_time"] === null
-                ) {
+                if ($direction === "out" && $gatePass["gate_out_time"] === null) {
                     $gatePass["gate_out_time"] = $movementItem["movement_at"];
                 }
             }
@@ -518,7 +505,7 @@ try {
     $receiving["appointment"] = $appointment;
     $receiving["vehicle"] = $vehicle;
     $receiving["driver"] = $driver;
-    $receiving["movements"] = $movement ?? [];
+    $receiving["movements"] = $movement;
 
     $receiving["gate_pass_id"] = $gatePass["id"] ?? null;
     $receiving["appointment_id"] = $appointment["id"] ?? null;
@@ -528,7 +515,6 @@ try {
     $receiving["driver_id"] = $driver["id"] ?? null;
     $receiving["driver_name"] = $driver["name"] ?? null;
     $receiving["driver_phone"] = $driver["phone"] ?? null;
-
     $receiving["gate_officer_name"] = $gatePass["gate_officer_name"] ?? null;
 
     $containersQuery = $conn->prepare("
@@ -552,10 +538,8 @@ try {
             rc.received_at,
             rc.created_at,
             rc.updated_at,
-
             receiver.full_name AS received_by_name,
             receiver.email AS received_by_email,
-
             sc.container_no AS declared_container_no,
             sc.size AS container_size,
             sc.seal_no AS declared_seal_no,
@@ -574,18 +558,13 @@ try {
             sc.received_at AS container_received_at,
             sc.stored_at,
             sc.gate_out_at
-
         FROM portal_receiving_containers rc
-
         LEFT JOIN portal_shipment_containers sc
-            ON sc.id = rc.container_id
-            AND sc.shipment_id = rc.shipment_id
-
+            ON BINARY sc.id = BINARY rc.container_id
+            AND BINARY sc.shipment_id = BINARY rc.shipment_id
         LEFT JOIN users receiver
-            ON receiver.id = rc.received_by
-
-        WHERE rc.receiving_id = :receiving_id
-
+            ON BINARY receiver.id = BINARY rc.received_by
+        WHERE BINARY rc.receiving_id = BINARY :receiving_id
         ORDER BY rc.created_at ASC
     ");
 
@@ -618,7 +597,7 @@ try {
                 kind,
                 status
             FROM terminal_locations
-            WHERE id IN ($placeholders)
+            WHERE BINARY id IN ($placeholders)
         ");
 
         $locationQuery->execute($locationIds);
@@ -663,10 +642,7 @@ try {
         $container["weight_difference"] =
             $container["expected_weight"] !== null &&
             $container["actual_weight"] !== null
-                ? round(
-                    $container["actual_weight"] - $container["expected_weight"],
-                    3
-                )
+                ? round($container["actual_weight"] - $container["expected_weight"], 3)
                 : null;
 
         $container["package_count"] =
@@ -711,6 +687,7 @@ try {
         $container["inspection_status"] = null;
         $container["inspector_name"] = $container["received_by_name"];
         $container["inspection_date"] = $container["received_at"];
+
         $container["damage_reported"] =
             !empty($container["damage_proof_path"]) ||
             in_array(
@@ -731,7 +708,6 @@ try {
         $container["damaged_quantity"] = null;
         $container["damage_location"] = null;
         $container["reported_by"] = $container["received_by_name"];
-
         $container["damage_photos"] = [];
 
         if (!empty($container["damage_proof_path"])) {
@@ -767,10 +743,7 @@ try {
 
         $condition = strtoupper(trim((string) ($container["condition_status"] ?? "")));
 
-        if (
-            $condition !== "" &&
-            !in_array($condition, ["GOOD"], true)
-        ) {
+        if ($condition !== "" && $condition !== "GOOD") {
             $discrepancyCount++;
         }
 
@@ -805,13 +778,14 @@ try {
 
     if (empty($receiving["received_at"])) {
         foreach ($containers as $container) {
-            if (!empty($container["received_at"])) {
-                if (
+            if (
+                !empty($container["received_at"]) &&
+                (
                     empty($receiving["received_at"]) ||
                     $container["received_at"] > $receiving["received_at"]
-                ) {
-                    $receiving["received_at"] = $container["received_at"];
-                }
+                )
+            ) {
+                $receiving["received_at"] = $container["received_at"];
             }
         }
     }
@@ -824,6 +798,60 @@ try {
         "container_count_with_weight" => $containersWithWeight,
         "container_count_with_seal_mismatch" => $containersWithSealMismatch
     ];
+
+    $documentsQuery = $conn->prepare("
+        SELECT
+            d.id,
+            d.receiving_id,
+            d.shipment_id,
+            d.document_key,
+            d.document_type,
+            d.original_name,
+            d.stored_name,
+            d.file_path,
+            d.mime_type,
+            d.file_size,
+            d.uploaded_by,
+            d.uploaded_at,
+            u.full_name AS uploaded_by_name,
+            u.email AS uploaded_by_email
+        FROM portal_receiving_documents d
+        LEFT JOIN users u
+            ON BINARY u.id = BINARY d.uploaded_by
+        WHERE BINARY d.receiving_id = BINARY :receiving_id
+        ORDER BY d.uploaded_at ASC
+    ");
+
+    $documentsQuery->execute([
+        ":receiving_id" => $receiving["id"]
+    ]);
+
+    $documents = $documentsQuery->fetchAll(PDO::FETCH_ASSOC);
+    $documentsByType = [];
+
+    foreach ($documents as &$document) {
+        $document["file_size"] = (int) $document["file_size"];
+
+        $document["uploaded_by_details"] = [
+            "id" => $document["uploaded_by"],
+            "name" => $document["uploaded_by_name"],
+            "email" => $document["uploaded_by_email"]
+        ];
+
+        $key = $document["document_key"];
+
+        if (!isset($documentsByType[$key])) {
+            $documentsByType[$key] = [];
+        }
+
+        $documentsByType[$key][] = $document;
+    }
+
+    unset($document);
+
+    $receiving["documents"] = $documents;
+    $receiving["documents_by_type"] = $documentsByType;
+    $receiving["documents_count"] = count($documents);
 
     $logsQuery = $conn->prepare("
         SELECT
@@ -843,8 +871,8 @@ try {
             l.performed_at
         FROM portal_receiving_logs l
         LEFT JOIN users u
-            ON u.id = l.performed_by
-        WHERE l.receiving_id = :receiving_id
+            ON BINARY u.id = BINARY l.performed_by
+        WHERE BINARY l.receiving_id = BINARY :receiving_id
         ORDER BY l.performed_at DESC
     ");
 
@@ -883,6 +911,7 @@ try {
         "received_count_from_details" => $receivedCount,
         "discrepancy_count_from_details" => $discrepancyCount,
         "damage_photos_count" => count($damagePhotos),
+        "documents_count" => count($documents),
         "actual_weight_total" => round($totalActualWeight, 3),
         "containers_with_weight" => $containersWithWeight,
         "containers_with_seal_mismatch" => $containersWithSealMismatch

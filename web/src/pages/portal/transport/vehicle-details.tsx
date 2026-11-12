@@ -4,6 +4,8 @@ import {
 	AlertTriangle,
 	ArrowLeft,
 	Check,
+	ExternalLink,
+	FileText,
 	Loader2,
 	Pencil,
 	User,
@@ -14,6 +16,7 @@ import { toast } from "sonner";
 import { AppShell, StatusBadge, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { http, type Resp } from "@/lib/httpClient";
+import { resolveSrc } from "@/lib/functions";
 import { cn } from "@/lib/utils";
 
 type VehicleStatus =
@@ -39,6 +42,7 @@ interface Driver {
 	licenceNumber: string;
 	licenceClass: string;
 	licenceExpiry: string;
+	licenceDocument: string;
 	transporter: string;
 	status: DriverStatus;
 }
@@ -55,6 +59,8 @@ interface Vehicle {
 	transporter: string;
 	insuranceExpiry: string;
 	roadworthinessExpiry: string;
+	insuranceCertificate: string;
+	roadworthinessCertificate: string;
 	status: VehicleStatus;
 	lastVisit: string;
 	notes: string;
@@ -105,9 +111,46 @@ const normalizeDriver = (raw: any): Driver => ({
 	licenceNumber: String(raw?.licence_number ?? raw?.licenceNumber ?? "—"),
 	licenceClass: String(raw?.licence_class ?? raw?.licenceClass ?? "—"),
 	licenceExpiry: String(raw?.licence_expiry ?? raw?.licenceExpiry ?? "—"),
+	licenceDocument: String(raw?.licence_document ?? raw?.driver_licence_document ?? ""),
 	transporter: String(raw?.transporter ?? "—"),
 	status: normalizeStatus(raw?.status),
 });
+
+const DocumentLink = ({ label, path }: { label: string; path: string }) => {
+	if (!path) {
+		return (
+			<div className="flex items-center gap-3 rounded-xl border border-dashed border-line bg-sand/40 p-3">
+				<span className="grid size-9 shrink-0 place-items-center rounded-lg bg-paper text-ink-soft ring-1 ring-line">
+					<FileText className="size-4" />
+				</span>
+				<div className="min-w-0">
+					<p className="text-[12px] font-semibold text-ink">{label}</p>
+					<p className="mt-0.5 text-[11px] text-ink-soft">No document uploaded</p>
+				</div>
+			</div>
+		);
+	}
+
+	return (
+		<a
+			href={resolveSrc(path)}
+			target="_blank"
+			rel="noopener noreferrer"
+			className="flex min-w-0 items-center gap-3 rounded-xl border border-line bg-sand p-3 transition hover:border-orange/50 hover:bg-orange/5"
+		>
+			<span className="grid size-9 shrink-0 place-items-center rounded-lg bg-paper text-orange-deep ring-1 ring-line">
+				<FileText className="size-4" />
+			</span>
+			<span className="min-w-0 flex-1">
+				<span className="block text-[12px] font-semibold text-ink">{label}</span>
+				<span className="mt-0.5 block truncate text-[10px] text-ink-soft">
+					{path.split("/").pop()}
+				</span>
+			</span>
+			<ExternalLink className="size-4 shrink-0 text-ink-soft" />
+		</a>
+	);
+};
 
 const normalizeVehicle = (raw: any): Vehicle => ({
 	id: String(raw?.id ?? ""),
@@ -125,6 +168,8 @@ const normalizeVehicle = (raw: any): Vehicle => ({
 	roadworthinessExpiry: String(
 		raw?.roadworthiness_expiry ?? raw?.roadworthinessExpiry ?? "—"
 	),
+	insuranceCertificate: String(raw?.insurance_certificate ?? ""),
+	roadworthinessCertificate: String(raw?.roadworthiness_certificate ?? ""),
 	status: normalizeStatus(raw?.status),
 	lastVisit: String(raw?.last_visit ?? raw?.lastVisit ?? "—"),
 	notes: String(raw?.notes ?? ""),
@@ -415,6 +460,11 @@ export default function GateVehicleDetailsPage() {
 										<p className="mt-0.5 text-[11px] text-ink-soft">
 											Transporter: {d.transporter}
 										</p>
+										{d.licenceDocument && (
+											<div className="mt-3 max-w-sm">
+												<DocumentLink label="Driver licence" path={d.licenceDocument} />
+											</div>
+										)}
 									</div>
 								</li>
 							))}
@@ -438,6 +488,27 @@ export default function GateVehicleDetailsPage() {
 						<p className="mt-1 font-mono text-sm font-semibold text-ink">
 							{vehicle.roadworthinessExpiry}
 						</p>
+					</div>
+				</div>
+
+				<div className="rounded-2xl bg-paper p-5 ring-1 ring-line sm:p-6">
+					<div>
+						<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+							Vehicle documents
+						</p>
+						<p className="mt-1 text-[11px] text-ink-soft">
+							Open the certificates uploaded for this vehicle.
+						</p>
+					</div>
+					<div className="mt-4 grid gap-3 sm:grid-cols-2">
+						<DocumentLink
+							label="Vehicle insurance certificate"
+							path={vehicle.insuranceCertificate}
+						/>
+						<DocumentLink
+							label="Roadworthiness certificate"
+							path={vehicle.roadworthinessCertificate}
+						/>
 					</div>
 				</div>
 

@@ -33,6 +33,8 @@
     $allowed_conditions = ["GOOD", "DAMAGED", "SEAL_MISMATCH", "OTHER_DISCREPANCY"];
     $allowed_proof_types = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
     $uploadedProofs = [];
+    $uploadedDocuments = [];
+    $preparedDocuments = [];
 
     try {
         $conn->beginTransaction();
@@ -51,6 +53,121 @@
             throw new RuntimeException("Shipment was not found.");
         }
 
+        $documentConfigQuery = $conn->prepare("
+            SELECT
+                dt.document_key,
+                dt.label,
+                dult.is_required AS required,
+                dult.allow_multiple
+            FROM document_upload_locations dul
+            INNER JOIN document_upload_location_types dult
+                ON dult.location_id = dul.id
+            INNER JOIN document_config_versions dcv
+                ON dcv.is_current = 1
+            INNER JOIN document_types dt
+                ON dt.config_version_id = dcv.id
+                AND dt.document_key = dult.document_key
+            WHERE dul.location_key = 'receiving_tally'
+                AND dul.is_active = 1
+            ORDER BY dt.sort_order ASC, dt.label ASC
+        ");
+        $documentConfigQuery->execute();
+        $documentConfig = $documentConfigQuery->fetchAll(PDO::FETCH_ASSOC);
+
+        if (!$documentConfig) {
+            throw new RuntimeException("Receiving document configuration is not available.");
+        }
+
+        $documentFiles = $_FILES["documents"] ?? null;
+
+        foreach ($documentConfig as $documentType) {
+            $documentKey = (string)$documentType["document_key"];
+            $documentLabel = (string)$documentType["label"];
+            $allowMultiple = (bool)$documentType["allow_multiple"];
+            $isRequired = (bool)$documentType["required"];
+            $filesForType = [];
+
+            if (
+                is_array($documentFiles) &&
+                isset($documentFiles["name"]) &&
+                array_key_exists($documentKey, $documentFiles["name"])
+            ) {
+                $names = $documentFiles["name"][$documentKey];
+                $tmpNames = $documentFiles["tmp_name"][$documentKey] ?? null;
+                $errors = $documentFiles["error"][$documentKey] ?? null;
+                $sizes = $documentFiles["size"][$documentKey] ?? null;
+
+                if (is_array($names)) {
+                    foreach ($names as $index => $name) {
+                        $filesForType[] = [
+                            "name" => $name,
+                            "tmp_name" => $tmpNames[$index] ?? "",
+                            "error" => $errors[$index] ?? UPLOAD_ERR_NO_FILE,
+                            "size" => $sizes[$index] ?? 0
+                        ];
+                    }
+                } else {
+                    $filesForType[] = [
+                        "name" => $names,
+                        "tmp_name" => $tmpNames ?? "",
+                        "error" => $errors ?? UPLOAD_ERR_NO_FILE,
+                        "size" => $sizes ?? 0
+                    ];
+                }
+            }
+
+            $validFiles = [];
+
+            foreach ($filesForType as $file) {
+                if ((int)$file["error"] === UPLOAD_ERR_NO_FILE) {
+                    continue;
+                }
+
+                if ((int)$file["error"] !== UPLOAD_ERR_OK) {
+                    throw new RuntimeException("Upload failed for " . $documentLabel . ".");
+                }
+
+                if ((int)$file["size"] > 10 * 1024 * 1024) {
+                    throw new RuntimeException($documentLabel . " must not exceed 10 MB per file.");
+                }
+
+                $tmpPath = (string)$file["tmp_name"];
+                if ($tmpPath === "" || !is_uploaded_file($tmpPath)) {
+                    throw new RuntimeException("Invalid uploaded file for " . $documentLabel . ".");
+                }
+
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $mimeType = $finfo->file($tmpPath);
+
+                if (!in_array($mimeType, $allowed_proof_types, true)) {
+                    throw new RuntimeException($documentLabel . " must be a JPEG, PNG, WebP image, or PDF.");
+                }
+
+                $validFiles[] = [
+                    "name" => (string)$file["name"],
+                    "tmp_name" => $tmpPath,
+                    "size" => (int)$file["size"],
+                    "type" => $mimeType
+                ];
+            }
+
+            if ($isRequired && count($validFiles) === 0) {
+                throw new RuntimeException($documentLabel . " is required before confirming receiving.");
+            }
+
+            if (!$allowMultiple && count($validFiles) > 1) {
+                throw new RuntimeException("Only one file is allowed for " . $documentLabel . ".");
+            }
+
+            foreach ($validFiles as $file) {
+                $preparedDocuments[] = [
+                    "document_key" => $documentKey,
+                    "document_label" => $documentLabel,
+                    "file" => $file
+                ];
+            }
+        }
+
         $preparedContainers = [];
         $seenContainerIds = [];
 
@@ -58,7 +175,7 @@
             SELECT id, code, name
             FROM terminal_locations
             WHERE id = :location_id
-            AND kind IN ('RECEIVING', 'YARD', 'WAREHOUSE', 'INSPECTION_BAY')
+            AND kind = 'RECEIVING'
             AND status = 'active'
             LIMIT 1
         ");
@@ -93,7 +210,7 @@
             $location = $locationQuery->fetch(PDO::FETCH_ASSOC);
 
             if (!$location) {
-                throw new RuntimeException("Select a valid receiving yard or warehouse location.");
+                throw new RuntimeException("Select a valid active yard location.");
             }
 
             if ($actual_weight !== "" && (!is_numeric($actual_weight) || (float)$actual_weight < 0)) {
@@ -265,6 +382,77 @@
             "total_containers" => $totalContainers,
             "started_by" => $performed_by
         ]);
+
+        $insertDocument = $conn->prepare("
+            INSERT INTO portal_receiving_documents (
+                id,
+                receiving_id,
+                shipment_id,
+                document_key,
+                document_type,
+                original_name,
+                stored_name,
+                file_path,
+                mime_type,
+                file_size,
+                uploaded_by,
+                uploaded_at
+            ) VALUES (
+                :id,
+                :receiving_id,
+                :shipment_id,
+                :document_key,
+                :document_type,
+                :original_name,
+                :stored_name,
+                :file_path,
+                :mime_type,
+                :file_size,
+                :uploaded_by,
+                NOW()
+            )
+        ");
+
+        foreach ($preparedDocuments as $document) {
+            $file = $document["file"];
+
+            $uploadFile = [
+                "name" => $file["name"],
+                "type" => $file["type"],
+                "tmp_name" => $file["tmp_name"],
+                "error" => UPLOAD_ERR_OK,
+                "size" => $file["size"]
+            ];
+
+            if (!function_exists("upload_files")) {
+                throw new RuntimeException("The document upload function is unavailable.");
+            }
+
+            $uploadResult = upload_files($uploadFile, $allowed_proof_types);
+
+            if (!empty($uploadResult["error"])) {
+                throw new RuntimeException(
+                    (string)($uploadResult["data"] ?? "Could not upload " . $document["document_label"] . ".")
+                );
+            }
+
+            $filePath = (string)$uploadResult["data"];
+            $uploadedDocuments[] = $filePath;
+
+            $insertDocument->execute([
+                "id" => generateId(),
+                "receiving_id" => $receiving_id,
+                "shipment_id" => $shipment_id,
+                "document_key" => $document["document_key"],
+                "document_type" => $document["document_label"],
+                "original_name" => $file["name"],
+                "stored_name" => basename($filePath),
+                "file_path" => $filePath,
+                "mime_type" => $file["type"],
+                "file_size" => $file["size"],
+                "uploaded_by" => $my_details->id
+            ]);
+        }
 
         $insertContainer = $conn->prepare("
             INSERT INTO portal_receiving_containers (
@@ -456,13 +644,29 @@
                 "containers_saved" => count($preparedContainers),
                 "received_containers" => $receivedCount,
                 "discrepancy_containers" => $discrepancyCount,
-                "total_containers" => $totalContainers
+                "total_containers" => $totalContainers,
+                "documents_saved" => count($preparedDocuments),
+                "documents" => array_map(
+                    static fn($document) => [
+                        "document_key" => $document["document_key"],
+                        "document_type" => $document["document_label"],
+                        "file_name" => $document["file"]["name"]
+                    ],
+                    $preparedDocuments
+                )
             ],
             "code" => null
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     } catch (Throwable $e) {
         if (isset($conn) && $conn instanceof PDO && $conn->inTransaction()) {
             $conn->rollBack();
+        }
+
+        foreach (array_merge($uploadedDocuments, array_values($uploadedProofs)) as $uploadedPath) {
+            $absolutePath = dirname(__DIR__, 1) . "/" . ltrim((string)$uploadedPath, "/");
+            if (is_file($absolutePath)) {
+                @unlink($absolutePath);
+            }
         }
 
         echo json_encode([

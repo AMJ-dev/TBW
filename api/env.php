@@ -25,3 +25,5 @@
     $mfa_key = "8227adcc2200e3bb07c8eb44db8eaf3de06bf261662c889a3a0f2a01963a681b";
     $INTEGRATION_ENCRYPTION_KEY = 'WANZ2f/letvPdFuHgKDxxfU7Z8oAG2U9UO+8567xY2E=';
 
+    $rate_limit_secret="adbe29903c9765ad07eb505666e0e012d0f507cb7d1a8909f10c55bc76558f4f";
+    $rate_limit_failed_closed=0;

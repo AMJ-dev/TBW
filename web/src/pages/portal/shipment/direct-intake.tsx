@@ -110,9 +110,7 @@ export default function DirectIntakePage() {
   const [licensedAgentId, setLicensedAgentId] = useState("");
 
   const [explanation, setExplanation] = useState("");
-  const [containers, setContainers] = useState<ContainerItem[]>([
-    initialContainer(),
-  ]);
+  const [containers, setContainers] = useState<ContainerItem[]>([initialContainer()]);
   const [containerTypes, setContainerTypes] = useState<string[]>([]);
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState("");
