@@ -5,8 +5,8 @@
         $get =  $conn->prepare("SELECT id, document_type FROM portal_shipment_documents");
         $get->execute();
         while($docs = $get->fetch(PDO::FETCH_OBJ)){
-            echo $type = clean_type($docs->document_type)."\n";
-            $reference_code = generate_ref();
+            $type = clean_type($docs->document_type)."\n";
+            $reference_code = generate_ref($type);
             $update = $conn->prepare("UPDATE portal_shipment_documents SET reference_code=:reference_code WHERE id=:id");
             $update->bindValue(":reference_code", $reference_code);
             $update->bindValue(":id", $docs->id);
