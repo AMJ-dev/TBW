@@ -1,7 +1,8 @@
-
+account_events	Account and security events
 <!-- cargo_config_audit	Cargo configuration changes -->
 <!-- cargo_status_audit	Shipment status changes -->
 <!-- document_config_audit	Document configuration changes -->
+feature_flag_audit_logs	Feature flag changes
 <!-- financial_configuration_audit	Financial configuration changes -->
 <!-- gate_configuration_audit	Gate configuration changes -->
 <!-- gate_driver_action_logs	Driver actions -->

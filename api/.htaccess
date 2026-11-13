@@ -112,7 +112,6 @@ RewriteRule ^operations/documents/([0-9a-zA-Z-]+)/?$ src/documents/op-details.ph
 RewriteRule ^public/maintenance/schedule/$ src/portal/maintenance.php [NC]
 RewriteRule ^operations/audit/$ src/audit/index.php [NC]
 
-
 RewriteRule ^portal/shipments/$ src/shipment/get.php [NC]
 RewriteRule ^portal/shipments/save/$ src/shipment/save.php [NC]
 RewriteRule ^portal/shipment/config/$ src/shipment/config.php [NC]
