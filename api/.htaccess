@@ -125,6 +125,11 @@ RewriteRule ^operator/shipments/review/$ src/shipment/review.php [NC]
 RewriteRule ^operator/shipment/transition/$ src/shipment/transition.php [NC]
 RewriteRule ^operator/shipment/([0-9a-zA-Z-]+)/$ src/shipment/op-details.php?id=$1 [NC]
 
+RewriteRule ^operations/seals/$ src/seals/all.php [NC]
+RewriteRule ^operations/seals/save/$ src/seals/save.php [NC]
+RewriteRule ^operations/seals/search/$ src/seals/search.php [NC]
+RewriteRule ^operations/seals/([0-9a-zA-Z-]+)/$ src/seals/details.php?id=$1 [NC]
+
 RewriteRule ^operations/manifests/$ src/manifests/index.php [NC]
 RewriteRule ^operations/manifests/save/$ src/manifests/save.php [NC]
 RewriteRule ^operations/manifests/match/$ src/manifests/match.php [NC]
