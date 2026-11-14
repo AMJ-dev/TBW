@@ -114,8 +114,11 @@ const OperationsInventoryDetailsPage = lazy(() => import("@/pages/operations/inv
 const OperationsManifestReviewPage = lazy(() => import("@/pages/manifest/review"));
 const OperationsManifestIntakePage = lazy(() => import("@/pages/manifest/intake"));
 const OperationsManifestDetailsPage = lazy(() => import("@/pages/manifest/details"));
-const OperationsStuffingPage = lazy(() => import("@/pages/operations/stuffing"));
-const OperationsValueAddedPage = lazy(() => import("@/pages/operations/value-added"));
+
+const OperationsValueAddedPage = lazy(() => import("@/pages/operations/value-added/"));
+const OperationsValueAddedNewPage = lazy(() => import("@/pages/operations/value-added/new"));
+const OperationsValueAddedDetailsPage = lazy(() => import("@/pages/operations/value-added/details"));
+
 const OperationsReviewPage = lazy(() => import("@/pages/shipment/review"));
 const OperationsShipmentReviewPage = lazy(() => import("@/pages/shipment/shipment-review-details"));
 const OperationDocumentationPage = lazy(()=>import("@/pages/operations/documentation/"))
@@ -270,8 +273,11 @@ export default function Routers() {
 						<Route path="/operations/manifests/review" element={<OperationsManifestReviewPage />} />
 						<Route path="/operations/manifests/intake" element={<OperationsManifestIntakePage />} />
 						<Route path="/operations/manifest/details/:id" element={<OperationsManifestDetailsPage />} />
-						<Route path="/operations/stuffing" element={<OperationsStuffingPage />} />
+
 						<Route path="/operations/value-added" element={<OperationsValueAddedPage />} />
+						<Route path="/operations/value-added/new" element={<OperationsValueAddedNewPage />} />		
+						<Route path="/operations/value-added/:id" element={<OperationsValueAddedDetailsPage />} />					
+
 						<Route path="/operations/overrides" element={<OperationsOverridesPage />} />
 						<Route path="/operations/overstay" element={<OperationsOverstayPage />}/>
 						<Route path="/operations/shipments/review" element={<OperationsReviewPage />} />
@@ -304,6 +310,7 @@ export default function Routers() {
 						<Route path="/portal/packages/:id" element={<PackageDetailPage />} />
 						<Route path="/portal/cargo/:id/service-request" element={<ServiceRequestPage />} />
 						<Route path="/portal/cargo/:id/claim" element={<DiscrepancyClaimPage />} />
+						
 						<Route path="/portal/documents" element={<PortalDocumentsPage />} />
 						<Route path="/portal/documents/:id" element={<PortalDocumentDetailsPage />} />
 						<Route path="/portal/invoices" element={<PortalInvoicesPage />} />

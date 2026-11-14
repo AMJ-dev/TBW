@@ -357,29 +357,6 @@ export default function ConfigurationRoute() {
 											</li>
 										))}
 									</ul>
-
-									<div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
-										<Link to="/admin/audit">
-											<Button
-												variant="outline"
-												size="sm"
-												className="border-line bg-paper text-ink hover:bg-sand"
-											>
-												<ClipboardCheck className="size-3.5" />
-												View configuration history
-											</Button>
-										</Link>
-										<Link to="/admin/users">
-											<Button
-												variant="outline"
-												size="sm"
-												className="border-line bg-paper text-ink hover:bg-sand"
-											>
-												<Users className="size-3.5" />
-												Manage access
-											</Button>
-										</Link>
-									</div>
 								</div>
 							</div>
 						</section>
