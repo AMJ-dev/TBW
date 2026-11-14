@@ -4,7 +4,6 @@
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-	http_response_code(405);
 	echo json_encode([
 		"error" => true,
 		"data" => "Method not allowed.",
@@ -16,7 +15,6 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 $examination_id = trim($_POST["examination_id"] ?? "");
 
 if ($examination_id === "") {
-	http_response_code(422);
 	echo json_encode([
 		"error" => true,
 		"data" => "Examination ID is required.",
@@ -54,7 +52,6 @@ try {
 	if (!$examination) {
 		$conn->rollBack();
 
-		http_response_code(404);
 		echo json_encode([
 			"error" => true,
 			"data" => "Examination not found.",
@@ -66,7 +63,6 @@ try {
 	if ($examination->officer_id !== $my_details->id) {
 		$conn->rollBack();
 
-		http_response_code(403);
 		echo json_encode([
 			"error" => true,
 			"data" => "You are not assigned to this examination.",
@@ -78,7 +74,6 @@ try {
 	if ($examination->status !== "SCHEDULED") {
 		$conn->rollBack();
 
-		http_response_code(409);
 		echo json_encode([
 			"error" => true,
 			"data" => "Only scheduled examinations can be started.",
@@ -102,7 +97,6 @@ try {
 	if (!in_array($examination->container_status, $allowed_container_statuses, true)) {
 		$conn->rollBack();
 
-		http_response_code(409);
 		echo json_encode([
 			"error" => true,
 			"data" => "The container cannot be placed under examination from its current status.",
@@ -275,7 +269,6 @@ try {
 		$conn->rollBack();
 	}
 
-	http_response_code(500);
 	echo json_encode([
 		"error" => true,
 		"data" => "Could not start examination.",

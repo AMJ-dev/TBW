@@ -4,17 +4,6 @@ require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 try {
     $id = $_GET["id"] ?? null;
 
-    if (!$id) {
-        http_response_code(400);
-
-        echo json_encode([
-            "error" => true,
-            "data" => "Examination ID is required.",
-            "code" => null
-        ]);
-        exit;
-    }
-
     $sql = "
         SELECT
             e.id,
@@ -73,7 +62,6 @@ try {
     $examination = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$examination) {
-        http_response_code(404);
 
         echo json_encode([
             "error" => true,
@@ -119,7 +107,6 @@ try {
     ]);
 
 } catch (PDOException $e) {
-    http_response_code(500);
 
     echo json_encode([
         "error" => true,

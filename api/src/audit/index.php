@@ -3,7 +3,6 @@
 
     try {
         if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-            http_response_code(405);
             echo json_encode([
                 "error" => true,
                 "data" => "Method not allowed.",
@@ -24,7 +23,6 @@
         $allowedSeverities = ["INFO", "WARNING", "ERROR", "CRITICAL"];
 
         if ($severity !== "" && !in_array($severity, $allowedSeverities, true)) {
-            http_response_code(400);
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid severity filter.",
@@ -185,8 +183,6 @@
         ]);
 
     } catch (Throwable $e) {
-        http_response_code(500);
-
         echo json_encode([
             "error" => true,
             "data" => "Could not load audit logs.",

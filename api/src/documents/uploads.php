@@ -20,7 +20,6 @@
         $organisationId = trim((string) ($my_details->organisation_id ?? ""));
 
         if ($userId === "" || $organisationId === "") {
-            http_response_code(401);
 
             echo json_encode([
                 "error" => true,
@@ -334,8 +333,6 @@
             delete_file($uploadedFilePath);
         }
 
-        http_response_code(422);
-
         echo json_encode([
             "error" => true,
             "data" => $e->getMessage(),
@@ -350,8 +347,6 @@
         if ($uploadedFilePath !== null) {
             delete_file($uploadedFilePath);
         }
-
-        http_response_code(500);
 
         echo json_encode([
             "error" => true,

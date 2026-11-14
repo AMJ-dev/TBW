@@ -3,7 +3,6 @@
 
     try {
         if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-            http_response_code(405);
             echo json_encode([
                 "error" => true,
                 "data" => "Method not allowed.",
@@ -13,7 +12,6 @@
         }
 
         if (($my_details->account_type ?? null) !== "system") {
-            http_response_code(403);
             echo json_encode([
                 "error" => true,
                 "data" => "You are not authorised to access shipments.",
@@ -156,10 +154,7 @@
                 "total_pages" => (int)ceil($total / $page_size)
             ]
         ]);
-
     } catch (\Throwable $th) {
-        http_response_code(500);
-
         echo json_encode([
             "error" => true,
             "data" => "Could not load shipments.",

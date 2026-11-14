@@ -8,7 +8,6 @@
             !is_string($id) ||
             !preg_match('/^[0-9a-zA-Z-]{1,36}$/', $id)
         ) {
-            http_response_code(400);
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid examination ID.",
@@ -114,7 +113,6 @@
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {
-            http_response_code(404);
             echo json_encode([
                 "error" => true,
                 "data" => "Examination not found.",
@@ -328,14 +326,12 @@
         ]);
 
     } catch (PDOException $e) {
-        http_response_code(500);
         echo json_encode([
             "error" => true,
             "data" => "Could not load examination details.",
             "code" => null
         ]);
     } catch (Throwable $e) {
-        http_response_code(500);
         echo json_encode([
             "error" => true,
             "data" => "An unexpected error occurred.",

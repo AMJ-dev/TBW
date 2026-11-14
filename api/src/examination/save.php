@@ -4,7 +4,6 @@
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-	http_response_code(405);
 	echo json_encode([
 		"error" => true,
 		"data" => "Method not allowed.",
@@ -45,7 +44,6 @@ try {
 		$scheduled_date === "" ||
 		$scheduled_time === ""
 	) {
-		http_response_code(422);
 		echo json_encode([
 			"error" => true,
 			"data" => "Complete all required examination fields.",
@@ -55,7 +53,6 @@ try {
 	}
 
 	if (!in_array($examination_type, $allowed_types, true)) {
-		http_response_code(422);
 		echo json_encode([
 			"error" => true,
 			"data" => "Invalid examination type.",
@@ -65,7 +62,6 @@ try {
 	}
 
 	if (!in_array($priority, $allowed_priorities, true)) {
-		http_response_code(422);
 		echo json_encode([
 			"error" => true,
 			"data" => "Invalid examination priority.",
@@ -83,7 +79,6 @@ try {
 		!$time ||
 		$time->format("H:i") !== $scheduled_time
 	) {
-		http_response_code(422);
 		echo json_encode([
 			"error" => true,
 			"data" => "Invalid examination date or time.",
@@ -98,7 +93,6 @@ try {
 	);
 
 	if (!$scheduled_at || $scheduled_at <= new DateTime()) {
-		http_response_code(422);
 		echo json_encode([
 			"error" => true,
 			"data" => "The examination schedule must be in the future.",
@@ -108,7 +102,6 @@ try {
 	}
 
 	if (strlen($instructions) > 5000) {
-		http_response_code(422);
 		echo json_encode([
 			"error" => true,
 			"data" => "Instructions cannot exceed 5000 characters.",
@@ -144,7 +137,6 @@ try {
 	if (!$container) {
 		$conn->rollBack();
 
-		http_response_code(404);
 		echo json_encode([
 			"error" => true,
 			"data" => "The selected container could not be found.",
@@ -165,7 +157,6 @@ try {
 	if (!in_array($container["container_status"], $earlierContainerStatuses, true)) {
 		$conn->rollBack();
 
-		http_response_code(409);
 		echo json_encode([
 			"error" => true,
 			"data" => "This container cannot be scheduled for examination from its current status.",
@@ -193,7 +184,6 @@ try {
 	if (!$officer) {
 		$conn->rollBack();
 
-		http_response_code(422);
 		echo json_encode([
 			"error" => true,
 			"data" => "The selected examination officer is invalid.",
@@ -222,7 +212,6 @@ try {
 	if ($duplicateStmt->fetch(PDO::FETCH_ASSOC)) {
 		$conn->rollBack();
 
-		http_response_code(409);
 		echo json_encode([
 			"error" => true,
 			"data" => "An active examination already exists for this container.",
@@ -462,7 +451,6 @@ try {
 		$conn->rollBack();
 	}
 
-	http_response_code(500);
 	echo json_encode([
 		"error" => true,
 		"data" => "Could not save the examination schedule.",

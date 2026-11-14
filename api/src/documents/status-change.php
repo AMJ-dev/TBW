@@ -2,7 +2,6 @@
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
     if ($my_details->account_type !== "system") {
-        http_response_code(403);
         echo json_encode([
             "error" => true,
             "data" => "Access denied.",
@@ -18,7 +17,6 @@
     $missingDocuments = $_POST["missing_documents"] ?? [];
 
     if ($action !== "BULK_UPDATE") {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Invalid action.",
@@ -28,7 +26,6 @@
     }
 
     if ($shipment_id === "") {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Shipment ID is required.",
@@ -38,7 +35,6 @@
     }
 
     if (!is_array($statusChanges) || !is_array($missingDocuments)) {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "Invalid document data.",
@@ -48,7 +44,6 @@
     }
 
     if (count($statusChanges) === 0 && count($missingDocuments) === 0) {
-        http_response_code(400);
         echo json_encode([
             "error" => true,
             "data" => "No document changes were submitted.",
@@ -150,7 +145,6 @@
         if (!$shipment) {
             $conn->rollBack();
 
-            http_response_code(404);
             echo json_encode([
                 "error" => true,
                 "data" => "Shipment not found.",
@@ -490,11 +484,7 @@
         ]);
 
     } catch (Throwable $e) {
-        if ($conn->inTransaction()) {
-            $conn->rollBack();
-        }
-
-        http_response_code(400);
+        if ($conn->inTransaction()) $conn->rollBack();
 
         echo json_encode([
             "error" => true,

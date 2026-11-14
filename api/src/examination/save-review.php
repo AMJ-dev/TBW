@@ -7,8 +7,6 @@
         $remarks = trim($_POST["remarks"] ?? "");
 
         if (!$examination_id || !$decision || !$remarks) {
-            http_response_code(400);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Examination ID, decision and remarks are required.",
@@ -24,8 +22,6 @@
         ];
 
         if (!in_array($decision, $allowed_decisions, true)) {
-            http_response_code(400);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid examination review decision.",
@@ -60,8 +56,6 @@
         if (!$examination) {
             $conn->rollBack();
 
-            http_response_code(404);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Examination not found.",
@@ -72,8 +66,6 @@
 
         if ($examination["status"] !== "PENDING_REVIEW") {
             $conn->rollBack();
-
-            http_response_code(409);
 
             echo json_encode([
                 "error" => true,
@@ -89,8 +81,6 @@
         ) {
             $conn->rollBack();
 
-            http_response_code(400);
-
             echo json_encode([
                 "error" => true,
                 "data" => "The examination is not linked to a valid shipment container.",
@@ -101,8 +91,6 @@
 
         if ($examination["container_status"] !== "UNDER_EXAMINATION") {
             $conn->rollBack();
-
-            http_response_code(409);
 
             echo json_encode([
                 "error" => true,
@@ -284,8 +272,6 @@
         if ($conn->inTransaction()) {
             $conn->rollBack();
         }
-
-        http_response_code(500);
 
         echo json_encode([
             "error" => true,
