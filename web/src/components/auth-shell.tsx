@@ -180,7 +180,6 @@ const systemMenu = [
             { label: "Declaration Review", to: "/operations/shipments/review", icon: ClipboardCheck },
             // { label: "Direct Container Intake", to: "/operations/manifests/intake", icon: Container },
             { label: "Receiving", to: "/operations/receiving", icon: PackageCheck },
-            { label: "Seal Events", to: "/operations/seals", icon: ShieldCheck },
             { label: "Yard", to: "/operations/yard", icon: Grid2X2 },
             { label: "Warehouse", to: "/operations/warehouse", icon: Warehouse },
             { label: "Documentation", to: "/operations/documentation", icon: BookOpen },
