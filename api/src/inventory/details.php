@@ -1,8 +1,21 @@
+
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
+    header("Content-Type: application/json");
+
     try {
         $id = trim($_GET["id"] ?? "");
+
+        if ($id === "") {
+            http_response_code(400);
+            echo json_encode([
+                "error" => true,
+                "data" => "Inventory ID is required.",
+                "code" => 400
+            ]);
+            exit;
+        }
 
         $sql = "
             SELECT
@@ -74,6 +87,7 @@
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {
+            http_response_code(404);
             echo json_encode([
                 "error" => true,
                 "data" => "Container not found, not yet received, or no longer within the terminal.",
@@ -183,7 +197,7 @@
                 ($movement["to_location_code"]
                     ? $movement["to_location_code"] . " · "
                     : "") .
-                $movement["to_location_name"]
+                ($movement["to_location_name"] ?? "")
             );
 
             return [
@@ -211,6 +225,43 @@
                 "createdAt" => $movement["created_at"]
             ];
         }, $movementRows);
+
+        $notesSql = "
+            SELECT
+                n.id,
+                n.note,
+                n.recorded_by,
+                u.full_name AS recorded_by_name,
+                n.created_at,
+                n.updated_at
+
+            FROM terminal_inventory_notes n
+
+            LEFT JOIN users u
+                ON u.id = n.recorded_by
+
+            WHERE n.container_id = ?
+
+            ORDER BY n.created_at DESC
+        ";
+
+        $notesStmt = $conn->prepare($notesSql);
+        $notesStmt->execute([$id]);
+
+        $noteRows = $notesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $notes = array_map(function ($note) {
+            return [
+                "id" => $note["id"],
+                "note" => $note["note"],
+                "recordedBy" => [
+                    "id" => $note["recorded_by"],
+                    "name" => $note["recorded_by_name"] ?: "Unknown user"
+                ],
+                "createdAt" => $note["created_at"],
+                "updatedAt" => $note["updated_at"]
+            ];
+        }, $noteRows);
 
         $quantity = $row["package_count"]
             ?? $row["item_quantity"]
@@ -305,7 +356,8 @@
             "movementHistory" => $movementHistory,
             "movementCount" => count($movementHistory),
 
-            "notes" => $row["special_instructions"] ?: ""
+            "notes" => $notes,
+            "notesCount" => count($notes)
         ];
 
         echo json_encode([
@@ -315,6 +367,8 @@
         ]);
 
     } catch (Throwable $e) {
+        http_response_code(500);
+
         echo json_encode([
             "error" => true,
             "data" => "Could not load inventory record.",
