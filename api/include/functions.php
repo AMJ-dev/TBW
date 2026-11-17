@@ -105,7 +105,7 @@
         $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
         
-        curl_close($ch);
+        // curl_close($ch);
 
         if ($error) {
             return [
@@ -175,7 +175,7 @@
     }
     function update_integration_setting(string $encryptionKey): bool {
         global $conn,$redis;
-
+ 
         $q = $conn->prepare("
             SELECT
                 a.adapter_key,

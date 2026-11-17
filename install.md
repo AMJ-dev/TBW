@@ -1,12 +1,3 @@
-CREATE DATABASE trinu;
-CREATE USER 'hqf'@'localhost' IDENTIFIED BY '_6-@#Q3HrG0OsKz4Yj';
-GRANT ALL PRIVILEGES ON trinu.* TO 'hqf'@'localhost';
-FLUSH PRIVILEGES;
-EXIT;
-
-mysql -u hqf -p trinu < trinu.sql
-
-
 
 
 account_events	Account and security events
