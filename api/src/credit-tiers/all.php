@@ -2,7 +2,9 @@
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
     try {
-        $stmt = $conn->prepare("
+        $status = strtolower(trim($_GET["status"] ?? ""));
+
+        $sql = "
             SELECT
                 id,
                 name,
@@ -22,8 +24,15 @@
                 created_at,
                 updated_at
             FROM finance_credit_tiers
-            ORDER BY created_at DESC
-        ");
+        ";
+
+        if ($status === "active") $sql .= " WHERE status = :status";
+
+        $sql .= " ORDER BY created_at DESC";
+
+        $stmt = $conn->prepare($sql);
+
+        if ($status === "active") $stmt->bindValue(":status", "ACTIVE", PDO::PARAM_STR);
 
         $stmt->execute();
 

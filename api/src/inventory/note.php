@@ -8,18 +8,7 @@
         $id = trim($_POST["id"] ?? "");
         $note = trim($_POST["note"] ?? "");
 
-        if ($id === "") {
-            http_response_code(400);
-            echo json_encode([
-                "error" => true,
-                "data" => "Container ID is required.",
-                "code" => 400
-            ]);
-            exit;
-        }
-
         if ($note === "") {
-            http_response_code(400);
             echo json_encode([
                 "error" => true,
                 "data" => "Note is required.",
@@ -29,7 +18,6 @@
         }
 
         if (mb_strlen($note) > 5000) {
-            http_response_code(400);
             echo json_encode([
                 "error" => true,
                 "data" => "Note cannot exceed 5000 characters.",
@@ -60,7 +48,6 @@
         $container = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$container) {
-            http_response_code(404);
             echo json_encode([
                 "error" => true,
                 "data" => "Container not found or no longer within the terminal.",
@@ -125,8 +112,6 @@
         ]);
 
     } catch (Throwable $e) {
-        http_response_code(500);
-
         echo json_encode([
             "error" => true,
             "data" => "Could not save inventory note.",

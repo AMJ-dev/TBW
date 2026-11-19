@@ -8,7 +8,6 @@
         $id = trim($_GET["id"] ?? "");
 
         if ($id === "") {
-            http_response_code(400);
             echo json_encode([
                 "error" => true,
                 "data" => "Inventory ID is required.",
@@ -87,7 +86,6 @@
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$row) {
-            http_response_code(404);
             echo json_encode([
                 "error" => true,
                 "data" => "Container not found, not yet received, or no longer within the terminal.",
@@ -367,7 +365,6 @@
         ]);
 
     } catch (Throwable $e) {
-        http_response_code(500);
 
         echo json_encode([
             "error" => true,

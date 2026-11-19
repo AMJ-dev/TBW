@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link } from "@/components/router-link";
 import {
 	AlertCircle,
+	ArrowLeft,
 	ArrowRight,
 	Building2,
 	Check,
@@ -20,6 +21,7 @@ import { AppShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { format_currency } from "@/lib/functions";
 import { http, type Resp } from "@/lib/httpClient";
 
 type ApplicationStep = "tier" | "references" | "review";
@@ -46,13 +48,6 @@ const steps: { key: ApplicationStep; label: string; detail: string }[] = [
 	{ key: "references", label: "References", detail: "Bank and trade" },
 	{ key: "review", label: "Review", detail: "Confirm application" },
 ];
-
-const formatCurrency = (value: number | string) =>
-	new Intl.NumberFormat("en-NG", {
-		style: "currency",
-		currency: "NGN",
-		maximumFractionDigits: 0,
-	}).format(Number(value || 0));
 
 const formatDuration = (value: number, unit: string) => {
 	const normalized = unit.toLowerCase();
@@ -172,7 +167,7 @@ export default function FinanceCreditApplyRoute() {
 					amount > Number(selectedTier.maximum_limit))
 			) {
 				toast.error(
-					`Requested amount must be between ${formatCurrency(selectedTier.minimum_limit)} and ${formatCurrency(selectedTier.maximum_limit)}.`
+					`Requested amount must be between ${format_currency(selectedTier.minimum_limit)} and ${format_currency(selectedTier.maximum_limit)}.`
 				);
 				return;
 			}
@@ -301,14 +296,14 @@ export default function FinanceCreditApplyRoute() {
 						/>
 						<ReviewRow
 							label="Maximum facility"
-							value={formatCurrency(selectedTier.maximum_limit)}
+							value={format_currency(selectedTier.maximum_limit)}
 							mono
 						/>
 						<ReviewRow
 							label="Requested amount"
 							value={
 								requestedAmount
-									? formatCurrency(requestedAmount.replace(/,/g, ""))
+									? format_currency(requestedAmount.replace(/,/g, ""))
 									: "Not specified"
 							}
 							mono
@@ -321,15 +316,9 @@ export default function FinanceCreditApplyRoute() {
 					</p>
 
 					<div className="mt-8 flex flex-wrap justify-center gap-3">
-						<Link to="/portal/payments">
+						<Link to="/portal/credit">
 							<Button className="bg-orange text-white hover:bg-orange-deep">
-								Back to payments <ArrowRight />
-							</Button>
-						</Link>
-
-						<Link to="/portal/statement">
-							<Button variant="outline" className="border-line bg-paper text-ink">
-								View statement
+								<ArrowLeft /> Back to Credits 
 							</Button>
 						</Link>
 					</div>
@@ -584,7 +573,7 @@ export default function FinanceCreditApplyRoute() {
 
 																<span className="hidden shrink-0 text-right sm:block">
 																	<span className="block text-sm font-semibold text-ink">
-																		{formatCurrency(item.maximum_limit)}
+																		{format_currency(item.maximum_limit)}
 																	</span>
 																	<span className="mt-1 block font-mono text-[9px] uppercase text-ink-soft">
 																		Maximum limit
@@ -653,11 +642,11 @@ export default function FinanceCreditApplyRoute() {
 										<div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
 											<DetailMetric
 												label="Minimum limit"
-												value={formatCurrency(selectedTier.minimum_limit)}
+												value={format_currency(selectedTier.minimum_limit)}
 											/>
 											<DetailMetric
 												label="Maximum limit"
-												value={formatCurrency(selectedTier.maximum_limit)}
+												value={format_currency(selectedTier.maximum_limit)}
 												highlight
 											/>
 											<DetailMetric
@@ -689,7 +678,7 @@ export default function FinanceCreditApplyRoute() {
 												Minimum transaction volume
 											</p>
 											<p className="font-mono text-sm font-semibold text-ink">
-												{formatCurrency(selectedTier.minimum_transaction_volume)}
+												{format_currency(selectedTier.minimum_transaction_volume)}
 											</p>
 										</div>
 
@@ -886,12 +875,12 @@ export default function FinanceCreditApplyRoute() {
 										<ReviewRow label="Tier code" value={selectedTier.code} mono />
 										<ReviewRow
 											label="Minimum limit"
-											value={formatCurrency(selectedTier.minimum_limit)}
+											value={format_currency(selectedTier.minimum_limit)}
 											mono
 										/>
 										<ReviewRow
 											label="Maximum limit"
-											value={formatCurrency(selectedTier.maximum_limit)}
+											value={format_currency(selectedTier.maximum_limit)}
 											mono
 										/>
 										<ReviewRow
@@ -908,14 +897,14 @@ export default function FinanceCreditApplyRoute() {
 										{requestedAmount && (
 											<ReviewRow
 												label="Requested limit"
-												value={formatCurrency(requestedAmount.replace(/,/g, ""))}
+												value={format_currency(requestedAmount.replace(/,/g, ""))}
 												mono
 											/>
 										)}
 										{averageMonthlySpend && (
 											<ReviewRow
 												label="Average monthly spend"
-												value={formatCurrency(
+												value={format_currency(
 													averageMonthlySpend.replace(/,/g, "")
 												)}
 												mono
