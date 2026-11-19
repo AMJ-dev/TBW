@@ -269,11 +269,6 @@ export default function FinanceCreditPage() {
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    <Link to="/finance/credit/apply">
-                        <Button variant="outline" className="border-line bg-paper text-ink">
-                            <ChevronLeft className="mr-1.5 size-4" /> Credit application
-                        </Button>
-                    </Link>
                     <Button
                         variant="outline"
                         className="border-line bg-paper text-ink"
@@ -503,51 +498,6 @@ export default function FinanceCreditPage() {
                     <span>Portfolio limit {format_currency(stats.totalLimit)} · exposure {format_currency(stats.totalExposure)}</span>
                 </div>
             </section>
-
-            <div className="rounded-xl bg-paper p-5 ring-1 ring-line">
-                <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-start">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <ShieldCheck className="size-4 text-orange" />
-                            <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-orange-deep">
-                                How credit control works
-                            </p>
-                        </div>
-                        <h3 className="mt-3 font-display text-xl font-bold text-ink">
-                            Block, adjust, or unblock from one place
-                        </h3>
-                        <p className="mt-2 max-w-xl text-[13px] leading-6 text-ink-soft">
-                            Blocking an account prevents new invoices from being raised against it.
-                            Adjusting the limit recalculates utilisation and status automatically.
-                            Every change is logged with the reviewer, timestamp, and reason.
-                        </p>
-                    </div>
-
-                    <div className="rounded-xl bg-sand p-4 ring-1 ring-line">
-                        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-                            Status thresholds
-                        </p>
-                        <ul className="mt-3 space-y-2 text-[12px] leading-5 text-ink-soft">
-                            <li className="flex items-start gap-2">
-                                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-teal" />
-                                Healthy · utilisation under 75%
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-orange" />
-                                Approaching limit · 75% to 89%
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-coral" />
-                                At limit · 90% to 99%
-                            </li>
-                            <li className="flex items-start gap-2">
-                                <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-coral" />
-                                Blocked · at or above 100%, or manually blocked
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
 
             {isAdjustOpen && adjustTarget && (
                 <AdjustLimitModal

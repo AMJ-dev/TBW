@@ -69,11 +69,11 @@ const FinanceInvoicesPage = lazy(() => import("@/pages/finance/invoices"));
 const FinancePaymentsPage = lazy(() => import("@/pages/finance/payments"));
  
 const FinanceCreditPage = lazy(() => import("@/pages/finance/credit/all"));
-const FinanceCreditApplyPage = lazy(() => import("@/pages/finance/credit/apply"));
-
+const PortalCreditPage = lazy(() => import("@/pages/finance/credit/portal"));
+const PortalCreditApplyPage = lazy(() => import("@/pages/finance/credit/apply"));
+		
 const FinanceCreditTiersPage = lazy(() => import("@/pages/finance/credit-tiers"));
-const FinanceNewCreditTiersPage = lazy(() => import("@/pages/finance/credit-tiers/new"));
-const FinanceEditCreditTiersPage = lazy(() => import("@/pages/finance/credit-tiers/edit"));
+const FinanceCreditTierFormPage = lazy(() => import("@/pages/finance/credit-tiers/form"));
 const FinanceCollectionsPage = lazy(() => import("@/pages/finance/collections"));
 const FinanceStatementPage = lazy(() => import("@/pages/finance/statement"));
 const FinanceApprovalsPage = lazy(() => import("@/pages/finance/approvals"));
@@ -235,13 +235,14 @@ export default function Routers() {
 						<Route path="/finance/dashboard" element={<FinanceDashboardPage />} />
 						<Route path="/finance/invoices" element={<FinanceInvoicesPage />} />
 						<Route path="/finance/payments" element={<FinancePaymentsPage />} />
-						
+					
 						<Route path="/finance/credit" element={<FinanceCreditPage />} />
-						<Route path="/finance/credit/apply" element={<FinanceCreditApplyPage />} />
-						
 						<Route path="/finance/credit-tiers" element={<FinanceCreditTiersPage />} />
-						<Route path="/finance/credit-tiers/new" element={<FinanceNewCreditTiersPage />} />
-						<Route path="/finance/credit-tiers/:id" element={<FinanceEditCreditTiersPage />} />
+						<Route path="/finance/credit-tiers/new" element={<FinanceCreditTierFormPage />} />
+						<Route path="/finance/credit-tiers/:id" element={<FinanceCreditTierFormPage />} />
+						
+						<Route path="/portal/credit" element={<PortalCreditPage />} />
+						<Route path="/portal/credit/apply" element={<PortalCreditApplyPage />} />
 
 						<Route path="/finance/collections" element={<FinanceCollectionsPage />} />
 						<Route path="/finance/statement/" element={<FinanceStatementPage />} />

@@ -206,6 +206,7 @@ const systemMenu = [
             { label: "Invoice Ledger", to: "/finance/invoices", icon: FileCheck2 },
             { label: "Payments & Receipts", to: "/finance/payments", icon: ReceiptText },
             { label: "Credit Management", to: "/finance/credit", icon: ShieldCheck },
+            { label: "Credit Tiers", to: "/finance/credit-tiers", icon: ShieldCheck },
             { label: "Collections", to: "/finance/collections", icon: Clock3 },
             { label: "Approvals", to: "/finance/approvals", icon: Check },
             { label: "Tax Rules", to: "/finance/tax", icon: Settings },
@@ -253,6 +254,7 @@ const organisationMenu = [
             { label: "Invoices", to: "/portal/invoices", icon: FileSpreadsheet },
             { label: "Payments", to: "/portal/payments", icon: CreditCard },
             { label: "Statement of Account", to: "/portal/statement", icon: ReceiptText },
+            { label: "Credit Mangements", to: "/portal/credit", icon: ReceiptText },
         ],
     },
     {

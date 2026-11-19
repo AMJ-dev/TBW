@@ -212,3 +212,8 @@ RewriteRule ^operator/examination/search/$ src/examination/search.php [NC]
 RewriteRule ^operator/examination/officers/$ src/examination/officers.php [NC]
 RewriteRule ^operator/examination/([0-9a-zA-Z-]+)/$ src/examination/details.php?id=$1 [NC]
 RewriteRule ^operator/examination/review/([0-9a-zA-Z-]+)/$ src/examination/review-details.php?id=$1 [NC]
+
+RewriteRule ^credit-tiers/$ src/credit-tiers/all.php [NC]
+RewriteRule ^credit-tiers/save/$ src/credit-tiers/save.php [NC]
+RewriteRule ^credit-tiers/update/$ src/credit-tiers/update.php [NC]
+RewriteRule ^credit-tiers/([0-9a-zA-Z-]+)/$ src/credit-tiers/single.php?id=$1 [NC]
