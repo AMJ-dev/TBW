@@ -22,6 +22,7 @@ import { AppShell, Metric, StatusBadge, statusTone } from "@/components/auth-she
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { format_currency } from "@/lib/functions";
 
 type ApprovalKind =
 	| "Discount"
@@ -56,13 +57,6 @@ interface ApprovalRequest {
 	expiresAt: string;
 	priority: "Standard" | "Priority" | "Critical";
 }
-
-const formatNaira = (amount: number) =>
-	new Intl.NumberFormat("en-NG", {
-		style: "currency",
-		currency: "NGN",
-		maximumFractionDigits: 0,
-	}).format(amount);
 
 const initialRequests: ApprovalRequest[] = [
 	{
@@ -283,11 +277,6 @@ export default function FinanceApprovalsRoute() {
 					</p>
 				</div>
 				<div className="flex flex-wrap gap-2">
-					<Link to="/finance/credit/limits">
-						<Button variant="outline" className="border-line bg-paper text-ink">
-							<Wallet className="mr-1.5 size-4" /> Credit limits
-						</Button>
-					</Link>
 					<Button
 						variant="outline"
 						className="border-line bg-paper text-ink"
@@ -315,7 +304,7 @@ export default function FinanceApprovalsRoute() {
 				/>
 				<Metric
 					label="Value pending"
-					value={formatNaira(stats.totalRequested)}
+					value={format_currency(stats.totalRequested)}
 					detail="Total difference at stake"
 					tone={stats.totalRequested > 0 ? "warning" : "success"}
 					icon={BadgePercent}
@@ -454,10 +443,10 @@ export default function FinanceApprovalsRoute() {
 										Value difference
 									</p>
 									<p className="mt-1 font-display text-xl font-bold text-ink">
-										{formatNaira(r.difference)}
+										{format_currency(r.difference)}
 									</p>
 									<p className="mt-0.5 font-mono text-[11px] text-orange-deep">
-										{r.differencePct}% of {formatNaira(r.originalAmount)}
+										{r.differencePct}% of {format_currency(r.originalAmount)}
 									</p>
 								</div>
 
@@ -607,7 +596,7 @@ function ApprovalDetailDialog({
 								Original amount
 							</p>
 							<p className="mt-1 font-mono text-[12px] text-ink">
-								{formatNaira(request.originalAmount)}
+								{format_currency(request.originalAmount)}
 							</p>
 						</div>
 						<div className="rounded-xl bg-sand p-3 ring-1 ring-line">
@@ -615,7 +604,7 @@ function ApprovalDetailDialog({
 								Requested amount
 							</p>
 							<p className="mt-1 font-mono text-[12px] text-ink">
-								{formatNaira(request.requestedAmount)}
+								{format_currency(request.requestedAmount)}
 							</p>
 						</div>
 						<div className="rounded-xl bg-sand p-3 ring-1 ring-line">
@@ -623,7 +612,7 @@ function ApprovalDetailDialog({
 								Difference
 							</p>
 							<p className="mt-1 font-mono text-[12px] font-semibold text-orange-deep">
-								{formatNaira(request.difference)} ({request.differencePct}%)
+								{format_currency(request.difference)} ({request.differencePct}%)
 							</p>
 						</div>
 					</div>

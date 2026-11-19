@@ -17,6 +17,7 @@ import { AppShell, Metric, StatusBadge, statusTone } from "@/components/auth-she
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { format_currency } from "@/lib/functions";
 
 type CustomerSegment = "Importer" | "Licensed agent" | "Shipping line" | "Transporter";
 type StatementHealth = "Current" | "Watch" | "Overdue" | "Blocked";
@@ -108,9 +109,6 @@ const initialRows: StatementRow[] = [
 		health: "Watch",
 	},
 ];
-
-const formatNaira = (value: number) =>
-	`₦${value.toLocaleString("en-NG", { maximumFractionDigits: 0 })}`;
 
 const healthFilters: (StatementHealth | "all")[] = [
 	"all",
@@ -224,14 +222,14 @@ export default function FinanceStatementsIndexRoute() {
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 				<Metric
 					label="Total balance due"
-					value={formatNaira(stats.totalDue)}
+					value={format_currency(stats.totalDue)}
 					detail={`${rows.length} active ledgers`}
 					tone="warning"
 					icon={Receipt}
 				/>
 				<Metric
 					label="Total overdue"
-					value={formatNaira(stats.totalOverdue)}
+					value={format_currency(stats.totalOverdue)}
 					detail={stats.totalOverdue > 0 ? "Action required" : "No overdue items"}
 					tone={stats.totalOverdue > 0 ? "critical" : "success"}
 					icon={AlertTriangle}
@@ -239,7 +237,7 @@ export default function FinanceStatementsIndexRoute() {
 				<Metric
 					label="Credit utilisation"
 					value={`${Math.round((stats.creditUsed / stats.creditLimit) * 100)}%`}
-					detail={`${formatNaira(stats.creditUsed)} of ${formatNaira(stats.creditLimit)}`}
+					detail={`${format_currency(stats.creditUsed)} of ${format_currency(stats.creditLimit)}`}
 					tone="info"
 					icon={TrendingUp}
 				/>
@@ -335,7 +333,7 @@ export default function FinanceStatementsIndexRoute() {
 										<tr key={r.id} className="transition-colors hover:bg-sand/60">
 											<td className="px-4 py-3.5">
 												<Link
-													to="/finance/statement/$customer"
+													to="#"
 													params={{ customer: r.id }}
 													className="font-mono text-[12px] font-semibold text-orange-deep hover:underline"
 												>
@@ -349,7 +347,7 @@ export default function FinanceStatementsIndexRoute() {
 												{r.segment}
 											</td>
 											<td className="px-4 py-3.5 text-right font-mono text-[12px] font-semibold text-ink">
-												{formatNaira(r.balanceDue)}
+												{format_currency(r.balanceDue)}
 											</td>
 											<td
 												className={cn(
@@ -357,7 +355,7 @@ export default function FinanceStatementsIndexRoute() {
 													r.overdue > 0 ? "text-coral" : "text-ink-soft"
 												)}
 											>
-												{r.overdue > 0 ? formatNaira(r.overdue) : "—"}
+												{r.overdue > 0 ? format_currency(r.overdue) : "—"}
 											</td>
 											<td
 												className={cn(
@@ -365,7 +363,7 @@ export default function FinanceStatementsIndexRoute() {
 													r.ageing90Plus > 0 ? "text-coral" : "text-ink-soft"
 												)}
 											>
-												{r.ageing90Plus > 0 ? formatNaira(r.ageing90Plus) : "—"}
+												{r.ageing90Plus > 0 ? format_currency(r.ageing90Plus) : "—"}
 											</td>
 											<td className="px-4 py-3.5">
 												<div className="flex items-center gap-2">
@@ -401,7 +399,7 @@ export default function FinanceStatementsIndexRoute() {
 											</td>
 											<td className="px-4 py-3.5 text-right">
 												<Link
-													to="/finance/statement/$customer"
+													to="#"
 													params={{ customer: r.id }}
 													className="inline-flex items-center gap-1.5 text-xs font-semibold text-orange-deep hover:bg-orange/10 rounded-md px-2 py-1"
 												>

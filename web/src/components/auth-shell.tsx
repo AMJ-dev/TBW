@@ -202,23 +202,22 @@ const systemMenu = [
     {
         title: "Finance",
         items: [
-            // { label: "Dashboard", to: "/finance/dashboard", icon: BarChart3 },
-            // { label: "Invoice Ledger", to: "/finance/invoices", icon: FileCheck2 },
-            // { label: "Payments & Receipts", to: "/finance/payments", icon: ReceiptText },
-            // { label: "Tariffs", to: "/finance/tariffs", icon: FileSpreadsheet },
-            // { label: "Credit Management", to: "/finance/credit", icon: ShieldCheck },
-            // { label: "Collections", to: "/finance/collections", icon: Clock3 },
-            // { label: "Approvals", to: "/finance/approvals", icon: Check },
-            // { label: "Tax Rules", to: "/finance/tax", icon: Settings },
-            // { label: "Reconciliation", to: "/finance/reconciliation", icon: ClipboardCheck },
+            { label: "Dashboard", to: "/finance/dashboard", icon: BarChart3 },
+            { label: "Invoice Ledger", to: "/finance/invoices", icon: FileCheck2 },
+            { label: "Payments & Receipts", to: "/finance/payments", icon: ReceiptText },
+            { label: "Credit Management", to: "/finance/credit", icon: ShieldCheck },
+            { label: "Collections", to: "/finance/collections", icon: Clock3 },
+            { label: "Approvals", to: "/finance/approvals", icon: Check },
+            { label: "Tax Rules", to: "/finance/tax", icon: Settings },
+            { label: "Reconciliation", to: "/finance/reconciliation", icon: ClipboardCheck },
         ],
     },
     {
         title: "Reports",
         items: [
-            // { label: "Operations Report", to: "/reports/operations", icon: Truck },
-            // { label: "Financial Report", to: "/reports/financial", icon: FileSpreadsheet },
-            // { label: "Compliance Report", to: "/reports/compliance", icon: ShieldCheck },
+            { label: "Operations Report", to: "/reports/operations", icon: Truck },
+            { label: "Financial Report", to: "/reports/financial", icon: FileSpreadsheet },
+            { label: "Compliance Report", to: "/reports/compliance", icon: ShieldCheck },
         ],
     },
 ];
@@ -251,9 +250,9 @@ const organisationMenu = [
     {
         title: "Financial Management",
         items: [
-            // { label: "Invoices", to: "/portal/invoices", icon: FileSpreadsheet },
-            // { label: "Payments", to: "/portal/payments", icon: CreditCard },
-            // { label: "Statement of Account", to: "/portal/statement", icon: ReceiptText },
+            { label: "Invoices", to: "/portal/invoices", icon: FileSpreadsheet },
+            { label: "Payments", to: "/portal/payments", icon: CreditCard },
+            { label: "Statement of Account", to: "/portal/statement", icon: ReceiptText },
         ],
     },
     {

@@ -67,9 +67,13 @@ const FinancePage = lazy(() => import("@/pages/finance"));
 const FinanceDashboardPage = lazy(() => import("@/pages/finance/dashboard"));
 const FinanceInvoicesPage = lazy(() => import("@/pages/finance/invoices"));
 const FinancePaymentsPage = lazy(() => import("@/pages/finance/payments"));
-const FinanceTariffsPage = lazy(() => import("@/pages/finance/tariffs"));
+ 
+const FinanceCreditPage = lazy(() => import("@/pages/finance/credit/all"));
 const FinanceCreditApplyPage = lazy(() => import("@/pages/finance/credit/apply"));
-const FinanceCreditLimitsPage = lazy(() => import("@/pages/finance/credit/limits"));
+
+const FinanceCreditTiersPage = lazy(() => import("@/pages/finance/credit-tiers"));
+const FinanceNewCreditTiersPage = lazy(() => import("@/pages/finance/credit-tiers/new"));
+const FinanceEditCreditTiersPage = lazy(() => import("@/pages/finance/credit-tiers/edit"));
 const FinanceCollectionsPage = lazy(() => import("@/pages/finance/collections"));
 const FinanceStatementPage = lazy(() => import("@/pages/finance/statement"));
 const FinanceApprovalsPage = lazy(() => import("@/pages/finance/approvals"));
@@ -226,16 +230,21 @@ export default function Routers() {
 						<Route path="/admin/configuration/retention" element={<AdminRetentionConfigurationPage />} />
 						<Route path="/admin/configuration/customs-tariffs" element={<AdminCustomsTariffsConfigurationPage />} />
 						<Route path="/admin/configuration/equipment" element={<AdminCustomsEquipmentPage />} />
-						
+						 
 						<Route path="/finance" element={<FinancePage />} />
 						<Route path="/finance/dashboard" element={<FinanceDashboardPage />} />
 						<Route path="/finance/invoices" element={<FinanceInvoicesPage />} />
 						<Route path="/finance/payments" element={<FinancePaymentsPage />} />
-						<Route path="/finance/tariffs" element={<FinanceTariffsPage />} />
+						
+						<Route path="/finance/credit" element={<FinanceCreditPage />} />
 						<Route path="/finance/credit/apply" element={<FinanceCreditApplyPage />} />
-						<Route path="/finance/credit/limits" element={<FinanceCreditLimitsPage />} />
+						
+						<Route path="/finance/credit-tiers" element={<FinanceCreditTiersPage />} />
+						<Route path="/finance/credit-tiers/new" element={<FinanceNewCreditTiersPage />} />
+						<Route path="/finance/credit-tiers/:id" element={<FinanceEditCreditTiersPage />} />
+
 						<Route path="/finance/collections" element={<FinanceCollectionsPage />} />
-						<Route path="/finance/statement/:customer" element={<FinanceStatementPage />} />
+						<Route path="/finance/statement/" element={<FinanceStatementPage />} />
 						<Route path="/finance/approvals" element={<FinanceApprovalsPage />} />
 						<Route path="/finance/tax" element={<FinanceTaxPage />} />
 						<Route path="/finance/reconciliation" element={<FinanceReconciliationPage />} />
