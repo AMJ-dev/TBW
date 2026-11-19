@@ -214,7 +214,10 @@ RewriteRule ^operator/examination/([0-9a-zA-Z-]+)/$ src/examination/details.php?
 RewriteRule ^operator/examination/review/([0-9a-zA-Z-]+)/$ src/examination/review-details.php?id=$1 [NC]
 
 RewriteRule ^credit-tiers/$ src/credit-tiers/all.php [NC]
+RewriteRule ^credit-tiers/active/$ src/credit-tiers/all.php?status=active [NC]
 RewriteRule ^credit-tiers/save/$ src/credit-tiers/save.php [NC]
 RewriteRule ^credit-tiers/update/$ src/credit-tiers/update.php [NC]
 RewriteRule ^credit-tiers/change-status/$ src/credit-tiers/change-status.php [NC]
 RewriteRule ^credit-tiers/([0-9a-zA-Z-]+)/$ src/credit-tiers/single.php?id=$1 [NC]
+
+RewriteRule ^credit/apply/$ src/credit/apply.php [NC]
