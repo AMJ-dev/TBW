@@ -5,8 +5,6 @@ import {
 	AlertCircle,
 	ArrowDownRight,
 	ArrowRight,
-	ArrowUpRight,
-	Banknote,
 	CalendarDays,
 	CheckCircle2,
 	Clock3,
@@ -18,7 +16,7 @@ import {
 	TrendingUp,
 	Wallet,
 } from "lucide-react";
-import { AppShell, Metric, StatusBadge, statusTone } from "@/components/auth-shell";
+import { AppShell, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -130,12 +128,29 @@ const formatNaira = (amount: number) =>
 		maximumFractionDigits: 0,
 	}).format(amount);
 
-const formatDate = (value: string) =>
-	new Date(value).toLocaleDateString("en-GB", {
-		day: "2-digit",
-		month: "short",
-		year: "numeric",
-	});
+const statusStyles: Record<string, string> = {
+	Active: "bg-orange/10 text-orange-deep",
+	Overdue: "bg-coral/10 text-coral",
+	"Due soon": "bg-orange/10 text-orange-deep",
+	Pending: "bg-sand-2 text-ink-soft",
+	Paid: "bg-orange/10 text-orange-deep",
+	Successful: "bg-orange/10 text-orange-deep",
+	Failed: "bg-coral/10 text-coral",
+	Inactive: "bg-sand-2 text-ink-soft",
+};
+
+function StatusBadge({ status }: { status: string }) {
+	return (
+		<span
+			className={cn(
+				"inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold",
+				statusStyles[status] || "bg-sand-2 text-ink-soft"
+			)}
+		>
+			{status}
+		</span>
+	);
+}
 
 export default function PortalCreditPage() {
 	const [invoices] = useState<CreditInvoice[]>(initialInvoices);
@@ -175,7 +190,8 @@ export default function PortalCreditPage() {
 			invoice.description.toLowerCase().includes(search.toLowerCase());
 
 		const matchesFilter =
-			invoiceFilter === "ALL" || invoice.status.toUpperCase() === invoiceFilter;
+			invoiceFilter === "ALL" ||
+			invoice.status.toUpperCase() === invoiceFilter;
 
 		return matchesSearch && matchesFilter;
 	});
@@ -197,14 +213,12 @@ export default function PortalCreditPage() {
 						</p>
 					</div>
 
-					<div className="flex flex-wrap gap-2">
-						<Link to="/portal/credit/apply">
-							<Button className="bg-orange text-white hover:bg-orange-deep">
-								<CreditCard className="mr-1.5 size-4" />
-								Apply for credit
-							</Button>
-						</Link>
-					</div>
+					<Link to="/portal/credit/apply">
+						<Button className="bg-orange text-white hover:bg-orange-deep">
+							<CreditCard className="mr-1.5 size-4" />
+							Apply for credit
+						</Button>
+					</Link>
 				</div>
 
 				{overdueInvoices.length > 0 && (
@@ -226,8 +240,12 @@ export default function PortalCreditPage() {
 							</div>
 						</div>
 						<Link to="/portal/payments" className="shrink-0">
-							<Button size="sm" className="bg-orange text-white hover:bg-orange-deep">
-								Make payment <ArrowRight className="ml-1.5 size-3.5" />
+							<Button
+								size="sm"
+								className="bg-orange text-white hover:bg-orange-deep"
+							>
+								Make payment
+								<ArrowRight className="ml-1.5 size-3.5" />
 							</Button>
 						</Link>
 					</div>
@@ -252,14 +270,14 @@ export default function PortalCreditPage() {
 						label="Available credit"
 						value={formatNaira(creditAccount.available)}
 						detail="Remaining facility balance"
-						tone="success"
+						tone="info"
 						icon={CreditCard}
 					/>
 					<Metric
 						label="Overdue amount"
 						value={formatNaira(overdueAmount)}
 						detail={`${overdueInvoices.length} overdue invoice(s)`}
-						tone={overdueAmount > 0 ? "warning" : "success"}
+						tone={overdueAmount > 0 ? "warning" : "info"}
 						icon={Clock3}
 					/>
 				</div>
@@ -278,10 +296,7 @@ export default function PortalCreditPage() {
 									{creditAccount.accountRef}
 								</p>
 							</div>
-							<StatusBadge
-								label={creditAccount.status}
-								tone={statusTone(creditAccount.status)}
-							/>
+							<StatusBadge status={creditAccount.status} />
 						</div>
 
 						<div className="mt-6">
@@ -309,19 +324,19 @@ export default function PortalCreditPage() {
 										{utilisation.toFixed(1)}%
 									</span>
 								</div>
+
 								<div className="h-3 overflow-hidden rounded-full bg-sand-2">
 									<div
 										className={cn(
 											"h-full rounded-full transition-all",
 											utilisation >= 90
 												? "bg-coral"
-												: utilisation >= 70
-													? "bg-orange"
-													: "bg-teal"
+												: "bg-orange"
 										)}
 										style={{ width: `${utilisation}%` }}
 									/>
 								</div>
+
 								<div className="mt-2 flex justify-between text-[10px] text-ink-soft">
 									<span>₦0 used</span>
 									<span>{formatNaira(creditAccount.outstanding)} used</span>
@@ -358,15 +373,16 @@ export default function PortalCreditPage() {
 									Credit score
 								</h3>
 							</div>
-							<div className="grid size-10 place-items-center rounded-lg bg-teal/10 text-teal-deep">
+							<div className="grid size-10 place-items-center rounded-lg bg-orange/10 text-orange-deep">
 								<TrendingUp className="size-5" />
 							</div>
 						</div>
 
 						<div className="mt-5 flex items-center gap-5">
-							<div className="relative grid size-28 shrink-0 place-items-center rounded-full"
+							<div
+								className="relative grid size-28 shrink-0 place-items-center rounded-full"
 								style={{
-									background: `conic-gradient(#16866D ${creditAccount.creditScore * 3.6}deg, #E9E5DC 0deg)`,
+									background: `conic-gradient(#F97316 ${creditAccount.creditScore * 3.6}deg, #E9E5DC 0deg)`,
 								}}
 							>
 								<div className="grid size-[88px] place-items-center rounded-full bg-paper">
@@ -374,12 +390,15 @@ export default function PortalCreditPage() {
 										<p className="font-display text-3xl font-bold text-ink">
 											{creditAccount.creditScore}
 										</p>
-										<p className="font-mono text-[9px] text-ink-soft">/ 100</p>
+										<p className="font-mono text-[9px] text-ink-soft">
+											/ 100
+										</p>
 									</div>
 								</div>
 							</div>
+
 							<div>
-								<p className="text-sm font-bold text-teal-deep">
+								<p className="text-sm font-bold text-orange-deep">
 									{creditAccount.scoreLabel}
 								</p>
 								<p className="mt-1 text-[11px] leading-5 text-ink-soft">
@@ -393,22 +412,22 @@ export default function PortalCreditPage() {
 							<ScoreFactor
 								label="Payment history"
 								value="Good"
-								tone="success"
+								tone="neutral"
 							/>
 							<ScoreFactor
 								label="Credit utilisation"
 								value="65%"
-								tone="success"
+								tone="neutral"
 							/>
 							<ScoreFactor
 								label="Account history"
 								value="Established"
-								tone="info"
+								tone="neutral"
 							/>
 							<ScoreFactor
 								label="Outstanding overdue"
 								value={overdueAmount > 0 ? "Needs attention" : "None"}
-								tone={overdueAmount > 0 ? "warning" : "success"}
+								tone={overdueAmount > 0 ? "warning" : "neutral"}
 							/>
 						</div>
 
@@ -433,8 +452,11 @@ export default function PortalCreditPage() {
 							</p>
 						</div>
 						<Link to="/portal/payments">
-							<Button size="sm" className="bg-orange text-white hover:bg-orange-deep">
-								<Banknote className="mr-1.5 size-4" />
+							<Button
+								size="sm"
+								className="bg-orange text-white hover:bg-orange-deep"
+							>
+								<Wallet className="mr-1.5 size-4" />
 								Make a payment
 							</Button>
 						</Link>
@@ -496,8 +518,7 @@ export default function PortalCreditPage() {
 								</thead>
 								<tbody className="divide-y divide-line">
 									{filteredInvoices.map((invoice) => {
-										const balance =
-											invoice.amount - invoice.paidAmount;
+										const balance = invoice.amount - invoice.paidAmount;
 
 										return (
 											<tr
@@ -525,10 +546,7 @@ export default function PortalCreditPage() {
 													{formatNaira(balance)}
 												</td>
 												<td className="px-4 py-4">
-													<StatusBadge
-														label={invoice.status}
-														tone={statusTone(invoice.status)}
-													/>
+													<StatusBadge status={invoice.status} />
 												</td>
 												<td className="px-4 py-4 text-right">
 													<Link to="/portal/payments">
@@ -537,7 +555,8 @@ export default function PortalCreditPage() {
 															variant="ghost"
 															className="text-orange-deep hover:bg-orange/10"
 														>
-															Pay <ArrowRight className="ml-1 size-3.5" />
+															Pay
+															<ArrowRight className="ml-1 size-3.5" />
 														</Button>
 													</Link>
 												</td>
@@ -569,7 +588,8 @@ export default function PortalCreditPage() {
 							to="/portal/payments"
 							className="text-xs font-semibold text-orange-deep hover:underline"
 						>
-							View all payments <ArrowRight className="ml-1 inline size-3.5" />
+							View all payments
+							<ArrowRight className="ml-1 inline size-3.5" />
 						</Link>
 					</div>
 
@@ -580,7 +600,7 @@ export default function PortalCreditPage() {
 								className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5"
 							>
 								<div className="flex min-w-0 items-center gap-3">
-									<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-teal/10 text-teal-deep">
+									<div className="grid size-9 shrink-0 place-items-center rounded-lg bg-orange/10 text-orange-deep">
 										<ArrowDownRight className="size-4" />
 									</div>
 									<div className="min-w-0">
@@ -601,10 +621,7 @@ export default function PortalCreditPage() {
 											{payment.method}
 										</p>
 									</div>
-									<StatusBadge
-										label={payment.status}
-										tone={statusTone(payment.status)}
-									/>
+									<StatusBadge status={payment.status} />
 								</div>
 							</div>
 						))}
@@ -629,7 +646,8 @@ export default function PortalCreditPage() {
 						</p>
 						<Link to="/portal/credit/apply">
 							<Button className="mt-4 bg-orange text-white hover:bg-orange-deep">
-								Apply for credit <ArrowRight className="ml-1.5 size-4" />
+								Apply for credit
+								<ArrowRight className="ml-1.5 size-4" />
 							</Button>
 						</Link>
 					</section>
@@ -691,18 +709,22 @@ function ScoreFactor({
 }: {
 	label: string;
 	value: string;
-	tone: "success" | "warning" | "info";
+	tone: "neutral" | "warning";
 }) {
 	const styles = {
-		success: "bg-teal/10 text-teal-deep",
-		warning: "bg-orange/10 text-orange-deep",
-		info: "bg-sand text-ink-soft",
+		neutral: "bg-sand-2 text-ink-soft",
+		warning: "bg-coral/10 text-coral",
 	};
 
 	return (
 		<div className="flex items-center justify-between gap-3">
 			<span className="text-[11px] text-ink-soft">{label}</span>
-			<span className={cn("rounded-md px-2 py-1 text-[10px] font-semibold", styles[tone])}>
+			<span
+				className={cn(
+					"rounded-md px-2 py-1 text-[10px] font-semibold",
+					styles[tone]
+				)}
+			>
 				{value}
 			</span>
 		</div>
