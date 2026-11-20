@@ -191,7 +191,6 @@
                         c.seal_no,
                         c.package_count,
                         c.gross_weight,
-                        c.cargo_description,
                         c.package_type,
                         c.status,
                         c.gate_in_at,
@@ -325,6 +324,6 @@
         echo json_encode([
             "error" => true,
             "data" => "Could not load this manifest.",
-            "code" => null
+            "code" => $e->getMessage()
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
     }

@@ -1,11 +1,9 @@
-
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
     header("Content-Type: application/json; charset=utf-8");
 
     if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-    
         echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
         exit;
     }
@@ -16,7 +14,6 @@
                 p.id AS id,
                 p.id AS gate_pass_id,
                 p.pass_code,
-                p.organisation_id,
                 p.type AS pass_type,
                 p.status AS pass_status,
                 p.issued_at,
@@ -41,7 +38,6 @@
                 v.roadworthiness_expiry,
                 v.insurance_certificate,
                 v.roadworthiness_certificate,
-
                 d.id AS driver_id,
                 d.name AS driver_name,
                 d.phone AS driver_phone,
@@ -52,7 +48,6 @@
                 d.notes AS driver_notes,
                 d.licence_expiry,
                 d.licence_document AS driver_licence_document,
-
                 (
                     SELECT GROUP_CONCAT(
                         ac.container_no
@@ -155,14 +150,10 @@
                 s.organisation_id AS shipment_organisation_id
             FROM gate_appointment_containers ac
             LEFT JOIN portal_shipment_containers sc
-                ON UPPER(TRIM(sc.container_no)) = UPPER(TRIM(ac.container_no))
-                AND sc.id = (
+                ON sc.id = (
                     SELECT sc2.id
                     FROM portal_shipment_containers sc2
-                    INNER JOIN portal_shipments s2
-                        ON s2.id = sc2.shipment_id
                     WHERE UPPER(TRIM(sc2.container_no)) = UPPER(TRIM(ac.container_no))
-                    AND s2.organisation_id = p.organisation_id
                     ORDER BY sc2.updated_at DESC, sc2.created_at DESC, sc2.id DESC
                     LIMIT 1
                 )
@@ -268,6 +259,8 @@
             }
 
             $containers = [];
+            $organisationId = null;
+
             foreach ($containerRows as $containerRow) {
                 $container = [];
 
@@ -307,6 +300,10 @@
                     }
                 }
 
+                if ($organisationId === null && !empty($containerRow["shipment_organisation_id"])) {
+                    $organisationId = $containerRow["shipment_organisation_id"];
+                }
+
                 $shipmentContainerId = (string) ($containerRow["shipment_container_id"] ?? "");
                 $container["items"] = $itemsByContainer[$shipmentContainerId] ?? [];
                 $container["item_count"] = count($container["items"]);
@@ -320,8 +317,10 @@
                 WHERE id = ?
                 LIMIT 1
             ");
-            $organisationStmt->execute([$row["organisation_id"] ?? null]);
+            $organisationStmt->execute([$organisationId]);
             $row["organisation"] = $organisationStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+            $row["organisation_id"] = $organisationId;
 
             $row["vehicle"] = [
                 "id" => $row["vehicle_id"] ?? null,
@@ -367,6 +366,7 @@
             $driverStatus = strtolower(trim((string) ($row["driver_status"] ?? "")));
 
             $used = (bool) $row["used"];
+
             $appointmentDate = !empty($row["appointment_date"])
                 ? date("Y-m-d", strtotime((string) $row["appointment_date"]))
                 : "";
@@ -404,7 +404,6 @@
                 )))
                 : [];
 
-
             $normalize = static function (array $values): array {
                 $values = array_map(
                     static fn($value) => strtoupper(trim((string) $value)),
@@ -432,9 +431,11 @@
                 if ($vehicleStatus !== "approved") {
                     $holds[] = "Vehicle is not approved";
                 }
+
                 if (empty($row["insurance_expiry"]) || $row["insurance_expiry"] < $today) {
                     $holds[] = "Vehicle insurance is missing or expired";
                 }
+
                 if (empty($row["roadworthiness_expiry"]) || $row["roadworthiness_expiry"] < $today) {
                     $holds[] = "Vehicle roadworthiness is missing or expired";
                 }
@@ -444,6 +445,7 @@
                 if ($driverStatus !== "approved") {
                     $holds[] = "Driver is not approved";
                 }
+
                 if (empty($row["licence_expiry"]) || $row["licence_expiry"] < $today) {
                     $holds[] = "Driver licence is missing or expired";
                 }
@@ -482,7 +484,15 @@
             }
 
             $readiness = "Ready";
-            if (!$vehicleEligible || !$driverEligible || !$assignmentEligible || !$appointmentEligible || !$cargoEligible || !$passEligible) {
+
+            if (
+                !$vehicleEligible ||
+                !$driverEligible ||
+                !$assignmentEligible ||
+                !$appointmentEligible ||
+                !$cargoEligible ||
+                !$passEligible
+            ) {
                 $readiness = "Needs verification";
             }
 
@@ -517,11 +527,10 @@
         ], JSON_UNESCAPED_SLASHES);
     } catch (Throwable $e) {
         error_log("Gate-in queue error: " . $e->getMessage());
-        
+
         echo json_encode([
             "error" => true,
             "data" => "Could not load today's gate-in passes.",
-            "code" => null
+            "code" => $e->getMessage()
         ]);
     }
-

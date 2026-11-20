@@ -32,32 +32,41 @@ import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
 import {statusLabel} from "@/lib/functions"
 
+type ShipmentCargoItem = {
+	id: string;
+	container_id: string;
+	customs_tariff_id: string;
+	hs_code: string | null;
+	item_description: string;
+	customs_tariff_description: string | null;
+	quantity: number | null;
+	unit_of_measure: string | null;
+	unit_value: number | null;
+	currency: string | null;
+	total_value: number | null;
+	created_at: string;
+	updated_at: string;
+};
+
 type ShipmentContainer = {
 	id: string;
 	shipment_id: string;
 	container_no: string;
-	size: string;
-	seal_no: string;
-	package_count: string | null;
-	gross_weight: string | null;
-	customs_tariff_id: string | null;
-	cargo_description: string | null;
+	size: string | null;
+	seal_no: string | null;
+	package_count: number | null;
+	gross_weight: number | null;
 	package_type: string | null;
-	hs_code: string | null;
-	item_quantity: string | null;
-	unit_of_measure: string | null;
-	unit_value: string;
-	currency: string;
-	total_value: string;
-	created_at: string;
 	status: string;
 	gate_in_at: string | null;
 	received_at: string | null;
 	stored_at: string | null;
+	current_location_id: string | null;
 	gate_out_at: string | null;
+	created_at: string;
 	updated_at: string;
-	tariff_hs_code: string | null;
-	customs_tariff_description: string | null;
+	items: ShipmentCargoItem[];
+	item_count: number;
 };
 
 type ManifestReviewRecord = {
@@ -921,56 +930,120 @@ export default function ManifestSupervisorReviewPage() {
 												</span>
 											</div>
 
-											<div className="grid gap-4 sm:grid-cols-2">
-												{selected.shipment_containers?.map((container, idx) => (
+											<div className="space-y-4">
+												{selected.shipment_containers?.map((container) => (
 													<div key={container.id} className="overflow-hidden rounded-xl border border-line bg-sand/30 shadow-sm">
-														{/* Container Header */}
-														<div className="flex items-center justify-between border-b border-line bg-paper px-4 py-2.5">
-															<div className="flex items-center gap-2">
-																<Package className="size-3.5 text-ink-soft" />
-																<p className="font-mono text-[12px] font-bold text-ink">
-																	{container.container_no}
-																</p>
+														<div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-paper px-4 py-3">
+															<div className="flex min-w-0 items-center gap-2">
+																<Package className="size-4 shrink-0 text-orange" />
+																<div className="min-w-0">
+																	<p className="break-all font-mono text-[12px] font-bold text-ink">{container.container_no}</p>
+																	<p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">
+																		{container.items?.length ?? container.item_count ?? 0} cargo item{(container.items?.length ?? container.item_count ?? 0) === 1 ? "" : "s"}
+																	</p>
+																</div>
 															</div>
 															<StatusBadge label={statusLabel(container.status)} tone={statusTone(container.status)} />
 														</div>
-														
-														{/* Container Stats */}
-														<div className="grid grid-cols-2 gap-y-2 p-3">
+
+														<div className="grid grid-cols-2 gap-x-4 gap-y-3 p-4 sm:grid-cols-4">
 															<div>
 																<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Size</p>
 																<p className="mt-0.5 text-[11px] font-medium text-ink">{container.size || "—"}</p>
 															</div>
 															<div>
-																<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Seal No.</p>
-																<p className="mt-0.5 font-mono text-[11px] text-ink">{container.seal_no || "—"}</p>
+																<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Seal number</p>
+																<p className="mt-0.5 break-all font-mono text-[11px] text-ink">{container.seal_no || "—"}</p>
 															</div>
 															<div>
 																<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Packages</p>
-																<p className="mt-0.5 font-mono text-[11px] text-ink">{container.package_count || "—"}</p>
+																<p className="mt-0.5 font-mono text-[11px] text-ink">{container.package_count ?? "—"}</p>
 															</div>
 															<div>
-																<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Gross Wt.</p>
-																<p className="mt-0.5 font-mono text-[11px] text-ink">{container.gross_weight || "—"}</p>
+																<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Gross weight</p>
+																<p className="mt-0.5 font-mono text-[11px] text-ink">
+																	{container.gross_weight == null ? "—" : `${Number(container.gross_weight).toLocaleString()} kg`}
+																</p>
 															</div>
+															{container.package_type && (
+																<div className="col-span-2 sm:col-span-4">
+																	<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">Package type</p>
+																	<p className="mt-0.5 text-[11px] text-ink">{container.package_type}</p>
+																</div>
+															)}
 														</div>
 
-														{/* Tariff / HS Code Info */}
-														<div className="border-t border-line bg-paper px-4 py-2.5">
-															<div className="flex items-start gap-2">
-																<ShieldCheck className="mt-0.5 size-3 shrink-0 text-teal-deep" />
-																<div>
-																	<p className="font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">HS Code / Tariff</p>
-																	<p className="mt-0.5 font-mono text-[11px] font-semibold text-ink">
-																		{container.hs_code || container.tariff_hs_code || "Not assigned"}
-																	</p>
+														<div className="border-t border-line bg-paper">
+															<div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+																<div className="flex items-center gap-2">
+																	<ShieldCheck className="size-4 text-teal-deep" />
+																	<div>
+																		<p className="text-[11px] font-semibold text-ink">Cargo items and HS classification</p>
+																		<p className="mt-0.5 text-[9px] text-ink-soft">Tariff details are assigned to each cargo item</p>
+																	</div>
 																</div>
+																<span className="rounded-full bg-teal/10 px-2.5 py-1 font-mono text-[10px] text-teal-deep">
+																	{container.items?.length ?? container.item_count ?? 0} items
+																</span>
 															</div>
+
+															{!container.items?.length ? (
+																<div className="mx-4 mb-4 rounded-lg border border-dashed border-line bg-sand/40 px-3 py-5 text-center">
+																	<Package className="mx-auto size-5 text-ink-soft" />
+																	<p className="mt-1.5 text-[11px] text-ink-soft">No cargo items recorded for this container.</p>
+																</div>
+															) : (
+																<div className="space-y-3 px-4 pb-4">
+																	{container.items.map((item, itemIndex) => (
+																		<div key={item.id || `${container.id}-${itemIndex}`} className="rounded-lg border border-line bg-sand/30 p-3.5">
+																			<div className="flex flex-wrap items-start justify-between gap-3">
+																				<div className="min-w-0">
+																					<p className="text-[12px] font-semibold text-ink">
+																						{item.item_description || `Cargo item ${itemIndex + 1}`}
+																					</p>
+																					{item.customs_tariff_description && (
+																						<p className="mt-1 text-[10px] leading-5 text-ink-soft">{item.customs_tariff_description}</p>
+																					)}
+																				</div>
+																				<div className="shrink-0 rounded-md bg-teal/10 px-2.5 py-1.5 text-right">
+																					<p className="font-mono text-[8px] uppercase tracking-[0.1em] text-teal-deep">HS code</p>
+																					<p className="mt-0.5 font-mono text-[12px] font-bold text-teal-deep">{item.hs_code || "Not assigned"}</p>
+																				</div>
+																			</div>
+
+																			<div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+																				<div className="min-w-0">
+																					<p className="font-mono text-[8px] uppercase tracking-[0.1em] text-ink-soft">Quantity</p>
+																					<p className="mt-1 text-[11px] font-medium text-ink">
+																						{item.quantity == null ? "—" : `${Number(item.quantity).toLocaleString()} ${item.unit_of_measure || ""}`}
+																					</p>
+																				</div>
+																				<div className="min-w-0">
+																					<p className="font-mono text-[8px] uppercase tracking-[0.1em] text-ink-soft">Unit value</p>
+																					<p className="mt-1 font-mono text-[11px] font-medium text-ink">
+																						{item.unit_value == null ? "—" : `${item.currency || "NGN"} ${Number(item.unit_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+																					</p>
+																				</div>
+																				<div className="min-w-0">
+																					<p className="font-mono text-[8px] uppercase tracking-[0.1em] text-ink-soft">Total value</p>
+																					<p className="mt-1 font-mono text-[11px] font-semibold text-ink">
+																						{item.total_value == null ? "—" : `${item.currency || "NGN"} ${Number(item.total_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+																					</p>
+																				</div>
+																				<div className="min-w-0">
+																					<p className="font-mono text-[8px] uppercase tracking-[0.1em] text-ink-soft">Tariff record</p>
+																					<p className="mt-1 break-all font-mono text-[9px] text-ink-soft">{item.customs_tariff_id || "—"}</p>
+																				</div>
+																			</div>
+																		</div>
+																	))}
+																</div>
+															)}
 														</div>
 													</div>
 												))}
 												{(!selected.shipment_containers || selected.shipment_containers.length === 0) && (
-													<p className="col-span-2 rounded-lg bg-sand p-4 text-center text-xs text-ink-soft">
+													<p className="rounded-lg bg-sand p-4 text-center text-xs text-ink-soft">
 														No containers declared for this shipment.
 													</p>
 												)}

@@ -537,65 +537,44 @@ export default function OperationsManifestDetailsPage() {
 									</p>
 								) : linkedShipment ? (
 									<>
-										<div className="grid gap-6 md:grid-cols-2">
-											{/* Manifest Details Column */}
-											<div className="space-y-4">
+										<div className="space-y-6">
+											{/* Manifest Details */}
+											<div className="space-y-4 rounded-xl border border-line bg-white/70 p-4 sm:p-5">
 												<div className="flex items-center gap-2 border-b border-line pb-2">
 													<FileText className="size-4 text-ink-soft" />
-													<h5 className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink">Manifest Details</h5>
+													<h5 className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-ink">Manifest Details</h5>
 												</div>
 												
-												<dl className="grid grid-cols-2 gap-x-4 gap-y-5">
+												<dl className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-10">
 													<CompareField label="Bill of lading" value={manifest.bl} mono />
 													<CompareField label="Vessel" value={manifest.vessel} />
 													<CompareField label="Shipping line" value={manifest.shippingLine} />
 													<CompareField label="Origin port" value={manifest.originPort} />
 													<CompareField label="ETA" value={manifest.eta} mono />
-													<CompareField label="Total containers" value={String(manifest.containers)} mono />
+													<CompareField label="Total containers" value={String(Array.isArray(manifest?.containers)?manifest.containers:0)} mono />
 													<CompareField label="Total packages" value={String(manifest.packages)} mono />
 													<CompareField label="Gross weight" value={manifest.grossWeight} mono />
 													<CompareField label="Consignee" value={manifest.consignee} />
 													<CompareField label="Agent" value={manifest.agent} />
 												</dl>
 												
-												{(linkedShipment.containers || []).length > 0 && (
-													<div className="mt-4">
-														<h6 className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">Manifest Containers</h6>
-														<div className="space-y-3">
-															{linkedShipment.containers.map((c: any, i: number) => (
-																<div key={`manifest-c-${i}`} className="rounded-lg border border-line bg-paper p-3">
-																	<div className="flex items-center gap-2">
-																		<ContainerIcon className="size-3.5 text-orange" />
-																		<p className="font-mono text-[12px] font-bold text-ink">{c.container_no || "—"}</p>
-																		<StatusBadge label={statusLabel(c.status)} tone={statusTone(c.status)} />
-																	</div>
-																	<div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
-																		<CompareField label="Size" value={c.size || "—"} />
-																		<CompareField label="Seal No." value={c.seal_no || "Not provided"} mono />
-																		<CompareField label="Packages" value={c.package_count || "—"} mono />
-																		<CompareField label="Gross Wt." value={c.gross_weight || "—"} mono />
-																	</div>
-																</div>
-															))}
-														</div>
-													</div>
-												)}
+				
 											</div>
 
-											{/* Shipment Declaration Column */}
-											<div className="space-y-4">
+											{/* Shipment Declaration */}
+											<div className="space-y-4 rounded-xl border border-teal/20 bg-teal/[0.025] p-4 sm:p-5">
 												<div className="flex items-center gap-2 border-b border-line pb-2">
 													<Ship className="size-4 text-teal-deep" />
-													<h5 className="font-mono text-[11px] uppercase tracking-[0.12em] text-teal-deep">Shipment Declaration</h5>
+													<h5 className="font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-teal-deep">Shipment Declaration</h5>
 												</div>
 												
-												<dl className="grid grid-cols-2 gap-x-4 gap-y-5">
+												<dl className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-10">
 													<CompareField label="Bill of lading" value={linkedShipment.bill_of_lading || linkedShipment.bl} mono />
 													<CompareField label="Vessel" value={linkedShipment.vessel_name || linkedShipment.vessel} />
 													<CompareField label="Shipping line" value={linkedShipment.shipping_line} />
 													<CompareField label="Origin port" value={linkedShipment.origin_port || linkedShipment.origin} />
 													<CompareField label="ETA" value={linkedShipment.expected_arrival || linkedShipment.eta} mono />
-													<CompareField label="Total containers" value={String(linkedShipment.containers?.length || 0)} mono />
+													<CompareField label="Total containers" value={String(Array.isArray(linkedShipment?.containers)? linkedShipment.containers.length: 0)} mono />
 													<CompareField label="Total packages" value={String(linkedShipment.package_count || 0)} mono />
 													<CompareField label="Gross weight" value={linkedShipment.gross_weight} mono />
 													<CompareField label="Consignee" value={linkedShipment.consignee} />
@@ -603,188 +582,104 @@ export default function OperationsManifestDetailsPage() {
 												</dl>
 
 												{(linkedShipment.containers || []).length > 0 && (
-													<div className="mt-4">
-														<h6 className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">Declared Containers</h6>
-														<div className="space-y-3">
-															{linkedShipment.containers.map((c: any, i: number) => (
-																<div key={`shipment-c-${i}`} className="rounded-lg border border-teal/20 bg-teal/5 p-3">
-																	<div className="flex items-center gap-2">
-																		<ContainerIcon className="size-3.5 text-teal-deep" />
-																		<p className="font-mono text-[12px] font-bold text-ink">{c.container_no || "—"}</p>
-																		<StatusBadge label={statusLabel(c.status)} tone={statusTone(c.status)} />
-																	</div>
-																	<div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
-																		<CompareField label="Size" value={c.size || "—"} />
-																		<CompareField label="Seal No." value={c.seal_no || "—"} mono />
-																		<CompareField label="Packages" value={c.package_count || "—"} mono />
-																		<CompareField label="Gross Wt." value={c.gross_weight || "—"} mono />
-																	</div>
-																</div>
-															))}
-														</div>
+											<div className="mt-5 space-y-3">
+												<div className="flex flex-wrap items-center justify-between gap-2">
+													<div>
+														<h6 className="text-xs font-semibold text-ink">Declared containers</h6>
+														<p className="mt-0.5 text-[11px] text-ink-soft">Expand a container to inspect its declared cargo items.</p>
 													</div>
-												)}
-											</div>
-										</div>
-
-										{/* Documents */}
-										<div className="border-t border-line pt-4">
-											<h5 className="mb-2 text-xs font-bold text-ink">
-												Uploaded documents
-											</h5>
-											{(linkedShipment.documents || []).length ? (
-												<div className="grid gap-2 sm:grid-cols-2">
-													{linkedShipment.documents.map(
-														(doc: any, i: number) => (
-															<div
-																key={doc.id || doc.file_path || i}
-																className="flex items-start gap-3 rounded-lg border border-line p-3"
-															>
-																<FileText className="mt-0.5 size-4 shrink-0 text-orange" />
-																<div className="min-w-0 flex-1">
-																	<p className="break-words text-xs font-semibold text-ink">
-																		{doc.original_name ||
-																			doc.document_type ||
-																			`Document ${i + 1}`}
-																	</p>
-																	<p className="mt-1 text-[10px] text-ink-soft">
-																		{doc.document_type || "Document"}
-																		{doc.file_size
-																			? ` · ${Math.round(
-																					Number(doc.file_size) / 1024
-																			  )} KB`
-																			: ""}
-																		{doc.uploaded_at
-																			? ` · ${doc.uploaded_at}`
-																			: ""}
-																	</p>
-																	{(doc.url ||
-																		doc.file_url ||
-																		doc.file_path) && (
-																		<a
-																			href={
-																				doc.url ||
-																				doc.file_url ||
-																				doc.file_path
-																			}
-																			target="_blank"
-																			rel="noreferrer"
-																			className="mt-2 inline-flex text-xs font-semibold text-teal-deep underline"
-																		>
-																			Open document
-																		</a>
-																	)}
-																</div>
-															</div>
-														)
-													)}
+													<div className="flex items-center gap-2">
+														<span className="rounded-full border border-teal/20 bg-teal/5 px-2.5 py-1 font-mono text-[10px] text-teal-deep">{linkedShipment.containers.length} containers</span>
+														<span className="rounded-full border border-line bg-sand px-2.5 py-1 font-mono text-[10px] text-ink-soft">{linkedShipment.containers.reduce((total: number, container: any) => total + (Array.isArray(container.items) ? container.items.length : 0), 0)} items</span>
+													</div>
 												</div>
-											) : (
-												<p className="rounded-lg bg-sand p-3 text-xs text-ink-soft">
-													No documents were returned for this declaration.
-												</p>
-											)}
-										</div>
-									</>
-								) : null}
-							</section>
-						)}
-
-						<div className="rounded-xl bg-sand p-4 ring-1 ring-line">
-							<p className="text-[12px] leading-6 text-ink-soft">
-								{manifest.notes || "No additional notes for this manifest."}
-							</p>
-						</div>
-
-						<dl className="grid gap-4 sm:grid-cols-2">
-							{(
-								[
-									["Bill of lading", manifest.bl, true],
-									["Vessel", manifest.vessel, false],
-									["Shipping line", manifest.shippingLine, false],
-									["Origin port", manifest.originPort, false],
-									["ETA at terminal", manifest.eta, true],
-									["Containers", String(manifest.containers), true],
-									["Packages", String(manifest.packages), true],
-									["Gross weight (KG)", manifest.grossWeight, true],
-									["Consignee", manifest.consignee, false],
-									["Licensed agent", manifest.agent, false],
-								] as const
-							).map(([label, value, mono]) => (
-								<div key={label}>
-									<dt className="font-mono text-[10px] uppercase tracking-[0.13em] text-ink-soft">
-										{label}
-									</dt>
-									<dd
-										className={cn(
-											"mt-1 text-sm font-medium text-ink",
-											mono && "font-mono"
-										)}
-									>
-										{value}
-									</dd>
-								</div>
-							))}
-						</dl>
-
-						{isUnregistered && (
-							<div className="rounded-xl border border-orange/25 bg-orange/5 p-4">
-								<div className="flex items-start gap-3">
-									<Info className="mt-0.5 size-4 shrink-0 text-orange-deep" />
-									<div className="min-w-0">
-										<p className="text-[13px] font-semibold text-ink">
-											Consignee not yet in TRÏNŪ
-										</p>
-										<p className="mt-1 text-[12px] leading-5 text-ink-soft">
-											This consignee is recorded by the name on the manifest.
-											You can continue with the shipment. Send them an
-											onboarding invite so future shipments link
-											automatically to their organisation account.
-										</p>
-										<div className="mt-3 space-y-3">
-											<label className="block">
-												<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-													Email
-												</span>
-												<Input
-													type="email"
-													value={inviteEmail}
-													onChange={(e) => setInviteEmail(e.target.value)}
-													placeholder="consignee@example.com"
-													className="mt-1.5 h-11 border-line bg-paper text-ink"
-												/>
-											</label>
-											<div className="flex flex-wrap gap-2">
-												<Button
-													type="button"
-													onClick={handleSendInvite}
-													disabled={inviting}
-													className="bg-orange text-white hover:bg-orange-deep"
-												>
-													{inviting ? (
-														<Loader2 className="mr-1.5 size-4 animate-spin" />
-													) : (
-														<Send className="mr-1.5 size-4" />
-													)}
-													Send onboarding invite
-												</Button>
-												<Button
-													type="button"
-													variant="outline"
-													onClick={handleCopyInviteLink}
-													className="border-line bg-paper text-ink hover:bg-sand"
-												>
-													<Mail className="mr-1.5 size-4" />
-													Copy invite link
-												</Button>
+												<div className="space-y-2">
+													{linkedShipment.containers.map((c: any, i: number) => {
+														const items = Array.isArray(c.items) ? c.items : [];
+														return (
+															<details key={c.id || `shipment-c-${i}`} open={i === 0} className="group overflow-hidden rounded-xl border border-line bg-white/70 open:border-teal/25 open:bg-white">
+																<summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-3 py-3 transition hover:bg-sand/50 [&::-webkit-details-marker]:hidden sm:px-4">
+																	<div className="flex min-w-0 items-center gap-3">
+																		<div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-teal/10 text-teal-deep"><ContainerIcon className="size-4" /></div>
+																		<div className="min-w-0">
+																			<p className="break-all font-mono text-xs font-bold text-ink">{c.container_no || "Unnamed container"}</p>
+																			<p className="mt-0.5 text-[10px] text-ink-soft">{c.size || "Size not set"} <span className="px-1">·</span> Seal {c.seal_no || "—"}</p>
+																		</div>
+																	</div>
+																	<div className="flex flex-wrap items-center gap-2">
+																		<StatusBadge label={statusLabel(c.status)} tone={statusTone(c.status)} />
+																		<span className="rounded-full bg-sand px-2.5 py-1 font-mono text-[10px] text-ink-soft">{items.length} {items.length === 1 ? "item" : "items"}</span>
+																		<span className="ml-1 text-xs text-ink-soft transition group-open:rotate-180">⌄</span>
+																	</div>
+															</summary>
+															<div className="border-t border-line px-3 py-3 sm:px-4">
+																<div className="grid grid-cols-2 gap-3 rounded-lg bg-sand/70 p-3 sm:grid-cols-4">
+																	<CompareField label="Size" value={c.size || "—"} />
+																	<CompareField label="Seal number" value={c.seal_no || "—"} mono />
+																	<CompareField label="Packages" value={c.package_count ?? "—"} mono />
+																	<CompareField label="Gross weight" value={c.gross_weight ?? "—"} mono />
+																</div>
+																<div className="mt-4">
+																	<div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+																		<h6 className="text-[11px] font-semibold text-ink">Cargo items</h6>
+																		<span className="font-mono text-[10px] text-ink-soft">{items.length} records</span>
+																	</div>
+																	{items.length ? (
+																		<div className="max-h-[360px] overflow-auto rounded-lg border border-line">
+																			<table className="w-full min-w-[680px] border-collapse text-left">
+																				<thead className="sticky top-0 z-[1] bg-sand text-[9px] uppercase tracking-wider text-ink-soft">
+																					<tr><th className="px-3 py-2 font-medium">Cargo item</th><th className="px-3 py-2 font-medium">HS code</th><th className="px-3 py-2 font-medium">Quantity</th><th className="px-3 py-2 font-medium">Unit value</th><th className="px-3 py-2 font-medium">Total value</th></tr>
+																				</thead>
+																				<tbody className="divide-y divide-line/70">
+																				{items.map((item: any, itemIndex: number) => (
+																					<tr key={item.id || `${c.id || i}-item-${itemIndex}`} className="align-top hover:bg-sand/40">
+																						<td className="max-w-[260px] px-3 py-3"><p className="text-xs font-semibold text-ink">{item.item_description || item.description || "Unnamed cargo item"}</p>{item.customs_tariff_description && <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-ink-soft">{item.customs_tariff_description}</p>}{item.customs_tariff_id && <p className="mt-1 font-mono text-[9px] text-ink-soft">Tariff {String(item.customs_tariff_id).slice(0, 8)}</p>}</td>
+																						<td className="whitespace-nowrap px-3 py-3 font-mono text-[10px] text-ink">{item.hs_code || "—"}</td>
+																						<td className="whitespace-nowrap px-3 py-3 font-mono text-[10px] text-ink">{item.quantity ?? "—"} {item.unit_of_measure || ""}</td>
+																						<td className="whitespace-nowrap px-3 py-3 font-mono text-[10px] text-ink">{item.unit_value == null ? "—" : `${item.currency || ""} ${Number(item.unit_value).toLocaleString()}`}</td>
+																						<td className="whitespace-nowrap px-3 py-3 font-mono text-[10px] font-semibold text-ink">{item.total_value == null ? "—" : `${item.currency || ""} ${Number(item.total_value).toLocaleString()}`}</td>
+																					</tr>
+																			))}
+																			</tbody>
+																		</table>
+																	</div>
+																) : (
+																	<p className="rounded-lg border border-dashed border-line px-3 py-5 text-center text-xs text-ink-soft">No cargo items were recorded for this container.</p>
+																)}
+															</div>
+													</div>
+													</details>
+													);
+												})}
+												</div>
 											</div>
-										</div>
+										)}
 									</div>
 								</div>
-							</div>
-						)}
 
-						<section className="rounded-xl border border-line bg-sand p-4">
+								<div className="border-t border-line pt-4">
+									<h5 className="mb-3 text-xs font-semibold text-ink">Uploaded documents</h5>
+									{(linkedShipment.documents || []).length ? (
+										<div className="grid gap-2 sm:grid-cols-2">
+											{linkedShipment.documents.map((doc: any, i: number) => (
+												<div key={doc.id || doc.file_path || i} className="flex min-w-0 items-start gap-3 rounded-lg border border-line p-3">
+													<FileText className="mt-0.5 size-4 shrink-0 text-orange" />
+													<div className="min-w-0 flex-1">
+														<p className="break-words text-xs font-semibold text-ink">{doc.original_name || doc.document_type || `Document ${i + 1}`}</p>
+														<p className="mt-1 text-[10px] text-ink-soft">{doc.document_type || "Document"}{doc.uploaded_at ? ` · ${doc.uploaded_at}` : ""}</p>
+														{(doc.url || doc.file_url || doc.file_path) && <a href={doc.url || doc.file_url || doc.file_path} target="_blank" rel="noreferrer" className="mt-2 inline-flex text-xs font-semibold text-teal-deep underline">Open document</a>}
+													</div>
+												</div>
+											))}
+										</div>
+									) : <p className="rounded-lg bg-sand p-3 text-xs text-ink-soft">No documents were returned for this declaration.</p>}
+								</div>
+						</>
+					) : null}
+				</section>
+			)}
+
+			<section className="rounded-xl border border-line bg-sand p-4">
 							<div className="flex items-start gap-3">
 								<span className="grid size-9 shrink-0 place-items-center rounded-lg bg-ink/5 text-ink-soft">
 									<ClipboardCheck className="size-4" />

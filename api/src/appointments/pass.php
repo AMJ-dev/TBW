@@ -150,9 +150,9 @@
                 c.created_at AS appointment_container_created_at,
                 sc.id AS shipment_container_id,
                 sc.shipment_id,
-                s.shipment_reference,
-                s.bill_of_lading,
-                s.status AS shipment_status,
+                sc.shipment_reference,
+                sc.bill_of_lading,
+                sc.shipment_status,
                 sc.size,
                 sc.seal_no,
                 sc.package_count,
@@ -416,6 +416,6 @@
         echo json_encode([
             "error" => true,
             "data" => "Could not load gate pass.",
-            "code" => null
+            "code" => $e->getMessage()
         ]);
     }

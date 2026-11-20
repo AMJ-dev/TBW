@@ -781,11 +781,56 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                               <Detail label="Size" value={getString(c, "size", "container_size", "containerSize")} />
                               <Detail label="Seal No." value={getString(c, "seal_no", "seal_number", "sealNo", "seal")} mono />
-                              <Detail label="HS Code" value={getString(c, "hs_code", "hsCode")} mono />
                               <Detail label="Packages" value={getString(c, "package_count", "packages", "packageCount")} mono />
                               <Detail label="Gross Wt." value={`${getString(c, "gross_weight", "weight", "grossWeight")} kg`} mono />
                               <Detail label="B/L" value={getString(c, "bill_of_lading", "billOfLading", "bl_number")} mono />
                             </div>
+                            {(() => {
+                              const items = getObjectArray(c["items"]);
+                              return (
+                                <div className="mt-4 border-t border-line pt-3">
+                                  <div className="mb-3 flex items-center justify-between gap-2">
+                                    <p className="text-xs font-semibold text-ink">Declared cargo items</p>
+                                    <span className="rounded-full bg-sand px-2 py-1 text-[10px] font-medium text-ink-soft">
+                                      {items.length} {items.length === 1 ? "item" : "items"}
+                                    </span>
+                                  </div>
+                                  {items.length > 0 ? (
+                                    <div className="space-y-2">
+                                      {items.map((cargo, itemIndex) => (
+                                        <div key={getString(cargo, "id") || `${getString(cargo, "hs_code")}-${itemIndex}`} className="rounded-lg border border-line bg-sand/40 p-3">
+                                          <div className="flex flex-wrap items-start justify-between gap-2">
+                                            <div className="min-w-0 flex-1">
+                                              <p className="text-xs font-semibold text-ink">
+                                                {getString(cargo, "item_description", "description") || "Unnamed cargo item"}
+                                              </p>
+                                              <p className="mt-1 text-[10px] text-ink-soft">
+                                                {getString(cargo, "tariff_description", "customs_tariff_description") || "Tariff description unavailable"}
+                                              </p>
+                                            </div>
+                                            <div className="shrink-0 rounded-md bg-paper px-2 py-1 text-right">
+                                              <p className="text-[9px] uppercase tracking-wider text-ink-soft">HS Code</p>
+                                              <p className="font-mono text-xs font-bold text-ink">
+                                                {getString(cargo, "hs_code", "hsCode") || "—"}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                            <Detail label="Quantity" value={`${getString(cargo, "quantity") || "—"} ${getString(cargo, "unit_of_measure", "unit")}`} />
+                                            <Detail label="Unit Value" value={`${getString(cargo, "currency") || ""} ${getString(cargo, "unit_value") || "—"}`} />
+                                            <Detail label="Total Value" value={`${getString(cargo, "currency") || ""} ${getString(cargo, "total_value") || "—"}`} />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="rounded-lg bg-sand/50 px-3 py-3 text-xs text-ink-soft">
+                                      No declared cargo items were returned for this container.
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         ))}
                       </div>
