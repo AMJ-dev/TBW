@@ -55,7 +55,7 @@
         </style>
     </head>
 
-    <body id="body-layout" style="margin:0;padding:0;background-color:#fff;font-family:Arial,Helvetica,sans-serif;">
+    <body id="body-layout" style="margin:0;padding:0;background-color:#FAF0E3;font-family:Arial,Helvetica,sans-serif;">
 
         <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#FAF0E3">
             <tr>
