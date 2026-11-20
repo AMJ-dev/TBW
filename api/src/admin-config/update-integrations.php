@@ -1,8 +1,6 @@
-
-    <?php
+<?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
-    header("Cache-Control: no-store, private");
     
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
         echo json_encode([

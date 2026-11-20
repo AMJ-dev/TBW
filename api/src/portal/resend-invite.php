@@ -152,19 +152,105 @@
         $subject = "Your TRINŪ invitation has been re-sent";
 
         $message = "
-            <div style='font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;color:#333;'>
-                <h2 style='color:#2258BF;'>TRINŪ</h2>
-                <p>Hello " . htmlspecialchars($member["full_name"], ENT_QUOTES, "UTF-8") . ",</p>
-                <p>Your invitation to join the TRINŪ Bonded Terminal Digital Platform has been re-sent.</p>
-                <p>Your role is <strong>" . htmlspecialchars($member["role_name"], ENT_QUOTES, "UTF-8") . "</strong>.</p>
-                <div style='text-align:center;margin:30px 0;'>
-                    <a href='" . htmlspecialchars($invitationURL, ENT_QUOTES, "UTF-8") . "' style='display:inline-block;background:#2258BF;color:#fff;text-decoration:none;padding:14px 24px;border-radius:7px;'>
-                        Accept Invitation
-                    </a>
-                </div>
-                <p>This invitation expires in 72 hours.</p>
-                <p>If you were not expecting this invitation, you can safely ignore this email.</p>
-                <p style='color:#777;font-size:12px;'>TRINŪ Bonded Terminal Digital Platform</p>
+            <div style='margin:0;padding:0;background-color:#FAF0E3;'>
+                <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0' style='background-color:#FAF0E3;padding:40px 16px;'>
+                    <tr>
+                        <td align='center'>
+                            <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0' style='max-width:600px;background-color:#FFFBF5;border:1px solid #E8D9C2;border-radius:16px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;'>
+
+                                <tr>
+                                    <td style='background-color:#FF6600;padding:28px 32px;'>
+                                        <div style='font-size:24px;font-weight:800;letter-spacing:2px;color:#FFFFFF;'>
+                                            TRINŪ
+                                        </div>
+                                        <div style='font-size:11px;font-weight:600;letter-spacing:1.5px;color:#FFE3CF;text-transform:uppercase;margin-top:5px;'>
+                                            Bonded Terminal Digital Platform
+                                        </div>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td style='padding:36px 32px 30px;'>
+                                        <div style='display:inline-block;background-color:#FFF0E5;color:#D95700;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:7px 12px;border-radius:20px;margin-bottom:20px;'>
+                                            Invitation reminder
+                                        </div>
+
+                                        <h1 style='margin:0 0 14px;font-size:25px;line-height:1.3;font-weight:800;color:#2B2A28;'>
+                                            Your invitation has been re-sent
+                                        </h1>
+
+                                        <p style='margin:0 0 16px;font-size:15px;line-height:1.7;color:#2B2A28;'>
+                                            Hello " . htmlspecialchars($member["full_name"], ENT_QUOTES, "UTF-8") . ",
+                                        </p>
+
+                                        <p style='margin:0 0 24px;font-size:14px;line-height:1.8;color:#6B6357;'>
+                                            Your invitation to join the TRINŪ Bonded Terminal Digital Platform has been re-sent. You can now use the updated invitation link below to complete your account setup.
+                                        </p>
+
+                                        <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0' style='margin-bottom:26px;'>
+                                            <tr>
+                                                <td style='background-color:#FAF0E3;border:1px solid #E8D9C2;border-radius:12px;padding:20px;'>
+                                                    <div style='font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#8C7C69;margin-bottom:8px;'>
+                                                        Assigned account role
+                                                    </div>
+                                                    <div style='font-size:17px;font-weight:700;color:#2B2A28;'>
+                                                        " . htmlspecialchars($member["role_name"], ENT_QUOTES, "UTF-8") . "
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <p style='margin:0 0 24px;font-size:14px;line-height:1.8;color:#6B6357;'>
+                                            Click below to accept your invitation and continue.
+                                        </p>
+
+                                        <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0'>
+                                            <tr>
+                                                <td align='center' style='padding:4px 0 28px;'>
+                                                    <a href='" . htmlspecialchars($invitationURL, ENT_QUOTES, "UTF-8") . "' style='display:inline-block;background-color:#FF6600;color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:700;padding:16px 34px;border-radius:8px;letter-spacing:0.3px;'>
+                                                        Accept Invitation
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <div style='padding:16px;background-color:#FFF4E9;border-left:3px solid #FF6600;border-radius:4px;'>
+                                            <p style='margin:0;font-size:13px;line-height:1.7;color:#765C45;'>
+                                                <strong style='color:#2B2A28;'>Invitation expiry:</strong>
+                                                This invitation link expires in <strong>72 hours</strong>. Make sure to complete your account setup before it expires.
+                                            </p>
+                                        </div>
+
+                                        <p style='margin:24px 0 0;font-size:13px;line-height:1.7;color:#6B6357;'>
+                                            If you were not expecting this invitation, you can safely ignore this email.
+                                        </p>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td style='padding:0 32px;'>
+                                        <div style='border-top:1px solid #E8D9C2;height:1px;line-height:1px;font-size:0;'>&nbsp;</div>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td style='padding:24px 32px 30px;text-align:center;'>
+                                        <div style='font-size:14px;font-weight:800;letter-spacing:1.5px;color:#FF6600;'>
+                                            TRINŪ
+                                        </div>
+                                        <p style='margin:8px 0 0;font-size:11px;line-height:1.6;color:#8C7C69;'>
+                                            Bonded Terminal Digital Platform
+                                        </p>
+                                        <p style='margin:12px 0 0;font-size:11px;line-height:1.6;color:#B8A894;'>
+                                            This is an automated message. Please do not reply.
+                                        </p>
+                                    </td>
+                                </tr>
+
+                            </table>
+                        </td>
+                    </tr>
+                </table>
             </div>
         ";
 
