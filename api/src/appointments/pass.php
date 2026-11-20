@@ -148,161 +148,135 @@
                 c.container_no,
                 c.container_no AS number,
                 c.created_at AS appointment_container_created_at,
-
-                (
-                    SELECT sc.id
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS shipment_container_id,
-
-                (
-                    SELECT sc.shipment_id
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS shipment_id,
-
-                (
-                    SELECT s.shipment_reference
-                    FROM portal_shipment_containers sc
-                    INNER JOIN portal_shipments s
-                        ON s.id = sc.shipment_id
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS shipment_reference,
-
-                (
-                    SELECT s.bill_of_lading
-                    FROM portal_shipment_containers sc
-                    INNER JOIN portal_shipments s
-                        ON s.id = sc.shipment_id
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS bill_of_lading,
-
-                (
-                    SELECT s.status
-                    FROM portal_shipment_containers sc
-                    INNER JOIN portal_shipments s
-                        ON s.id = sc.shipment_id
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS shipment_status,
-
-                (
-                    SELECT sc.size
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS size,
-
-                (
-                    SELECT sc.seal_no
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS seal_no,
-
-                (
-                    SELECT sc.hs_code
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS hs_code,
-
-                (
-                    SELECT sc.package_count
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS package_count,
-
-                (
-                    SELECT sc.gross_weight
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS gross_weight,
-
-                (
-                    SELECT sc.status
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS status,
-
-                (
-                    SELECT sc.gate_in_at
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS gate_in_at,
-
-                (
-                    SELECT sc.received_at
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS received_at,
-
-                (
-                    SELECT sc.stored_at
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS stored_at,
-
-                (
-                    SELECT sc.gate_out_at
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS gate_out_at,
-
-                (
-                    SELECT sc.created_at
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS container_created_at,
-
-                (
-                    SELECT sc.updated_at
-                    FROM portal_shipment_containers sc
-                    WHERE UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
-                    ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
-                    LIMIT 1
-                ) AS container_updated_at
-
+                sc.id AS shipment_container_id,
+                sc.shipment_id,
+                s.shipment_reference,
+                s.bill_of_lading,
+                s.status AS shipment_status,
+                sc.size,
+                sc.seal_no,
+                sc.package_count,
+                sc.gross_weight,
+                sc.status,
+                sc.gate_in_at,
+                sc.received_at,
+                sc.stored_at,
+                sc.gate_out_at,
+                sc.created_at AS container_created_at,
+                sc.updated_at AS container_updated_at
             FROM gate_appointment_containers c
-
+            LEFT JOIN (
+                SELECT
+                    ranked.*
+                FROM (
+                    SELECT
+                        sc.*,
+                        s.shipment_reference,
+                        s.bill_of_lading,
+                        s.status AS shipment_status,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY UPPER(TRIM(sc.container_no))
+                            ORDER BY sc.updated_at DESC, sc.created_at DESC, sc.id DESC
+                        ) AS row_num
+                    FROM portal_shipment_containers sc
+                    INNER JOIN portal_shipments s
+                        ON s.id = sc.shipment_id
+                    WHERE s.organisation_id = :organisation_id
+                ) ranked
+                WHERE ranked.row_num = 1
+            ) sc
+                ON UPPER(TRIM(sc.container_no)) = UPPER(TRIM(c.container_no))
             WHERE c.appointment_id = :appointment_id
-
             ORDER BY c.container_no ASC
         ");
 
+        $containerStmt->bindValue(":organisation_id", $organisation_id, PDO::PARAM_STR);
         $containerStmt->bindValue(":appointment_id", $appointment_id, PDO::PARAM_STR);
         $containerStmt->execute();
 
         $containers = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
- 
+
+        $shipmentContainerIds = [];
+
+        foreach ($containers as $container) {
+            if (!empty($container["shipment_container_id"])) {
+                $shipmentContainerIds[] = (string) $container["shipment_container_id"];
+            }
+        }
+
+        $itemsByContainer = [];
+
+        if ($shipmentContainerIds) {
+            $placeholders = implode(",", array_fill(0, count($shipmentContainerIds), "?"));
+
+            $itemStmt = $conn->prepare("
+                SELECT
+                    i.id,
+                    i.container_id,
+                    i.customs_tariff_id,
+                    i.item_description,
+                    i.quantity,
+                    i.unit_of_measure,
+                    i.unit_value,
+                    i.currency,
+                    i.total_value,
+                    i.created_at,
+                    i.updated_at,
+                    ct.hs_code,
+                    ct.description AS customs_tariff_description,
+                    ct.category AS customs_tariff_category,
+                    ct.rate_type,
+                    ct.rate,
+                    ct.unit AS tariff_unit
+                FROM portal_shipment_container_items i
+                LEFT JOIN customs_tariffs ct
+                    ON ct.id = i.customs_tariff_id
+                WHERE i.container_id IN ($placeholders)
+                ORDER BY i.created_at ASC, i.id ASC
+            ");
+
+            $itemStmt->execute($shipmentContainerIds);
+
+            foreach ($itemStmt->fetchAll(PDO::FETCH_ASSOC) as $item) {
+                $containerId = (string) $item["container_id"];
+
+                $itemsByContainer[$containerId][] = [
+                    "id" => (string) $item["id"],
+                    "container_id" => $containerId,
+                    "customs_tariff_id" => $item["customs_tariff_id"],
+                    "hs_code" => $item["hs_code"],
+                    "item_description" => $item["item_description"],
+                    "customs_tariff_description" => $item["customs_tariff_description"],
+                    "customs_tariff_category" => $item["customs_tariff_category"],
+                    "rate_type" => $item["rate_type"],
+                    "rate" => $item["rate"] !== null ? (float) $item["rate"] : null,
+                    "tariff_unit" => $item["tariff_unit"],
+                    "quantity" => (float) $item["quantity"],
+                    "unit_of_measure" => $item["unit_of_measure"],
+                    "unit_value" => (float) $item["unit_value"],
+                    "currency" => $item["currency"],
+                    "total_value" => (float) $item["total_value"],
+                    "created_at" => $item["created_at"],
+                    "updated_at" => $item["updated_at"]
+                ];
+            }
+        }
+
+        foreach ($containers as &$container) {
+            $shipmentContainerId = (string) ($container["shipment_container_id"] ?? "");
+            $container["items"] = $itemsByContainer[$shipmentContainerId] ?? [];
+            $container["item_count"] = count($container["items"]);
+
+            if ($container["package_count"] !== null) {
+                $container["package_count"] = (float) $container["package_count"];
+            }
+
+            if ($container["gross_weight"] !== null) {
+                $container["gross_weight"] = (float) $container["gross_weight"];
+            }
+        }
+        unset($container);
+
         $pass["vehicle"] = [
             "id" => $pass["vehicle_detail_id"],
             "plate" => $pass["vehicle_plate"],
@@ -435,7 +409,7 @@
             "error" => false,
             "data" => "Gate pass loaded successfully.",
             "code" => $pass
-        ]);
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     } catch (Throwable $e) {
         error_log("Gate pass loading error: " . $e->getMessage());
 

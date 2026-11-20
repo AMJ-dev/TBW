@@ -129,13 +129,8 @@
         }
 
         $containerStmt = $conn->prepare("
-            SELECT
-                c.*,
-                ct.hs_code AS tariff_hs_code,
-                ct.description AS customs_tariff_description
+            SELECT c.*
             FROM portal_shipment_containers c
-            LEFT JOIN customs_tariffs ct
-                ON ct.id = c.customs_tariff_id
             WHERE c.shipment_id = :shipment_id
             ORDER BY c.created_at ASC
         ");
@@ -145,10 +140,15 @@
         ]);
 
         $containers = [];
+        $containerIndexes = [];
 
         foreach ($containerStmt->fetchAll(PDO::FETCH_ASSOC) as $c) {
+            $containerId = (string) $c["id"];
+
+            $containerIndexes[$containerId] = count($containers);
+
             $containers[] = [
-                "id" => (string) $c["id"],
+                "id" => $containerId,
                 "shipment_id" => (string) $c["shipment_id"],
                 "container_no" => $c["container_no"],
                 "size" => $c["size"],
@@ -164,25 +164,67 @@
                 "received_at" => $c["received_at"] ?? null,
                 "stored_at" => $c["stored_at"] ?? null,
                 "gate_out_at" => $c["gate_out_at"] ?? null,
+                "current_location_id" => $c["current_location_id"] ?? null,
                 "cargo_description" => $c["cargo_description"] ?? null,
                 "package_type" => $c["package_type"] ?? null,
-                "hs_code" => $c["hs_code"] ?? null,
-                "customs_tariff_id" => $c["customs_tariff_id"] ?? null,
-                "tariff_hs_code" => $c["tariff_hs_code"] ?? null,
-                "customs_tariff_description" => $c["customs_tariff_description"] ?? null,
-                "item_quantity" => isset($c["item_quantity"])
-                    ? (float) $c["item_quantity"]
-                    : null,
-                "unit_of_measure" => $c["unit_of_measure"] ?? null,
-                "unit_value" => isset($c["unit_value"])
-                    ? (float) $c["unit_value"]
-                    : null,
-                "currency" => $c["currency"] ?? null,
-                "total_value" => isset($c["total_value"])
-                    ? (float) $c["total_value"]
-                    : null,
                 "created_at" => $c["created_at"] ?? null,
-                "updated_at" => $c["updated_at"] ?? null
+                "updated_at" => $c["updated_at"] ?? null,
+                "items" => []
+            ];
+        }
+
+        $itemStmt = $conn->prepare("
+            SELECT
+                i.id,
+                i.container_id,
+                i.customs_tariff_id,
+                i.item_description,
+                i.quantity,
+                i.unit_of_measure,
+                i.unit_value,
+                i.currency,
+                i.total_value,
+                i.created_at,
+                i.updated_at,
+                ct.hs_code AS tariff_hs_code,
+                ct.description AS customs_tariff_description
+            FROM portal_shipment_container_items i
+            INNER JOIN portal_shipment_containers c
+                ON c.id = i.container_id
+            LEFT JOIN customs_tariffs ct
+                ON ct.id = i.customs_tariff_id
+            WHERE c.shipment_id = :shipment_id
+            ORDER BY i.created_at ASC
+        ");
+
+        $itemStmt->execute([
+            ":shipment_id" => $shipmentId
+        ]);
+
+        foreach ($itemStmt->fetchAll(PDO::FETCH_ASSOC) as $item) {
+            $containerId = (string) $item["container_id"];
+
+            if (!isset($containerIndexes[$containerId])) {
+                continue;
+            }
+
+            $containers[$containerIndexes[$containerId]]["items"][] = [
+                "id" => (string) $item["id"],
+                "container_id" => $containerId,
+                "customs_tariff_id" => $item["customs_tariff_id"],
+                "hs_code" => $item["tariff_hs_code"],
+                "tariff_hs_code" => $item["tariff_hs_code"],
+                "customs_tariff_description" => $item["customs_tariff_description"],
+                "item_description" => $item["item_description"],
+                "description" => $item["item_description"],
+                "quantity" => (float) $item["quantity"],
+                "unit_of_measure" => $item["unit_of_measure"],
+                "unit" => $item["unit_of_measure"],
+                "unit_value" => (float) $item["unit_value"],
+                "currency" => (string) $item["currency"],
+                "total_value" => (float) $item["total_value"],
+                "created_at" => $item["created_at"],
+                "updated_at" => $item["updated_at"]
             ];
         }
 

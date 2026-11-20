@@ -170,11 +170,23 @@ try {
     ]);
 
     $manifest = $q->fetch(PDO::FETCH_ASSOC);
-    
-    $q = $conn->prepare("SELECT COUNT(*) as cnt FROM operation_manifest_containers WHERE manifest_id = :manifest_id");
-    $q->execute([":manifest_id" => $manifest["id"]]);
-    $containersCount = $q->fetch(PDO::FETCH_ASSOC);
-    
+
+    $containersCount = ["cnt" => 0];
+
+    if ($manifest) {
+        $manifestCountQuery = $conn->prepare("
+            SELECT COUNT(*) AS cnt
+            FROM operation_manifest_containers
+            WHERE manifest_id = :manifest_id
+        ");
+
+        $manifestCountQuery->execute([
+            ":manifest_id" => $manifest["id"]
+        ]);
+
+        $containersCount = $manifestCountQuery->fetch(PDO::FETCH_ASSOC) ?: ["cnt" => 0];
+    }
+
     $shipment["manifest"] = $manifest ? [
         "id" => (string) $manifest["id"],
         "manifest_ref" => $manifest["manifest_ref"],
@@ -192,14 +204,16 @@ try {
         "origin_port" => $manifest["origin_port"],
         "eta" => $manifest["eta"],
         "containers" => (int) $containersCount["cnt"],
-        "gross_weight" => (float) $manifest["gross_weight"],
+        "gross_weight" => $manifest["gross_weight"] !== null
+            ? (float) $manifest["gross_weight"]
+            : null,
         "consignee" => $manifest["consignee"],
         "consignee_type" => $manifest["consignee_type"],
         "agent" => $manifest["agent"],
         "source" => $manifest["source"]
     ] : null;
-    // operation_manifest_containers
-    $q = $conn->prepare("
+
+    $containerQuery = $conn->prepare("
         SELECT
             c.id,
             c.shipment_id,
@@ -208,35 +222,98 @@ try {
             c.seal_no,
             c.package_count,
             c.gross_weight,
-            c.cargo_description,
             c.package_type,
-            c.hs_code,
-            c.customs_tariff_id,
-            c.item_quantity,
-            c.unit_of_measure,
-            c.unit_value,
-            c.currency,
-            c.total_value,
-            ct.description AS customs_tariff_description,
             c.status,
             c.gate_in_at,
             c.received_at,
             c.stored_at,
+            c.current_location_id,
             c.gate_out_at,
             c.created_at,
             c.updated_at
         FROM portal_shipment_containers c
-        LEFT JOIN customs_tariffs ct
-            ON ct.id = c.customs_tariff_id
         WHERE c.shipment_id = :shipment_id
         ORDER BY c.created_at ASC, c.id ASC
     ");
 
-    $q->execute([
+    $containerQuery->execute([
         ":shipment_id" => $shipmentId
     ]);
 
-    $containers = $q->fetchAll(PDO::FETCH_ASSOC);
+    $containers = $containerQuery->fetchAll(PDO::FETCH_ASSOC);
+
+    $containerIds = [];
+    $containerIndexes = [];
+
+    foreach ($containers as $index => &$container) {
+        $container["id"] = (string) $container["id"];
+        $container["shipment_id"] = (string) $container["shipment_id"];
+        $container["package_count"] = $container["package_count"] !== null
+            ? (float) $container["package_count"]
+            : null;
+        $container["gross_weight"] = $container["gross_weight"] !== null
+            ? (float) $container["gross_weight"]
+            : null;
+        $container["items"] = [];
+        $container["item_count"] = 0;
+
+        $containerIds[] = $container["id"];
+        $containerIndexes[$container["id"]] = $index;
+    }
+
+    unset($container);
+
+    if ($containerIds) {
+        $itemPlaceholders = implode(",", array_fill(0, count($containerIds), "?"));
+
+        $itemQuery = $conn->prepare("
+            SELECT
+                i.id,
+                i.container_id,
+                i.customs_tariff_id,
+                ct.hs_code,
+                i.item_description,
+                ct.description AS customs_tariff_description,
+                i.quantity,
+                i.unit_of_measure,
+                i.unit_value,
+                i.currency,
+                i.total_value,
+                i.created_at,
+                i.updated_at
+            FROM portal_shipment_container_items i
+            LEFT JOIN customs_tariffs ct
+                ON ct.id = i.customs_tariff_id
+            WHERE i.container_id IN ($itemPlaceholders)
+            ORDER BY i.created_at ASC, i.id ASC
+        ");
+
+        $itemQuery->execute($containerIds);
+
+        foreach ($itemQuery->fetchAll(PDO::FETCH_ASSOC) as $item) {
+            $containerId = (string) $item["container_id"];
+
+            if (!isset($containerIndexes[$containerId])) {
+                continue;
+            }
+
+            $item["id"] = (string) $item["id"];
+            $item["container_id"] = $containerId;
+            $item["quantity"] = $item["quantity"] !== null
+                ? (float) $item["quantity"]
+                : null;
+            $item["unit_value"] = $item["unit_value"] !== null
+                ? (float) $item["unit_value"]
+                : null;
+            $item["total_value"] = $item["total_value"] !== null
+                ? (float) $item["total_value"]
+                : null;
+
+            $index = $containerIndexes[$containerId];
+            $containers[$index]["items"][] = $item;
+            $containers[$index]["item_count"]++;
+        }
+    }
 
     $q = $conn->prepare("
         SELECT

@@ -1,9 +1,11 @@
+
 <?php
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 header("Content-Type: application/json; charset=UTF-8");
 
-if ($_SERVER["REQUEST_METHOD"] !== "GET") {
+if (($_SERVER["REQUEST_METHOD"] ?? "") !== "GET") {
+    header("Allow: GET");
     echo json_encode([
         "error" => true,
         "data" => "Method not allowed.",
@@ -111,11 +113,12 @@ try {
 
         FROM operation_manifests om
 
-        LEFT JOIN portal_shipments ps ON ps.id = om.matched_shipment_id
+        LEFT JOIN portal_shipments ps
+            ON ps.id = om.matched_shipment_id
 
-        WHERE om.review_responsible_party = 'Operations' 
-          AND om.flagged_at IS NOT NULL
-          AND om.status = 'Review required'
+        WHERE om.review_responsible_party = 'Operations'
+            AND om.flagged_at IS NOT NULL
+            AND om.status = 'Review required'
 
         ORDER BY om.flagged_at DESC
     ";
@@ -129,41 +132,128 @@ try {
 
     foreach ($manifests as $manifest) {
         if (!empty($manifest["shipment_id"])) {
-            $shipmentIds[] = $manifest["shipment_id"];
+            $shipmentIds[] = (string) $manifest["shipment_id"];
         }
     }
 
     $shipmentIds = array_values(array_unique($shipmentIds));
     $containersByShipment = [];
+    $containersById = [];
 
     if (!empty($shipmentIds)) {
         $placeholders = implode(",", array_fill(0, count($shipmentIds), "?"));
 
         $containerSql = "
             SELECT
-                c.*,
-                ct.hs_code AS tariff_hs_code,
-                ct.description AS customs_tariff_description
+                c.id,
+                c.shipment_id,
+                c.container_no,
+                c.size,
+                c.seal_no,
+                c.package_count,
+                c.gross_weight,
+                c.package_type,
+                c.status,
+                c.gate_in_at,
+                c.received_at,
+                c.stored_at,
+                c.current_location_id,
+                c.gate_out_at,
+                c.created_at,
+                c.updated_at
             FROM portal_shipment_containers c
-            LEFT JOIN customs_tariffs ct
-                ON ct.id = c.customs_tariff_id
             WHERE c.shipment_id IN ($placeholders)
-            ORDER BY c.created_at ASC
+            ORDER BY c.created_at ASC, c.container_no ASC
         ";
 
         $containerStmt = $conn->prepare($containerSql);
         $containerStmt->execute($shipmentIds);
 
         $containers = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
+        $containerIds = [];
 
         foreach ($containers as $container) {
-            $shipmentId = $container["shipment_id"];
+            $containerId = (string) $container["id"];
+            $shipmentId = (string) $container["shipment_id"];
 
-            if (!isset($containersByShipment[$shipmentId])) {
-                $containersByShipment[$shipmentId] = [];
+            $container["items"] = [];
+            $container["item_count"] = 0;
+
+            foreach (["package_count", "gross_weight"] as $field) {
+                $container[$field] = $container[$field] !== null
+                    ? (float) $container[$field]
+                    : null;
             }
 
             $containersByShipment[$shipmentId][] = $container;
+
+            $containersById[$containerId] = [
+                "shipment_id" => $shipmentId,
+                "index" => count($containersByShipment[$shipmentId]) - 1
+            ];
+
+            $containerIds[] = $containerId;
+        }
+
+        if (!empty($containerIds)) {
+            $itemPlaceholders = implode(
+                ",",
+                array_fill(0, count($containerIds), "?")
+            );
+
+            $itemSql = "
+                SELECT
+                    i.id,
+                    i.container_id,
+                    i.customs_tariff_id,
+                    ct.hs_code,
+                    i.item_description,
+                    ct.description AS customs_tariff_description,
+                    i.quantity,
+                    i.unit_of_measure,
+                    i.unit_value,
+                    i.currency,
+                    i.total_value,
+                    i.created_at,
+                    i.updated_at
+                FROM portal_shipment_container_items i
+                LEFT JOIN customs_tariffs ct
+                    ON ct.id = i.customs_tariff_id
+                WHERE i.container_id IN ($itemPlaceholders)
+                ORDER BY i.created_at ASC, i.id ASC
+            ";
+
+            $itemStmt = $conn->prepare($itemSql);
+            $itemStmt->execute($containerIds);
+
+            $items = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($items as $item) {
+                $containerId = (string) $item["container_id"];
+
+                if (!isset($containersById[$containerId])) {
+                    continue;
+                }
+
+                $shipmentId = $containersById[$containerId]["shipment_id"];
+                $containerIndex = $containersById[$containerId]["index"];
+
+                $item["quantity"] = $item["quantity"] !== null
+                    ? (float) $item["quantity"]
+                    : null;
+
+                $item["unit_value"] = $item["unit_value"] !== null
+                    ? (float) $item["unit_value"]
+                    : null;
+
+                $item["total_value"] = $item["total_value"] !== null
+                    ? (float) $item["total_value"]
+                    : null;
+
+                $containersByShipment[$shipmentId][$containerIndex]["items"][] = $item;
+
+                $containersByShipment[$shipmentId][$containerIndex]["item_count"]++;
+            }
         }
     }
 
@@ -171,10 +261,53 @@ try {
         $shipmentId = $manifest["shipment_id"] ?? null;
 
         $manifest["shipment_containers"] = $shipmentId !== null
-            ? ($containersByShipment[$shipmentId] ?? [])
+            ? ($containersByShipment[(string) $shipmentId] ?? [])
             : [];
 
         $manifest["container_count"] = count($manifest["shipment_containers"]);
+
+        $manifest["packages"] = (float) ($manifest["packages"] ?? 0);
+
+        $manifest["gross_weight"] = is_numeric($manifest["gross_weight"])
+            ? (float) $manifest["gross_weight"]
+            : $manifest["gross_weight"];
+
+        if ($manifest["shipment_id"] !== null) {
+            $manifest["shipment"] = [
+                "id" => $manifest["shipment_id"],
+                "shipment_reference" => $manifest["shipment_reference"],
+                "user_id" => $manifest["shipment_user_id"],
+                "organisation_id" => $manifest["shipment_organisation_id"],
+                "shipment_type" => $manifest["shipment_type"],
+                "booking_number" => $manifest["booking_number"],
+                "voyage_number" => $manifest["voyage_number"],
+                "origin_country" => $manifest["origin_country"],
+                "destination_port" => $manifest["destination_port"],
+                "cargo_description" => $manifest["cargo_description"],
+                "cargo_category" => $manifest["cargo_category"],
+                "package_type" => $manifest["package_type"],
+                "package_count" => $manifest["shipment_package_count"] !== null
+                    ? (float) $manifest["shipment_package_count"]
+                    : null,
+                "gross_weight" => $manifest["shipment_gross_weight"] !== null
+                    ? (float) $manifest["shipment_gross_weight"]
+                    : null,
+                "volume" => $manifest["volume"] !== null
+                    ? (float) $manifest["volume"]
+                    : null,
+                "dangerous_goods" => $manifest["dangerous_goods"],
+                "temperature_controlled" => $manifest["temperature_controlled"],
+                "temperature" => $manifest["temperature"],
+                "special_instructions" => $manifest["special_instructions"],
+                "customs_reference" => $manifest["customs_reference"],
+                "status" => $manifest["shipment_status"],
+                "created_at" => $manifest["shipment_created_at"],
+                "updated_at" => $manifest["shipment_updated_at"],
+                "containers" => $manifest["shipment_containers"]
+            ];
+        } else {
+            $manifest["shipment"] = null;
+        }
     }
 
     unset($manifest);
@@ -183,7 +316,8 @@ try {
         "error" => false,
         "data" => $manifests,
         "code" => null
-    ]);
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
 } catch (Throwable $e) {
     error_log("Operations manifest reviews error: " . $e->getMessage());
 

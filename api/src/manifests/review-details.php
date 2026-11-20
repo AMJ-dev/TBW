@@ -1,3 +1,4 @@
+
 <?php
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
@@ -134,33 +135,88 @@ try {
             c.seal_no,
             c.package_count,
             c.gross_weight,
-            c.cargo_description,
             c.package_type,
-            c.hs_code,
-            c.customs_tariff_id,
-            ct.hs_code AS tariff_hs_code,
-            ct.description AS customs_tariff_description,
-            c.item_quantity,
-            c.unit_of_measure,
-            c.unit_value,
-            c.currency,
-            c.total_value,
             c.status,
             c.gate_in_at,
             c.received_at,
             c.stored_at,
             c.gate_out_at,
+            c.current_location_id,
             c.created_at,
             c.updated_at
         FROM portal_shipment_containers c
-        LEFT JOIN customs_tariffs ct
-            ON ct.id = c.customs_tariff_id
         WHERE c.shipment_id = :shipment_id
         ORDER BY c.container_no ASC, c.created_at ASC
     ");
 
-    $containerStmt->execute([":shipment_id" => $id]);
+    $containerStmt->execute([
+        ":shipment_id" => $id
+    ]);
+
     $containers = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($containers as &$container) {
+        $container["items"] = [];
+    }
+
+    unset($container);
+
+    if (count($containers) > 0) {
+        $containerIds = array_column($containers, "id");
+
+        $placeholders = [];
+        $itemParams = [];
+
+        foreach ($containerIds as $index => $containerId) {
+            $placeholder = ":container_" . $index;
+            $placeholders[] = $placeholder;
+            $itemParams[$placeholder] = $containerId;
+        }
+
+        $itemStmt = $conn->prepare("
+            SELECT
+                i.id,
+                i.container_id,
+                i.customs_tariff_id,
+                ct.hs_code,
+                i.item_description,
+                ct.description AS customs_tariff_description,
+                i.quantity,
+                i.unit_of_measure,
+                i.unit_value,
+                i.currency,
+                i.total_value,
+                i.created_at,
+                i.updated_at
+            FROM portal_shipment_container_items i
+            LEFT JOIN customs_tariffs ct
+                ON ct.id = i.customs_tariff_id
+            WHERE i.container_id IN (" . implode(", ", $placeholders) . ")
+            ORDER BY i.created_at ASC
+        ");
+
+        $itemStmt->execute($itemParams);
+        $items = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $itemsByContainer = [];
+
+        foreach ($items as $item) {
+            $containerId = $item["container_id"];
+
+            if (!isset($itemsByContainer[$containerId])) {
+                $itemsByContainer[$containerId] = [];
+            }
+
+            $itemsByContainer[$containerId][] = $item;
+        }
+
+        foreach ($containers as &$container) {
+            $container["items"] =
+                $itemsByContainer[$container["id"]] ?? [];
+        }
+
+        unset($container);
+    }
 
     $documentStmt = $conn->prepare("
         SELECT
@@ -177,7 +233,10 @@ try {
         ORDER BY uploaded_at DESC
     ");
 
-    $documentStmt->execute([":shipment_id" => $id]);
+    $documentStmt->execute([
+        ":shipment_id" => $id
+    ]);
+
     $documents = $documentStmt->fetchAll(PDO::FETCH_ASSOC);
 
     foreach ($documents as &$document) {
@@ -209,7 +268,6 @@ try {
     ], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 } catch (Throwable $e) {
-
     echo json_encode([
         "error" => true,
         "data" => "Could not load shipment details.",

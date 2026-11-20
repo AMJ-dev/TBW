@@ -2,6 +2,8 @@
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
+    header("Content-Type: application/json; charset=utf-8");
+
     if ($_SERVER["REQUEST_METHOD"] !== "GET") {
     
         echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
@@ -138,7 +140,6 @@
                 sc.container_no AS shipment_container_no,
                 sc.size,
                 sc.seal_no,
-                sc.hs_code,
                 sc.package_count,
                 sc.gross_weight,
                 sc.status AS container_status,
@@ -158,7 +159,10 @@
                 AND sc.id = (
                     SELECT sc2.id
                     FROM portal_shipment_containers sc2
+                    INNER JOIN portal_shipments s2
+                        ON s2.id = sc2.shipment_id
                     WHERE UPPER(TRIM(sc2.container_no)) = UPPER(TRIM(ac.container_no))
+                    AND s2.organisation_id = p.organisation_id
                     ORDER BY sc2.updated_at DESC, sc2.created_at DESC, sc2.id DESC
                     LIMIT 1
                 )
@@ -172,6 +176,96 @@
             $containerStmt->bindValue(":appointment_id", $row["appointment_id"], PDO::PARAM_STR);
             $containerStmt->execute();
             $containerRows = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $shipmentContainerIds = array_values(array_unique(array_filter(array_map(
+                static fn($container) => (string) ($container["shipment_container_id"] ?? ""),
+                $containerRows
+            ))));
+
+            $itemsByContainer = [];
+
+            if ($shipmentContainerIds) {
+                $itemPlaceholders = implode(", ", array_fill(0, count($shipmentContainerIds), "?"));
+
+                $itemStmt = $conn->prepare("
+                    SELECT
+                        i.id,
+                        i.container_id,
+                        i.customs_tariff_id,
+                        i.item_description,
+                        i.quantity,
+                        i.unit_of_measure,
+                        i.unit_value,
+                        i.currency,
+                        i.total_value,
+                        i.created_at,
+                        i.updated_at,
+                        ct.hs_code,
+                        ct.description AS tariff_description,
+                        ct.category AS tariff_category,
+                        ct.rate_type,
+                        ct.rate,
+                        ct.unit AS tariff_unit,
+                        ct.import_duty,
+                        ct.vat,
+                        ct.levy,
+                        ct.exc,
+                        ct.wgl,
+                        ct.ric,
+                        ct.brl,
+                        ct.wfl,
+                        ct.sug,
+                        ct.cem,
+                        ct.cig,
+                        ct.iro,
+                        ct.crl,
+                        ct.tpl,
+                        ct.nau,
+                        ct.nan,
+                        ct.gts
+                    FROM portal_shipment_container_items i
+                    LEFT JOIN customs_tariffs ct
+                        ON ct.id = i.customs_tariff_id
+                    WHERE i.container_id IN ($itemPlaceholders)
+                    ORDER BY i.created_at ASC, i.id ASC
+                ");
+
+                $itemStmt->execute($shipmentContainerIds);
+
+                foreach ($itemStmt->fetchAll(PDO::FETCH_ASSOC) as $item) {
+                    $containerId = (string) $item["container_id"];
+
+                    foreach ([
+                        "quantity",
+                        "unit_value",
+                        "total_value",
+                        "rate",
+                        "import_duty",
+                        "vat",
+                        "levy",
+                        "exc",
+                        "wgl",
+                        "ric",
+                        "brl",
+                        "wfl",
+                        "sug",
+                        "cem",
+                        "cig",
+                        "iro",
+                        "crl",
+                        "tpl",
+                        "nau",
+                        "nan",
+                        "gts"
+                    ] as $numericField) {
+                        if (array_key_exists($numericField, $item) && $item[$numericField] !== null) {
+                            $item[$numericField] = (float) $item[$numericField];
+                        }
+                    }
+
+                    $itemsByContainer[$containerId][] = $item;
+                }
+            }
 
             $containers = [];
             foreach ($containerRows as $containerRow) {
@@ -195,7 +289,6 @@
                     "shipment_container_id",
                     "shipment_id",
                     "shipment_container_no",
-                    "hs_code",
                     "package_count",
                     "container_status",
                     "gate_in_at",
@@ -213,6 +306,10 @@
                         $container[$field] = $containerRow[$field];
                     }
                 }
+
+                $shipmentContainerId = (string) ($containerRow["shipment_container_id"] ?? "");
+                $container["items"] = $itemsByContainer[$shipmentContainerId] ?? [];
+                $container["item_count"] = count($container["items"]);
 
                 $containers[] = $container;
             }
@@ -238,9 +335,9 @@
                 "transporter" => $row["transporter"] ?? null,
                 "status" => $row["vehicle_status"] ?? null,
                 "insurance_expiry" => $row["insurance_expiry"] ?? null,
-                "roadworthiness_expiry" => $row["roadworthiness_expiry"],
-                "roadworthiness_certificate" => $row["roadworthiness_certificate"],
-                "roadworthiness_expiry" => $row["roadworthiness_expiry"] ?? null
+                "roadworthiness_expiry" => $row["roadworthiness_expiry"] ?? null,
+                "insurance_certificate" => $row["insurance_certificate"] ?? null,
+                "roadworthiness_certificate" => $row["roadworthiness_certificate"] ?? null
             ];
 
             $row["driver"] = [
@@ -252,7 +349,7 @@
                 "licence_expiry" => $row["licence_expiry"] ?? null,
                 "status" => $row["driver_status"] ?? null,
                 "transporter" => $row["driver_transporter"] ?? null,
-                "licence_document" => $row["driver_licence_document"],
+                "licence_document" => $row["driver_licence_document"] ?? null,
                 "notes" => $row["driver_notes"] ?? null
             ];
 

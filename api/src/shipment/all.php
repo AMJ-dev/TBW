@@ -174,27 +174,45 @@
         );
 
         $containerStmt = $conn->prepare("
-            SELECT *
-            FROM portal_shipment_containers
-            WHERE shipment_id IN ($placeholders)
-            ORDER BY created_at ASC
+            SELECT
+                c.id,
+                c.shipment_id,
+                c.container_no,
+                c.size,
+                c.seal_no,
+                c.package_count,
+                c.gross_weight,
+                c.status,
+                c.gate_in_at,
+                c.received_at,
+                c.stored_at,
+                c.current_location_id,
+                c.gate_out_at,
+                c.created_at,
+                c.updated_at
+            FROM portal_shipment_containers c
+            WHERE c.shipment_id IN ($placeholders)
+            ORDER BY c.created_at ASC
         ");
 
         $containerStmt->execute($shipmentIds);
         $containerRows = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
 
         $containersByShipment = [];
+        $containerIds = [];
+        $containerShipmentMap = [];
 
         foreach ($containerRows as $row) {
             $sid = (string) $row["shipment_id"];
+            $containerId = (string) $row["id"];
 
             if (!isset($containersByShipment[$sid])) {
                 $containersByShipment[$sid] = [];
             }
 
-            $containersByShipment[$sid][] = [
-                "id" => (string) $row["id"],
-                "shipment_id" => (string) $row["shipment_id"],
+            $containersByShipment[$sid][$containerId] = [
+                "id" => $containerId,
+                "shipment_id" => $sid,
                 "container_no" => $row["container_no"] ?? null,
                 "size" => $row["size"] ?? null,
                 "seal_no" => $row["seal_no"] ?? null,
@@ -208,26 +226,89 @@
                 "gate_in_at" => $row["gate_in_at"] ?? null,
                 "received_at" => $row["received_at"] ?? null,
                 "stored_at" => $row["stored_at"] ?? null,
+                "current_location_id" => $row["current_location_id"] ?? null,
                 "gate_out_at" => $row["gate_out_at"] ?? null,
-                "cargo_description" => $row["cargo_description"] ?? null,
-                "package_type" => $row["package_type"] ?? null,
-                "hs_code" => $row["hs_code"] ?? null,
-                "customs_tariff_id" => $row["customs_tariff_id"] ?? null,
-                "item_quantity" => isset($row["item_quantity"])
-                    ? (float) $row["item_quantity"]
-                    : null,
-                "unit_of_measure" => $row["unit_of_measure"] ?? null,
-                "unit_value" => isset($row["unit_value"])
-                    ? (float) $row["unit_value"]
-                    : null,
-                "currency" => $row["currency"] ?? null,
-                "total_value" => isset($row["total_value"])
-                    ? (float) $row["total_value"]
-                    : null,
+                "items" => [],
+                "item_count" => 0,
                 "created_at" => $row["created_at"] ?? null,
                 "updated_at" => $row["updated_at"] ?? null
             ];
+
+            $containerIds[] = $containerId;
+            $containerShipmentMap[$containerId] = $sid;
         }
+
+        if ($containerIds) {
+            $containerItemPlaceholders = implode(
+                ",",
+                array_fill(0, count($containerIds), "?")
+            );
+
+            $itemStmt = $conn->prepare("
+                SELECT
+                    i.id,
+                    i.container_id,
+                    i.customs_tariff_id,
+                    ct.hs_code,
+                    i.item_description,
+                    ct.description AS customs_tariff_description,
+                    i.quantity,
+                    i.unit_of_measure,
+                    i.unit_value,
+                    i.currency,
+                    i.total_value,
+                    i.created_at,
+                    i.updated_at
+                FROM portal_shipment_container_items i
+                LEFT JOIN customs_tariffs ct
+                    ON ct.id = i.customs_tariff_id
+                WHERE i.container_id IN ($containerItemPlaceholders)
+                ORDER BY i.created_at ASC
+            ");
+
+            $itemStmt->execute($containerIds);
+            $itemRows = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            foreach ($itemRows as $item) {
+                $containerId = (string) $item["container_id"];
+
+                $shipmentId = $containerShipmentMap[$containerId] ?? null;
+
+                if ($shipmentId === null || !isset($containersByShipment[$shipmentId][$containerId])) {
+                    continue;
+                }
+
+                $containersByShipment[$shipmentId][$containerId]["items"][] = [
+                        "id" => (string) $item["id"],
+                        "container_id" => $containerId,
+                        "customs_tariff_id" => $item["customs_tariff_id"],
+                        "hs_code" => $item["hs_code"],
+                        "item_description" => $item["item_description"],
+                        "customs_tariff_description" => $item["customs_tariff_description"],
+                        "quantity" => $item["quantity"] !== null
+                            ? (float) $item["quantity"]
+                            : null,
+                        "unit_of_measure" => $item["unit_of_measure"],
+                        "unit_value" => $item["unit_value"] !== null
+                            ? (float) $item["unit_value"]
+                            : null,
+                        "currency" => $item["currency"],
+                        "total_value" => $item["total_value"] !== null
+                            ? (float) $item["total_value"]
+                            : null,
+                        "created_at" => $item["created_at"],
+                        "updated_at" => $item["updated_at"]
+                    ];
+
+                $containersByShipment[$shipmentId][$containerId]["item_count"]++;
+            }
+        }
+
+        foreach ($containersByShipment as &$shipmentContainers) {
+            $shipmentContainers = array_values($shipmentContainers);
+        }
+
+        unset($shipmentContainers);
 
         $documentStmt = $conn->prepare("
             SELECT

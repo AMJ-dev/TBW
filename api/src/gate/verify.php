@@ -208,7 +208,6 @@
                 sc.container_no AS shipment_container_no,
                 sc.size,
                 sc.seal_no,
-                sc.hs_code,
                 sc.package_count,
                 sc.gross_weight,
                 sc.status AS container_status,
@@ -250,13 +249,79 @@
 
         $containers = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($containers as &$container) {
+        $containersById = [];
+        $containerIds = [];
+
+        foreach ($containers as $index => &$container) {
+            $containerId = (string) ($container["shipment_container_id"] ?? "");
+
+            $container["items"] = [];
+            $container["item_count"] = 0;
             $container["seal_number"] = $container["seal_no"] ?? null;
             $container["container_size"] = $container["size"] ?? null;
             $container["weight"] = $container["gross_weight"] ?? null;
             $container["number"] = $container["container_no"] ?? null;
+
+            if ($containerId !== "") {
+                $containersById[$containerId] = $index;
+                $containerIds[] = $containerId;
+            }
         }
         unset($container);
+
+        if (!empty($containerIds)) {
+            $containerIds = array_values(array_unique($containerIds));
+            $itemPlaceholders = implode(",", array_fill(0, count($containerIds), "?"));
+
+            $itemStmt = $conn->prepare("
+                SELECT
+                    i.id,
+                    i.container_id,
+                    i.customs_tariff_id,
+                    ct.hs_code,
+                    i.item_description,
+                    ct.description AS customs_tariff_description,
+                    i.quantity,
+                    i.unit_of_measure,
+                    i.unit_value,
+                    i.currency,
+                    i.total_value,
+                    i.created_at,
+                    i.updated_at
+                FROM portal_shipment_container_items i
+                LEFT JOIN customs_tariffs ct
+                    ON ct.id = i.customs_tariff_id
+                WHERE i.container_id IN ($itemPlaceholders)
+                ORDER BY i.created_at ASC, i.id ASC
+            ");
+
+            $itemStmt->execute($containerIds);
+
+            foreach ($itemStmt->fetchAll(PDO::FETCH_ASSOC) as $item) {
+                $containerId = (string) $item["container_id"];
+
+                if (!isset($containersById[$containerId])) {
+                    continue;
+                }
+
+                $item["quantity"] = $item["quantity"] !== null
+                    ? (float) $item["quantity"]
+                    : null;
+
+                $item["unit_value"] = $item["unit_value"] !== null
+                    ? (float) $item["unit_value"]
+                    : null;
+
+                $item["total_value"] = $item["total_value"] !== null
+                    ? (float) $item["total_value"]
+                    : null;
+
+                $containerIndex = $containersById[$containerId];
+
+                $containers[$containerIndex]["items"][] = $item;
+                $containers[$containerIndex]["item_count"]++;
+            }
+        }
 
         $today = date("Y-m-d");
 
