@@ -1,4 +1,7 @@
-
+Username:api@tbw.ng
+Password:Group2026@
+POP/IMAP Server:mail.tbw.ng
+SMTP Server:mail.tbw.ng port 587
 
 account_events	Account and security events
 <!-- cargo_config_audit	Cargo configuration changes -->
