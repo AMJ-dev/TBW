@@ -32,7 +32,7 @@ import { AppShell, StatusBadge, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
-import { resolveSrc, statusLabel } from "@/lib/functions";
+import { resolveSrc, statusLabel, format_currency } from "@/lib/functions";
 
 type ShipmentContainerItem = {
 	id: string;
@@ -827,8 +827,8 @@ export default function PortalShipmentDetailsPage() {
 															</div>
 														<div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
 															<div><p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">Quantity</p><p className="mt-1 text-[13px] font-medium text-ink">{formatNumber(item.quantity)} {item.unit_of_measure || ""}</p></div>
-															<div><p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">Unit value</p><p className="mt-1 font-mono text-[13px] text-ink">{item.currency || "—"} {formatNumber(item.unit_value)}</p></div>
-															<div><p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">Total value</p><p className="mt-1 font-mono text-[13px] font-semibold text-ink">{item.currency || "—"} {formatNumber(item.total_value)}</p></div>
+															<div><p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">Unit value</p><p className="mt-1 font-mono text-[13px] text-ink">{format_currency(item.unit_value, item.currency)}</p></div>
+															<div><p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">Total value</p><p className="mt-1 font-mono text-[13px] font-semibold text-ink">{format_currency(item.total_value, item.currency)}</p></div>
 															<div className="min-w-0"><p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">Tariff reference</p><p className="mt-1 truncate font-mono text-[10px] text-ink-soft" title={item.customs_tariff_id}>{item.customs_tariff_id || "—"}</p></div>
 													</div>
 											</div>

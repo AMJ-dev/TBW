@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
 import { PublicFrame, PublicKicker } from "@/components/public-shell";
+import {format_currency} from "@/lib/functions"
 
 type Currency = "NGN" | "USD";
 
@@ -308,7 +309,7 @@ export default function QuotePage() {
 
     setSaving(true);
     try {
-      const response = await http.post("/quote/save/", formData);
+      const response = await http.post("/save-quote/", formData);
       const resp = response.data as Resp;
 
       if (resp.error) {
@@ -338,13 +339,6 @@ export default function QuotePage() {
     }
     setStep((current) => current + 1);
   };
-
-  const formatMoney = (value: number, currency: Currency) =>
-    new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(value);
 
   if (submitted) {
     return (
@@ -605,7 +599,7 @@ export default function QuotePage() {
                                     <div className="mt-3 flex items-center justify-between rounded-md bg-paper px-3 py-2">
                                       <span className="text-xs text-ink-soft">Item total</span>
                                       <span className="font-mono text-sm font-bold text-ink">
-                                        {formatMoney(Number(item.quantity || 0) * Number(item.unit_value || 0), item.currency)}
+                                        {format_currency(Number(item.quantity || 0) * Number(item.unit_value || 0), item.currency)}
                                       </span>
                                     </div>
                                   </div>
@@ -618,11 +612,11 @@ export default function QuotePage() {
                         <div className="grid gap-3 sm:grid-cols-2">
                           <div className="rounded-lg bg-sand p-4 ring-1 ring-line">
                             <p className="text-xs uppercase tracking-wider text-ink-soft">Declared value · NGN</p>
-                            <p className="mt-1 font-display text-xl font-bold text-ink">{formatMoney(totals.ngn, "NGN")}</p>
+                            <p className="mt-1 font-display text-xl font-bold text-ink">{format_currency(totals.ngn, "NGN")}</p>
                           </div>
                           <div className="rounded-lg bg-sand p-4 ring-1 ring-line">
                             <p className="text-xs uppercase tracking-wider text-ink-soft">Declared value · USD</p>
-                            <p className="mt-1 font-display text-xl font-bold text-ink">{formatMoney(totals.usd, "USD")}</p>
+                            <p className="mt-1 font-display text-xl font-bold text-ink">{format_currency(totals.usd, "USD")}</p>
                           </div>
                         </div>
                       </div>
@@ -681,7 +675,7 @@ export default function QuotePage() {
                                         <p className="font-medium text-ink">{item.description}</p>
                                         <p className="font-mono text-xs text-ink-soft">HS {item.hs_code} · {item.quantity} {item.unit}</p>
                                       </div>
-                                      <p className="font-mono text-xs font-semibold text-ink">{formatMoney(Number(item.quantity || 0) * Number(item.unit_value || 0), item.currency)}</p>
+                                      <p className="font-mono text-xs font-semibold text-ink">{format_currency(Number(item.quantity || 0) * Number(item.unit_value || 0), item.currency)}</p>
                                     </div>
                                   ))}
                                 </div>
@@ -793,7 +787,7 @@ function TariffSearchField({
     setLoading(true);
     setSearchError("");
 
-    try {
+    try { 
       const response = await http.post("/admin/config/customs-tariffs/search/", {
         q: search.trim(),
         as_of: new Date().toISOString().slice(0, 10),

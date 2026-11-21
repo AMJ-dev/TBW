@@ -118,9 +118,7 @@
             ]
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     } catch (Throwable $e) {
-        if (isset($conn) && $conn instanceof PDO && $conn->inTransaction()) {
-            $conn->rollBack();
-        }
+        if (isset($conn) && $conn instanceof PDO && $conn->inTransaction()) $conn->rollBack();
 
         error_log("Notification configuration read error: " . $e->getMessage());
 

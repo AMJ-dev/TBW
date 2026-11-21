@@ -1,6 +1,6 @@
 <?php
 
-require_once dirname(__DIR__, 2) . "/include/verify-user.php";
+require_once dirname(__DIR__, 2) . "/include/set-header.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "GET") {
    
@@ -13,16 +13,6 @@ if ($_SERVER["REQUEST_METHOD"] !== "GET") {
 }
 
 try {
-    $userId = (string) ($my_details->id ?? "");
-
-    if ($userId === "") {
-        echo json_encode([
-            "error" => true,
-            "data" => "Authentication required.",
-            "code" => null
-        ]);
-        exit;
-    }
 
     $q = $conn->prepare("
         SELECT id, label

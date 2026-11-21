@@ -118,7 +118,7 @@ try {
 
         WHERE om.review_responsible_party = 'Operations'
             AND om.flagged_at IS NOT NULL
-            AND om.status = 'Review required'
+            AND om.status = 'Discrepancy'
 
         ORDER BY om.flagged_at DESC
     ";

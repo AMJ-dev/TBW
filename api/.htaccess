@@ -11,6 +11,8 @@ RewriteRule ^(.+[^/])$ %{REQUEST_URI}/ [R=301,L]
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME} !-f
 
+RewriteRule ^save-quote/$ src/quote/save.php [NC]
+
 RewriteRule ^sign-up/$ src/register/sign-up.php [NC]
 RewriteRule ^register-send-otp/$ src/register/send-otp.php [NC]
 RewriteRule ^register-verify-otp/$ src/register/verify-otp.php [NC]

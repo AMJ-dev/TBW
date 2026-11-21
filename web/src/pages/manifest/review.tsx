@@ -5,7 +5,7 @@ import {
 	ArrowLeft,
 	ArrowRight,
 	CheckCircle2,
-	ChevronRight,
+	Eye,
 	ClipboardCheck,
 	Clock3,
 	FileText,
@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
-import {statusLabel} from "@/lib/functions"
+import {statusLabel, format_currency} from "@/lib/functions"
 
 type ShipmentCargoItem = {
 	id: string;
@@ -502,62 +502,56 @@ export default function ManifestSupervisorReviewPage() {
 										</p>
 									</div>
 								) : (
-									<ul className="divide-y divide-line">
-										{filteredManifests.map((manifest) => (
-											<li key={manifest.id}>
-												<button
-													type="button"
-													onClick={() => openManifest(manifest)}
-													className="group flex w-full cursor-pointer items-start gap-4 px-5 py-4 text-left transition-colors hover:bg-sand/60 sm:px-6 sm:py-5"
-												>
-													<span className="grid size-11 shrink-0 place-items-center rounded-xl bg-orange/10 text-orange-deep ring-1 ring-orange/15 transition group-hover:bg-orange group-hover:text-white">
-														<FileText className="size-5" />
-													</span>
-													<div className="min-w-[220px] flex-1">
-														<div className="flex flex-wrap items-center gap-2">
-															<p className="font-mono text-[13px] font-semibold text-ink">
-																{manifest.manifest_ref}
-															</p>
+									<div className="overflow-x-auto">
+										<table className="w-full min-w-[850px] text-left">
+											<thead className="border-b border-line bg-sand/50">
+												<tr className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
+													<th className="px-5 py-3 font-medium sm:px-6">Manifest</th>
+													<th className="px-5 py-3 font-medium">Bill of lading</th>
+													<th className="px-5 py-3 font-medium">Vessel / shipping line</th>
+													<th className="px-5 py-3 font-medium">Flagged</th>
+													<th className="px-5 py-3 font-medium">Review status</th>
+													<th className="px-5 py-3 text-right font-medium">Action</th>
+												</tr>
+											</thead>
+											<tbody className="divide-y divide-line">
+												{filteredManifests.map((manifest) => (
+													<tr key={manifest.id} className="transition-colors hover:bg-sand/40">
+														<td className="px-5 py-4 sm:px-6">
+															<p className="font-mono text-[12px] font-semibold text-ink">{manifest.manifest_ref}</p>
+															{manifest.status && <p className="mt-1 text-[10px] text-ink-soft">{manifest.status}</p>}
+														</td>
+														<td className="px-5 py-4">
+															<p className="font-mono text-[11px] text-ink">{manifest.bill_of_lading || "—"}</p>
+														</td>
+														<td className="px-5 py-4">
+															<p className="text-[12px] font-medium text-ink">{manifest.vessel || "—"}</p>
+															<p className="mt-1 text-[11px] text-ink-soft">{manifest.shipping_line || "—"}</p>
+														</td>
+														<td className="px-5 py-4 text-[11px] text-ink-soft">{formatDate(manifest.flagged_at)}</td>
+														<td className="px-5 py-4">
 															<StatusBadge
 																label={manifest.review_status ?? "Pending"}
 																tone={statusTone(manifest.review_status ?? "Pending")}
 															/>
-															{manifest.status && (
-																<span className="rounded bg-sand-2 px-2 py-0.5 font-mono text-[9px] uppercase tracking-[0.1em] text-ink-soft">
-																	{manifest.status}
-																</span>
-															)}
-														</div>
-														<p className="mt-1.5 text-[13px] text-ink-soft">
-															<span className="font-mono text-ink">BL · </span>
-															{manifest.bill_of_lading}
-														</p>
-														<div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px] text-ink-soft">
-															{manifest.vessel && (
-																<span className="flex items-center gap-1.5">
-																	<Ship className="size-3" />
-																	{manifest.vessel}
-																</span>
-															)}
-															{manifest.shipping_line && (
-																<span className="flex items-center gap-1.5">
-																	<ClipboardCheck className="size-3" />
-																	{manifest.shipping_line}
-																</span>
-															)}
-															{manifest.flagged_at && (
-																<span className="flex items-center gap-1.5 text-orange-deep">
-																	<Clock3 className="size-3" />
-																	Flagged: {formatDate(manifest.flagged_at)}
-																</span>
-															)}
-														</div>
-													</div>
-													<ChevronRight className="mt-3 size-5 shrink-0 text-ink-soft transition-transform group-hover:translate-x-1 group-hover:text-orange-deep" />
-												</button>
-											</li>
-										))}
-									</ul>
+														</td>
+														<td className="px-5 py-4 text-right">
+															<Button
+																type="button"
+																variant="outline"
+																size="sm"
+																onClick={() => openManifest(manifest)}
+																className="cursor-pointer gap-1.5 border-line bg-paper text-ink hover:border-orange/40 hover:bg-orange/5 hover:text-orange-deep"
+															>
+																<Eye className="size-3.5" />
+																View
+															</Button>
+														</td>
+													</tr>
+												))}
+												</tbody>
+											</table>
+									</div>
 								)}
 
 								<div className="flex items-center justify-between border-t border-line bg-sand/30 px-5 py-4 font-mono text-[10px] text-ink-soft sm:px-6">
@@ -1021,13 +1015,13 @@ export default function ManifestSupervisorReviewPage() {
 																				<div className="min-w-0">
 																					<p className="font-mono text-[8px] uppercase tracking-[0.1em] text-ink-soft">Unit value</p>
 																					<p className="mt-1 font-mono text-[11px] font-medium text-ink">
-																						{item.unit_value == null ? "—" : `${item.currency || "NGN"} ${Number(item.unit_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+																						{item.unit_value == null ? "—" : format_currency(item.unit_value, item.currency)}
 																					</p>
 																				</div>
 																				<div className="min-w-0">
 																					<p className="font-mono text-[8px] uppercase tracking-[0.1em] text-ink-soft">Total value</p>
 																					<p className="mt-1 font-mono text-[11px] font-semibold text-ink">
-																						{item.total_value == null ? "—" : `${item.currency || "NGN"} ${Number(item.total_value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+																						{item.total_value == null ? "—" : format_currency(item.total_value, item.currency)}
 																					</p>
 																				</div>
 																				<div className="min-w-0">

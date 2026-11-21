@@ -8,22 +8,9 @@ import {
 	FileText,
 	Info,
 	Loader2,
-	Mail,
-	Send,
 	X,
-	Hash,
 	Container as ContainerIcon,
-	ShieldCheck,
-	Clock3,
-	CalendarDays,
-	Package,
 	Ship,
-	ArrowRight,
-	MapPin,
-	User,
-	Scale,
-	CheckCircle2,
-	XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell, StatusBadge, statusTone } from "@/components/auth-shell";
@@ -31,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
-import { statusLabel } from "@/lib/functions";
+import { statusLabel, format_currency } from "@/lib/functions";
 
 type ManifestStatus =
 	| "Pre-advice"
@@ -136,9 +123,7 @@ export default function OperationsManifestDetailsPage() {
 
 	const [flagDialogOpen, setFlagDialogOpen] = useState(false);
 	const [flagReason, setFlagReason] = useState("");
-	const [responsibleParty, setResponsibleParty] = useState<
-		"" | "Organisation" | "Operations"
-	>("");
+	const [responsibleParty, setResponsibleParty] = useState<"" | "Organisation" | "Operations">("");
 	const [submittingFlag, setSubmittingFlag] = useState(false);
 
 	const [linkedShipment, setLinkedShipment] = useState<any>(null);
@@ -636,8 +621,8 @@ export default function OperationsManifestDetailsPage() {
 																						<td className="max-w-[260px] px-3 py-3"><p className="text-xs font-semibold text-ink">{item.item_description || item.description || "Unnamed cargo item"}</p>{item.customs_tariff_description && <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-ink-soft">{item.customs_tariff_description}</p>}{item.customs_tariff_id && <p className="mt-1 font-mono text-[9px] text-ink-soft">Tariff {String(item.customs_tariff_id).slice(0, 8)}</p>}</td>
 																						<td className="whitespace-nowrap px-3 py-3 font-mono text-[10px] text-ink">{item.hs_code || "—"}</td>
 																						<td className="whitespace-nowrap px-3 py-3 font-mono text-[10px] text-ink">{item.quantity ?? "—"} {item.unit_of_measure || ""}</td>
-																						<td className="whitespace-nowrap px-3 py-3 font-mono text-[10px] text-ink">{item.unit_value == null ? "—" : `${item.currency || ""} ${Number(item.unit_value).toLocaleString()}`}</td>
-																						<td className="whitespace-nowrap px-3 py-3 font-mono text-[10px] font-semibold text-ink">{item.total_value == null ? "—" : `${item.currency || ""} ${Number(item.total_value).toLocaleString()}`}</td>
+																						<td className="whitespace-nowrap px-3 py-3 font-mono text-[10px] text-ink">{item.unit_value == null ? "—" : format_currency(item.unit_value, item.currency)}</td>
+																						<td className="whitespace-nowrap px-3 py-3 font-mono text-[10px] font-semibold text-ink">{item.total_value == null ? "—" : format_currency(item.total_value, item.currency)}</td>
 																					</tr>
 																			))}
 																			</tbody>

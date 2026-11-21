@@ -40,7 +40,7 @@ import { AppShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { http, type Resp } from "@/lib/httpClient";
-import { resolveSrc } from "@/lib/functions";
+import { resolveSrc, format_currency } from "@/lib/functions";
 
 type ShipmentCargoItem = {
   id: string;
@@ -759,30 +759,11 @@ const activityKindMeta: Record<
   },
 };
 
-const humanise = (value: string) =>
-  value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const humanise = (value: string) => value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-const formatDate = (value: string | null | undefined) =>
-  value ? value.slice(0, 10) : "—";
+const formatDate = (value: string | null | undefined) => value ? value.slice(0, 10) : "—";
 
-const formatDateTime = (value: string | null | undefined) =>
-  value ? value.slice(0, 16).replace("T", " ") : "—";
-
-const formatMoney = (
-  value: number | null | undefined,
-  currency = "NGN"
-): string => {
-  if (value == null) return "—";
-  try {
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `${currency} ${value.toLocaleString()}`;
-  }
-};
+const formatDateTime = (value: string | null | undefined) => value ? value.slice(0, 16).replace("T", " ") : "—";
 
 function phaseIndexForStatus(status: string): number {
   const index = PHASES.findIndex((phase) => phase.codes.includes(status));
@@ -1501,10 +1482,10 @@ export default function OperationsShipmentReviewPage() {
                                         {item.quantity == null ? "—" : `${item.quantity.toLocaleString()} ${item.unit_of_measure || item.unit || ""}`}
                                       </td>
                                       <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-ink">
-                                        {item.unit_value == null ? "—" : formatMoney(item.unit_value, item.currency || "NGN")}
+                                        {item.unit_value == null ? "—" : format_currency(item.unit_value, item.currency)}
                                       </td>
                                       <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-semibold text-ink">
-                                        {item.total_value == null ? "—" : formatMoney(item.total_value, item.currency || "NGN")}
+                                        {item.total_value == null ? "—" : format_currency(item.total_value, item.currency)}
                                       </td>
                                     </tr>
                                   ))}
@@ -1888,12 +1869,12 @@ export default function OperationsShipmentReviewPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <Field
                         label="Amount due"
-                        value={formatMoney(finance.amount_due, finance.currency)}
+                        value={format_currency(finance.amount_due, finance.currency)}
                         mono
                       />
                       <Field
                         label="Amount paid"
-                        value={formatMoney(finance.amount_paid, finance.currency)}
+                        value={format_currency(finance.amount_paid, finance.currency)}
                         mono
                       />
                     </div>
@@ -1909,7 +1890,7 @@ export default function OperationsShipmentReviewPage() {
                             : "text-teal-deep"
                         )}
                       >
-                        {formatMoney(finance.balance, finance.currency)}
+                        {format_currency(finance.balance, finance.currency)}
                       </p>
                     </div>
                   </dl>
