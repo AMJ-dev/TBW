@@ -43,6 +43,8 @@ type Container = {
   items: CargoItem[];
 };
 
+type ConfigOption = { id: string; label: string };
+
 const steps = [
   { key: "company", label: "Company", icon: Building2 },
   { key: "shipment", label: "Shipment", icon: Ship },
@@ -55,9 +57,7 @@ const steps = [
 const services = [
   "Bonded warehousing",
   "Cargo receiving & handling",
-  "Stuffing and destuffing",
   "Examination coordination",
-  "Truck appointment coordination",
   "Cargo documentation support",
 ];
 
@@ -78,10 +78,10 @@ const createItem = (): CargoItem => ({
   currency: "NGN",
 });
 
-const createContainer = (): Container => ({
+const createContainer = (size = "40FT"): Container => ({
   id: makeId(),
   container_no: "",
-  size: "40FT",
+  size,
   seal_no: "",
   package_count: "",
   gross_weight: "",
@@ -102,6 +102,11 @@ export default function QuotePage() {
   const [destination, setDestination] = useState("TRÏNŪ Bonded Warehouse");
   const [expectedArrival, setExpectedArrival] = useState("");
   const [cargoCategory, setCargoCategory] = useState("Containerised");
+  const [valuationBasis, setValuationBasis] = useState("CIF");
+  const [freightCost, setFreightCost] = useState("");
+  const [insuranceCost, setInsuranceCost] = useState("");
+  const [valuationCurrency, setValuationCurrency] = useState<Currency>("USD");
+  const [containerSizes, setContainerSizes] = useState<ConfigOption[]>([]);
   const [containers, setContainers] = useState<Container[]>([createContainer()]);
   const [selectedServices, setSelectedServices] = useState<string[]>(services.slice(0, 3));
   const [requirements, setRequirements] = useState("");
@@ -121,7 +126,25 @@ export default function QuotePage() {
           throw new Error(String(resp.data || "Could not load shipment configuration."));
         }
 
+        const config = resp.code && typeof resp.code === "object"
+          ? resp.code as Record<string, unknown>
+          : {};
+        const configuredSizes = Array.isArray(config["container_sizes"])
+          ? config["container_sizes"].filter((item: any) => item && item.id && item.label).map((item: any) => ({
+              id: String(item.id),
+              label: String(item.label),
+            }))
+          : [];
+
         if (active) {
+          setContainerSizes(configuredSizes);
+          if (configuredSizes.length) {
+            const validSizes = configuredSizes.map((item) => item.label.toUpperCase());
+            setContainers((current) => current.map((container) => ({
+              ...container,
+              size: validSizes.includes(container.size.toUpperCase()) ? container.size : (validSizes[0] ?? container.size),
+            })));
+          }
           setConfigLoading(false);
         }
       } catch (error) {
@@ -182,7 +205,10 @@ export default function QuotePage() {
     );
   };
 
-  const addContainer = () => setContainers((current) => [...current, createContainer()]);
+  const addContainer = () => setContainers((current) => [
+    ...current,
+    createContainer(containerSizes[0]?.label.toUpperCase() || "40FT"),
+  ]);
 
   const removeContainer = (containerId: string) => {
     setContainers((current) => current.filter((container) => container.id !== containerId));
@@ -277,6 +303,10 @@ export default function QuotePage() {
     formData.append("destination", destination);
     formData.append("expected_arrival", expectedArrival);
     formData.append("cargo_category", cargoCategory);
+    formData.append("valuation_basis", valuationBasis);
+    formData.append("freight_cost", freightCost || "0");
+    formData.append("insurance_cost", insuranceCost || "0");
+    formData.append("valuation_currency", valuationCurrency);
     formData.append("requirements", requirements);
     formData.append("containers_count", String(containers.length));
 
@@ -501,6 +531,31 @@ export default function QuotePage() {
                             {["Containerised", "General", "Agricultural", "Industrial", "Automotive", "Project cargo"].map((category) => <option key={category}>{category}</option>)}
                           </select>
                         </label>
+                        <div className="sm:col-span-2 rounded-xl border border-line bg-sand/60 p-4">
+                          <h3 className="font-display font-bold text-ink">Cargo valuation</h3>
+                          <p className="mt-1 mb-4 text-xs leading-5 text-ink-soft">Enter freight and insurance for the whole shipment, not separately for each container or cargo item. If the goods value is already CIF, these costs are included in the declared item values and must not be added again.</p>
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <label className="block">
+                              <span className="font-mono text-xs uppercase tracking-[0.14em] text-ink-soft">Valuation basis</span>
+                              <select value={valuationBasis} onChange={(event) => setValuationBasis(event.target.value)} className="mt-2 h-11 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink">
+                                <option value="CIF">CIF</option>
+                                <option value="FOB">FOB</option>
+                                <option value="EXW">EXW</option>
+                                <option value="OTHER">Other</option>
+                              </select>
+                            </label>
+                            <label className="block">
+                              <span className="font-mono text-xs uppercase tracking-[0.14em] text-ink-soft">Freight / insurance currency</span>
+                              <select value={valuationCurrency} onChange={(event) => setValuationCurrency(event.target.value as Currency)} className="mt-2 h-11 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink">
+                                <option value="USD">USD</option>
+                                <option value="NGN">NGN</option>
+                              </select>
+                            </label>
+                            <Field label="Freight cost" type="number" placeholder="Enter total freight cost" value={freightCost} onChange={setFreightCost} />
+                            <Field label="Insurance cost" type="number" placeholder="Enter total insurance cost" value={insuranceCost} onChange={setInsuranceCost} />
+                          </div>
+                          <p className="mt-3 text-[11px] leading-5 text-ink-soft">Freight and insurance are optional at submission. Operations can complete missing values later. For CIF declarations, leave separate costs at zero when they are already included in the declared goods value.</p>
+                        </div>
                       </div>
                     )}
 
@@ -540,8 +595,8 @@ export default function QuotePage() {
                               <Field label="Container number" placeholder="ABCD1234567" value={container.container_no} onChange={(value) => updateContainer(container.id, "container_no", value)} />
                               <label className="block">
                                 <span className="font-mono text-xs uppercase tracking-[0.14em] text-ink-soft">Container size</span>
-                                <select value={container.size} onChange={(event) => updateContainer(container.id, "size", event.target.value)} className="mt-2 h-11 w-full rounded-md border border-line bg-sand px-3 text-sm text-ink">
-                                  {["20FT", "40FT", "40FT HC", "45FT", "OTHER"].map((size) => <option key={size}>{size}</option>)}
+                                <select value={container.size} onChange={(event) => updateContainer(container.id, "size", event.target.value)} disabled={configLoading || containerSizes.length === 0} className="mt-2 h-11 w-full rounded-md border border-line bg-sand px-3 text-sm text-ink disabled:opacity-60">
+                                  {containerSizes.map((size) => <option key={size.id} value={size.label.toUpperCase()}>{size.label}</option>)}
                                 </select>
                               </label>
                               <Field label="Seal number" placeholder="Seal number" value={container.seal_no} onChange={(value) => updateContainer(container.id, "seal_no", value)} />
@@ -653,6 +708,9 @@ export default function QuotePage() {
                           <Summary label="Origin" value={origin} />
                           <Summary label="Expected arrival" value={expectedArrival} />
                           <Summary label="Cargo category" value={cargoCategory} />
+                          <Summary label="Valuation basis" value={valuationBasis} />
+                          <Summary label="Freight cost" value={`${format_currency(Number(freightCost || 0), valuationCurrency)} (${valuationCurrency})`} />
+                          <Summary label="Insurance cost" value={`${format_currency(Number(insuranceCost || 0), valuationCurrency)} (${valuationCurrency})`} />
                           <Summary label="Selected services" value={selectedServices.join(", ") || "None selected"} />
                         </div>
                         <div>
