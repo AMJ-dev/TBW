@@ -240,7 +240,7 @@ export default function QuotePage() {
 
       for (let index = 0; index < containers.length; index += 1) {
         const container = containers[index];
-        if (!container.container_no.trim()) {
+        if (!container?.container_no.trim()) {
           toast.error(`Enter the container number for container ${index + 1}.`);
           return false;
         }
@@ -250,7 +250,7 @@ export default function QuotePage() {
         }
         for (let itemIndex = 0; itemIndex < container.items.length; itemIndex += 1) {
           const item = container.items[itemIndex];
-          if (!item.customs_tariff_id || !item.description.trim() || !item.hs_code.trim() || !item.quantity || !item.unit) {
+          if (!item?.customs_tariff_id || !item.description.trim() || !item.hs_code.trim() || !item.quantity || !item.unit) {
             toast.error(`Select a valid customs tariff and complete the description, quantity and unit for item ${itemIndex + 1} in container ${index + 1}.`);
             return false;
           }
@@ -318,7 +318,7 @@ export default function QuotePage() {
       const result = resp.code && typeof resp.code === "object"
         ? resp.code as Record<string, unknown>
         : {};
-      const reference = result.quote_reference ?? result.reference ?? result.id;
+      const reference = result["quote_reference"] ?? result["reference"] ?? result["id"];
       setQuoteReference(reference ? String(reference) : "");
       setSubmitted(true);
       toast.success("Quote request submitted successfully.");
@@ -809,7 +809,7 @@ function TariffSearchField({
       const result = resp.code && typeof resp.code === "object"
         ? resp.code as Record<string, unknown>
         : {};
-      const tariffs = Array.isArray(result.tariffs) ? result.tariffs : [];
+      const tariffs = Array.isArray(result["tariffs"]) ? result["tariffs"] : [];
 
       setResults(
         tariffs
