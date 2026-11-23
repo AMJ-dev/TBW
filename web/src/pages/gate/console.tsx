@@ -44,7 +44,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
-import { resolveSrc } from "@/lib/functions";
+import { format_currency, resolveSrc } from "@/lib/functions";
 
 type GateDirection = "in" | "out";
 type GateDecision = "ADMIT" | "REFER" | "REJECT";
@@ -817,8 +817,8 @@ function GateConsole({ direction }: { direction: GateDirection }) {
                                           </div>
                                           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
                                             <Detail label="Quantity" value={`${getString(cargo, "quantity") || "—"} ${getString(cargo, "unit_of_measure", "unit")}`} />
-                                            <Detail label="Unit Value" value={`${getString(cargo, "currency") || ""} ${getString(cargo, "unit_value") || "—"}`} />
-                                            <Detail label="Total Value" value={`${getString(cargo, "currency") || ""} ${getString(cargo, "total_value") || "—"}`} />
+                                            <Detail label="Unit Value" value={`${format_currency(getString(cargo, "unit_value"), getString(cargo, "currency")) || "—"}`} />
+                                            <Detail label="Total Value" value={`${format_currency(getString(cargo, "total_value"), getString(cargo, "currency")) || "—"}`} />
                                           </div>
                                         </div>
                                       ))}

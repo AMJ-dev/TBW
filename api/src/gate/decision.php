@@ -1,5 +1,6 @@
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
+    $code = null;
 
     header("Content-Type: application/json; charset=utf-8");
 
@@ -292,23 +293,20 @@
             "release" => null
         ];
 
-        if ($decision === "ADMIT" && $direction === "out") {
-            throw new RuntimeException(
-                "Gate-out is blocked until financial clearance and release authorisation are verified by the server."
-            );
-        }
-
         if ($decision === "ADMIT" && count($holds) > 0) {
+            $code = [
+                "holds" => $holds,
+                "checks" => $checks
+            ];
+
             throw new RuntimeException(
-                "Admission blocked. Resolve the outstanding checks first."
+                "Admission blocked: " . implode("; ", $holds) . "."
             );
         }
 
         if (isset($_FILES["gate_in_evidence"])) {
             $evidenceFile = $_FILES["gate_in_evidence"];
             
-            print_r($_FILES["gate_in_evidence"]);
-
             if (($evidenceFile["error"] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
                 if ($direction !== "in") {
                     throw new RuntimeException("Gate-In Evidence can only be uploaded for gate-in movements.");
@@ -717,6 +715,6 @@
         echo json_encode([
             "error" => true,
             "data" => $message,
-            "code" => null
-        ]);
+            "code" => $code
+        ], JSON_UNESCAPED_SLASHES);
     }

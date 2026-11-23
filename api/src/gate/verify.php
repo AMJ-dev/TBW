@@ -342,25 +342,31 @@
             !empty($pass["licence_expiry"]) &&
             $pass["licence_expiry"] >= $today;
 
-        $appointmentDate = !empty($pass["appointment_date"])
-            ? date("Y-m-d", strtotime((string) $pass["appointment_date"]))
-            : null;
+        $appointmentDate = null;
 
+        if (!empty($pass["appointment_date"])) {
+            $appointmentTimestamp = strtotime((string) $pass["appointment_date"]);
+
+            if ($appointmentTimestamp !== false) {
+                $appointmentDate = date("Y-m-d", $appointmentTimestamp);
+            }
+        }
+
+        $appointmentIsToday = $appointmentDate === $today;
         $passExpired = $appointmentDate !== null && $appointmentDate < $today;
         $used = (bool) $pass["used"];
 
         $passEligible =
             $passStatus === "active" &&
-            $appointmentDate === $today &&
+            $appointmentIsToday &&
             !$used;
 
-        $appointmentEligible =
-            $appointmentDate === $today &&
-            (
-                $direction === "in"
-                    ? in_array($appointmentStatus, ["confirmed", "arrived"], true)
-                    : in_array($appointmentStatus, ["in terminal", "in_terminal"], true)
-            );
+        $appointmentEligible = $direction === "in"
+            ? (
+                $appointmentIsToday &&
+                in_array($appointmentStatus, ["confirmed", "arrived"], true)
+            )
+            : in_array($appointmentStatus, ["in terminal", "in_terminal"], true);
 
         $appointmentContainers = !empty($pass["appointment_container_nos"])
             ? array_values(

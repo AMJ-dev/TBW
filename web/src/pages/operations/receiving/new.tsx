@@ -337,7 +337,7 @@ export default function OperationsReceivingNewPage() {
 
       try {
         const response = await http.post("/admin/config/search-location/", {
-          q: "YARD",
+          q: "RECEIVING",
         });
 
         const resp: Resp = response.data;

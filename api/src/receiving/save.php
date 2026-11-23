@@ -210,7 +210,7 @@
             $location = $locationQuery->fetch(PDO::FETCH_ASSOC);
 
             if (!$location) {
-                throw new RuntimeException("Select a valid active yard location.");
+                throw new RuntimeException("Select a valid active receiving location.");
             }
 
             if ($actual_weight !== "" && (!is_numeric($actual_weight) || (float)$actual_weight < 0)) {
