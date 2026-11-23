@@ -79,7 +79,7 @@
         $conn->beginTransaction();
 
         $qAdapter = $conn->prepare("
-            SELECT id, adapter_key, fields
+            SELECT id, adapter_key, fields, name
             FROM integration_adapters
             WHERE id = ?
             LIMIT 1
@@ -89,7 +89,6 @@
         $updateAdapter = $conn->prepare("
             UPDATE integration_adapters
             SET enabled = ?,
-                environment = ?,
                 updated_by = ?,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
@@ -168,12 +167,6 @@
                 true
             ) ? 1 : 0;
 
-            $environment = $integration["environment"] ?? "";
-
-            if (!in_array($environment, ["sandbox", "production"], true)) {
-                throw new InvalidArgumentException("Invalid integration environment.");
-            }
-
             $qAdapter->execute([$integrationId]);
             $adapter = $qAdapter->fetch(PDO::FETCH_ASSOC);
 
@@ -185,7 +178,6 @@
 
             $updateAdapter->execute([
                 $enabled,
-                $environment,
                 $actorId,
                 $integrationId
             ]);
@@ -199,8 +191,7 @@
                 ":entity_id" => $integrationId,
                 ":description" => "Integration configuration updated.",
                 ":new_values" => json_encode([
-                    "enabled" => $enabled,
-                    "environment" => $environment
+                    "enabled" => $enabled
                 ], JSON_THROW_ON_ERROR),
                 ":metadata" => json_encode([
                     "source_table" => "integration_audit_logs",
@@ -343,6 +334,158 @@
                     "source_table" => "integration_audit_logs",
                     "integration_id" => $integrationId,
                     "field_key" => $fieldKey
+                ], JSON_THROW_ON_ERROR),
+                ":severity" => "INFO"
+            ]);
+        }
+
+        if (array_key_exists("bank_accounts", $_POST)) {
+            $bankAccounts = json_decode((string) $_POST["bank_accounts"], true);
+
+            if (!is_array($bankAccounts) || !array_is_list($bankAccounts)) {
+                throw new InvalidArgumentException("Invalid bank accounts payload.");
+            }
+
+            $bankReconciliationQuery = $conn->prepare("
+                SELECT id
+                FROM integration_adapters
+                WHERE adapter_key = 'bank_reconciliation'
+                   OR LOWER(name) LIKE '%bank reconciliation%'
+                ORDER BY CASE WHEN adapter_key = 'bank_reconciliation' THEN 0 ELSE 1 END
+                LIMIT 1
+                FOR UPDATE
+            ");
+            $bankReconciliationQuery->execute();
+            $bankReconciliation = $bankReconciliationQuery->fetch(PDO::FETCH_ASSOC);
+
+            if (!$bankReconciliation) {
+                throw new InvalidArgumentException("Bank Reconciliation integration was not found.");
+            }
+
+            $bankIntegrationId = (string) $bankReconciliation["id"];
+
+            if (!isset($seenIntegrationIds[$bankIntegrationId])) {
+                throw new InvalidArgumentException(
+                    "Bank Reconciliation must be included in the integrations update."
+                );
+            }
+
+            $normalisedBankAccounts = [];
+
+            foreach ($bankAccounts as $index => $account) {
+                if (!is_array($account)) {
+                    throw new InvalidArgumentException("Invalid bank account at row " . ($index + 1) . ".");
+                }
+
+                $country = strtoupper(trim((string) ($account["country"] ?? $account["countryCode"] ?? "")));
+                $country = in_array($country, ["NIGERIA", "NG"], true) ? "NG" :
+                    (in_array($country, ["UNITED STATES", "UNITED STATES OF AMERICA", "US", "USA"], true) ? "US" : "");
+
+                $bankName = trim((string) ($account["bankName"] ?? $account["bank_name"] ?? ""));
+                $accountName = trim((string) ($account["accountName"] ?? $account["account_name"] ?? ""));
+                $accountNumber = preg_replace('/\\s+/', '', (string) ($account["accountNumber"] ?? $account["account_number"] ?? ""));
+                $currency = strtoupper(trim((string) ($account["currency"] ?? ($country === "NG" ? "NGN" : "USD"))));
+                $swiftCode = strtoupper(trim((string) ($account["swiftCode"] ?? $account["swift_code"] ?? "")));
+                $bankCode = trim((string) ($account["bankCode"] ?? $account["bank_code"] ?? ""));
+                $routingNumber = preg_replace('/\\s+/', '', (string) ($account["routingNumber"] ?? $account["routing_number"] ?? ""));
+                $accountType = strtolower(trim((string) ($account["accountType"] ?? $account["account_type"] ?? "")));
+
+                if ($country === "" || $bankName === "" || $accountName === "" || $accountNumber === "") {
+                    throw new InvalidArgumentException("Country, bank name, account name and account number are required for each bank account.");
+                }
+
+                if ($country === "NG") {
+                    if (!preg_match('/^\\d{10}$/', $accountNumber)) {
+                        throw new InvalidArgumentException("Nigerian bank account numbers must contain exactly 10 digits.");
+                    }
+
+                    if (!in_array($currency, ["NGN", "USD"], true)) {
+                        throw new InvalidArgumentException("Invalid currency for a Nigerian bank account.");
+                    }
+                }
+
+                if ($country === "US") {
+                    if (!preg_match('/^\\d{4,17}$/', $accountNumber)) {
+                        throw new InvalidArgumentException("Enter a valid US bank account number.");
+                    }
+
+                    if (!preg_match('/^\\d{9}$/', $routingNumber)) {
+                        throw new InvalidArgumentException("US bank accounts require a 9-digit ABA routing number.");
+                    }
+
+                    if (!in_array($accountType, ["checking", "savings"], true)) {
+                        throw new InvalidArgumentException("Select checking or savings for each US bank account.");
+                    }
+
+                    if ($currency !== "USD") {
+                        throw new InvalidArgumentException("US bank accounts must use USD.");
+                    }
+                }
+
+                // if ($swiftCode !== "" && !preg_match('/^[A-Z0-9]{8}([A-Z0-9]{3})?$/', $swiftCode)) {
+                //     throw new InvalidArgumentException("Enter a valid SWIFT/BIC code.");
+                // }
+
+                $normalisedBankAccounts[] = [
+                    "id" => trim((string) ($account["id"] ?? generateId())),
+                    "country" => $country,
+                    "bankName" => $bankName,
+                    "accountName" => $accountName,
+                    "accountNumber" => $accountNumber,
+                    "currency" => $currency,
+                    "bankCode" => $bankCode,
+                    "swiftCode" => $swiftCode,
+                    "branchName" => trim((string) ($account["branchName"] ?? $account["branch_name"] ?? "")),
+                    "branchAddress" => trim((string) ($account["branchAddress"] ?? $account["branch_address"] ?? "")),
+                    "routingNumber" => $routingNumber,
+                    "accountType" => $accountType,
+                    "bankAddress" => trim((string) ($account["bankAddress"] ?? $account["bank_address"] ?? "")),
+                    "intermediaryBankName" => trim((string) ($account["intermediaryBankName"] ?? $account["intermediary_bank_name"] ?? "")),
+                    "intermediarySwiftCode" => strtoupper(trim((string) ($account["intermediarySwiftCode"] ?? $account["intermediary_swift_code"] ?? ""))),
+                    "intermediaryBankAddress" => trim((string) ($account["intermediaryBankAddress"] ?? $account["intermediary_bank_address"] ?? ""))
+                ];
+            }
+
+            $bankAccountsJson = json_encode($normalisedBankAccounts, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+            $bankAccountsIv = random_bytes(12);
+            $bankAccountsTag = "";
+
+            $bankAccountsCiphertext = openssl_encrypt(
+                $bankAccountsJson,
+                "aes-256-gcm",
+                $encryptionKey,
+                OPENSSL_RAW_DATA,
+                $bankAccountsIv,
+                $bankAccountsTag
+            );
+
+            if ($bankAccountsCiphertext === false || strlen($bankAccountsTag) !== 16) {
+                throw new RuntimeException("Could not encrypt bank account details.");
+            }
+
+            $saveCredential->execute([
+                generateId(),
+                $bankIntegrationId,
+                "bank_accounts",
+                base64_encode($bankAccountsIv . $bankAccountsTag . $bankAccountsCiphertext),
+                $actorId
+            ]);
+
+            $saveAudit->execute([
+                ":id" => generateId(),
+                ":actor_id" => $actorId,
+                ":category" => "INTEGRATION",
+                ":action" => "BANK_ACCOUNTS_UPDATED",
+                ":entity_type" => "INTEGRATION",
+                ":entity_id" => $bankIntegrationId,
+                ":description" => "Bank reconciliation accounts updated.",
+                ":new_values" => json_encode([
+                    "bank_account_count" => count($normalisedBankAccounts)
+                ], JSON_THROW_ON_ERROR),
+                ":metadata" => json_encode([
+                    "source_table" => "integration_credentials",
+                    "integration_id" => $bankIntegrationId,
+                    "field_key" => "bank_accounts"
                 ], JSON_THROW_ON_ERROR),
                 ":severity" => "INFO"
             ]);
