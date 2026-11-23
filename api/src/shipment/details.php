@@ -51,6 +51,10 @@ try {
             s.organisation_id,
             o.organisation_name,
             s.shipment_type,
+            s.valuation_basis,
+            s.freight_insurance_currency,
+            s.freight_cost,
+            s.insurance_cost,
             s.bill_of_lading,
             s.booking_number,
             s.vessel_name,
@@ -390,6 +394,14 @@ try {
     }
 
     $latestReview = $reviews[0] ?? null;
+
+    $shipment["freight_cost"] = $shipment["freight_cost"] !== null
+        ? (float) $shipment["freight_cost"]
+        : null;
+    $shipment["insurance_cost"] = $shipment["insurance_cost"] !== null
+        ? (float) $shipment["insurance_cost"]
+        : null;
+    $shipment["freight_insurance_currency"] = $shipment["freight_insurance_currency"] ?: "NGN";
 
     $shipment["container_count"] = count($containers);
     $shipment["containers_count"] = count($containers);

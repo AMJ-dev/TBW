@@ -70,24 +70,47 @@
             exit;
         }
 
-        $requestedStatus = trim((string) ($_POST["status"] ?? "PENDING_REVIEW"));
-
-        $status = in_array($requestedStatus, ["DRAFT", "PENDING_REVIEW"], true)
-            ? $requestedStatus
-            : "PENDING_REVIEW";
+        $status = "PENDING_REVIEW";
 
         $declarationAccepted = strtolower(trim((string) (
             $_POST["declaration_accepted"] ?? $_POST["declarationAccepted"] ?? "0"
         )));
 
-        if (
-            $status === "PENDING_REVIEW" &&
-            !in_array($declarationAccepted, ["1", "true", "yes", "on"], true)
-        ) {
+        if (!in_array($declarationAccepted, ["1", "true", "yes", "on"], true)) {
             throw new InvalidArgumentException(
                 "Please accept the shipment declaration before submitting."
             );
         }
+
+        $valuationBasis = strtoupper(trim((string) (
+            $_POST["valuation_basis"] ?? $_POST["valuationBasis"] ?? ""
+        )));
+
+        $freightInsuranceCurrency = strtoupper(trim((string) (
+            $_POST["freight_insurance_currency"]
+            ?? $_POST["freightInsuranceCurrency"]
+            ?? "NGN"
+        )));
+
+        $freightCost = $_POST["freight_cost"] ?? $_POST["freightCost"] ?? "";
+        $insuranceCost = $_POST["insurance_cost"] ?? $_POST["insuranceCost"] ?? "";
+
+        if (!in_array($valuationBasis, ["CIF", "FOB", "EXW", "OTHER"], true)) {
+            throw new InvalidArgumentException("Select a valid cargo valuation basis.");
+        }
+
+        if (!in_array($freightInsuranceCurrency, ["NGN", "USD"], true)) {
+            throw new InvalidArgumentException("Freight and insurance currency must be NGN or USD.");
+        }
+
+        foreach (["Freight cost" => $freightCost, "Insurance cost" => $insuranceCost] as $label => $amount) {
+            if ($amount !== "" && (!is_numeric($amount) || (float) $amount < 0)) {
+                throw new InvalidArgumentException("Enter a valid " . strtolower($label) . ".");
+            }
+        }
+
+        $freightCost = $freightCost === "" ? null : round((float) $freightCost, 2);
+        $insuranceCost = $insuranceCost === "" ? null : round((float) $insuranceCost, 2);
 
         $shipmentType = trim((string) ($_POST["shipment_type"] ?? $_POST["shipmentType"] ?? ""));
         $cargoCategory = trim((string) ($_POST["cargo_category"] ?? $_POST["cargoCategory"] ?? ""));
@@ -435,6 +458,10 @@
             UPDATE portal_shipments
             SET
                 shipment_type = :shipment_type,
+                valuation_basis = :valuation_basis,
+                freight_insurance_currency = :freight_insurance_currency,
+                freight_cost = :freight_cost,
+                insurance_cost = :insurance_cost,
                 bill_of_lading = :bill_of_lading,
                 booking_number = :booking_number,
                 vessel_name = :vessel_name,
@@ -468,6 +495,10 @@
 
         $updateShipment->execute([
             ":shipment_type" => $shipmentType,
+            ":valuation_basis" => $valuationBasis,
+            ":freight_insurance_currency" => $freightInsuranceCurrency,
+            ":freight_cost" => $freightCost,
+            ":insurance_cost" => $insuranceCost,
             ":bill_of_lading" => $_POST["bill_of_lading"] ?? "",
             ":booking_number" => $_POST["booking_number"] ?? "",
             ":vessel_name" => $_POST["vessel_name"] ?? "",
@@ -526,7 +557,6 @@
                 seal_no,
                 package_count,
                 gross_weight,
-                package_type,
                 status
             ) VALUES (
                 :id,
@@ -536,7 +566,6 @@
                 :seal_no,
                 :package_count,
                 :gross_weight,
-                :package_type,
                 'EXPECTED'
             )
         ");
@@ -547,8 +576,7 @@
                 size = :size,
                 seal_no = :seal_no,
                 package_count = :package_count,
-                gross_weight = :gross_weight,
-                package_type = :package_type
+                gross_weight = :gross_weight
             WHERE id = :id
             AND shipment_id = :shipment_id
         ");
@@ -707,7 +735,6 @@
                 ":seal_no" => $sealNo,
                 ":package_count" => $containerCount === "" ? null : $containerCount,
                 ":gross_weight" => $containerWeight === "" ? null : $containerWeight,
-                ":package_type" => $containerPackageType,
                 ":id" => $containerId
             ];
 

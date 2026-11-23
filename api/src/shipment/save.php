@@ -26,14 +26,36 @@ try {
         exit;
     }
 
-    $requestedStatus = trim($_POST["status"] ?? "PENDING_REVIEW");
-    $status = in_array($requestedStatus, ["DRAFT", "PENDING_REVIEW"], true)
-        ? $requestedStatus
-        : "PENDING_REVIEW";
+    $status = "PENDING_REVIEW";
 
-    if ($status === "PENDING_REVIEW" && ($_POST["declaration_accepted"] ?? "0") !== "1") {
+    if (($_POST["declaration_accepted"] ?? "0") !== "1") {
         throw new InvalidArgumentException("Please accept the shipment declaration before submitting.");
     }
+
+    $valuationBasis = strtoupper(trim($_POST["valuation_basis"] ?? ""));
+    $freightInsuranceCurrency = strtoupper(trim($_POST["freight_insurance_currency"] ?? "NGN"));
+    $freightCostInput = trim((string) ($_POST["freight_cost"] ?? ""));
+    $insuranceCostInput = trim((string) ($_POST["insurance_cost"] ?? ""));
+
+    if (!in_array($valuationBasis, ["CIF", "FOB", "EXW", "OTHER"], true)) {
+        throw new InvalidArgumentException("Please select a valid cargo valuation basis.");
+    }
+
+    if (!in_array($freightInsuranceCurrency, ["NGN", "USD"], true)) {
+        throw new InvalidArgumentException("Freight and insurance currency must be NGN or USD.");
+    }
+
+    foreach ([
+        "Freight cost" => $freightCostInput,
+        "Insurance cost" => $insuranceCostInput
+    ] as $label => $value) {
+        if ($value !== "" && (!is_numeric($value) || (float) $value < 0)) {
+            throw new InvalidArgumentException($label . " must be a valid amount greater than or equal to zero.");
+        }
+    }
+
+    $freightCost = $freightCostInput === "" ? null : (float) $freightCostInput;
+    $insuranceCost = $insuranceCostInput === "" ? null : (float) $insuranceCostInput;
 
     $shipmentType = trim($_POST["shipment_type"] ?? "");
     $cargoCategory = trim($_POST["cargo_category"] ?? "");
@@ -376,7 +398,8 @@ try {
             licensed_agent_id, licensed_agent_name, cargo_description,
             cargo_category, package_type, package_count, gross_weight,
             volume, dangerous_goods, temperature_controlled,
-            temperature, special_instructions, customs_reference, status
+            temperature, special_instructions, customs_reference,
+            valuation_basis, freight_insurance_currency, freight_cost, insurance_cost, status
         ) VALUES (
             :id, :shipment_reference, :user_id, :organisation_id, :shipment_type, :bill_of_lading, :booking_number,
             :vessel_name, :voyage_number, :shipping_line, :origin_country,
@@ -386,7 +409,8 @@ try {
             :licensed_agent_id, :licensed_agent_name, :cargo_description,
             :cargo_category, :package_type, :package_count, :gross_weight,
             :volume, :dangerous_goods, :temperature_controlled,
-            :temperature, :special_instructions, :customs_reference, :status
+            :temperature, :special_instructions, :customs_reference,
+            :valuation_basis, :freight_insurance_currency, :freight_cost, :insurance_cost, :status
         )
     ");
 
@@ -438,18 +462,18 @@ try {
         trim($_POST["special_instructions"] ?? "") ?: null
     );
     $q->bindValue(":customs_reference", trim($_POST["customs_reference"] ?? "") ?: null);
+    $q->bindValue(":valuation_basis", $valuationBasis);
+    $q->bindValue(":freight_insurance_currency", $freightInsuranceCurrency);
+    $q->bindValue(":freight_cost", $freightCost);
+    $q->bindValue(":insurance_cost", $insuranceCost);
     $q->bindValue(":status", $status);
     $q->execute();
 
     $containerInsert = $conn->prepare("
         INSERT INTO portal_shipment_containers (
-            id, shipment_id, container_no, size, seal_no, package_count, gross_weight,
-            customs_tariff_id, cargo_description, package_type, hs_code,
-            item_quantity, unit_of_measure, unit_value, currency, total_value
+            id, shipment_id, container_no, size, seal_no, package_count, gross_weight
         ) VALUES (
-            :id, :shipment_id, :container_no, :size, :seal_no, :package_count, :gross_weight,
-            :customs_tariff_id, :cargo_description, :package_type, :hs_code,
-            :item_quantity, :unit_of_measure, :unit_value, :currency, :total_value
+            :id, :shipment_id, :container_no, :size, :seal_no, :package_count, :gross_weight
         )
     ");
 
@@ -608,7 +632,7 @@ try {
                 $unit !== "" ||
                 $unitValue !== "";
 
-            if (!$hasAnyValue && $status === "DRAFT") {
+            if (!$hasAnyValue) {
                 continue;
             }
 
@@ -668,10 +692,6 @@ try {
         }
 
         $containerId = generateId();
-        $firstItem = $validatedItems[0] ?? null;
-        $containerDescription = $validatedItems
-            ? implode("; ", array_column($validatedItems, "description"))
-            : null;
 
         $containerInsert->execute([
             ":id" => $containerId,
@@ -680,16 +700,7 @@ try {
             ":size" => $containerSize,
             ":seal_no" => $sealNo,
             ":package_count" => $containerCount === "" ? null : $containerCount,
-            ":gross_weight" => $containerWeight === "" ? null : $containerWeight,
-            ":customs_tariff_id" => $firstItem["tariff_id"] ?? null,
-            ":cargo_description" => $containerDescription,
-            ":package_type" => $containerPackageType !== "" ? $containerPackageType : null,
-            ":hs_code" => $firstItem["hs_code"] ?? null,
-            ":item_quantity" => $firstItem["quantity"] ?? null,
-            ":unit_of_measure" => $firstItem["unit"] ?? null,
-            ":unit_value" => $firstItem["unit_value"] ?? 0,
-            ":currency" => $firstItem["currency"] ?? "NGN",
-            ":total_value" => $firstItem["total_value"] ?? 0
+            ":gross_weight" => $containerWeight === "" ? null : $containerWeight
         ]);
 
         foreach ($validatedItems as $item) {
@@ -840,7 +851,7 @@ try {
 
     echo json_encode([
         "error" => false,
-        "data" => $status === "DRAFT" ? "Shipment draft saved." : "Shipment declaration submitted for review.",
+        "data" => "Shipment declaration submitted for review.",
         "code" => [
             "id" => $shipmentId,
             "shipment_id" => $shipmentId,
@@ -859,7 +870,7 @@ try {
     echo json_encode([
         "error" => true,
         "data" => $e->getMessage(),
-        "code" => null
+        "code" => $e->getMessage()
     ]);
 
 } catch (Throwable $e) {

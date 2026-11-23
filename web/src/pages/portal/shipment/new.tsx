@@ -6,7 +6,6 @@ import {
 	ArrowRight, 
 	Check,
 	CheckCircle2,
-	ClipboardList,
 	FileCheck2,
 	FileText,
 	Info,
@@ -267,6 +266,10 @@ interface ExistingShipment {
 		customs_tariff_id?: string;
 	}>;
 	documents?: ExistingDocument[];
+	valuation_basis?: string;
+	freight_insurance_currency?: string;
+	freight_cost?: string;
+	insurance_cost?: string;
 }
 
 const inputClass =
@@ -366,14 +369,17 @@ export default function NewPortalShipmentPage() {
 
 	const [shipmentId, setShipmentId] = useState<string>(routeId);
 	const [step, setStep] = useState(1);
-	const [saving, setSaving] = useState(false);
-	const [submitting, setSubmitting] = useState(false);
+		const [submitting, setSubmitting] = useState(false);
 	const [loadingOptions, setLoadingOptions] = useState(true);
 	const [loadingShipment, setLoadingShipment] = useState(false);
 	const [optionsError, setOptionsError] = useState("");
 	const [options, setOptions] = useState<ConfigOptions>(emptyOptions);
 	const [form, setForm] = useState({
 		shipmentType: "",
+		valuationBasis: "",
+		freightInsuranceCurrency: "NGN",
+		freightCost: "",
+		insuranceCost: "",
 		billOfLading: "",
 		bookingNumber: "",
 		customsReference: "",
@@ -499,6 +505,10 @@ export default function NewPortalShipmentPage() {
 
 			setForm({
 				shipmentType: String(record.shipment_type ?? ""),
+				valuationBasis: String(record.valuation_basis ?? ""),
+				freightInsuranceCurrency: String(record.freight_insurance_currency ?? "NGN"),
+				freightCost: record.freight_cost != null ? String(record.freight_cost) : "",
+				insuranceCost: record.insurance_cost != null ? String(record.insurance_cost) : "",
 				billOfLading: String(record.bill_of_lading ?? ""),
 				bookingNumber: String(record.booking_number ?? ""),
 				customsReference: String(record.customs_reference ?? ""),
@@ -846,6 +856,25 @@ export default function NewPortalShipmentPage() {
 		}
 
 		if (step === 3) {
+			if (!form.valuationBasis) {
+				toast.error("Select the cargo valuation basis.");
+				return false;
+			}
+
+			console.log({freightCost: Number(form.freightCost), insuranceCost:Number(form.insuranceCost)})
+			
+			const isInvalidCost = (value: unknown): boolean => {
+				if (value === undefined || value === null) return false;
+				const trimmed = String(value).trim();
+				if (trimmed === "") return false;
+				return !/^\d+(\.\d+)?$/.test(trimmed) || Number(trimmed) < 0;
+			};
+
+			if (isInvalidCost(form.freightCost) || isInvalidCost(form.insuranceCost)) {
+				toast.error("Freight and insurance costs must be valid non-negative amounts.");
+				return false;
+			}
+
 			if (!form.cargoDescription.trim()) {
 				toast.error("Enter a cargo description.");
 				return false;
@@ -903,13 +932,6 @@ export default function NewPortalShipmentPage() {
 					Number(form.volume) <= 0)
 			) {
 				toast.error("Enter a valid cargo volume.");
-				return false;
-			}
-
-			if (form.dangerousGoods === "yes" && !form.hsCode.trim()) {
-				toast.error(
-					"Provide the HS code for the declared dangerous goods."
-				);
 				return false;
 			}
 
@@ -988,7 +1010,7 @@ export default function NewPortalShipmentPage() {
 	const validContainersForSubmit = () =>
 		containers.filter((container) => container.containerNo.trim());
 
-	const buildFormData = (status: "DRAFT" | "PENDING_REVIEW") => {
+	const buildFormData = () => {
 		const formData = new FormData();
 
 		const consigneeName =
@@ -998,6 +1020,10 @@ export default function NewPortalShipmentPage() {
 
 		const fields: Record<string, string> = {
 			shipment_type: form.shipmentType,
+			valuation_basis: form.valuationBasis,
+			freight_insurance_currency: form.freightInsuranceCurrency,
+			freight_cost: form.freightCost,
+			insurance_cost: form.insuranceCost,
 			bill_of_lading: form.billOfLading.trim(),
 			booking_number: form.bookingNumber.trim(),
 			customs_reference: form.customsReference.trim(),
@@ -1026,13 +1052,12 @@ export default function NewPortalShipmentPage() {
 			package_count: form.packageCount, 
 			gross_weight: form.grossWeight,
 			volume: form.volume,
-			hs_code: form.hsCode.trim(),
 			dangerous_goods: form.dangerousGoods,
 			temperature_controlled: form.temperatureControlled,
 			temperature: form.temperature.trim(),
 			special_instructions: form.specialInstructions.trim(),
 			declaration_accepted: declarationAccepted ? "1" : "0",
-			status,
+			status: "PENDING_REVIEW",
 		};
 
 		Object.entries(fields).forEach(([key, value]) =>
@@ -1105,14 +1130,12 @@ export default function NewPortalShipmentPage() {
 		return formData;
 	};
 
-	const persistShipment = async (
-		status: "DRAFT" | "PENDING_REVIEW"
-	): Promise<string | null> => {
+	const persistShipment = async (): Promise<string | null> => {
 		const endpoint = shipmentId
 			? `/portal/shipments/update/${shipmentId}/`
 			: "/portal/shipments/save/";
 
-		const res = await http.post(endpoint, buildFormData(status));
+		const res = await http.post(endpoint, buildFormData());
 		const resp: Resp = res.data;
 
 		if (resp.error) {
@@ -1130,30 +1153,6 @@ export default function NewPortalShipmentPage() {
 		return record?.id ?? shipmentId ?? null;
 	};
 
-	const saveDraft = async () => {
-		setSaving(true);
-		try {
-			const nextId = await persistShipment("DRAFT");
-			if (!nextId) return;
-
-			if (!shipmentId) {
-				setShipmentId(nextId);
-				navigate(`/portal/shipment/new?id=${nextId}`, {
-					replace: true,
-				});
-			}
-
-			toast.success("Draft saved. You can continue editing it later.");
-		} catch (error: any) {
-			toast.error(
-				error?.response?.data?.data ||
-					error?.response?.data?.message ||
-					"Unable to save the shipment draft."
-			);
-		} finally {
-			setSaving(false);
-		}
-	};
 
 	const submitShipment = async () => {
 		if (!validateStep()) return;
@@ -1165,7 +1164,7 @@ export default function NewPortalShipmentPage() {
 
 		setSubmitting(true);
 		try {
-			const nextId = await persistShipment("PENDING_REVIEW");
+			const nextId = await persistShipment();
 			if (!nextId) return;
 
 			setShipmentId(nextId);
@@ -1226,21 +1225,6 @@ export default function NewPortalShipmentPage() {
 						</h1>
 					</div>
 
-					<div className="flex items-center gap-2">
-						<Button
-							variant="outline"
-							disabled={saving || loadingShipment}
-							onClick={saveDraft}
-							className="gap-2 border-line bg-paper text-ink hover:bg-sand"
-						>
-							<ClipboardList className="size-4" />
-							{saving
-								? "Saving…"
-								: isEditing
-									? "Save changes"
-									: "Save draft"}
-						</Button>
-					</div>
 				</div>
 
 				{loadingShipment && (
@@ -1542,6 +1526,39 @@ export default function NewPortalShipmentPage() {
 									/>
 
 									<div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
+										<div className="sm:col-span-2 rounded-xl border border-line bg-sand/50 p-4">
+											<div className="mb-4">
+												<p className="text-sm font-semibold text-ink">Cargo valuation</p>
+												<p className="mt-1 text-xs leading-5 text-ink-soft">Provide the valuation basis and any freight or insurance costs declared for this shipment.</p>
+											</div>
+											<div className="grid gap-4 sm:grid-cols-2">
+												<label className={labelClass}>
+													Valuation basis
+													<select className={inputClass} value={form.valuationBasis} onChange={(event) => updateField("valuationBasis", event.target.value)}>
+														<option value="">Select valuation basis</option>
+														<option value="CIF">CIF</option>
+														<option value="FOB">FOB</option>
+														<option value="EXW">EXW</option>
+														<option value="OTHER">Other</option>
+													</select>
+												</label>
+												<label className={labelClass}>
+													Freight / insurance currency
+													<select className={inputClass} value={form.freightInsuranceCurrency} onChange={(event) => updateField("freightInsuranceCurrency", event.target.value)}>
+														<option value="NGN">NGN — Nigerian Naira</option>
+														<option value="USD">USD — US Dollar</option>
+													</select>
+												</label>
+												<label className={labelClass}>
+													Freight cost
+													<Input type="number" min="0" step="0.01" value={form.freightCost} onChange={(event) => updateField("freightCost", event.target.value)} placeholder="0.00" className="mt-1.5 h-11 border-line bg-sand text-ink" />
+												</label>
+												<label className={labelClass}>
+													Insurance cost
+													<Input type="number" min="0" step="0.01" value={form.insuranceCost} onChange={(event) => updateField("insuranceCost", event.target.value)} placeholder="0.00" className="mt-1.5 h-11 border-line bg-sand text-ink" />
+												</label>
+											</div>
+										</div>
 										<label className={cn(labelClass, "sm:col-span-2")}>
 											Cargo description
 											<span className="text-coral"> *</span>
