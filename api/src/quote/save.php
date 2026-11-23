@@ -25,24 +25,7 @@
         return $number;
     }
 
-    function quote_reference(PDO $conn) {
-        do {
-            $reference = "TRN-Q-" . date("Ymd") . "-" . strtoupper(bin2hex(random_bytes(3)));
-
-            $check = $conn->prepare("
-                SELECT id
-                FROM portal_quote_requests
-                WHERE quote_reference = ?
-                LIMIT 1
-            ");
-            $check->execute([$reference]);
-        } while ($check->fetch(PDO::FETCH_ASSOC));
-
-        return $reference;
-    }
-
     if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-        http_response_code(405);
         echo json_encode([
             "error" => true,
             "data" => "Method not allowed.",
@@ -284,7 +267,7 @@
         $conn->beginTransaction();
 
         $quoteId = generateId();
-        $reference = quote_reference($conn);
+        $reference = generate_ref("QTE");
 
         $insertQuote = $conn->prepare("
             INSERT INTO portal_quote_requests (
@@ -458,7 +441,6 @@
 
         error_log("Quote request save error: " . $e->getMessage());
 
-        http_response_code(500);
         echo json_encode([
             "error" => true,
             "data" => "Could not save your quote request. Please try again.",

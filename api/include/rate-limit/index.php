@@ -136,8 +136,6 @@ LUA;
 
         $retryAfter = max(1, (int) $result[1]);
 
-        http_response_code(429);
-
         header('Content-Type: application/json');
         header('Retry-After: ' . $retryAfter);
         header('Cache-Control: no-store');
@@ -159,8 +157,6 @@ LUA;
         isset($rate_limit_failed_closed) &&
         (string) $rate_limit_failed_closed === '1'
     ) {
-
-        http_response_code(503);
 
         header('Content-Type: application/json');
         header('Cache-Control: no-store');

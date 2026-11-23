@@ -1,14 +1,6 @@
 
 <?php
     require_once dirname(__DIR__, 1) . "/include/conn.php";
-    // every 5 minutes
-
-    // if (PHP_SAPI !== "cli") {
-    //     http_response_code(403);
-    //     exit("Forbidden");
-    // }
-
-    $batchSize = 20;
     $processed = 0;
     $deleted = 0;
     $failed = 0;
@@ -16,50 +8,15 @@
     try {
         $conn->beginTransaction();
 
-        $resetExpired = $conn->prepare("
-            UPDATE portal_quote_email_queue
-            SET
-                status = 'FAILED',
-                locked_at = NULL,
-                next_attempt_at = NOW(),
-                last_error = 'Previous processing lock expired.',
-                updated_at = NOW()
-            WHERE status = 'PROCESSING'
-            AND locked_at IS NOT NULL
-            AND locked_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE)
-            AND attempts < max_attempts
-        ");
-        $resetExpired->execute();
-
-        $expireExhausted = $conn->prepare("
-            UPDATE portal_quote_email_queue
-            SET
-                status = 'FAILED',
-                locked_at = NULL,
-                next_attempt_at = NULL,
-                last_error = 'Maximum email attempts reached.',
-                updated_at = NOW()
-            WHERE status = 'PROCESSING'
-            AND locked_at IS NOT NULL
-            AND locked_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE)
-            AND attempts >= max_attempts
-        ");
-        $expireExhausted->execute();
-
         $selectQueue = $conn->prepare("
             SELECT id
             FROM portal_quote_email_queue
             WHERE status IN ('PENDING', 'FAILED')
-            AND attempts < max_attempts
-            AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
             ORDER BY created_at ASC
-            LIMIT ?
             FOR UPDATE
         ");
 
-        $selectQueue->bindValue(1, $batchSize, PDO::PARAM_INT);
         $selectQueue->execute();
-
         $queueIds = $selectQueue->fetchAll(PDO::FETCH_COLUMN);
 
         $claimQueue = $conn->prepare("
@@ -94,21 +51,13 @@
             UPDATE portal_quote_email_queue
             SET
                 status = 'FAILED',
-                attempts = ?,
-                next_attempt_at = DATE_ADD(NOW(), INTERVAL ? MINUTE),
+                attempts = attempts + 1,
+                next_attempt_at = NULL,
                 locked_at = NULL,
                 last_error = ?,
                 updated_at = NOW()
             WHERE id = ?
             AND status = 'PROCESSING'
-        ");
-
-        $getAttempts = $conn->prepare("
-            SELECT attempts, max_attempts
-            FROM portal_quote_email_queue
-            WHERE id = ?
-            AND status = 'PROCESSING'
-            LIMIT 1
         ");
 
         foreach ($claimedIds as $queueId) {
@@ -213,9 +162,9 @@
                 foreach ($containers as $index => $container) {
                     $containerHtml .= "
                         <tr>
-                            <td colspan='2' style='padding:14px 12px;background:#f4f6fa;border-bottom:1px solid #e5e7eb;'>
+                            <td colspan='2' style='padding:12px 10px;background:#FAF0E3;border-bottom:1px solid #E8D9C2;'>
                                 <strong>Container " . ($index + 1) . ": " . $escape($container["container_no"]) . "</strong>
-                                <div style='font-size:13px;color:#667085;margin-top:5px;'>
+                                <div style='font-size:13px;color:#6B6357;margin-top:5px;'>
                                     Size: " . $escape($container["container_size"] ?: "Not specified") . "
                                     &nbsp; | &nbsp;
                                     Seal: " . $escape($container["seal_no"] ?: "Not specified") . "
@@ -231,13 +180,13 @@
                     foreach ($itemsByContainer[$container["id"]] ?? [] as $item) {
                         $containerHtml .= "
                             <tr>
-                                <td style='padding:11px 12px;border-bottom:1px solid #edf0f4;'>
+                                <td style='padding:10px 8px;border-bottom:1px solid #E8D9C2;'>
                                     <strong>" . $escape($item["item_description"]) . "</strong>
-                                    <div style='font-size:12px;color:#667085;margin-top:4px;'>
+                                    <div style='font-size:12px;color:#6B6357;margin-top:4px;'>
                                         HS Code: " . $escape($item["hs_code"]) . "
                                     </div>
                                 </td>
-                                <td style='padding:11px 12px;border-bottom:1px solid #edf0f4;text-align:right;'>
+                                <td style='padding:10px 8px;border-bottom:1px solid #E8D9C2;text-align:right;'>
                                     " . $escape($item["quantity"]) . " " . $escape($item["unit_of_measure"]) . "
                                 </td>
                             </tr>
@@ -264,125 +213,101 @@
                     : "Not specified";
 
                 $message = "
-                <!doctype html>
-                <html>
-                <head>
-                    <meta charset='UTF-8'>
-                    <meta name='viewport' content='width=device-width,initial-scale=1'>
-                    <title>" . $escape($queue["subject"]) . "</title>
-                </head>
+                    <p style='margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#2B2A28;'>
+                        Hello " . $escape($queue["recipient_name"]) . ",
+                    </p>
 
-                <body style='margin:0;padding:0;background:#f3f5f8;font-family:Arial,Helvetica,sans-serif;color:#202938;'>
-                    <div style='max-width:680px;margin:30px auto;padding:0 15px;'>
-                        <div style='background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;'>
+                    <p style='margin:0 0 20px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#6B6357;'>
+                        Thank you for contacting Trinu. We have received your shipment details and your quote request has been recorded.
+                    </p>
 
-                            <div style='padding:28px 30px;background:#0a2a9b;color:#ffffff;'>
-                                <div style='font-size:12px;letter-spacing:2px;text-transform:uppercase;opacity:.85;'>
-                                    TRINU
+                    <table role='presentation' width='100%' border='0' cellpadding='0' cellspacing='0' style='width:100%;margin:0 0 24px;background:#FAF0E3;border:1px solid #E8D9C2;border-radius:8px;'>
+                        <tr>
+                            <td style='padding:16px 18px;'>
+                                <div style='font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:1.5;font-weight:bold;letter-spacing:1px;text-transform:uppercase;color:#6B6357;'>
+                                    Your quote reference
                                 </div>
-                                <h1 style='margin:12px 0 0;font-size:24px;'>
-                                    Quote request received
-                                </h1>
-                            </div>
-
-                            <div style='padding:30px;'>
-                                <p style='margin-top:0;'>
-                                    Hello " . $escape($queue["recipient_name"]) . ",
-                                </p>
-
-                                <p style='line-height:1.7;color:#475467;'>
-                                    Thank you for contacting Trinu. We have received your shipment details and your quote request has been recorded.
-                                </p>
-
-                                <div style='margin:22px 0;padding:18px;background:#f4f6fa;border-radius:8px;'>
-                                    <div style='font-size:12px;color:#667085;text-transform:uppercase;letter-spacing:1px;'>
-                                        Your quote reference
-                                    </div>
-                                    <div style='font-size:22px;font-weight:bold;color:#0a2a9b;margin-top:7px;'>
-                                        " . $escape($queue["quote_reference"]) . "
-                                    </div>
+                                <div style='margin-top:7px;font-family:Arial,Helvetica,sans-serif;font-size:20px;line-height:1.4;font-weight:bold;color:#FF6600;word-break:break-word;'>
+                                    " . $escape($queue["quote_reference"]) . "
                                 </div>
+                            </td>
+                        </tr>
+                    </table>
 
-                                <h3 style='margin:26px 0 12px;font-size:16px;'>
-                                    Company and shipment details
-                                </h3>
+                    <h3 style='margin:24px 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.4;color:#2B2A28;'>
+                        Company and shipment details
+                    </h3>
 
-                                <table style='width:100%;border-collapse:collapse;font-size:14px;'>
-                                    <tr>
-                                        <td style='padding:8px 0;color:#667085;width:40%;'>Company</td>
-                                        <td style='padding:8px 0;font-weight:600;'>" . $escape($queue["company_name"]) . "</td>
-                                    </tr>
-                                    <tr>
-                                        <td style='padding:8px 0;color:#667085;'>Bill of lading</td>
-                                        <td style='padding:8px 0;font-weight:600;'>" . $escape($queue["bill_of_lading"]) . "</td>
-                                    </tr>
-                                    <tr>
-                                        <td style='padding:8px 0;color:#667085;'>Vessel</td>
-                                        <td style='padding:8px 0;'>" . $escape($queue["vessel_name"] ?: "Not specified") . "</td>
-                                    </tr>
-                                    <tr>
-                                        <td style='padding:8px 0;color:#667085;'>Voyage</td>
-                                        <td style='padding:8px 0;'>" . $escape($queue["voyage_number"] ?: "Not specified") . "</td>
-                                    </tr>
-                                    <tr>
-                                        <td style='padding:8px 0;color:#667085;'>Origin</td>
-                                        <td style='padding:8px 0;'>" . $escape($queue["origin"] ?: "Not specified") . "</td>
-                                    </tr>
-                                    <tr>
-                                        <td style='padding:8px 0;color:#667085;'>Destination</td>
-                                        <td style='padding:8px 0;'>" . $escape($queue["destination"] ?: "Not specified") . "</td>
-                                    </tr>
-                                    <tr>
-                                        <td style='padding:8px 0;color:#667085;'>Expected arrival</td>
-                                        <td style='padding:8px 0;'>" . $escape($arrival) . "</td>
-                                    </tr>
-                                    <tr>
-                                        <td style='padding:8px 0;color:#667085;'>Cargo category</td>
-                                        <td style='padding:8px 0;'>" . $escape($queue["cargo_category"] ?: "Not specified") . "</td>
-                                    </tr>
-                                </table>
+                    <table role='presentation' width='100%' border='0' cellpadding='0' cellspacing='0' style='width:100%;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#2B2A28;'>
+                        <tr>
+                            <td width='40%' style='padding:8px 8px 8px 0;color:#6B6357;border-bottom:1px solid #E8D9C2;'>Company</td>
+                            <td style='padding:8px 0;font-weight:bold;border-bottom:1px solid #E8D9C2;word-break:break-word;'>" . $escape($queue["company_name"]) . "</td>
+                        </tr>
+                        <tr>
+                            <td style='padding:8px 8px 8px 0;color:#6B6357;border-bottom:1px solid #E8D9C2;'>Bill of lading</td>
+                            <td style='padding:8px 0;font-weight:bold;border-bottom:1px solid #E8D9C2;word-break:break-word;'>" . $escape($queue["bill_of_lading"]) . "</td>
+                        </tr>
+                        <tr>
+                            <td style='padding:8px 8px 8px 0;color:#6B6357;border-bottom:1px solid #E8D9C2;'>Vessel</td>
+                            <td style='padding:8px 0;border-bottom:1px solid #E8D9C2;word-break:break-word;'>" . $escape($queue["vessel_name"] ?: "Not specified") . "</td>
+                        </tr>
+                        <tr>
+                            <td style='padding:8px 8px 8px 0;color:#6B6357;border-bottom:1px solid #E8D9C2;'>Voyage</td>
+                            <td style='padding:8px 0;border-bottom:1px solid #E8D9C2;word-break:break-word;'>" . $escape($queue["voyage_number"] ?: "Not specified") . "</td>
+                        </tr>
+                        <tr>
+                            <td style='padding:8px 8px 8px 0;color:#6B6357;border-bottom:1px solid #E8D9C2;'>Origin</td>
+                            <td style='padding:8px 0;border-bottom:1px solid #E8D9C2;word-break:break-word;'>" . $escape($queue["origin"] ?: "Not specified") . "</td>
+                        </tr>
+                        <tr>
+                            <td style='padding:8px 8px 8px 0;color:#6B6357;border-bottom:1px solid #E8D9C2;'>Destination</td>
+                            <td style='padding:8px 0;border-bottom:1px solid #E8D9C2;word-break:break-word;'>" . $escape($queue["destination"] ?: "Not specified") . "</td>
+                        </tr>
+                        <tr>
+                            <td style='padding:8px 8px 8px 0;color:#6B6357;border-bottom:1px solid #E8D9C2;'>Expected arrival</td>
+                            <td style='padding:8px 0;border-bottom:1px solid #E8D9C2;'>" . $escape($arrival) . "</td>
+                        </tr>
+                        <tr>
+                            <td style='padding:8px 8px 8px 0;color:#6B6357;'>Cargo category</td>
+                            <td style='padding:8px 0;'>" . $escape($queue["cargo_category"] ?: "Not specified") . "</td>
+                        </tr>
+                    </table>
 
-                                <h3 style='margin:28px 0 12px;font-size:16px;'>
-                                    Containers and cargo items
-                                </h3>
+                    <h3 style='margin:26px 0 12px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.4;color:#2B2A28;'>
+                        Containers and cargo items
+                    </h3>
 
-                                <table style='width:100%;border-collapse:collapse;font-size:14px;'>
-                                    " . $containerHtml . "
-                                </table>
+                    <table role='presentation' width='100%' border='0' cellpadding='0' cellspacing='0' style='width:100%;border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.5;color:#2B2A28;'>
+                        " . $containerHtml . "
+                    </table>
 
-                                <h3 style='margin:28px 0 12px;font-size:16px;'>
-                                    Requested services
-                                </h3>
+                    <h3 style='margin:26px 0 10px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.4;color:#2B2A28;'>
+                        Requested services
+                    </h3>
 
-                                <ul style='padding-left:20px;color:#475467;font-size:14px;line-height:1.6;'>
-                                    " . $serviceHtml . "
-                                </ul>
+                    <ul style='margin:0;padding:0 0 0 20px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.7;color:#6B6357;'>
+                        " . $serviceHtml . "
+                    </ul>
 
-                                <h3 style='margin:28px 0 12px;font-size:16px;'>
-                                    Special requirements
-                                </h3>
+                    <h3 style='margin:26px 0 10px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.4;color:#2B2A28;'>
+                        Special requirements
+                    </h3>
 
-                                <p style='line-height:1.7;color:#475467;white-space:pre-line;'>
-                                    " . $escape($queue["requirements"] ?: "None specified.") . "
-                                </p>
+                    <p style='margin:0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.7;color:#6B6357;white-space:pre-line;'>
+                        " . $escape($queue["requirements"] ?: "None specified.") . "
+                    </p>
 
-                                <div style='margin-top:28px;padding:16px;background:#fff8e8;border:1px solid #f4dfad;border-radius:8px;color:#785b20;font-size:13px;line-height:1.6;'>
-                                    This email confirms receipt of your request only. It is not a final quotation or confirmation of shipment acceptance. Our team will review the submitted details and contact you regarding the quotation.
-                                </div>
+                    <table role='presentation' width='100%' border='0' cellpadding='0' cellspacing='0' style='width:100%;margin:24px 0 0;background:#FAF0E3;border:1px solid #E8D9C2;border-radius:8px;'>
+                        <tr>
+                            <td style='padding:14px 16px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.7;color:#6B6357;'>
+                                This email confirms receipt of your request only. It is not a final quotation or confirmation of shipment acceptance. Our team will review the submitted details and contact you regarding the quotation.
+                            </td>
+                        </tr>
+                    </table>
 
-                                <p style='margin-top:28px;line-height:1.7;color:#475467;'>
-                                    Thank you for choosing Trinu.
-                                </p>
-                            </div>
-
-                            <div style='padding:18px 30px;background:#f8fafc;border-top:1px solid #e5e7eb;color:#98a2b3;font-size:12px;'>
-                                This is an automated acknowledgement of your quote request.
-                            </div>
-
-                        </div>
-                    </div>
-                </body>
-                </html>
+                    <p style='margin:22px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.7;color:#6B6357;'>
+                        Thank you for choosing Trinu.
+                    </p>
                 ";
 
                 $sent = send_email(
@@ -401,25 +326,10 @@
 
                     $processed++;
                 } else {
-                    $getAttempts->execute([$queueId]);
-                    $attemptData = $getAttempts->fetch(PDO::FETCH_ASSOC);
-
-                    if ($attemptData) {
-                        $attempt = (int)$attemptData["attempts"] + 1;
-                        $maxAttempts = (int)$attemptData["max_attempts"];
-                        $delayMinutes = min(1440, 5 * (2 ** max(0, $attempt - 1)));
-
-                        $errorMessage = $attempt >= $maxAttempts
-                            ? "Email sending failed. Maximum attempts reached."
-                            : "send_email() returned false.";
-
-                        $updateFailed->execute([
-                            $attempt,
-                            $delayMinutes,
-                            $errorMessage,
-                            $queueId
-                        ]);
-                    }
+                    $updateFailed->execute([
+                        "send_email() returned false.",
+                        $queueId
+                    ]);
 
                     $failed++;
                 }
@@ -429,23 +339,10 @@
                     "Quote email queue error for " . $queueId . ": " . $e->getMessage()
                 );
 
-                $getAttempts->execute([$queueId]);
-                $attemptData = $getAttempts->fetch(PDO::FETCH_ASSOC);
-
-                if ($attemptData) {
-                    $attempt = (int)$attemptData["attempts"] + 1;
-                    $maxAttempts = (int)$attemptData["max_attempts"];
-                    $delayMinutes = min(1440, 5 * (2 ** max(0, $attempt - 1)));
-
-                    $errorMessage = mb_substr($e->getMessage(), 0, 4000);
-
-                    $updateFailed->execute([
-                        $attempt,
-                        $delayMinutes,
-                        $errorMessage,
-                        $queueId
-                    ]);
-                }
+                $updateFailed->execute([
+                    mb_substr($e->getMessage(), 0, 4000),
+                    $queueId
+                ]);
 
                 $failed++;
             }

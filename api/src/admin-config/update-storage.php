@@ -13,7 +13,6 @@ $pauseOnHold = $_POST["pause_on_hold"] ?? false;
 $pauseOnExamination = $_POST["pause_on_examination"] ?? false;
 
 $fail = static function (int $status, string $message): void {
-    http_response_code($status);
     echo json_encode([
         "error" => true,
         "data" => $message,
