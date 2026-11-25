@@ -1,10 +1,9 @@
 <?php
-    require_once dirname(__DIR__, 1) . "/includeset-headern.php";
+    require_once dirname(__DIR__, 1) . "/include/set-header.php";
 
     date_default_timezone_set("Africa/Lagos");
 
     $runDate = (new DateTimeImmutable("today"))->format("Y-m-d");
-    $templateDirectory = __DIR__ . "/storage-notification-templates";
 
     $summary = [
         "run_date" => $runDate,
@@ -28,21 +27,6 @@
         return storageEscape($currency ?: "NGN") . " " . number_format((float)$amount, 2);
     }
 
-    function storageLoadTemplate(string $file, array $values): string{
-        $path = __DIR__ . "/storage-notification-templates/" . $file;
-        $template = file_get_contents($path);
-
-        if ($template === false) {
-            throw new RuntimeException("Could not load email template: " . $file);
-        }
-
-        foreach ($values as $key => $value) {
-            $template = str_replace("{{" . $key . "}}", (string)$value, $template);
-        }
-
-        return $template;
-    }
-
     function storageContainerRows(array $containers, string $type, string $currency): string{
         $html = "";
 
@@ -55,22 +39,22 @@
             $unpaid = storageMoney($container["container_unpaid"] ?? 0, $currency);
 
             if ($type === "DAILY_CHARGES") {
-                $html .= "<tr style=\"border-bottom:1px solid #e5e9f0\">"
-                    . "<td>" . storageEscape($container["container_no"]) . "</td>"
-                    . "<td>" . storageEscape($container["container_size"]) . "</td>"
-                    . "<td>" . (int)$container["storage_day"] . "</td>"
-                    . "<td>" . storageMoney($container["base_rate"], $currency) . "</td>"
-                    . "<td>" . number_format((float)$container["rate_multiplier"], 2) . "x</td>"
-                    . "<td><strong>" . $todayCharge . "</strong></td>"
-                    . "<td>" . storageEscape($status) . "</td>"
+                $html .= "<tr style=\"border-bottom:1px solid #E8D9C2\">"
+                    . "<td style=\"padding:10px 8px\">" . storageEscape($container["container_no"]) . "</td>"
+                    . "<td style=\"padding:10px 8px\">" . storageEscape($container["container_size"]) . "</td>"
+                    . "<td style=\"padding:10px 8px\">" . (int)$container["storage_day"] . "</td>"
+                    . "<td style=\"padding:10px 8px\">" . storageMoney($container["base_rate"], $currency) . "</td>"
+                    . "<td style=\"padding:10px 8px\">" . number_format((float)$container["rate_multiplier"], 2) . "x</td>"
+                    . "<td style=\"padding:10px 8px\"><strong>" . $todayCharge . "</strong></td>"
+                    . "<td style=\"padding:10px 8px\">" . storageEscape($status) . "</td>"
                     . "</tr>";
             } else {
-                $html .= "<tr style=\"border-bottom:1px solid #e5e9f0\">"
-                    . "<td>" . storageEscape($container["container_no"]) . "</td>"
-                    . "<td>" . storageEscape($container["container_size"]) . "</td>"
-                    . "<td>" . (int)$container["storage_day"] . "</td>"
-                    . "<td>" . $todayCharge . "</td>"
-                    . "<td><strong>" . $unpaid . "</strong></td>"
+                $html .= "<tr style=\"border-bottom:1px solid #E8D9C2\">"
+                    . "<td style=\"padding:10px 8px\">" . storageEscape($container["container_no"]) . "</td>"
+                    . "<td style=\"padding:10px 8px\">" . storageEscape($container["container_size"]) . "</td>"
+                    . "<td style=\"padding:10px 8px\">" . (int)$container["storage_day"] . "</td>"
+                    . "<td style=\"padding:10px 8px\">" . $todayCharge . "</td>"
+                    . "<td style=\"padding:10px 8px\"><strong>" . $unpaid . "</strong></td>"
                     . "</tr>";
             }
         }
@@ -80,36 +64,137 @@
 
     function storageBuildEmail(string $type, array $shipment, array $containers, array $totals, string $runDate): array{
         $currency = $totals["currency_code"] ?: "NGN";
-        $values = [
-            "ORGANISATION_NAME" => storageEscape($shipment["organisation_name"]),
-            "SHIPMENT_REFERENCE" => storageEscape($shipment["shipment_reference"] ?: $shipment["bill_of_lading"] ?: $shipment["shipment_id"]),
-            "CHARGE_DATE" => storageEscape((new DateTimeImmutable($runDate))->format("d M Y")),
-            "TODAY_TOTAL" => storageMoney($totals["today_total"], $currency),
-            "ACCUMULATED_TOTAL" => storageMoney($totals["accumulated_total"], $currency),
-            "TOTAL_PAID" => storageMoney($totals["total_paid"], $currency),
-            "OUTSTANDING_TOTAL" => storageMoney($totals["outstanding_total"], $currency),
-            "CONTAINER_ROWS" => storageContainerRows($containers, $type, $currency)
-        ];
+        $reference = $shipment["shipment_reference"] ?: $shipment["bill_of_lading"] ?: $shipment["shipment_id"];
+        $shipmentReference = storageEscape($reference);
+        $organisation = storageEscape($shipment["organisation_name"]);
+        $chargeDate = storageEscape((new DateTimeImmutable($runDate))->format("d M Y"));
 
-        $templates = [
+        $todayTotal = storageMoney($totals["today_total"], $currency);
+        $accumulatedTotal = storageMoney($totals["accumulated_total"], $currency);
+        $totalPaid = storageMoney($totals["total_paid"], $currency);
+        $outstandingTotal = storageMoney($totals["outstanding_total"], $currency);
+        $containerRows = storageContainerRows($containers, $type, $currency);
+
+        $content = match ($type) {
             "DAILY_CHARGES" => [
-                "file" => "daily-charges.html",
-                "subject" => "Daily Storage Charges - " . ($shipment["shipment_reference"] ?: $shipment["bill_of_lading"])
+                "subject" => "Daily Storage Charges - " . $reference,
+                "label" => "STORAGE CHARGE NOTIFICATION",
+                "title" => "Daily Storage Charges",
+                "intro" => "This is to inform you that storage charges have been calculated for your containers currently stored within the terminal.",
+                "highlight_title" => "Today's storage charges",
+                "highlight_amount" => $todayTotal,
+                "notice_title" => "Storage information",
+                "notice" => "Storage charges continue to accrue while your containers remain within the terminal, subject to the applicable free days and storage configuration."
             ],
             "OVERSTAY" => [
-                "file" => "overstay.html",
-                "subject" => "Storage Overstay Notice - " . ($shipment["shipment_reference"] ?: $shipment["bill_of_lading"])
+                "subject" => "Storage Overstay Notice - " . $reference,
+                "label" => "STORAGE OVERSTAY NOTIFICATION",
+                "title" => "Storage Overstay Notice",
+                "intro" => "One or more containers under this shipment have reached the configured storage overstay threshold.",
+                "highlight_title" => "Current outstanding charges",
+                "highlight_amount" => $outstandingTotal,
+                "notice_title" => "Action required",
+                "notice" => "Please arrange payment and the necessary clearance procedures to avoid further storage charges and operational delays."
             ],
             "ESCALATION" => [
-                "file" => "escalation.html",
-                "subject" => "Storage Escalation Notice - " . ($shipment["shipment_reference"] ?: $shipment["bill_of_lading"])
-            ]
-        ];
+                "subject" => "Storage Escalation Notice - " . $reference,
+                "label" => "STORAGE ESCALATION NOTIFICATION",
+                "title" => "Storage Escalation Notice",
+                "intro" => "One or more containers under this shipment have reached the configured storage escalation threshold. Applicable storage charges may continue to increase.",
+                "highlight_title" => "Current outstanding charges",
+                "highlight_amount" => $outstandingTotal,
+                "notice_title" => "Immediate attention required",
+                "notice" => "Please contact the terminal operations or finance team to resolve the outstanding charges and arrange prompt cargo clearance."
+            ],
+            default => throw new InvalidArgumentException("Invalid storage notification type.")
+        };
 
-        $template = $templates[$type];
+        $tableHeaders = $type === "DAILY_CHARGES"
+            ? "
+                <th style='padding:11px 8px;text-align:left;'>Container</th>
+                <th style='padding:11px 8px;text-align:left;'>Size</th>
+                <th style='padding:11px 8px;text-align:left;'>Day</th>
+                <th style='padding:11px 8px;text-align:left;'>Base rate</th>
+                <th style='padding:11px 8px;text-align:left;'>Multiplier</th>
+                <th style='padding:11px 8px;text-align:left;'>Today's charge</th>
+                <th style='padding:11px 8px;text-align:left;'>Status</th>
+            "
+            : "
+                <th style='padding:11px 8px;text-align:left;'>Container</th>
+                <th style='padding:11px 8px;text-align:left;'>Size</th>
+                <th style='padding:11px 8px;text-align:left;'>Day</th>
+                <th style='padding:11px 8px;text-align:left;'>Daily charge</th>
+                <th style='padding:11px 8px;text-align:left;'>Outstanding</th>
+            ";
+
+        $message = "
+            <div style='margin-bottom:22px;'>
+                <div style='font-size:10px;font-weight:700;letter-spacing:1.5px;color:#FF6600;text-transform:uppercase;'>" . storageEscape($content["label"]) . "</div>
+                <h2 style='margin:8px 0 12px;font-size:22px;line-height:1.3;color:#2B2A28;'>" . storageEscape($content["title"]) . "</h2>
+                <p style='margin:0;color:#6B6357;'>Dear <strong>{$organisation}</strong>,</p>
+                <p style='margin:12px 0 0;color:#6B6357;'>" . storageEscape($content["intro"]) . "</p>
+            </div>
+
+            <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0' style='margin-bottom:20px;background-color:#FAF0E3;border:1px solid #E8D9C2;border-radius:8px;'>
+                <tr>
+                    <td style='padding:14px;'>
+                        <div style='font-size:10px;color:#9A8F80;text-transform:uppercase;letter-spacing:1px;'>Shipment reference</div>
+                        <div style='margin-top:5px;font-size:14px;font-weight:700;color:#2B2A28;'>{$shipmentReference}</div>
+                    </td>
+                    <td align='right' style='padding:14px;'>
+                        <div style='font-size:10px;color:#9A8F80;text-transform:uppercase;letter-spacing:1px;'>Charge date</div>
+                        <div style='margin-top:5px;font-size:13px;font-weight:600;color:#2B2A28;'>{$chargeDate}</div>
+                    </td>
+                </tr>
+            </table>
+
+            <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0' style='margin-bottom:24px;background-color:#FF6600;border-radius:8px;'>
+                <tr><td style='padding:17px 18px;'>
+                    <div style='font-size:11px;color:#FFF0E5;'>" . storageEscape($content["highlight_title"]) . "</div>
+                    <div style='margin-top:7px;font-size:24px;font-weight:700;color:#FFFFFF;'>" . storageEscape($content["highlight_amount"]) . "</div>
+                </td></tr>
+            </table>
+
+            <h3 style='margin:0 0 12px;font-size:15px;color:#2B2A28;'>Container charge details</h3>
+            <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0' style='margin-bottom:24px;border-collapse:collapse;font-size:10px;color:#2B2A28;'>
+                <thead><tr style='background-color:#FAF0E3;color:#6B6357;text-align:left;'>{$tableHeaders}</tr></thead>
+                <tbody>{$containerRows}</tbody>
+            </table>
+
+            <h3 style='margin:0 0 12px;font-size:15px;color:#2B2A28;'>Charge summary</h3>
+            <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0' style='margin-bottom:22px;border:1px solid #E8D9C2;border-collapse:collapse;'>
+                <tr>
+                    <td style='padding:12px;border-bottom:1px solid #E8D9C2;color:#6B6357;font-size:12px;'>Today's charges</td>
+                    <td align='right' style='padding:12px;border-bottom:1px solid #E8D9C2;font-size:12px;font-weight:600;color:#2B2A28;'>{$todayTotal}</td>
+                </tr>
+                <tr>
+                    <td style='padding:12px;border-bottom:1px solid #E8D9C2;color:#6B6357;font-size:12px;'>Accumulated charges</td>
+                    <td align='right' style='padding:12px;border-bottom:1px solid #E8D9C2;font-size:12px;font-weight:600;color:#2B2A28;'>{$accumulatedTotal}</td>
+                </tr>
+                <tr>
+                    <td style='padding:12px;border-bottom:1px solid #E8D9C2;color:#6B6357;font-size:12px;'>Total paid</td>
+                    <td align='right' style='padding:12px;border-bottom:1px solid #E8D9C2;font-size:12px;font-weight:600;color:#126836;'>{$totalPaid}</td>
+                </tr>
+                <tr>
+                    <td style='padding:13px;color:#2B2A28;font-size:12px;font-weight:700;'>Outstanding balance</td>
+                    <td align='right' style='padding:13px;color:#FF6600;font-size:14px;font-weight:700;'>{$outstandingTotal}</td>
+                </tr>
+            </table>
+
+            <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0' style='background-color:#FAF0E3;border-left:4px solid #FF6600;border-radius:5px;'>
+                <tr><td style='padding:14px 16px;'>
+                    <div style='margin-bottom:6px;font-size:12px;font-weight:700;color:#2B2A28;'>" . storageEscape($content["notice_title"]) . "</div>
+                    <div style='font-size:12px;line-height:1.7;color:#6B6357;'>" . storageEscape($content["notice"]) . "</div>
+                </td></tr>
+            </table>
+
+            <p style='margin:22px 0 0;font-size:12px;line-height:1.7;color:#6B6357;'>If you have questions about these charges, please contact the terminal operations or finance team.</p>
+            <p style='margin:12px 0 0;font-size:12px;font-weight:700;color:#2B2A28;'>Trinū Terminal Operations</p>
+        ";
+
         return [
-            "subject" => $template["subject"],
-            "message" => storageLoadTemplate($template["file"], $values)
+            "subject" => $content["subject"],
+            "message" => $message
         ];
     }
 

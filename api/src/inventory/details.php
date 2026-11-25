@@ -2,19 +2,8 @@
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
-    header("Content-Type: application/json");
-
     try {
         $id = trim($_GET["id"] ?? "");
-
-        if ($id === "") {
-            echo json_encode([
-                "error" => true,
-                "data" => "Inventory ID is required.",
-                "code" => 400
-            ]);
-            exit;
-        }
 
         $sql = "
             SELECT
@@ -24,8 +13,6 @@
                 c.seal_no,
                 c.status AS container_status,
                 c.package_count,
-                c.item_quantity,
-                c.unit_of_measure,
                 c.package_type AS container_package_type,
                 c.gross_weight,
                 s.cargo_description AS container_description,
@@ -58,11 +45,14 @@
 
             FROM portal_shipment_containers c
 
-            INNER JOIN portal_shipments s ON s.id = c.shipment_id
+            INNER JOIN portal_shipments s
+                ON s.id = c.shipment_id
 
-            LEFT JOIN organisations o ON o.id = s.organisation_id
+            LEFT JOIN organisations o
+                ON o.id = s.organisation_id
 
-            LEFT JOIN terminal_locations l ON l.id = c.current_location_id
+            LEFT JOIN terminal_locations l
+                ON l.id = c.current_location_id
 
             WHERE c.id = :id
                 AND c.received_at IS NOT NULL
@@ -262,12 +252,10 @@
         }, $noteRows);
 
         $quantity = $row["package_count"]
-            ?? $row["item_quantity"]
             ?? $row["shipment_package_count"]
             ?? 0;
 
-        $unit = $row["unit_of_measure"]
-            ?: $row["container_package_type"]
+        $unit = $row["container_package_type"]
             ?: $row["package_type"]
             ?: "packages";
 
@@ -312,8 +300,6 @@
                 "packageType" => $row["container_package_type"]
                     ?: $row["package_type"],
                 "packageCount" => (float) $quantity,
-                "itemQuantity" => (float) ($row["item_quantity"] ?? 0),
-                "unitOfMeasure" => $row["unit_of_measure"],
                 "grossWeight" => (float) $weight,
                 "volume" => (float) ($row["volume"] ?? 0),
                 "specialInstructions" => $row["special_instructions"] ?: ""
@@ -369,6 +355,6 @@
         echo json_encode([
             "error" => true,
             "data" => "Could not load inventory record.",
-            "code" => 500
+            "code" => $e->getMessage()
         ]);
     }

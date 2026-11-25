@@ -1,3 +1,4 @@
+
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
@@ -14,116 +15,32 @@
             exit;
         }
 
-        $tableExists = function ($table) use ($conn) {
-            $stmt = $conn->prepare("
-                SELECT COUNT(*)
-                FROM information_schema.tables
-                WHERE table_schema = DATABASE()
-                AND table_name = :table
-            ");
-
-            $stmt->execute(["table" => $table]);
-
-            return (int) $stmt->fetchColumn() > 0;
-        };
-
-        $columnExists = function ($table, $column) use ($conn) {
-            $stmt = $conn->prepare("
-                SELECT COUNT(*)
-                FROM information_schema.columns
-                WHERE table_schema = DATABASE()
-                AND table_name = :table
-                AND column_name = :column
-            ");
-
-            $stmt->execute([
-                "table" => $table,
-                "column" => $column
-            ]);
-
-            return (int) $stmt->fetchColumn() > 0;
-        };
-
-        $getOrderColumn = function ($table) use ($columnExists) {
-            foreach (["created_at", "id"] as $candidate) {
-                if ($columnExists($table, $candidate)) {
-                    return $candidate;
-                }
-            }
-
-            return null;
-        };
-
-        $userNameColumn = null;
-
-        if ($tableExists("users")) {
-            foreach (["name", "full_name", "username"] as $candidate) {
-                if ($columnExists("users", $candidate)) {
-                    $userNameColumn = $candidate;
-                    break;
-                }
-            }
-        }
-
-        $getUserName = function ($userId) use ($conn, $userNameColumn) {
-            if (!$userId || !$userNameColumn) {
-                return null;
-            }
-
-            $stmt = $conn->prepare("
-                SELECT `$userNameColumn`
-                FROM users
-                WHERE id = :id
-                LIMIT 1
-            ");
-
-            $stmt->execute(["id" => $userId]);
-
-            return $stmt->fetchColumn() ?: null;
-        };
-
         $stmt = $conn->prepare("
             SELECT
                 a.*,
-
                 o.organisation_name,
+                o.organisation_type,
+                o.verification_status,
+                o.verified_at,
                 o.contact_person AS organisation_contact_person,
                 o.contact_email AS organisation_contact_email,
                 o.contact_phone AS organisation_contact_phone,
-
                 v.plate AS vehicle_number,
-                v.kind AS vehicle_kind,
-                v.make AS vehicle_make,
-                v.model AS vehicle_model,
-                v.year AS vehicle_year,
-                v.capacity AS vehicle_capacity,
-                v.owner AS vehicle_owner,
-                v.transporter AS vehicle_transporter,
-                v.insurance_expiry,
-                v.roadworthiness_expiry,
-                v.status AS vehicle_status,
-
+                v.kind AS vehicle_type,
                 d.name AS driver_name,
-                d.phone AS driver_phone,
-                d.licence_number AS driver_licence_number,
-                d.licence_class AS driver_licence_class,
-                d.licence_expiry AS driver_licence_expiry,
-                d.assigned_vehicle AS driver_assigned_vehicle,
-                d.transporter AS driver_transporter,
-                d.status AS driver_status
-
+                d.phone AS driver_phone
             FROM gate_appointments a
-
             LEFT JOIN organisations o
-                ON o.id = a.organisation_id
-
+                ON o.id COLLATE utf8mb4_unicode_ci =
+                   a.organisation_id COLLATE utf8mb4_unicode_ci
             LEFT JOIN gate_vehicles v
-                ON v.id = a.vehicle_id
-
+                ON v.id COLLATE utf8mb4_unicode_ci =
+                   a.vehicle_id COLLATE utf8mb4_unicode_ci
             LEFT JOIN gate_drivers d
-                ON d.id = a.driver_id
-
-            WHERE a.id = :id
+                ON d.id COLLATE utf8mb4_unicode_ci =
+                   a.driver_id COLLATE utf8mb4_unicode_ci
+            WHERE a.id COLLATE utf8mb4_unicode_ci =
+                  CONVERT(:id USING utf8mb4) COLLATE utf8mb4_unicode_ci
             LIMIT 1
         ");
 
@@ -132,7 +49,6 @@
 
         if (!$appointment) {
             http_response_code(404);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Appointment not found.",
@@ -143,334 +59,287 @@
 
         $appointmentId = $appointment["id"];
 
+        $isCompleted = strtolower($appointment["status"] ?? "") === "completed";
+
+        $appointment["appointment_completed_at"] = $isCompleted
+            ? ($appointment["updated_at"] ?? null)
+            : null;
+
         $organisation = [
-            "organisation_name" => $appointment["organisation_name"] ?? null,
-            "contact_person" => $appointment["organisation_contact_person"] ?? null,
-            "contact_email" => $appointment["organisation_contact_email"] ?? null,
-            "contact_phone" => $appointment["organisation_contact_phone"] ?? null
+            "organisation_name" => $appointment["organisation_name"],
+            "organisation_type" => $appointment["organisation_type"],
+            "verification_status" => $appointment["verification_status"],
+            "verified_at" => $appointment["verified_at"],
+            "contact_person" => $appointment["organisation_contact_person"],
+            "contact_email" => $appointment["organisation_contact_email"],
+            "contact_phone" => $appointment["organisation_contact_phone"]
         ];
 
         $vehicle = [
-            "plate" => $appointment["vehicle_number"] ?? null,
-            "kind" => $appointment["vehicle_kind"] ?? null,
-            "make" => $appointment["vehicle_make"] ?? null,
-            "model" => $appointment["vehicle_model"] ?? null,
-            "year" => $appointment["vehicle_year"] ?? null,
-            "capacity" => $appointment["vehicle_capacity"] ?? null,
-            "owner" => $appointment["vehicle_owner"] ?? null,
-            "transporter" => $appointment["vehicle_transporter"] ?? null,
-            "insurance_expiry" => $appointment["insurance_expiry"] ?? null,
-            "roadworthiness_expiry" => $appointment["roadworthiness_expiry"] ?? null,
-            "status" => $appointment["vehicle_status"] ?? null
+            "plate" => $appointment["vehicle_number"],
+            "kind" => $appointment["vehicle_type"],
+            "vehicle_id" => $appointment["vehicle_id"]
         ];
 
         $driver = [
-            "name" => $appointment["driver_name"] ?? null,
-            "phone" => $appointment["driver_phone"] ?? null,
-            "licence_number" => $appointment["driver_licence_number"] ?? null,
-            "licence_class" => $appointment["driver_licence_class"] ?? null,
-            "licence_expiry" => $appointment["driver_licence_expiry"] ?? null,
-            "assigned_vehicle" => $appointment["driver_assigned_vehicle"] ?? null,
-            "transporter" => $appointment["driver_transporter"] ?? null,
-            "status" => $appointment["driver_status"] ?? null
+            "name" => $appointment["driver_name"],
+            "phone" => $appointment["driver_phone"],
+            "driver_id" => $appointment["driver_id"]
         ];
 
-        $movementRecords = [];
+        $containerStmt = $conn->prepare("
+            SELECT
+                ac.id,
+                ac.appointment_id,
+                ac.container_no,
+                ac.created_at,
+                psc.id AS shipment_container_id,
+                psc.container_no AS shipment_container_no,
+                psc.size,
+                psc.seal_no,
+                psc.package_count,
+                psc.gross_weight,
+                psc.package_type,
+                psc.status AS container_status,
+                ps.id AS shipment_id,
+                ps.shipment_reference,
+                ps.bill_of_lading,
+                ps.booking_number,
+                ps.vessel_name,
+                ps.voyage_number,
+                ps.cargo_description,
+                ps.status AS shipment_status
+            FROM gate_appointment_containers ac
+            LEFT JOIN portal_shipment_containers psc
+                ON CONVERT(psc.container_no USING utf8mb4) COLLATE utf8mb4_unicode_ci =
+                   CONVERT(ac.container_no USING utf8mb4) COLLATE utf8mb4_unicode_ci
+            LEFT JOIN portal_shipments ps
+                ON ps.id COLLATE utf8mb4_unicode_ci =
+                   psc.shipment_id COLLATE utf8mb4_unicode_ci
+            WHERE ac.appointment_id COLLATE utf8mb4_unicode_ci =
+                  CONVERT(:appointment_id USING utf8mb4) COLLATE utf8mb4_unicode_ci
+            ORDER BY ac.created_at ASC
+        ");
 
-        if (
-            $tableExists("gate_movement_records") &&
-            $tableExists("gate_lanes")
-        ) {
-            $stmt = $conn->prepare("
-                SELECT
-                    gm.id,
-                    gm.direction,
-                    gm.decision,
-                    gm.reason,
-                    gm.override_reason,
-                    gm.gate_in_evidence,
-                    gm.supervisor_approval_ref,
-                    gm.movement_at,
-                    gm.created_at,
+        $containerStmt->execute([
+            "appointment_id" => $appointmentId
+        ]);
 
-                    gl.id AS lane_id,
-                    gl.code AS lane_code,
-                    gl.name AS lane_name,
-                    gl.gate_name,
-
-                    gm.operator_id
-
-                FROM gate_movement_records gm
-
-                LEFT JOIN gate_lanes gl
-                    ON gl.id = gm.gate_lane_id
-
-                WHERE gm.appointment_id = :appointment_id
-
-                ORDER BY gm.movement_at ASC, gm.created_at ASC
-            ");
-
-            $stmt->execute([
-                "appointment_id" => $appointmentId
-            ]);
-
-            $movementRecords = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($movementRecords as &$movement) {
-                $movement["operator_name"] = $getUserName(
-                    $movement["operator_id"] ?? null
-                );
-            }
-
-            unset($movement);
-        }
-
-        $checkIn = null;
-        $checkOut = null;
-
-        foreach ($movementRecords as $movement) {
-            $movementDetails = [
-                "direction" => $movement["direction"] ?? null,
-                "decision" => $movement["decision"] ?? null,
-                "movement_at" => $movement["movement_at"] ?? null,
-                "operator_name" => $movement["operator_name"] ?? null,
-                "gate_name" => $movement["gate_name"] ?? null,
-                "lane_id" => $movement["lane_id"] ?? null,
-                "lane_name" => $movement["lane_name"] ?? null,
-                "lane_code" => $movement["lane_code"] ?? null,
-                "remarks" => $movement["reason"] ?? null,
-                "override_reason" => $movement["override_reason"] ?? null,
-                "gate_in_evidence" => $movement["gate_in_evidence"] ?? null,
-                "supervisor_approval_ref" => $movement["supervisor_approval_ref"] ?? null,
-                "created_at" => $movement["created_at"] ?? null
-            ];
-
-            if (($movement["direction"] ?? "") === "in") {
-                $checkIn = $movementDetails;
-            }
-
-            if (($movement["direction"] ?? "") === "out") {
-                $checkOut = $movementDetails;
-            }
-        }
-
-        $lane = null;
-
-        if (!empty($movementRecords)) {
-            $latestMovement = end($movementRecords);
-
-            $lane = [
-                "id" => $latestMovement["lane_id"] ?? null,
-                "name" => $latestMovement["lane_name"] ?? null,
-                "code" => $latestMovement["lane_code"] ?? null,
-                "gate_name" => $latestMovement["gate_name"] ?? null
-            ];
-        }
-
-        $gatePass = null;
-
-        if (
-            $tableExists("gate_passes") &&
-            $columnExists("gate_passes", "appointment_id")
-        ) {
-            $orderColumn = $getOrderColumn("gate_passes");
-
-            $sql = "
-                SELECT *
-                FROM gate_passes
-                WHERE appointment_id = :appointment_id
-            ";
-
-            if ($orderColumn) {
-                $sql .= " ORDER BY `$orderColumn` DESC";
-            }
-
-            $sql .= " LIMIT 1";
-
-            $stmt = $conn->prepare($sql);
-            $stmt->execute([
-                "appointment_id" => $appointmentId
-            ]);
-
-            $gatePass = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
-
-            if ($gatePass) {
-                $gatePass["issued_by_name"] = $getUserName(
-                    $gatePass["issued_by"] ?? null
-                );
-            }
-        }
+        $appointmentContainers = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
 
         $containers = [];
-
-        if ($tableExists("gate_appointment_containers")) {
-            $orderColumn = $getOrderColumn("gate_appointment_containers");
-
-            $sql = "
-                SELECT
-                    ac.id,
-                    ac.appointment_id,
-                    ac.container_no,
-                    ac.created_at
-                FROM gate_appointment_containers ac
-                WHERE ac.appointment_id = :appointment_id
-            ";
-
-            if ($orderColumn) {
-                $sql .= " ORDER BY ac.`$orderColumn` ASC";
-            }
-
-            $stmt = $conn->prepare($sql);
-            $stmt->execute([
-                "appointment_id" => $appointmentId
-            ]);
-
-            $appointmentContainers = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($appointmentContainers as $container) {
-                $containerDetails = $container;
-                $containerDetails["shipment_container"] = null;
-
-                if (
-                    !empty($container["container_no"]) &&
-                    $tableExists("portal_shipment_containers")
-                ) {
-                    $stmt = $conn->prepare("
-                        SELECT
-                            psc.id,
-                            psc.container_no,
-                            psc.size,
-                            psc.seal_no,
-                            psc.package_count,
-                            psc.gross_weight,
-                            psc.package_type,
-                            psc.status AS container_status,
-
-                            ps.id AS shipment_id,
-                            ps.shipment_reference,
-                            ps.bill_of_lading,
-                            ps.booking_number,
-                            ps.vessel_name,
-                            ps.voyage_number,
-                            ps.cargo_description,
-                            ps.status AS shipment_status
-
-                        FROM portal_shipment_containers psc
-
-                        LEFT JOIN portal_shipments ps
-                            ON ps.id = psc.shipment_id
-
-                        WHERE psc.container_no = :container_no
-                        LIMIT 1
-                    ");
-
-                    $stmt->execute([
-                        "container_no" => $container["container_no"]
-                    ]);
-
-                    $shipmentContainer = $stmt->fetch(PDO::FETCH_ASSOC);
-
-                    if ($shipmentContainer) {
-                        $containerDetails["shipment_container"] = $shipmentContainer;
-                    }
-                }
-
-                $containers[] = $containerDetails;
-            }
-        }
-
         $shipment = null;
 
-        foreach ($containers as $container) {
-            $shipmentContainer = $container["shipment_container"] ?? null;
+        foreach ($appointmentContainers as $container) {
+            $shipmentContainer = null;
 
-            if (!empty($shipmentContainer["shipment_id"])) {
-                $shipment = [
-                    "id" => $shipmentContainer["shipment_id"],
-                    "shipment_reference" => $shipmentContainer["shipment_reference"] ?? null,
-                    "bill_of_lading" => $shipmentContainer["bill_of_lading"] ?? null,
-                    "booking_number" => $shipmentContainer["booking_number"] ?? null,
-                    "vessel_name" => $shipmentContainer["vessel_name"] ?? null,
-                    "voyage_number" => $shipmentContainer["voyage_number"] ?? null,
-                    "cargo_description" => $shipmentContainer["cargo_description"] ?? null,
-                    "status" => $shipmentContainer["shipment_status"] ?? null
+            if (!empty($container["shipment_container_id"])) {
+                $shipmentContainer = [
+                    "id" => $container["shipment_container_id"],
+                    "container_no" => $container["shipment_container_no"],
+                    "size" => $container["size"],
+                    "seal_no" => $container["seal_no"],
+                    "package_count" => $container["package_count"],
+                    "gross_weight" => $container["gross_weight"],
+                    "package_type" => $container["package_type"],
+                    "container_status" => $container["container_status"],
+                    "shipment_id" => $container["shipment_id"],
+                    "shipment_reference" => $container["shipment_reference"],
+                    "bill_of_lading" => $container["bill_of_lading"],
+                    "booking_number" => $container["booking_number"],
+                    "vessel_name" => $container["vessel_name"],
+                    "voyage_number" => $container["voyage_number"],
+                    "cargo_description" => $container["cargo_description"],
+                    "shipment_status" => $container["shipment_status"]
                 ];
 
-                break;
-            }
-        }
-
-        $activityLogs = [];
-
-        if (
-            $tableExists("activity_logs") &&
-            $columnExists("activity_logs", "entity_id")
-        ) {
-            $entityColumn = null;
-
-            foreach (["entity_type", "module", "table_name"] as $candidate) {
-                if ($columnExists("activity_logs", $candidate)) {
-                    $entityColumn = $candidate;
-                    break;
+                if ($shipment === null && !empty($container["shipment_id"])) {
+                    $shipment = [
+                        "id" => $container["shipment_id"],
+                        "shipment_reference" => $container["shipment_reference"],
+                        "bill_of_lading" => $container["bill_of_lading"],
+                        "booking_number" => $container["booking_number"],
+                        "vessel_name" => $container["vessel_name"],
+                        "voyage_number" => $container["voyage_number"],
+                        "cargo_description" => $container["cargo_description"],
+                        "status" => $container["shipment_status"]
+                    ];
                 }
             }
 
-            $sql = "
-                SELECT *
-                FROM activity_logs
-                WHERE entity_id = :entity_id
-            ";
-
-            if ($entityColumn === "entity_type") {
-                $sql .= "
-                    AND entity_type IN (
-                        'gate_appointments',
-                        'gate_appointment',
-                        'appointment'
-                    )
-                ";
-            } elseif ($entityColumn === "module") {
-                $sql .= "
-                    AND module IN (
-                        'gate_appointments',
-                        'gate_appointment',
-                        'appointment'
-                    )
-                ";
-            } elseif ($entityColumn === "table_name") {
-                $sql .= "
-                    AND table_name IN (
-                        'gate_appointments',
-                        'gate_appointment',
-                        'appointment'
-                    )
-                ";
-            }
-
-            $orderColumn = $getOrderColumn("activity_logs");
-
-            if ($orderColumn) {
-                $sql .= " ORDER BY `$orderColumn` DESC";
-            }
-
-            $stmt = $conn->prepare($sql);
-            $stmt->execute([
-                "entity_id" => $appointmentId
-            ]);
-
-            $activityLogs = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($activityLogs as &$log) {
-                $actorId = $log["user_id"]
-                    ?? $log["created_by"]
-                    ?? $log["performed_by"]
-                    ?? null;
-
-                $log["performed_by_name"] = $getUserName($actorId);
-            }
-
-            unset($log);
+            $containers[] = [
+                "id" => $container["id"],
+                "appointment_id" => $container["appointment_id"],
+                "container_no" => $container["container_no"],
+                "created_at" => $container["created_at"],
+                "shipment_container" => $shipmentContainer
+            ];
         }
+
+        $movementStmt = $conn->prepare("
+            SELECT
+                gm.*,
+                gl.code AS lane_code,
+                gl.name AS lane_name,
+                gl.gate_name,
+                u.full_name AS operator_name
+            FROM gate_movement_records gm
+            LEFT JOIN gate_lanes gl
+                ON gl.id COLLATE utf8mb4_unicode_ci =
+                   gm.gate_lane_id COLLATE utf8mb4_unicode_ci
+            LEFT JOIN users u
+                ON u.id COLLATE utf8mb4_unicode_ci =
+                   gm.operator_id COLLATE utf8mb4_unicode_ci
+            WHERE gm.appointment_id COLLATE utf8mb4_unicode_ci =
+                  CONVERT(:appointment_id USING utf8mb4) COLLATE utf8mb4_unicode_ci
+            ORDER BY gm.movement_at DESC, gm.created_at DESC
+        ");
+
+        $movementStmt->execute([
+            "appointment_id" => $appointmentId
+        ]);
+
+        $movementRecords = $movementStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $checkIn = [
+            "checked_in_at" => null,
+            "checked_in_by" => null,
+            "checked_in_by_name" => null,
+            "gate_name" => null,
+            "lane_name" => null,
+            "remarks" => null,
+            "decision" => null,
+            "override_reason" => null,
+            "gate_in_evidence" => null,
+            "supervisor_approval_ref" => null
+        ];
+
+        $checkOut = [
+            "checked_out_at" => null,
+            "checked_out_by" => null,
+            "checked_out_by_name" => null,
+            "gate_name" => null,
+            "lane_name" => null,
+            "remarks" => null,
+            "decision" => null,
+            "override_reason" => null,
+            "gate_in_evidence" => null,
+            "supervisor_approval_ref" => null
+        ];
+
+        $lane = [
+            "id" => null,
+            "name" => null,
+            "code" => null
+        ];
+
+        foreach ($movementRecords as $movement) {
+            $movementData = [
+                "movement_at" => $movement["movement_at"],
+                "operator_id" => $movement["operator_id"],
+                "operator_name" => $movement["operator_name"],
+                "gate_name" => $movement["gate_name"],
+                "lane_id" => $movement["gate_lane_id"],
+                "lane_name" => $movement["lane_name"],
+                "lane_code" => $movement["lane_code"],
+                "direction" => $movement["direction"],
+                "decision" => $movement["decision"],
+                "reason" => $movement["reason"],
+                "override_reason" => $movement["override_reason"],
+                "gate_in_evidence" => $movement["gate_in_evidence"],
+                "supervisor_approval_ref" => $movement["supervisor_approval_ref"]
+            ];
+
+            if (
+                strtolower($movement["direction"]) === "in" &&
+                $checkIn["checked_in_at"] === null
+            ) {
+                $checkIn = [
+                    "checked_in_at" => $movement["movement_at"],
+                    "checked_in_by" => $movement["operator_id"],
+                    "checked_in_by_name" => $movement["operator_name"],
+                    "gate_name" => $movement["gate_name"],
+                    "lane_name" => $movement["lane_name"],
+                    "remarks" => $movement["reason"],
+                    "decision" => $movement["decision"],
+                    "override_reason" => $movement["override_reason"],
+                    "gate_in_evidence" => $movement["gate_in_evidence"],
+                    "supervisor_approval_ref" => $movement["supervisor_approval_ref"]
+                ];
+            }
+
+            if (
+                strtolower($movement["direction"]) === "out" &&
+                $checkOut["checked_out_at"] === null
+            ) {
+                $checkOut = [
+                    "checked_out_at" => $movement["movement_at"],
+                    "checked_out_by" => $movement["operator_id"],
+                    "checked_out_by_name" => $movement["operator_name"],
+                    "gate_name" => $movement["gate_name"],
+                    "lane_name" => $movement["lane_name"],
+                    "remarks" => $movement["reason"],
+                    "decision" => $movement["decision"],
+                    "override_reason" => $movement["override_reason"],
+                    "gate_in_evidence" => $movement["gate_in_evidence"],
+                    "supervisor_approval_ref" => $movement["supervisor_approval_ref"]
+                ];
+            }
+
+            if ($lane["id"] === null && !empty($movement["gate_lane_id"])) {
+                $lane = [
+                    "id" => $movement["gate_lane_id"],
+                    "name" => $movement["lane_name"],
+                    "code" => $movement["lane_code"]
+                ];
+            }
+
+            $movement["movement_details"] = $movementData;
+        }
+
+        $gatePassStmt = $conn->prepare("
+            SELECT
+                gp.*,
+                u.full_name AS issued_by_name
+            FROM gate_passes gp
+            LEFT JOIN users u
+                ON u.id COLLATE utf8mb4_unicode_ci =
+                   gp.issued_by COLLATE utf8mb4_unicode_ci
+            WHERE gp.appointment_id COLLATE utf8mb4_unicode_ci =
+                  CONVERT(:appointment_id USING utf8mb4) COLLATE utf8mb4_unicode_ci
+            ORDER BY gp.issued_at DESC
+            LIMIT 1
+        ");
+
+        $gatePassStmt->execute([
+            "appointment_id" => $appointmentId
+        ]);
+
+        $gatePass = $gatePassStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+        $activityStmt = $conn->prepare("
+            SELECT
+                al.*,
+                u.full_name AS performed_by_name
+            FROM activity_logs al
+            LEFT JOIN users u
+                ON u.id COLLATE utf8mb4_unicode_ci =
+                   al.actor_id COLLATE utf8mb4_unicode_ci
+            WHERE al.entity_id COLLATE utf8mb4_unicode_ci =
+                  CONVERT(:entity_id USING utf8mb4) COLLATE utf8mb4_unicode_ci
+            AND al.entity_type IN (
+                'gate_appointments',
+                'gate_appointment',
+                'appointment'
+            )
+            ORDER BY al.created_at DESC
+        ");
+
+        $activityStmt->execute([
+            "entity_id" => $appointmentId
+        ]);
+
+        $activityLogs = $activityStmt->fetchAll(PDO::FETCH_ASSOC);
 
         $appointment["organisation"] = $organisation;
         $appointment["vehicle"] = $vehicle;
@@ -478,10 +347,10 @@
         $appointment["lane"] = $lane;
         $appointment["check_in"] = $checkIn;
         $appointment["check_out"] = $checkOut;
-        $appointment["movement_records"] = $movementRecords;
         $appointment["gate_pass"] = $gatePass;
         $appointment["shipment"] = $shipment;
         $appointment["containers"] = $containers;
+        $appointment["movement_records"] = $movementRecords;
         $appointment["activity_logs"] = $activityLogs;
 
         echo json_encode([

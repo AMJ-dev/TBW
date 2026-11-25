@@ -512,7 +512,6 @@ export default function OperationsInventoryDetailsPage() {
 									<Detail label="Shipment type" value={item.shipmentType} />
 									<Detail label="Shipment status" value={getInventoryStatus(item.shipmentStatus || "Unknown")} />
 									<Detail label="Organisation" value={item.organisation} />
-									<Detail label="Organisation ID" value={item.organisationId} mono />
 									<Detail label="Current location" value={item.location} />
 									<Detail label="Location code" value={item.locationCode} mono />
 									<Detail label="Location type" value={item.locationKind} />
