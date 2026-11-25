@@ -37,8 +37,18 @@ try {
             COALESCE(NULLIF(ps.shipping_line, ''), om.shipping_line) AS shipping_line,
             COALESCE(NULLIF(ps.origin_port, ''), om.origin_port) AS origin_port,
             COALESCE(
-                NULLIF(ps.expected_arrival, '0000-00-00 00:00:00'),
-                NULLIF(om.eta, '')
+                CASE
+                    WHEN ps.expected_arrival IS NULL
+                        OR CAST(ps.expected_arrival AS CHAR) = '0000-00-00 00:00:00'
+                    THEN NULL
+                    ELSE ps.expected_arrival
+                END,
+                CASE
+                    WHEN om.eta IS NULL
+                        OR CAST(om.eta AS CHAR) IN ('', '0000-00-00 00:00:00')
+                    THEN NULL
+                    ELSE om.eta
+                END
             ) AS eta,
 
             om.containers,
@@ -324,6 +334,6 @@ try {
     echo json_encode([
         "error" => true,
         "data" => "Could not load Operations manifest reviews.",
-        "code" => $e instanceof PDOException ? $e->getCode() : null
+        "code" => $e->getMessage()
     ]);
 }

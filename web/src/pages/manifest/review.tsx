@@ -132,7 +132,7 @@ type ManifestReviewRecord = {
 	shipment_updated_at: string | null;
 	shipment_containers: ShipmentContainer[];
 	container_count: number;
-};
+}; 
 
 type Draft = {
 	manifest_ref: string;
