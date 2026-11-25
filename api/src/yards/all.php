@@ -84,7 +84,7 @@ try {
             psc.size AS container_size,
             psc.seal_no,
             psc.gross_weight,
-            psc.cargo_description,
+            ps.cargo_description,
             psc.status AS container_status,
 
             tl_from.code AS from_location_code,
@@ -97,7 +97,7 @@ try {
             te.equipment_name,
             te.equipment_type,
             te.registration_number,
-
+ 
             (
                 SELECT COUNT(*)
                 FROM activity_logs al

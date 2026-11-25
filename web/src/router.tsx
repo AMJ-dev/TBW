@@ -113,8 +113,13 @@ const ExaminationReviewDetailsPage = lazy(() => import("@/pages/operations/exami
 const OperationsWarehousePage = lazy(() => import("@/pages/operations/warehouse"));
 const OperationsYardPage = lazy(() => import("@/pages/operations/yard"));
 const OperationsManifestPage = lazy(() => import("@/pages/manifest"));
+
 const OperationsInventoryPage = lazy(() => import("@/pages/operations/inventory/"));
 const OperationsInventoryDetailsPage = lazy(() => import("@/pages/operations/inventory/details"));
+
+const GateAppointmentsPage = lazy(() => import("@/pages/gate/appointments"));
+const GateAppointmentDetailsPage = lazy(() => import("@/pages/gate/appointments-details"));
+
 const OperationsManifestReviewPage = lazy(() => import("@/pages/manifest/review"));
 const OperationsManifestIntakePage = lazy(() => import("@/pages/manifest/intake"));
 const OperationsManifestDetailsPage = lazy(() => import("@/pages/manifest/details"));
@@ -279,6 +284,9 @@ export default function Routers() {
 						
 						<Route path="/operations/inventory" element={<OperationsInventoryPage />} />
 						<Route path="/operations/inventory/:id" element={<OperationsInventoryDetailsPage />} />
+						
+						<Route path="/gate/appointments" element={<GateAppointmentsPage />} />
+						<Route path="/gate/appointment/:id" element={<GateAppointmentDetailsPage />} />
 
 						<Route path="/operations/manifests/review" element={<OperationsManifestReviewPage />} />
 						<Route path="/operations/manifests/intake" element={<OperationsManifestIntakePage />} />

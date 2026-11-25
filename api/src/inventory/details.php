@@ -28,7 +28,7 @@
                 c.unit_of_measure,
                 c.package_type AS container_package_type,
                 c.gross_weight,
-                c.cargo_description AS container_description,
+                s.cargo_description AS container_description,
                 c.gate_in_at,
                 c.received_at,
                 c.stored_at,

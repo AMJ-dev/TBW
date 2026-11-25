@@ -1042,7 +1042,7 @@ export default function OperationsShipmentReviewPage() {
 
       try {
         const [shipmentRes, configRes] = await Promise.all([
-          http.get(`/operator/shipment/${id}/`),
+          http.get(`/operations/shipment/${id}/`),
           http.get("/portal/shipment/config/"),
         ]);
 

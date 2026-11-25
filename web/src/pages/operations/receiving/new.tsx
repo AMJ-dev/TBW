@@ -414,7 +414,7 @@ export default function OperationsReceivingNewPage() {
     setReceivingDocuments({});
 
     try {
-      const response = await http.post("/operator/receiving/search/", {
+      const response = await http.post("/operations/receiving/search/", {
         type: lookupType,
         q: lookupValue.trim(),
       });
@@ -594,7 +594,7 @@ export default function OperationsReceivingNewPage() {
         });
       });
 
-      const response = await http.post("/operator/receiving/save/", formData);
+      const response = await http.post("/operations/receiving/save/", formData);
 
       const resp: Resp = response.data;
 
@@ -608,7 +608,7 @@ export default function OperationsReceivingNewPage() {
       setDamageProofs({});
       setReceivingDocuments({});
 
-      const refreshResponse = await http.post("/operator/receiving/search/", {
+      const refreshResponse = await http.post("/operations/receiving/search/", {
         type: lookupType,
         q: lookupValue.trim(),
       });

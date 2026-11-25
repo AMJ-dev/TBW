@@ -1,3 +1,4 @@
+
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
@@ -63,7 +64,7 @@
                 c.size AS container_size,
                 c.seal_no,
                 c.gross_weight AS container_gross_weight,
-                c.cargo_description AS container_cargo_description,
+                s.cargo_description AS container_cargo_description,
                 c.status AS container_status,
                 c.current_location_id,
 
@@ -130,28 +131,89 @@
         if (!empty($row["findings"])) {
             $decodedFindings = json_decode($row["findings"], true);
 
-            if (json_last_error() === JSON_ERROR_NONE) {
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decodedFindings)) {
                 $savedFindings = $decodedFindings;
             }
         }
 
-        $checklist = [];
+        $checklistTemplate = [
+            [
+                "id" => "container_condition",
+                "label" => "Container condition",
+                "description" => "Inspect the general external condition of the container.",
+                "result" => "PENDING",
+                "remarks" => ""
+            ],
+            [
+                "id" => "container_seal",
+                "label" => "Seal verification",
+                "description" => "Verify the seal number against the declared shipment details.",
+                "result" => "PENDING",
+                "remarks" => ""
+            ],
+            [
+                "id" => "cargo_description",
+                "label" => "Cargo description",
+                "description" => "Verify that the cargo corresponds with the declared description.",
+                "result" => "PENDING",
+                "remarks" => ""
+            ],
+            [
+                "id" => "quantity",
+                "label" => "Cargo quantity",
+                "description" => "Check the declared package count and observed quantity.",
+                "result" => "PENDING",
+                "remarks" => ""
+            ],
+            [
+                "id" => "documentation",
+                "label" => "Supporting documentation",
+                "description" => "Verify the relevant shipment documentation.",
+                "result" => "PENDING",
+                "remarks" => ""
+            ],
+            [
+                "id" => "compliance",
+                "label" => "Compliance checks",
+                "description" => "Record any compliance concerns identified during examination.",
+                "result" => "PENDING",
+                "remarks" => ""
+            ]
+        ];
+
+        $checklist = $checklistTemplate;
         $findings = [];
 
-        if ($isExaminationOfficer && is_array($savedFindings)) {
-            if (
-                isset($savedFindings["checklist"]) &&
-                is_array($savedFindings["checklist"])
-            ) {
-                $checklist = $savedFindings["checklist"];
+        if (
+            isset($savedFindings["checklist"]) &&
+            is_array($savedFindings["checklist"])
+        ) {
+            $savedChecklist = [];
+
+            foreach ($savedFindings["checklist"] as $item) {
+                if (isset($item["id"])) {
+                    $savedChecklist[$item["id"]] = $item;
+                }
             }
 
-            if (
-                isset($savedFindings["findings"]) &&
-                is_array($savedFindings["findings"])
-            ) {
-                $findings = $savedFindings["findings"];
+            foreach ($checklist as &$item) {
+                if (isset($savedChecklist[$item["id"]])) {
+                    $item = array_merge(
+                        $item,
+                        $savedChecklist[$item["id"]]
+                    );
+                }
             }
+
+            unset($item);
+        }
+
+        if (
+            $isExaminationOfficer &&
+            isset($savedFindings["findings"]) &&
+            is_array($savedFindings["findings"])
+        ) {
+            $findings = $savedFindings["findings"];
         }
 
         $reviewDecision = in_array($row["status"], [

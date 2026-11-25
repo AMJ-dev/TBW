@@ -225,7 +225,7 @@ export default function WarehouseManagementPage() {
 	const fetchMovements = useCallback(async () => {
 		try {
 			setLoading(true);
-			const res = await http.get("/operator/warehouses/");
+			const res = await http.get("/operations/warehouses/");
 			const resp: Resp = res.data;
 			const data = resp.data as any;
 
@@ -734,7 +734,7 @@ function WarehousePlacement({
 			setSelectedContainers([]);
 			setDrafts({});
 
-			const res = await http.post("/operator/warehouses/search/", {
+			const res = await http.post("/operations/warehouses/search/", {
 				q: value,
 				where: searchWhere,
 			});
@@ -878,7 +878,7 @@ function WarehousePlacement({
 				),
 			);
 
-			const res = await http.post("/operator/warehouses/save/", formData);
+			const res = await http.post("/operations/warehouses/save/", formData);
 			const resp: Resp = res.data;
 			const data = resp.data as any;
 

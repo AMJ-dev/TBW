@@ -112,7 +112,7 @@ export default function OperationsReviewPage() {
 		setError("");
 
 		try {
-			const response = await http.get("/operator/shipments/review/");
+			const response = await http.get("/operations/shipments/review/");
 			const resp: Resp = response.data;
 
 			if (resp.error) {

@@ -93,7 +93,7 @@ try {
             psc.size AS container_size,
             psc.seal_no,
             psc.gross_weight AS container_gross_weight,
-            psc.cargo_description,
+            ps.cargo_description,
             psc.status AS container_status,
 
             receiving.receiving_id,

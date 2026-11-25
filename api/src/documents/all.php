@@ -1,3 +1,4 @@
+
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
@@ -31,15 +32,24 @@
 
         if ($search !== "") {
             $where_sql = "WHERE (
-                s.shipment_reference LIKE :search
-                OR s.bill_of_lading LIKE :search
-                OR s.booking_number LIKE :search
-                OR s.vessel_name LIKE :search
-                OR s.consignee LIKE :search
-                OR o.organisation_name LIKE :search
+                s.shipment_reference LIKE :search_reference
+                OR s.bill_of_lading LIKE :search_bill_of_lading
+                OR s.booking_number LIKE :search_booking
+                OR s.vessel_name LIKE :search_vessel
+                OR s.consignee LIKE :search_consignee
+                OR o.organisation_name LIKE :search_organisation
             )";
 
-            $params["search"] = "%{$search}%";
+            $search_value = "%{$search}%";
+
+            $params = [
+                ":search_reference" => $search_value,
+                ":search_bill_of_lading" => $search_value,
+                ":search_booking" => $search_value,
+                ":search_vessel" => $search_value,
+                ":search_consignee" => $search_value,
+                ":search_organisation" => $search_value
+            ];
         }
 
         $count_stmt = $conn->prepare("
@@ -49,7 +59,11 @@
             $where_sql
         ");
 
-        $count_stmt->execute($params);
+        foreach ($params as $key => $value) {
+            $count_stmt->bindValue($key, $value, PDO::PARAM_STR);
+        }
+
+        $count_stmt->execute();
         $total = (int)$count_stmt->fetchColumn();
 
         $shipment_stmt = $conn->prepare("
@@ -77,7 +91,7 @@
         ");
 
         foreach ($params as $key => $value) {
-            $shipment_stmt->bindValue(":{$key}", $value);
+            $shipment_stmt->bindValue($key, $value, PDO::PARAM_STR);
         }
 
         $shipment_stmt->bindValue(":limit", $page_size, PDO::PARAM_INT);
@@ -154,10 +168,11 @@
                 "total_pages" => (int)ceil($total / $page_size)
             ]
         ]);
-    } catch (\Throwable $th) {
+
+    } catch (\Throwable $e) {
         echo json_encode([
             "error" => true,
             "data" => "Could not load shipments.",
-            "code" => null
+            "code" => $e->getMessage()
         ]);
     }

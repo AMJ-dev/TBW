@@ -609,7 +609,7 @@ export default function OperationsReceivingDetailsPage() {
 
       try {
         const response = await http.get(
-          `/operator/receiving/details/${encodeURIComponent(id)}/`,
+          `/operations/receiving/details/${encodeURIComponent(id)}/`,
         );
 
         const resp: Resp = response.data;

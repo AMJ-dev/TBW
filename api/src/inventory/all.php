@@ -1,3 +1,4 @@
+
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
@@ -9,11 +10,9 @@
                 c.size,
                 c.status AS container_status,
                 c.package_count,
-                c.item_quantity,
-                c.unit_of_measure,
                 c.package_type AS container_package_type,
                 c.gross_weight,
-                c.cargo_description AS container_description,
+                s.cargo_description AS container_description,
                 c.received_at,
                 c.created_at AS container_created_at,
 
@@ -85,13 +84,21 @@
                 "CANCELLED" => "Cancelled",
                 default => $containerStatus
             };
-            $quantity = $row["package_count"] ?? $row["item_quantity"] ?? $row["shipment_package_count"] ?? 0;
 
-            $unit = $row["unit_of_measure"] ?: $row["container_package_type"] ?: $row["package_type"] ?: "packages";
+            $quantity = $row["package_count"]
+                ?? $row["shipment_package_count"]
+                ?? 0;
 
-            $weight = $row["gross_weight"] ?? $row["shipment_gross_weight"] ?? 0;
+            $unit = $row["container_package_type"]
+                ?: $row["package_type"]
+                ?: "packages";
 
-            $receivedAt = $row["received_at"] ?: $row["container_created_at"];
+            $weight = $row["gross_weight"]
+                ?? $row["shipment_gross_weight"]
+                ?? 0;
+
+            $receivedAt = $row["received_at"]
+                ?: $row["container_created_at"];
 
             return [
                 "id" => $row["id"],
@@ -103,7 +110,9 @@
                 "unit" => $unit,
                 "weight" => (float) $weight,
                 "volume" => (float) ($row["volume"] ?? 0),
-                "location" => $row["location_name"] ? $row["location_code"] . " · " . $row["location_name"] : "Not assigned",
+                "location" => $row["location_name"]
+                    ? $row["location_code"] . " · " . $row["location_name"]
+                    : "Not assigned",
                 "locationId" => $row["location_id"],
                 "locationCode" => $row["location_code"],
                 "consignment" => $row["shipment_reference"],
@@ -129,6 +138,6 @@
         echo json_encode([
             "error" => true,
             "data" => "Could not load inventory.",
-            "code" => 500
+            "code" => $e->getMessage()
         ]);
     }

@@ -395,7 +395,7 @@ export default function OperationsReceivingRoute() {
     setError("");
 
         try {
-        const response = await http.get("/operator/receiving/");
+        const response = await http.get("/operations/receiving/");
         const resp: Resp = response.data;
 
         if (resp.error) {

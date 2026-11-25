@@ -562,8 +562,8 @@ export default function ExaminationDetailsPage() {
 			setLoadError("");
 
 			try {
-				const response = await http.get(`/operator/examination/${id}/`);
-				const resp: Resp = response.data;
+				const res = await http.get(`/operations/examination/${id}/`);
+				const resp: Resp = res.data;
 
 				if (resp.error) {
 					throw new Error(
