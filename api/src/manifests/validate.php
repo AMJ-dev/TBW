@@ -119,17 +119,55 @@
         }
 
         $event = $conn->prepare("
-            INSERT INTO operation_manifest_events
-            (id, manifest_id, actor_id, action, from_status, to_status, details)
-            VALUES (:event_id, :id, :actor, 'VALIDATED', :from_status, 'Validated', :details)
+            INSERT INTO activity_logs (
+                id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                CURRENT_TIMESTAMP
+            )
         ");
 
         $event->execute([
-            ':event_id' => generateId(),
-            ':id' => $id,
-            ':actor' => (string)$my_details->id,
-            ':from_status' => $m['status'],
-            ':details' => $details
+            ":id" => generateId(),
+            ":actor_id" => (string) $my_details->id,
+            ":category" => "MANIFEST",
+            ":action" => "VALIDATED",
+            ":entity_type" => "MANIFEST",
+            ":entity_id" => $id,
+            ":description" => "Manifest validated.",
+            ":old_values" => json_encode([
+                "status" => $m["status"]
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":new_values" => json_encode([
+                "status" => "Validated"
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "operation_manifest_events",
+                "manifest_id" => $id,
+                "details" => $details
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":severity" => "INFO"
         ]);
 
         $conn->commit();

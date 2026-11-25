@@ -229,26 +229,61 @@ try {
             WHERE id = :id
         ");
         $updateStmt->execute([":status" => $toStatus, ":id" => $shipmentId]);
-
+        
         $auditStmt = $conn->prepare("
-            INSERT INTO cargo_status_audit
-                (id, shipment_id, actor_id, from_code, to_code, note, hold_reason,
-                 authority_reference, financial_reference, config_version_id, created_at)
-            VALUES
-                (:id, :shipment_id, :actor_id, :from_code, :to_code, :note, :hold_reason,
-                 :authority_reference, :financial_reference, :config_version_id, CURRENT_TIMESTAMP)
+            INSERT INTO activity_logs (
+                id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                reason,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :reason,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                CURRENT_TIMESTAMP
+            )
         ");
+
         $auditStmt->execute([
             ":id" => generateId(),
-            ":shipment_id" => $shipmentId,
             ":actor_id" => $userId,
-            ":from_code" => $currentStatus,
-            ":to_code" => $toStatus,
-            ":note" => $note !== "" ? $note : null,
-            ":hold_reason" => $holdReason !== "" ? $holdReason : null,
-            ":authority_reference" => $authorityReference !== "" ? $authorityReference : null,
-            ":financial_reference" => $financialReference !== "" ? $financialReference : null,
-            ":config_version_id" => $configVersionId
+            ":category" => "SHIPMENT",
+            ":action" => "SHIPMENT_STATUS_CHANGED",
+            ":entity_type" => "SHIPMENT",
+            ":entity_id" => $shipmentId,
+            ":description" => "Shipment status changed from {$currentStatus} to {$toStatus}.",
+            ":reason" => $note !== "" ? $note : ($holdReason !== "" ? $holdReason : null),
+            ":old_values" => json_encode([
+                "status" => $currentStatus
+            ]),
+            ":new_values" => json_encode([
+                "status" => $toStatus
+            ]),
+            ":metadata" => json_encode([
+                "hold_reason" => $holdReason !== "" ? $holdReason : null,
+                "authority_reference" => $authorityReference !== "" ? $authorityReference : null,
+                "financial_reference" => $financialReference !== "" ? $financialReference : null,
+                "config_version_id" => $configVersionId
+            ]),
+            ":severity" => "INFO"
         ]);
         $conn->commit();
     } catch (Throwable $inner) {

@@ -40,10 +40,18 @@ export function str_to_url(str: string): string {
 
 export const is_numeric = (num:any) => (typeof(num) === 'number' || typeof(num) === "string" && num.trim() !== '');
 
-export const format_currency = (amount: number | string | undefined) => {
-	const num = typeof amount === 'string' ? Number(amount) : amount;
-	if (num == null || Number.isNaN(num)) return '—';
-	return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(num);
+const CURRENCY_LOCALES: Record<string, string> = {NGN: "en-NG", USD: "en-US", EUR: "de-DE", GBP: "en-GB"};
+
+export const format_currency = (amount: number | string | null | undefined, currency: string | null | undefined = "NGN"): string => {
+    if (amount === null || amount === undefined || String(amount).trim() === "") return "—";
+
+    const num = typeof amount === "string" ? Number(amount) : amount;
+    if (!Number.isFinite(num)) return "—";
+
+    const code = currency?currency.toUpperCase(): "NGN";
+    const locale = CURRENCY_LOCALES[code] ?? "en-NG";
+
+    return new Intl.NumberFormat(locale, {style: "currency", currency: code, }).format(num);
 };
 
 export const format_number = (x:number) => x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");

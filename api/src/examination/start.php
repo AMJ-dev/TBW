@@ -4,7 +4,6 @@
 require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
 if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-	http_response_code(405);
 	echo json_encode([
 		"error" => true,
 		"data" => "Method not allowed.",
@@ -16,7 +15,6 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST") {
 $examination_id = trim($_POST["examination_id"] ?? "");
 
 if ($examination_id === "") {
-	http_response_code(422);
 	echo json_encode([
 		"error" => true,
 		"data" => "Examination ID is required.",
@@ -54,7 +52,6 @@ try {
 	if (!$examination) {
 		$conn->rollBack();
 
-		http_response_code(404);
 		echo json_encode([
 			"error" => true,
 			"data" => "Examination not found.",
@@ -66,7 +63,6 @@ try {
 	if ($examination->officer_id !== $my_details->id) {
 		$conn->rollBack();
 
-		http_response_code(403);
 		echo json_encode([
 			"error" => true,
 			"data" => "You are not assigned to this examination.",
@@ -78,7 +74,6 @@ try {
 	if ($examination->status !== "SCHEDULED") {
 		$conn->rollBack();
 
-		http_response_code(409);
 		echo json_encode([
 			"error" => true,
 			"data" => "Only scheduled examinations can be started.",
@@ -102,7 +97,6 @@ try {
 	if (!in_array($examination->container_status, $allowed_container_statuses, true)) {
 		$conn->rollBack();
 
-		http_response_code(409);
 		echo json_encode([
 			"error" => true,
 			"data" => "The container cannot be placed under examination from its current status.",
@@ -203,41 +197,57 @@ try {
 	));
 
 	$log = $conn->prepare("
-		INSERT INTO terminal_examination_logs (
+		INSERT INTO activity_logs (
 			id,
-			examination_id,
+			actor_id,
+			category,
 			action,
-			previous_status,
-			new_status,
+			entity_type,
+			entity_id,
 			description,
+			old_values,
+			new_values,
 			metadata,
-			performed_by
+			severity,
+			created_at
 		) VALUES (
 			:id,
-			:examination_id,
+			:actor_id,
+			:category,
 			:action,
-			:previous_status,
-			:new_status,
+			:entity_type,
+			:entity_id,
 			:description,
+			:old_values,
+			:new_values,
 			:metadata,
-			:performed_by
+			:severity,
+			NOW()
 		)
 	");
 
 	$log->execute([
 		":id" => generateId(),
-		":examination_id" => $examination_id,
+		":actor_id" => $my_details->id,
+		":category" => "EXAMINATION",
 		":action" => "EXAMINATION_STARTED",
-		":previous_status" => "SCHEDULED",
-		":new_status" => "IN_PROGRESS",
+		":entity_type" => "EXAMINATION",
+		":entity_id" => $examination_id,
 		":description" => "Examination started for container {$examination->container_no}.",
+		":old_values" => json_encode([
+			"examination_status" => "SCHEDULED",
+			"container_status" => $examination->container_status
+		], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+		":new_values" => json_encode([
+			"examination_status" => "IN_PROGRESS",
+			"container_status" => "UNDER_EXAMINATION"
+		], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
 		":metadata" => json_encode([
+			"source_table" => "terminal_examination_logs",
 			"container_id" => $examination->container_id,
-			"container_no" => $examination->container_no,
-			"previous_container_status" => $examination->container_status,
-			"new_container_status" => "UNDER_EXAMINATION"
-		], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-		":performed_by" => $my_details->id
+			"container_no" => $examination->container_no
+		], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+		":severity" => "INFO"
 	]);
 
 	$conn->commit();
@@ -259,7 +269,6 @@ try {
 		$conn->rollBack();
 	}
 
-	http_response_code(500);
 	echo json_encode([
 		"error" => true,
 		"data" => "Could not start examination.",

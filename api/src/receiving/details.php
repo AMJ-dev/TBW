@@ -545,18 +545,12 @@ try {
             sc.seal_no AS declared_seal_no,
             sc.package_count AS expected_package_count,
             sc.gross_weight AS expected_weight,
-            sc.cargo_description AS container_cargo_description,
             sc.package_type AS container_package_type,
-            sc.hs_code AS container_hs_code,
-            sc.item_quantity,
-            sc.unit_of_measure,
-            sc.unit_value,
-            sc.currency,
-            sc.total_value AS container_total_value,
             sc.status AS container_lifecycle_status,
             sc.gate_in_at,
             sc.received_at AS container_received_at,
             sc.stored_at,
+            sc.current_location_id,
             sc.gate_out_at
         FROM portal_receiving_containers rc
         LEFT JOIN portal_shipment_containers sc
@@ -574,7 +568,78 @@ try {
 
     $containers = $containersQuery->fetchAll(PDO::FETCH_ASSOC);
 
-    $locationIds = [];
+    $containerIds = [];
+
+    foreach ($containers as &$container) {
+        $container["items"] = [];
+
+        if (!empty($container["container_id"])) {
+            $containerIds[] = $container["container_id"];
+        }
+    }
+
+    unset($container);
+
+    if (!empty($containerIds)) {
+        $containerIds = array_values(array_unique($containerIds));
+        $itemPlaceholders = implode(",", array_fill(0, count($containerIds), "?"));
+
+        $itemsQuery = $conn->prepare("
+            SELECT
+                i.id,
+                i.container_id,
+                i.customs_tariff_id,
+                ct.hs_code,
+                i.item_description,
+                ct.description AS customs_tariff_description,
+                i.quantity,
+                i.unit_of_measure,
+                i.unit_value,
+                i.currency,
+                i.total_value,
+                i.created_at,
+                i.updated_at
+            FROM portal_shipment_container_items i
+            LEFT JOIN customs_tariffs ct
+                ON BINARY ct.id = BINARY i.customs_tariff_id
+            WHERE BINARY i.container_id IN ($itemPlaceholders)
+            ORDER BY i.created_at ASC
+        ");
+
+        $itemsQuery->execute($containerIds);
+
+        $itemsByContainer = [];
+
+        foreach ($itemsQuery->fetchAll(PDO::FETCH_ASSOC) as $item) {
+            $itemsByContainer[(string) $item["container_id"]][] = $item;
+        }
+
+        foreach ($containers as &$container) {
+            $containerId = (string) ($container["container_id"] ?? "");
+            $container["items"] = $itemsByContainer[$containerId] ?? [];
+            $container["item_count"] = count($container["items"]);
+            $container["cargo_descriptions"] = array_values(array_filter(array_map(
+                static fn($item) => trim((string) ($item["item_description"] ?? "")),
+                $container["items"]
+            )));
+            $container["hs_codes"] = array_values(array_unique(array_filter(array_map(
+                static fn($item) => trim((string) ($item["hs_code"] ?? "")),
+                $container["items"]
+            ))));
+        }
+
+        unset($container);
+    }
+
+    foreach ($containers as &$container) {
+        $container["item_count"] = count($container["items"] ?? []);
+        $container["cargo_descriptions"] = $container["cargo_descriptions"] ?? [];
+        $container["hs_codes"] = $container["hs_codes"] ?? [];
+    }
+
+    unset($container);
+
+        $locationIds = [];
 
     foreach ($containers as $container) {
         if (!empty($container["receiving_location_id"])) {
@@ -652,7 +717,7 @@ try {
 
         $container["cargo_type"] =
             $container["container_package_type"]
-            ?: $container["container_cargo_description"]
+            ?: (!empty($container["cargo_descriptions"]) ? implode(", ", $container["cargo_descriptions"]) : null)
             ?: $shipment["cargo_category"]
             ?: null;
 
@@ -856,24 +921,27 @@ try {
     $logsQuery = $conn->prepare("
         SELECT
             l.id,
-            l.receiving_id,
-            l.receiving_container_id,
-            l.shipment_id,
-            l.container_id,
+            JSON_UNQUOTE(JSON_EXTRACT(l.metadata, '$.receiving_id')) AS receiving_id,
+            JSON_UNQUOTE(JSON_EXTRACT(l.metadata, '$.receiving_container_id')) AS receiving_container_id,
+            JSON_UNQUOTE(JSON_EXTRACT(l.metadata, '$.shipment_id')) AS shipment_id,
+            l.entity_id AS container_id,
             l.action,
-            l.previous_status,
-            l.new_status,
+            JSON_UNQUOTE(JSON_EXTRACT(l.old_values, '$.status')) AS previous_status,
+            JSON_UNQUOTE(JSON_EXTRACT(l.new_values, '$.status')) AS new_status,
             l.description,
             l.metadata,
-            l.performed_by,
+            l.actor_id AS performed_by,
             u.full_name AS performed_by_name,
             u.email AS performed_by_email,
-            l.performed_at
-        FROM portal_receiving_logs l
+            l.created_at AS performed_at
+        FROM activity_logs l
         LEFT JOIN users u
-            ON BINARY u.id = BINARY l.performed_by
-        WHERE BINARY l.receiving_id = BINARY :receiving_id
-        ORDER BY l.performed_at DESC
+            ON BINARY u.id = BINARY l.actor_id
+        WHERE
+            l.category = 'RECEIVING'
+            AND l.action = 'CONTAINER_RECEIVED'
+            AND BINARY JSON_UNQUOTE(JSON_EXTRACT(l.metadata, '$.receiving_id')) = BINARY :receiving_id
+        ORDER BY l.created_at DESC
     ");
 
     $logsQuery->execute([

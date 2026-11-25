@@ -575,7 +575,7 @@ export default function ConductExaminationPage() {
 		setLoadError("");
 
 		try {
-			const response = await http.get(`/operator/examination/${id}/`);
+			const response = await http.get(`/operations/examination/${id}/`);
 			const resp = response.data as Resp;
 
 			if (resp.error) {
@@ -677,7 +677,7 @@ export default function ConductExaminationPage() {
 			formData.append("examination_id", id);
 
 			const response = await http.post(
-				"/operator/examination/start/",
+				"/operations/examination/start/",
 				formData,
 			);
 
@@ -795,7 +795,7 @@ export default function ConductExaminationPage() {
 			);
 
 			const response = await http.post(
-				"/operator/examination/finish/",
+				"/operations/examination/finish/",
 				formData,
 			);
 
@@ -1012,7 +1012,7 @@ export default function ConductExaminationPage() {
 									Review the assignment details above, then start the
 									examination to open the inspection workspace.
 								</p>
-							</div>
+							</div> 
 							<button
 								type="button"
 								onClick={() => void startExamination()}

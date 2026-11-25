@@ -191,27 +191,16 @@
                         c.seal_no,
                         c.package_count,
                         c.gross_weight,
-                        c.cargo_description,
                         c.package_type,
-                        c.hs_code,
-                        c.customs_tariff_id,
-                        ct.hs_code AS tariff_hs_code,
-                        ct.description AS customs_tariff_description,
-                        c.item_quantity,
-                        c.unit_of_measure,
-                        c.unit_value,
-                        c.currency,
-                        c.total_value,
                         c.status,
                         c.gate_in_at,
                         c.received_at,
                         c.stored_at,
+                        c.current_location_id,
                         c.gate_out_at,
                         c.created_at,
                         c.updated_at
                     FROM portal_shipment_containers c
-                    LEFT JOIN customs_tariffs ct
-                        ON ct.id = c.customs_tariff_id
                     WHERE c.shipment_id = :shipment_id
                     ORDER BY c.container_no ASC, c.created_at ASC
                 ");
@@ -222,9 +211,75 @@
 
                 $containers = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
 
+                if ($containers) {
+                    $containerIds = array_values(array_filter(array_map(
+                        static fn($container) => (string) $container["id"],
+                        $containers
+                    )));
+
+                    $placeholders = implode(", ", array_fill(0, count($containerIds), "?"));
+
+                    $itemStmt = $conn->prepare("
+                        SELECT
+                            i.id,
+                            i.container_id,
+                            i.customs_tariff_id,
+                            i.item_description,
+                            i.quantity,
+                            i.unit_of_measure,
+                            i.unit_value,
+                            i.currency,
+                            i.total_value,
+                            i.created_at,
+                            i.updated_at,
+                            ct.hs_code,
+                            ct.description AS customs_tariff_description,
+                            ct.category AS customs_tariff_category,
+                            ct.rate_type,
+                            ct.rate,
+                            ct.unit AS tariff_unit
+                        FROM portal_shipment_container_items i
+                        LEFT JOIN customs_tariffs ct
+                            ON ct.id = i.customs_tariff_id
+                        WHERE i.container_id IN ($placeholders)
+                        ORDER BY i.created_at ASC, i.id ASC
+                    ");
+
+                    $itemStmt->execute($containerIds);
+                    $itemsByContainer = [];
+
+                    foreach ($itemStmt->fetchAll(PDO::FETCH_ASSOC) as $item) {
+                        $containerId = (string) $item["container_id"];
+
+                        foreach (["quantity", "unit_value", "total_value", "rate"] as $field) {
+                            if (array_key_exists($field, $item) && $item[$field] !== null) {
+                                $item[$field] = (float) $item[$field];
+                            }
+                        }
+
+                        $itemsByContainer[$containerId][] = $item;
+                    }
+
+                    foreach ($containers as &$container) {
+                        $containerId = (string) $container["id"];
+                        $container["items"] = $itemsByContainer[$containerId] ?? [];
+                        $container["item_count"] = count($container["items"]);
+
+                        if ($container["package_count"] !== null) {
+                            $container["package_count"] = (float) $container["package_count"];
+                        }
+
+                        if ($container["gross_weight"] !== null) {
+                            $container["gross_weight"] = (float) $container["gross_weight"];
+                        }
+                    }
+                    unset($container);
+                }
+
                 $shipment["containers"] = $containers;
                 $shipment["container_count"] = count($containers);
                 $shipment["containers_count"] = count($containers);
+
 
                 $manifest["shipment"] = $shipment;
                 $manifest["containers"] = $containers;
@@ -264,10 +319,11 @@
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
 
     } catch (Throwable $e) {
+        error_log("Manifest loading error: " . $e->getMessage());
 
         echo json_encode([
             "error" => true,
             "data" => "Could not load this manifest.",
-            "code" => null
+            "code" => $e->getMessage()
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
     }

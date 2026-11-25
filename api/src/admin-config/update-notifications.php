@@ -297,15 +297,66 @@
             $q->execute($submittedIds);
         }
 
-        $q = $conn->prepare("INSERT INTO notification_config_audit (id, config_version_id, actor_id, action, change_reason, before_json, after_json, request_id, ip_address, user_agent) VALUES (:id, :config_version_id, :actor_id, :action, :change_reason, :before_json, :after_json, :request_id, :ip_address, :user_agent)");
-        $q->bindValue(":id", generateId(), PDO::PARAM_STR);
-        $q->bindValue(":config_version_id", $configurationId, PDO::PARAM_STR);
-        $q->bindValue(":actor_id", $actorId, PDO::PARAM_STR);
-        $q->bindValue(":action", "notification_configuration_updated", PDO::PARAM_STR);
-        $q->bindValue(":change_reason", $changeReason, PDO::PARAM_STR);
-        $q->bindValue(":before_json", $beforeJson, $beforeJson === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
-        $q->bindValue(":after_json", $afterJson, PDO::PARAM_STR);
-        $q->bindValue(":request_id", bin2hex(random_bytes(16)), PDO::PARAM_STR);
+        $requestId = bin2hex(random_bytes(16));
+
+        $q = $conn->prepare("
+            INSERT INTO activity_logs (
+                id,
+                request_id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                reason,
+                old_values,
+                new_values,
+                metadata,
+                ip_address,
+                user_agent,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :request_id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :reason,
+                :old_values,
+                :new_values,
+                :metadata,
+                :ip_address,
+                :user_agent,
+                :severity,
+                CURRENT_TIMESTAMP
+            )
+        ");
+
+        $q->execute([
+            ":id" => generateId(),
+            ":request_id" => $requestId,
+            ":actor_id" => $actorId,
+            ":category" => "CONFIGURATION",
+            ":action" => "NOTIFICATION_CONFIGURATION_UPDATED",
+            ":entity_type" => "NOTIFICATION_CONFIGURATION",
+            ":entity_id" => $configurationId,
+            ":description" => "Notification configuration updated.",
+            ":reason" => $changeReason,
+            ":old_values" => $beforeJson,
+            ":new_values" => $afterJson,
+            ":metadata" => json_encode([
+                "source_table" => "notification_config_audit",
+                "config_version_id" => $configurationId
+            ], JSON_THROW_ON_ERROR),
+            ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
+            ":user_agent" => substr($_SERVER["HTTP_USER_AGENT"] ?? "", 0, 500),
+            ":severity" => "INFO"
+        ]);
 
         $ipAddress = $_SERVER["REMOTE_ADDR"] ?? null;
         $userAgent = substr((string)($_SERVER["HTTP_USER_AGENT"] ?? ""), 0, 500);

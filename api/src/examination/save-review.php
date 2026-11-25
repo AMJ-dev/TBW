@@ -7,8 +7,6 @@
         $remarks = trim($_POST["remarks"] ?? "");
 
         if (!$examination_id || !$decision || !$remarks) {
-            http_response_code(400);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Examination ID, decision and remarks are required.",
@@ -24,8 +22,6 @@
         ];
 
         if (!in_array($decision, $allowed_decisions, true)) {
-            http_response_code(400);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid examination review decision.",
@@ -60,8 +56,6 @@
         if (!$examination) {
             $conn->rollBack();
 
-            http_response_code(404);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Examination not found.",
@@ -72,8 +66,6 @@
 
         if ($examination["status"] !== "PENDING_REVIEW") {
             $conn->rollBack();
-
-            http_response_code(409);
 
             echo json_encode([
                 "error" => true,
@@ -89,8 +81,6 @@
         ) {
             $conn->rollBack();
 
-            http_response_code(400);
-
             echo json_encode([
                 "error" => true,
                 "data" => "The examination is not linked to a valid shipment container.",
@@ -101,8 +91,6 @@
 
         if ($examination["container_status"] !== "UNDER_EXAMINATION") {
             $conn->rollBack();
-
-            http_response_code(409);
 
             echo json_encode([
                 "error" => true,
@@ -217,38 +205,55 @@
         ]);
 
         $stmt = $conn->prepare("
-            INSERT INTO terminal_examination_logs (
+            INSERT INTO activity_logs (
                 id,
-                examination_id,
+                actor_id,
+                category,
                 action,
-                previous_status,
-                new_status,
+                entity_type,
+                entity_id,
                 description,
+                old_values,
+                new_values,
                 metadata,
-                performed_at,
-                performed_by
+                severity,
+                created_at
             ) VALUES (
                 :id,
-                :examination_id,
+                :actor_id,
+                :category,
                 :action,
-                :previous_status,
-                :new_status,
+                :entity_type,
+                :entity_id,
                 :description,
+                :old_values,
+                :new_values,
                 :metadata,
-                NOW(),
-                :performed_by
+                :severity,
+                NOW()
             )
         ");
 
         $stmt->execute([
             ":id" => generateId(),
-            ":examination_id" => $examination_id,
+            ":actor_id" => $my_details->id,
+            ":category" => "EXAMINATION",
             ":action" => $actions[$decision],
-            ":previous_status" => $previous_status,
-            ":new_status" => $decision,
+            ":entity_type" => "EXAMINATION",
+            ":entity_id" => $examination_id,
             ":description" => $remarks,
-            ":metadata" => $metadata,
-            ":performed_by" => $my_details->id
+            ":old_values" => json_encode([
+                "status" => $previous_status
+            ], JSON_THROW_ON_ERROR),
+            ":new_values" => json_encode([
+                "status" => $decision
+            ], JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "terminal_examination_logs",
+                "examination_id" => $examination_id,
+                "details" => $metadata
+            ], JSON_THROW_ON_ERROR),
+            ":severity" => "INFO"
         ]);
 
         $conn->commit();
@@ -267,8 +272,6 @@
         if ($conn->inTransaction()) {
             $conn->rollBack();
         }
-
-        http_response_code(500);
 
         echo json_encode([
             "error" => true,

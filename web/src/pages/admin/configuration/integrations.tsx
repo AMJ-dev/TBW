@@ -6,6 +6,8 @@ import {
     Check,
     ChevronDown,
     CircleDollarSign,
+    Plus,
+    Trash2,
     Eye,
     EyeOff,
     Landmark,
@@ -27,7 +29,6 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { http, type Resp } from "@/lib/httpClient";
 
-type Environment = "sandbox" | "production";
 type FieldKind = "text" | "password" | "email" | "url" | "number";
 
 type IntegrationField = {
@@ -48,7 +49,6 @@ type Integration = {
     category: string;
     icon: LucideIcon;
     enabled: boolean;
-    environment: Environment;
     fields: IntegrationField[];
 };
 
@@ -57,10 +57,33 @@ type IntegrationConfig = {
     credentials: Record<string, string>;
 };
 
+type BankAccountCountry = "NG" | "US";
+
+type BankAccount = {
+    id: string;
+    country: BankAccountCountry;
+    bank_name: string;
+    account_name: string;
+    account_number: string;
+    currency: "NGN" | "USD";
+    bank_code: string;
+    routing_number: string;
+    swift_code: string;
+    branch_name: string;
+    branch_address: string;
+    bank_address: string;
+    account_type: string;
+    intermediary_bank: string;
+    intermediary_swift_code: string;
+    intermediary_bank_address: string;
+};
+
 const iconRegistry: Record<string, LucideIcon> = {
     ShieldCheck,
     Ship,
     CircleDollarSign,
+    Plus,
+    Trash2,
     Landmark,
     Mail,
     Smartphone,
@@ -91,7 +114,6 @@ const normaliseIntegration = (raw: any): Integration => ({
     category: raw?.category ?? "",
     icon: iconRegistry[raw?.icon ?? raw?.icon_name ?? "Webhook"] ?? Webhook,
     enabled: Boolean(raw?.enabled ?? false),
-    environment: (raw?.environment ?? "sandbox") as Environment,
     fields: Array.isArray(raw?.fields)
         ? raw.fields.map(normaliseField)
         : [],
@@ -130,6 +152,7 @@ function Toggle({
 
 export default function AdminIntegrationsConfigurationPage() {
     const [config, setConfig] = useState<IntegrationConfig>(emptyConfig);
+    const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
     const [dirty, setDirty] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -175,6 +198,28 @@ export default function AdminIntegrationsConfigurationPage() {
             };
 
             setConfig(loaded);
+            setBankAccounts(
+                Array.isArray(payload.bank_accounts)
+                    ? payload.bank_accounts.map((account: any) => ({
+                          id: String(account.id ?? crypto.randomUUID()),
+                          country: account.country === "US" ? "US" : "NG",
+                          bank_name: String(account.bank_name ?? account.bankName ?? ""),
+                          account_name: String(account.account_name ?? account.accountName ?? ""),
+                          account_number: String(account.account_number ?? account.accountNumber ?? ""),
+                          currency: account.currency === "USD" ? "USD" : "NGN",
+                          bank_code: String(account.bank_code ?? account.bankCode ?? ""),
+                          routing_number: String(account.routing_number ?? account.routingNumber ?? ""),
+                          swift_code: String(account.swift_code ?? account.swiftCode ?? ""),
+                          branch_name: String(account.branch_name ?? account.branchName ?? ""),
+                          branch_address: String(account.branch_address ?? account.branchAddress ?? ""),
+                          bank_address: String(account.bank_address ?? account.bankAddress ?? ""),
+                          account_type: String(account.account_type ?? account.accountType ?? ""),
+                          intermediary_bank: String(account.intermediary_bank ?? account.intermediaryBank ?? account.intermediaryBankName ?? ""),
+                          intermediary_swift_code: String(account.intermediary_swift_code ?? account.intermediarySwiftCode ?? ""),
+                          intermediary_bank_address: String(account.intermediary_bank_address ?? account.intermediaryBankAddress ?? ""),
+                      }))
+                    : []
+            );
             setDirty(false);
             setRevealed(new Set());
         } catch (err: any) {
@@ -192,6 +237,45 @@ export default function AdminIntegrationsConfigurationPage() {
     }, []);
 
     const markDirty = () => setDirty(true);
+
+    const addBankAccount = (country: BankAccountCountry) => {
+        setBankAccounts((current) => [
+            ...current,
+            {
+                id: crypto.randomUUID(),
+                country,
+                bank_name: "",
+                account_name: "",
+                account_number: "",
+                currency: country === "NG" ? "NGN" : "USD",
+                bank_code: "",
+                routing_number: "",
+                swift_code: "",
+                branch_name: "",
+                branch_address: "",
+                bank_address: "",
+                account_type: country === "US" ? "checking" : "",
+                intermediary_bank: "",
+                intermediary_swift_code: "",
+                intermediary_bank_address: "",
+            },
+        ]);
+        markDirty();
+    };
+
+    const updateBankAccount = (id: string, patch: Partial<BankAccount>) => {
+        setBankAccounts((current) =>
+            current.map((account) =>
+                account.id === id ? { ...account, ...patch } : account
+            )
+        );
+        markDirty();
+    };
+
+    const removeBankAccount = (id: string) => {
+        setBankAccounts((current) => current.filter((account) => account.id !== id));
+        markDirty();
+    };
 
     const updateIntegration = (id: string, patch: Partial<Integration>) => {
         setConfig((current) => ({
@@ -234,7 +318,35 @@ export default function AdminIntegrationsConfigurationPage() {
         });
     };
 
-    const validate = () => true;
+    const validate = () => {
+        for (const [index, account] of bankAccounts.entries()) {
+            const requiredFields = account.country === "NG"
+                ? [
+                    ["Bank name", account.bank_name],
+                    ["Account name", account.account_name],
+                    ["Account number", account.account_number],
+                    ["Bank code", account.bank_code],
+                    ["SWIFT / BIC code", account.swift_code],
+                ]
+                : [
+                    ["Bank name", account.bank_name],
+                    ["Account holder name", account.account_name],
+                    ["Account number", account.account_number],
+                    ["ABA routing number", account.routing_number],
+                    ["SWIFT / BIC code", account.swift_code],
+                    ["Bank address", account.bank_address],
+                ];
+
+            const missing = requiredFields.find(([, value]) => !String(value).trim());
+
+            if (missing) {
+                toast.error(`Bank account ${index + 1}: ${missing[0]} is required.`);
+                return false;
+            }
+        }
+
+        return true;
+    };
 
     const handleSave = async () => {
         if (!dirty || saving) return;
@@ -251,12 +363,12 @@ export default function AdminIntegrationsConfigurationPage() {
                     config.integrations.map((integration) => ({
                         id: integration.id,
                         enabled: integration.enabled,
-                        environment: integration.environment,
                     }))
                 )
             );
 
             formData.set("credentials", JSON.stringify(config.credentials));
+            formData.set("bank_accounts", JSON.stringify(bankAccounts));
 
             const res = await http.post(
                 "/admin/config/integrations/update/",
@@ -473,8 +585,7 @@ export default function AdminIntegrationsConfigurationPage() {
                             </h3>
 
                             <p className="mt-1 text-xs leading-5 text-ink-soft">
-                                Expand an adapter to configure its environment
-                                and connection credentials.
+                                Expand an adapter to configure its connection credentials.
                             </p>
                         </div>
 
@@ -522,9 +633,14 @@ export default function AdminIntegrationsConfigurationPage() {
 
                             const isEmailIntegration =
                                 integration.id === emailIntegrationId;
+                            const isBankReconciliation =
+                                integration.name.toLowerCase().includes("bank reconciliation") ||
+                                integration.category.toLowerCase().includes("bank reconciliation");
 
                             const connectionFields: IntegrationField[] =
-                                isEmailIntegration
+                                isBankReconciliation
+                                    ? []
+                                    : isEmailIntegration
                                     ? [
                                           {
                                               key: "email_host",
@@ -624,8 +740,7 @@ export default function AdminIntegrationsConfigurationPage() {
                                             </p>
 
                                             <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-ink-soft">
-                                                {integration.category} ·{" "}
-                                                {integration.environment}
+                                                {integration.category}
                                             </p>
                                         </button>
 
@@ -665,36 +780,6 @@ export default function AdminIntegrationsConfigurationPage() {
 
                                     {isExpanded && (
                                         <div className="space-y-5 border-t border-line bg-sand/40 p-4 sm:p-5">
-                                            <div className="grid gap-4 sm:grid-cols-2">
-                                                <label className="block">
-                                                    <span className="text-xs font-medium text-ink">
-                                                        Environment
-                                                    </span>
-
-                                                    <select
-                                                        value={integration.environment}
-                                                        onChange={(event) =>
-                                                            updateIntegration(
-                                                                integration.id,
-                                                                {
-                                                                    environment:
-                                                                        event.target
-                                                                            .value as Environment,
-                                                                }
-                                                            )
-                                                        }
-                                                        className="mt-1.5 h-10 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-orange"
-                                                    >
-                                                        <option value="sandbox">
-                                                            Sandbox / testing
-                                                        </option>
-                                                        <option value="production">
-                                                            Production
-                                                        </option>
-                                                    </select>
-                                                </label>
-                                            </div>
-
                                             {connectionFields.length > 0 && (
                                                 <div>
                                                     <div className="mb-3 flex items-center gap-2">
@@ -811,6 +896,97 @@ export default function AdminIntegrationsConfigurationPage() {
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {isBankReconciliation && (
+                                                <div className="space-y-4 border-t border-line pt-5">
+                                                    <div className="flex flex-wrap items-end justify-between gap-3">
+                                                        <div>
+                                                            <h4 className="font-display text-base font-bold text-ink">Settlement bank accounts</h4>
+                                                            <p className="mt-1 max-w-2xl text-xs leading-5 text-ink-soft">
+                                                                Add Nigerian and United States accounts used for bank reconciliation and settlement matching.
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <Button type="button" onClick={() => addBankAccount("NG")} className="bg-orange text-white hover:bg-orange-deep">
+                                                                <Plus className="mr-2 size-4" /> Add Nigeria account
+                                                            </Button>
+                                                            <Button type="button" onClick={() => addBankAccount("US")} variant="outline" className="border-line text-ink">
+                                                                <Plus className="mr-2 size-4" /> Add US account
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                    {bankAccounts.length === 0 ? (
+                                                        <div className="rounded-2xl border border-dashed border-line bg-paper p-8 text-center">
+                                                            <Landmark className="mx-auto size-8 text-ink-soft" />
+                                                            <p className="mt-3 text-sm font-semibold text-ink">No bank accounts added</p>
+                                                            <p className="mt-1 text-xs text-ink-soft">Add accounts to store the local and international settlement details used during reconciliation.</p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-3">
+                                                            {bankAccounts.map((account, index) => {
+                                                                const fields = account.country === "NG"
+                                                                    ? [
+                                                                        { key: "bank_name", label: "Bank name", placeholder: "e.g. Access Bank" },
+                                                                        { key: "account_name", label: "Account name", placeholder: "Name registered with the bank" },
+                                                                        { key: "account_number", label: "Account number", placeholder: "10-digit NUBAN" },
+                                                                        { key: "bank_code", label: "Bank code", placeholder: "CBN/NIP bank code" },
+                                                                        { key: "swift_code", label: "SWIFT / BIC code", placeholder: "Bank SWIFT code" },
+                                                                        { key: "branch_name", label: "Branch name", placeholder: "Branch name" },
+                                                                        { key: "branch_address", label: "Branch address", placeholder: "Branch address" },
+                                                                    ]
+                                                                    : [
+                                                                        { key: "bank_name", label: "Bank name", placeholder: "e.g. JPMorgan Chase Bank" },
+                                                                        { key: "account_name", label: "Account holder name", placeholder: "Name registered with the bank" },
+                                                                        { key: "account_number", label: "Account number", placeholder: "Bank account number" },
+                                                                        { key: "routing_number", label: "ABA routing number", placeholder: "9-digit routing number" },
+                                                                        { key: "swift_code", label: "SWIFT / BIC code", placeholder: "SWIFT / BIC code" },
+                                                                        { key: "bank_address", label: "Bank address", placeholder: "Bank street, city, state, ZIP" },
+                                                                        { key: "intermediary_bank", label: "Intermediary bank (optional)", placeholder: "Intermediary bank name" },
+                                                                        { key: "intermediary_swift_code", label: "Intermediary SWIFT code (optional)", placeholder: "Intermediary bank BIC" },
+                                                                    ];
+                                                                return (
+                                                                    <article key={account.id} className="overflow-hidden rounded-2xl bg-paper ring-1 ring-line">
+                                                                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line p-4">
+                                                                            <div className="flex items-center gap-3">
+                                                                                <div className="grid size-10 place-items-center rounded-xl bg-orange/10 text-orange-deep"><Landmark className="size-5" /></div>
+                                                                                <div>
+                                                                                    <p className="text-sm font-semibold text-ink">{account.country === "NG" ? "Nigeria bank account" : "United States bank account"} {index + 1}</p>
+                                                                                    <p className="mt-0.5 text-xs text-ink-soft">{account.bank_name || "Bank name not provided"} · {account.currency}</p>
+                                                                                </div>
+                                                                            </div>
+                                                                            <Button type="button" variant="outline" onClick={() => removeBankAccount(account.id)} className="border-line text-ink-soft hover:text-coral"><Trash2 className="mr-2 size-4" /> Remove</Button>
+                                                                        </div>
+                                                                        <div className="grid gap-4 p-4 sm:grid-cols-2">
+                                                                            {fields.map((field) => (
+                                                                                <label key={field.key} className="block">
+                                                                                    <span className="text-xs font-medium text-ink">{field.label}</span>
+                                                                                    <Input value={account[field.key as keyof BankAccount] as string} onChange={(event) => updateBankAccount(account.id, { [field.key]: event.target.value })} placeholder={field.placeholder} autoComplete="off" className="mt-1.5 h-10 border-line bg-paper text-sm text-ink" />
+                                                                                </label>
+                                                                            ))}
+                                                                            <label className="block">
+                                                                                <span className="text-xs font-medium text-ink">Currency</span>
+                                                                                <select value={account.currency} onChange={(event) => updateBankAccount(account.id, { currency: event.target.value as "NGN" | "USD" })} className="mt-1.5 h-10 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-orange">
+                                                                                    <option value="NGN">NGN - Nigerian Naira</option>
+                                                                                    <option value="USD">USD - US Dollar</option>
+                                                                                </select>
+                                                                            </label>
+                                                                            {account.country === "US" && (
+                                                                                <label className="block">
+                                                                                    <span className="text-xs font-medium text-ink">Account type</span>
+                                                                                    <select value={account.account_type} onChange={(event) => updateBankAccount(account.id, { account_type: event.target.value })} className="mt-1.5 h-10 w-full rounded-md border border-line bg-paper px-3 text-sm text-ink outline-none focus:ring-2 focus:ring-orange">
+                                                                                        <option value="checking">Checking</option>
+                                                                                        <option value="savings">Savings</option>
+                                                                                    </select>
+                                                                                </label>
+                                                                            )}
+                                                                        </div>
+                                                                    </article>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </article>
@@ -832,6 +1008,8 @@ export default function AdminIntegrationsConfigurationPage() {
                         )}
                     </div>
                 </section>
+
+
 
                 <div className="flex items-start gap-3 rounded-xl bg-paper p-4 ring-1 ring-line">
                     <AlertTriangle className="mt-0.5 size-5 shrink-0 text-orange" />

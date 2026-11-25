@@ -208,7 +208,6 @@
                 sc.container_no AS shipment_container_no,
                 sc.size,
                 sc.seal_no,
-                sc.hs_code,
                 sc.package_count,
                 sc.gross_weight,
                 sc.status AS container_status,
@@ -250,13 +249,79 @@
 
         $containers = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        foreach ($containers as &$container) {
+        $containersById = [];
+        $containerIds = [];
+
+        foreach ($containers as $index => &$container) {
+            $containerId = (string) ($container["shipment_container_id"] ?? "");
+
+            $container["items"] = [];
+            $container["item_count"] = 0;
             $container["seal_number"] = $container["seal_no"] ?? null;
             $container["container_size"] = $container["size"] ?? null;
             $container["weight"] = $container["gross_weight"] ?? null;
             $container["number"] = $container["container_no"] ?? null;
+
+            if ($containerId !== "") {
+                $containersById[$containerId] = $index;
+                $containerIds[] = $containerId;
+            }
         }
         unset($container);
+
+        if (!empty($containerIds)) {
+            $containerIds = array_values(array_unique($containerIds));
+            $itemPlaceholders = implode(",", array_fill(0, count($containerIds), "?"));
+
+            $itemStmt = $conn->prepare("
+                SELECT
+                    i.id,
+                    i.container_id,
+                    i.customs_tariff_id,
+                    ct.hs_code,
+                    i.item_description,
+                    ct.description AS customs_tariff_description,
+                    i.quantity,
+                    i.unit_of_measure,
+                    i.unit_value,
+                    i.currency,
+                    i.total_value,
+                    i.created_at,
+                    i.updated_at
+                FROM portal_shipment_container_items i
+                LEFT JOIN customs_tariffs ct
+                    ON ct.id = i.customs_tariff_id
+                WHERE i.container_id IN ($itemPlaceholders)
+                ORDER BY i.created_at ASC, i.id ASC
+            ");
+
+            $itemStmt->execute($containerIds);
+
+            foreach ($itemStmt->fetchAll(PDO::FETCH_ASSOC) as $item) {
+                $containerId = (string) $item["container_id"];
+
+                if (!isset($containersById[$containerId])) {
+                    continue;
+                }
+
+                $item["quantity"] = $item["quantity"] !== null
+                    ? (float) $item["quantity"]
+                    : null;
+
+                $item["unit_value"] = $item["unit_value"] !== null
+                    ? (float) $item["unit_value"]
+                    : null;
+
+                $item["total_value"] = $item["total_value"] !== null
+                    ? (float) $item["total_value"]
+                    : null;
+
+                $containerIndex = $containersById[$containerId];
+
+                $containers[$containerIndex]["items"][] = $item;
+                $containers[$containerIndex]["item_count"]++;
+            }
+        }
 
         $today = date("Y-m-d");
 
@@ -277,25 +342,31 @@
             !empty($pass["licence_expiry"]) &&
             $pass["licence_expiry"] >= $today;
 
-        $appointmentDate = !empty($pass["appointment_date"])
-            ? date("Y-m-d", strtotime((string) $pass["appointment_date"]))
-            : null;
+        $appointmentDate = null;
 
+        if (!empty($pass["appointment_date"])) {
+            $appointmentTimestamp = strtotime((string) $pass["appointment_date"]);
+
+            if ($appointmentTimestamp !== false) {
+                $appointmentDate = date("Y-m-d", $appointmentTimestamp);
+            }
+        }
+
+        $appointmentIsToday = $appointmentDate === $today;
         $passExpired = $appointmentDate !== null && $appointmentDate < $today;
         $used = (bool) $pass["used"];
 
         $passEligible =
             $passStatus === "active" &&
-            $appointmentDate === $today &&
+            $appointmentIsToday &&
             !$used;
 
-        $appointmentEligible =
-            $appointmentDate === $today &&
-            (
-                $direction === "in"
-                    ? in_array($appointmentStatus, ["confirmed", "arrived"], true)
-                    : in_array($appointmentStatus, ["in terminal", "in_terminal"], true)
-            );
+        $appointmentEligible = $direction === "in"
+            ? (
+                $appointmentIsToday &&
+                in_array($appointmentStatus, ["confirmed", "arrived"], true)
+            )
+            : in_array($appointmentStatus, ["in terminal", "in_terminal"], true);
 
         $appointmentContainers = !empty($pass["appointment_container_nos"])
             ? array_values(
@@ -558,34 +629,59 @@
         );
 
         $conn->beginTransaction();
-
+        
         $audit = $conn->prepare("
-            INSERT INTO gate_movement_audit (
+            INSERT INTO activity_logs (
                 id,
-                appointment_id,
-                gate_pass_id,
-                operator_id,
-                event_type,
-                event_data
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                new_values,
+                metadata,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :new_values,
+                :metadata,
+                :severity,
+                NOW()
+            )
         ");
 
         $audit->execute([
-            generateId(),
-            $pass["appointment_id"],
-            $pass["gate_pass_id"],
-            $my_details->id ?? null,
-            "PASS_VERIFIED",
-            json_encode([
+            ":id" => generateId(),
+            ":actor_id" => $my_details->id ?? null,
+            ":category" => "GATE",
+            ":action" => "PASS_VERIFIED",
+            ":entity_type" => "GATE_PASS",
+            ":entity_id" => $pass["gate_pass_id"],
+            ":description" => "Gate pass verified for vehicle " . $pass["vehicle"]["plate"] . ".",
+            ":new_values" => json_encode([
                 "direction" => $direction,
+                "used" => $used,
+                "status_label" => $statusLabel
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "gate_movement_audit",
+                "appointment_id" => $pass["appointment_id"],
+                "gate_pass_id" => $pass["gate_pass_id"],
                 "pass_code" => $pass["pass_code"],
                 "plate" => $pass["vehicle"]["plate"],
                 "organisation_id" => $pass["organisation_id"],
-                "used" => $used,
-                "status_label" => $statusLabel,
                 "checks" => $checks,
                 "holds" => $holds
-            ], JSON_UNESCAPED_SLASHES)
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":severity" => !empty($holds) ? "WARNING" : "INFO"
         ]);
 
         $conn->commit();

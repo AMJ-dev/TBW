@@ -145,9 +145,7 @@ export default function ExaminationReviewDetailsPage() {
 		try {
 			setLoading(true);
 
-			const response = await http.get(
-				`/operator/examination/review/${id}/`,
-			);
+			const response = await http.get(`/operations/examination/review/${id}/`);
 
 			const resp = response.data as Resp;
 
@@ -230,10 +228,7 @@ export default function ExaminationReviewDetailsPage() {
 				remarks: remarks.trim(),
 			};
 
-			const response = await http.post(
-				"/operator/examination/review/save/",
-				payload,
-			);
+			const response = await http.post("/operations/examination/review/save/", payload);
 
 			const resp = response.data as Resp;
 

@@ -66,7 +66,6 @@ try {
             s.package_count,
             s.gross_weight,
             s.volume,
-            s.hs_code,
             s.dangerous_goods,
             s.temperature_controlled,
             s.temperature,

@@ -32,7 +32,23 @@ import { AppShell, StatusBadge, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
-import { resolveSrc, statusLabel } from "@/lib/functions";
+import { resolveSrc, statusLabel, format_currency } from "@/lib/functions";
+
+type ShipmentContainerItem = {
+	id: string;
+	container_id: string;
+	customs_tariff_id: string;
+	hs_code?: string | null;
+	item_description?: string | null;
+	customs_tariff_description?: string | null;
+	quantity?: string | number | null;
+	unit_of_measure?: string | null;
+	unit_value?: string | number | null;
+	currency?: string | null;
+	total_value?: string | number | null;
+	created_at?: string;
+	updated_at?: string;
+};
 
 type ShipmentContainer = {
 	id: string;
@@ -41,11 +57,7 @@ type ShipmentContainer = {
 	seal_no?: string | null;
 	package_count?: string | number | null;
 	gross_weight?: string | number | null;
-	cargo_description?: string | null;
 	package_type?: string | null;
-	hs_code?: string | null;
-	customs_tariff_id?: string | null;
-	customs_tariff_description?: string | null;
 	status?: string | null;
 	gate_in_at?: string | null;
 	received_at?: string | null;
@@ -53,6 +65,8 @@ type ShipmentContainer = {
 	gate_out_at?: string | null;
 	updated_at?: string | null;
 	created_at?: string;
+	items?: ShipmentContainerItem[];
+	item_count?: number;
 };
 
 type ShipmentDocument = {
@@ -307,7 +321,12 @@ export default function PortalShipmentDetailsPage() {
 
 			setShipment({
 				...record,
-				containers: Array.isArray(record.containers) ? record.containers : [],
+				containers: Array.isArray(record.containers)
+					? record.containers.map((container: ShipmentContainer) => ({
+						...container,
+						items: Array.isArray(container.items) ? container.items : [],
+					}))
+					: [],
 				documents: Array.isArray(record.documents) ? record.documents : [],
 				reviews: Array.isArray(record.reviews) ? record.reviews : [],
 			});
@@ -783,77 +802,40 @@ export default function PortalShipmentDetailsPage() {
 												)}
 											</div>
 
-											{/* Container Details / Info */}
-											<div className="grid gap-6 p-5 sm:grid-cols-2">
-												<div className="space-y-4">
-													{/* Cargo Description */}
-													<div>
-														<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
-															Cargo Description (Declared Items)
-														</p>
-														<p className="mt-1 text-[13px] leading-relaxed text-ink">
-															{container.cargo_description || container.customs_tariff_description || "—"}
-														</p>
-													</div>
-
-													{/* HS Code / Customs Tariff */}
-													<div className="rounded-xl border border-teal/20 bg-teal/5 p-4">
-														<div className="flex items-start gap-3">
-															<ShieldCheck className="mt-0.5 size-4 shrink-0 text-teal-deep" />
-															<div>
-																<p className="font-mono text-[10px] uppercase tracking-[0.14em] text-teal-deep">
-																	Customs / HS Classification
-																</p>
-																<p className="mt-1 font-mono text-base font-bold text-ink">
-																	{container.hs_code || "—"}
-																</p>
-																{container.customs_tariff_id && (
-																	<p className="mt-1 font-mono text-[10px] text-ink-soft">
-																		Tariff ID: {container.customs_tariff_id}
-																	</p>
-																)}
-															</div>
+												<div className="space-y-5 p-5">
+													<div className="grid gap-5 sm:grid-cols-2">
+														<div className="grid grid-cols-2 gap-4">
+															<div><dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">Size</dt><dd className="mt-1 text-[13px] font-medium text-ink">{container.size || "—"}</dd></div>
+															<div><dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">Seal Number</dt><dd className="mt-1 font-mono text-[13px] text-ink">{container.seal_no || "—"}</dd></div>
+															<div><dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">Packages</dt><dd className="mt-1 font-mono text-[13px] text-ink">{formatNumber(container.package_count)}</dd></div>
+															<div><dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">Gross Weight</dt><dd className="mt-1 font-mono text-[13px] text-ink">{container.gross_weight != null && container.gross_weight !== "" ? `${formatNumber(container.gross_weight)} kg` : "—"}</dd></div>
 														</div>
+													<div className="rounded-xl border border-line bg-sand/50 p-4">
+														<div className="flex items-center justify-between gap-3"><p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">Declared cargo items</p><span className="rounded-full bg-orange/10 px-2.5 py-1 font-mono text-[10px] font-semibold text-orange-deep">{container.item_count ?? container.items?.length ?? 0}</span></div>
+														<p className="mt-2 text-xs leading-5 text-ink-soft">Each item is classified separately using its customs tariff.</p>
 													</div>
-												</div>
-
-												{/* Container Stats */}
-												<div className="grid grid-cols-2 gap-y-4">
-													<div>
-														<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-															Size
-														</dt>
-														<dd className="mt-1 text-[13px] font-medium text-ink">
-															{container.size || "—"}
-														</dd>
-													</div>
-													<div>
-														<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-															Seal Number
-														</dt>
-														<dd className="mt-1 font-mono text-[13px] text-ink">
-															{container.seal_no || "—"}
-														</dd>
-													</div>
-													<div>
-														<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-															Packages
-														</dt>
-														<dd className="mt-1 font-mono text-[13px] text-ink">
-															{formatNumber(container.package_count)}
-														</dd>
-													</div>
-													<div>
-														<dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">
-															Gross Weight
-														</dt>
-														<dd className="mt-1 font-mono text-[13px] text-ink">
-															{container.gross_weight ? `${formatNumber(container.gross_weight)} kg` : "—"}
-														</dd>
-													</div>
-												</div>
 											</div>
-
+											{(container.items ?? []).length === 0 ? (
+												<div className="rounded-xl border border-dashed border-line p-6 text-center"><Package className="mx-auto size-6 text-ink-soft" /><p className="mt-2 text-sm font-medium text-ink">No cargo items recorded</p></div>
+											) : (
+												<div className="space-y-3">
+													{container.items!.map((item, itemIndex) => (
+														<div key={item.id} className="rounded-xl border border-line p-4">
+															<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+																<div className="min-w-0"><p className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink-soft">Item {itemIndex + 1}</p><p className="mt-1 text-sm font-semibold text-ink">{item.item_description || "Unnamed cargo item"}</p>{item.customs_tariff_description && <p className="mt-1 text-xs leading-5 text-ink-soft">{item.customs_tariff_description}</p>}</div>
+																<div className="shrink-0 rounded-lg bg-teal/5 px-3 py-2 ring-1 ring-teal/20"><p className="font-mono text-[9px] uppercase tracking-[0.12em] text-teal-deep">HS Code</p><p className="mt-1 font-mono text-sm font-bold text-ink">{item.hs_code || "—"}</p></div>
+															</div>
+														<div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+															<div><p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">Quantity</p><p className="mt-1 text-[13px] font-medium text-ink">{formatNumber(item.quantity)} {item.unit_of_measure || ""}</p></div>
+															<div><p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">Unit value</p><p className="mt-1 font-mono text-[13px] text-ink">{format_currency(item.unit_value, item.currency)}</p></div>
+															<div><p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">Total value</p><p className="mt-1 font-mono text-[13px] font-semibold text-ink">{format_currency(item.total_value, item.currency)}</p></div>
+															<div className="min-w-0"><p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">Tariff reference</p><p className="mt-1 truncate font-mono text-[10px] text-ink-soft" title={item.customs_tariff_id}>{item.customs_tariff_id || "—"}</p></div>
+													</div>
+											</div>
+											))}
+										</div>
+									)}
+								</div>
 											{/* Container Timeline */}
 											{(container.gate_in_at || container.received_at || container.stored_at || container.gate_out_at) && (
 												<div className="border-t border-line bg-sand/30 px-5 py-4">

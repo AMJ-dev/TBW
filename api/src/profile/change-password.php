@@ -193,16 +193,48 @@
         $subject = "Your TRINU password has been changed";
 
         $message = "
-        <html>
-        <body style=\"font-family:Arial,sans-serif;line-height:1.6;color:#222;\">
-            <h2>Password Changed</h2>
-            <p>Hello " . htmlspecialchars($user["full_name"]) . ",</p>
-            <p>Your TRINU BONDED WAREHOUSE account password was successfully changed.</p>
-            <p>All other active sessions on your account have been signed out.</p>
-            <p>If you did not make this change, please contact your administrator immediately.</p>
-            <p>Regards,<br>TRINU BONDED WAREHOUSE</p>
-        </body>
-        </html>
+            <div style='display:inline-block;background-color:#FFF0E5;color:#D95700;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:7px 12px;border-radius:20px;margin-bottom:20px;'>
+                Account security
+            </div>
+
+            <h1 style='margin:0 0 14px;font-size:25px;line-height:1.3;font-weight:800;color:#2B2A28;'>
+                Your password has been changed
+            </h1>
+
+            <p style='margin:0 0 16px;font-size:15px;line-height:1.7;color:#2B2A28;'>
+                Hello " . htmlspecialchars($user["full_name"], ENT_QUOTES, "UTF-8") . ",
+            </p>
+
+            <p style='margin:0 0 24px;font-size:14px;line-height:1.8;color:#6B6357;'>
+                Your TRINŪ Bonded Terminal Digital Platform account password was successfully changed.
+            </p>
+
+            <table role='presentation' width='100%' cellpadding='0' cellspacing='0' border='0' style='margin-bottom:24px;'>
+                <tr>
+                    <td bgcolor='#FAF0E3' style='background-color:#FAF0E3;border:1px solid #E8D9C2;border-radius:12px;padding:20px;'>
+                        <div style='font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#8C7C69;margin-bottom:8px;'>
+                            Security update
+                        </div>
+                        <div style='font-size:15px;font-weight:700;color:#2B2A28;margin-bottom:6px;'>
+                            Password successfully updated
+                        </div>
+                        <div style='font-size:13px;line-height:1.7;color:#6B6357;'>
+                            All other active sessions on your account have been signed out.
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <div style='padding:16px;background-color:#FFF4E9;border-left:3px solid #FF6600;border-radius:4px;'>
+                <p style='margin:0;font-size:13px;line-height:1.7;color:#765C45;'>
+                    <strong style='color:#2B2A28;'>Didn't make this change?</strong>
+                    If you did not change your password, contact your administrator immediately to secure your account.
+                </p>
+            </div>
+
+            <p style='margin:24px 0 0;font-size:14px;line-height:1.7;color:#6B6357;'>
+                Thank you for keeping your account secure.
+            </p>
         ";
 
         send_email($user["email"], $user["full_name"], $subject, $message);

@@ -89,7 +89,7 @@
             "body" => $body,
             "gateway" => "direct-corporate"
         ];
-
+ 
         $ch = curl_init($url);
         
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -105,7 +105,7 @@
         $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
         
-        curl_close($ch);
+        // curl_close($ch);
 
         if ($error) {
             return [
@@ -133,49 +133,67 @@
         $template = str_replace("<!-- #{date_year} -->", date("Y"), $template);
        
         try {
-            $mail = new PHPMailer(true);             
-            $mail->isSMTP();      
-            $mail->Mailer = "smtp";                                      
-            $mail->SMTPAuth=true;                                            
-            $mail->SMTPKeepAlive=true;                                
-            $mail->SMTPSecure = "ssl"; 
+            $mail = new PHPMailer(true);
+
+            $mail->isSMTP();
+            $mail->Mailer = "smtp";
+            $mail->SMTPAuth = true;
+            $mail->SMTPKeepAlive = true;
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
             $mail->CharSet = "UTF-8";
-            $mail->Encoding = "base64";                                            
-            $mail->Host       = $email_host;                    
-            $mail->Port       = $email_port;                
-            $mail->Username   = $email_user;                    
-            $mail->Password   = $email_password; 
-            $mail->Sender = $sender_email;    
-            $mail->From     = $sender_email;
-            $mail->FromName = $AppName;                         
+            $mail->Encoding = "base64";
+
+            $mail->Host = $email_host;
+            $mail->Port = $email_port;
+            $mail->Username = $email_user;
+            $mail->Password = $email_password;
+
+            $mail->Sender = $sender_email;
+            $mail->From = $sender_email;
+            $mail->FromName = $AppName;
+
             $mail->Subject = $subject;
-            $mail->Body    = $template;
-            $mail->addAddress($to, $name);
-            
-            if(!empty($reply_to)) $mail->addReplyTo($reply_to, $reply_name);  
-            else $mail->addReplyTo($sender_email, $AppName);
-            if (is_array($attachment) && isset($attachment['path']) && file_exists($attachment['path'])) {
-                $name = isset($attachment['name']) ? $attachment['name'] : basename($attachment['path']);
-                $mail->addAttachment($attachment['path'], $name);
-            }
+            $mail->Body = $template;
+
             $mail->isHTML(true);
-            try {
-                $is_send = $mail->send();
-                $mail->clearAddresses();
-                $mail->clearAttachments();
-                $mail->clearAllRecipients();
-                $mail->clearCustomHeaders();
-                return $is_send;
-            } catch (\Throwable $th) {
-                throw $th;
+
+            $mail->addAddress($to, $name);
+
+            if (!empty($reply_to)) $mail->addReplyTo($reply_to, $reply_name);
+            else $mail->addReplyTo($sender_email, $AppName);
+
+            if (is_array($attachment) && isset($attachment['path']) && file_exists($attachment['path'])) {
+                $attachment_name = $attachment['name'] ?? basename($attachment['path']);
+                $mail->addAttachment($attachment['path'], $attachment_name);
             }
+
+            $smtp_debug = [];
+
+            $mail->SMTPDebug = 2;
+
+            $mail->Debugoutput = function ($str, $level) use (&$smtp_debug) {
+                $smtp_debug[] = [
+                    "level" => $level,
+                    "message" => trim($str)
+                ];
+            };
+
+            $is_send = $mail->send();
+
+            $mail->clearAddresses();
+            $mail->clearAttachments();
+            $mail->clearAllRecipients();
+            $mail->clearCustomHeaders();
+
+            return $is_send;
+
         } catch (Exception $e) {
             echo "Message could not be sent. Mailer Error: {$mail->ErrorInfo}";
         }
     }
     function update_integration_setting(string $encryptionKey): bool {
         global $conn,$redis;
-
+ 
         $q = $conn->prepare("
             SELECT
                 a.adapter_key,

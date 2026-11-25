@@ -249,7 +249,7 @@ function ContainerSelector({
 			setHasSearched(false);
 			setOpen(false);
 
-			const response = await http.post("/operator/examination/search/", {
+			const response = await http.post("/operations/examination/search/", {
 				q: value,
 				where: searchType,
 			});
@@ -559,7 +559,7 @@ export default function ScheduleExaminationPage() {
 			setLoadingOfficers(true);
 
 			const response = await http.get(
-				"/operator/examination/officers/",
+				"/operations/examination/officers/",
 			);
 
 			const resp: Resp = response.data;
@@ -681,7 +681,7 @@ export default function ScheduleExaminationPage() {
 			};
 
 			const response = await http.post(
-				"/operator/examination/save/",
+				"/operations/examination/save/",
 				payload,
 			);
 

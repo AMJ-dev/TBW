@@ -13,6 +13,7 @@ import {
 import { AppShell, StatusBadge, statusTone, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { format_currency } from "@/lib/functions";
 
 interface PaymentReceipt {
 	id: string;
@@ -87,17 +88,9 @@ export default function PortalPaymentsRoute() {
 
 	const [formInvoice, setFormInvoice] = useState("");
 	const [formAmount, setFormAmount] = useState("");
-	const [formChannel, setFormChannel] =
-		useState<PaymentReceipt["channel"]>("Bank Transfer");
+	const [formChannel, setFormChannel] = useState<PaymentReceipt["channel"]>("Bank Transfer");
 	const [formRef, setFormRef] = useState("");
 
-	const formatNaira = (amount: number) => {
-		return new Intl.NumberFormat("en-NG", {
-			style: "currency",
-			currency: "NGN",
-			maximumFractionDigits: 0,
-		}).format(amount);
-	};
 
 	const filteredPayments = useMemo(() => {
 		return payments.filter((item) => {
@@ -123,8 +116,8 @@ export default function PortalPaymentsRoute() {
 			.reduce((sum, p) => sum + p.amount, 0);
 
 		return {
-			totalSettled: formatNaira(totalReconciled),
-			pendingVerification: formatNaira(pendingTotal),
+			totalSettled: format_currency(totalReconciled),
+			pendingVerification: format_currency(pendingTotal),
 			receiptCount: payments.length,
 			creditLimit: "₦25,000,000",
 		};
@@ -314,7 +307,7 @@ export default function PortalPaymentsRoute() {
 											<div className="text-[10px] text-ink-soft">{p.time}</div>
 										</td>
 										<td className="px-4 py-4 font-mono text-sm font-semibold text-ink">
-											{formatNaira(p.amount)}
+											{format_currency(p.amount)}
 										</td>
 										<td className="px-4 py-4">
 											<StatusBadge label={p.status} tone={statusTone(p.status)} />
@@ -391,7 +384,7 @@ export default function PortalPaymentsRoute() {
 										: "Processing"}
 								</h4>
 								<div className="mt-1 font-mono text-2xl font-bold text-ink">
-									{formatNaira(selectedReceipt.amount)}
+									{format_currency(selectedReceipt.amount)}
 								</div>
 								<p className="mt-1 font-mono text-xs text-ink-soft">
 									Ref: {selectedReceipt.referenceCode}

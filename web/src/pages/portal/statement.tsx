@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { AppShell, Metric, StatusBadge, statusTone } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { format_currency } from "@/lib/functions";
 
 interface StatementEntry {
 	id: string;
@@ -169,13 +170,6 @@ export default function StatementPage() {
 		return { debits, credits, closing };
 	}, [filteredEntries]);
 
-	const formatNaira = (n: number) =>
-		new Intl.NumberFormat("en-NG", {
-			style: "currency",
-			currency: "NGN",
-			maximumFractionDigits: 0,
-		}).format(n);
-
 	const downloadStatement = () => {
 		toast.success("Statement prepared locally for download.");
 	};
@@ -217,27 +211,27 @@ export default function StatementPage() {
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 				<Metric
 					label="Opening balance"
-					value={formatNaira(openingBalance)}
+					value={format_currency(openingBalance)}
 					detail="As at 01 Sep 2026"
 					icon={Wallet}
 				/>
 				<Metric
 					label="Invoiced in period"
-					value={formatNaira(totals.debits)}
+					value={format_currency(totals.debits)}
 					detail={`${filteredEntries.filter((e) => e.type === "Invoice").length} invoices`}
 					tone="info"
 					icon={Receipt}
 				/>
 				<Metric
 					label="Settled in period"
-					value={formatNaira(totals.credits)}
+					value={format_currency(totals.credits)}
 					detail={`${filteredEntries.filter((e) => e.type === "Receipt").length} receipts`}
 					tone="success"
 					icon={Check}
 				/>
 				<Metric
 					label="Closing balance"
-					value={formatNaira(totals.closing)}
+					value={format_currency(totals.closing)}
 					detail="Amount outstanding as at period end"
 					tone={totals.closing > 0 ? "warning" : "success"}
 					icon={TrendingUp}
@@ -319,7 +313,7 @@ export default function StatementPage() {
 									Opening balance as at 01 Sep 2026
 								</td>
 								<td className="px-4 py-3 text-right font-mono text-[12px] font-semibold text-ink">
-									{formatNaira(openingBalance)}
+									{format_currency(openingBalance)}
 								</td>
 								<td className="px-4 py-3" />
 								<td className="px-4 py-3" colSpan={3} />
@@ -343,10 +337,10 @@ export default function StatementPage() {
 										{e.type}
 									</td>
 									<td className="px-4 py-3.5 text-right font-mono text-[12px] text-ink">
-										{e.debit ? formatNaira(e.debit) : "—"}
+										{e.debit ? format_currency(e.debit) : "—"}
 									</td>
 									<td className="px-4 py-3.5 text-right font-mono text-[12px] text-teal-deep">
-										{e.credit ? formatNaira(e.credit) : "—"}
+										{e.credit ? format_currency(e.credit) : "—"}
 									</td>
 									<td className="px-4 py-3.5">
 										<StatusBadge label={e.status} tone={statusTone(e.status)} />
@@ -368,10 +362,10 @@ export default function StatementPage() {
 									Totals for period
 								</td>
 								<td className="px-4 py-4 text-right font-mono text-[13px] font-bold text-ink">
-									{formatNaira(totals.debits)}
+									{format_currency(totals.debits)}
 								</td>
 								<td className="px-4 py-4 text-right font-mono text-[13px] font-bold text-teal-deep">
-									{formatNaira(totals.credits)}
+									{format_currency(totals.credits)}
 								</td>
 								<td colSpan={2} />
 							</tr>
@@ -382,7 +376,7 @@ export default function StatementPage() {
 								</td>
 								<td colSpan={2} className="px-4 py-5 text-right">
 									<span className="font-mono text-[16px] font-bold text-ink">
-										{formatNaira(totals.closing)}
+										{format_currency(totals.closing)}
 									</span>
 								</td>
 								<td colSpan={2} />

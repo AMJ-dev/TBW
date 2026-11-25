@@ -21,7 +21,6 @@ try {
             category,
             icon,
             enabled,
-            environment,
             fields
         FROM integration_adapters
         ORDER BY name ASC
@@ -53,6 +52,7 @@ try {
     }
 
     $savedCredentials = [];
+    $bankAccounts = [];
 
     foreach ($credentialRows as $credential) {
         $encryptedValue = base64_decode(
@@ -83,6 +83,14 @@ try {
 
         $integrationId = (string) $credential["integration_id"];
         $fieldKey = (string) $credential["field_key"];
+
+        if ($fieldKey === "bank_accounts") {
+            $decodedAccounts = json_decode($value, true);
+            if (is_array($decodedAccounts) && array_is_list($decodedAccounts)) {
+                $bankAccounts = $decodedAccounts;
+            }
+            continue;
+        }
 
         $savedCredentials[$integrationId][$fieldKey] = $value;
     }
@@ -150,8 +158,8 @@ try {
                 FILTER_VALIDATE_BOOLEAN
             );
 
-            $credential = $savedCredentials[(string) $row["id"]][$key] ?? null;
             $value = $savedCredentials[(string) $row["id"]][$key] ?? "";
+
             $normalisedFields[] = [
                 "key" => $key,
                 "label" => $label,
@@ -162,7 +170,7 @@ try {
                     FILTER_VALIDATE_BOOLEAN
                 ),
                 "secret" => $isSecret,
-                "configured" => (bool) ($credential["configured"] ?? false),
+                "configured" => $value !== "",
                 "value" => $value
             ];
         }
@@ -174,7 +182,6 @@ try {
             "category" => (string) ($row["category"] ?? ""),
             "icon" => (string) ($row["icon"] ?? "Webhook"),
             "enabled" => (bool) $row["enabled"],
-            "environment" => (string) ($row["environment"] ?? "sandbox"),
             "fields" => $normalisedFields
         ];
     }
@@ -183,11 +190,11 @@ try {
         "error" => false,
         "data" => true,
         "code" => [
-            "integrations" => $integrations
+            "integrations" => $integrations,
+            "bank_accounts" => $bankAccounts
         ]
-    ]);
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } catch (Throwable $e) {
-
     echo json_encode([
         "error" => true,
         "data" => "Could not load integrations configuration.",

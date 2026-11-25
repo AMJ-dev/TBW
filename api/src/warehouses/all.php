@@ -47,7 +47,7 @@
 				pc.size AS container_size,
 				pc.seal_no,
 				pc.gross_weight,
-				pc.cargo_description,
+				ps.cargo_description,
 				pc.status AS container_status,
 				fl.code AS from_location_code,
 				fl.name AS from_location_name,
@@ -103,6 +103,6 @@
 		echo json_encode([
 			"error" => true,
 			"data" => "Could not load warehouse movements.",
-			"code" => null
+			"code" => $e->getMessage()
 		]);
 	}

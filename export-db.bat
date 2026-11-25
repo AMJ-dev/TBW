@@ -5,3 +5,5 @@ cd ..
 git add . 
 git commit -m "working"
 git push
+
+@REM git reset --soft HEAD~1

@@ -43,8 +43,6 @@ try {
     $shipment = $shipment_stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$shipment) {
-        http_response_code(404);
-
         echo json_encode([
             "error" => true,
             "data" => "Shipment not found.",

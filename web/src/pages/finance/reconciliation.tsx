@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LocalFilePicker } from "@/components/ui/local-file-picker";
 import { cn } from "@/lib/utils";
+import { format_currency } from "@/lib/functions";
 
 type BankLineStatus =
 	| "Matched"
@@ -127,13 +128,6 @@ const initialLines: BankLine[] = [
 		notes: "Bank fees excluded from reconciliation.",
 	},
 ];
-
-const formatNaira = (amount: number) =>
-	new Intl.NumberFormat("en-NG", {
-		style: "currency",
-		currency: "NGN",
-		maximumFractionDigits: 0,
-	}).format(amount);
 
 function parseStatementCsv(content: string): BankLine[] | null {
 	const rows = content.split(/\r?\n/).filter((row) => row.trim()).map(parseCsvRow);
@@ -424,7 +418,7 @@ export default function FinanceReconciliationRoute() {
 											)}
 										>
 											{l.direction === "credit" ? "+" : "−"}
-											{formatNaira(l.amount)}
+											{format_currency(l.amount)}
 										</td>
 										<td className="px-4 py-3.5">
 											{l.suggestedMatch ? (
@@ -599,7 +593,7 @@ function LineDetailDialog({
 							)}
 						>
 							{line.direction === "credit" ? "+" : "−"}
-							{formatNaira(line.amount)}
+							{format_currency(line.amount)}
 						</p>
 					</div>
 

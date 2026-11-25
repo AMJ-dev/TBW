@@ -434,7 +434,7 @@ export default function OperationsYardRoute() {
 		try {
 			setLoading(true);
 
-			const response = await http.get("/operator/yards/");
+			const response = await http.get("/operations/yards/");
 			const resp: Resp = response.data;
 
 			if (resp.error) {
@@ -464,7 +464,7 @@ export default function OperationsYardRoute() {
 		try {
 			setLoadingEquipment(true);
 
-			const response = await http.get("/operator/yards/equipments/");
+			const response = await http.get("/operations/yards/equipments/");
 			const resp: Resp = response.data;
 
 			if (resp.error) {
@@ -1028,7 +1028,7 @@ function IntakeView({
 		setAssignments({});
 
 		try {
-			const response = await http.post("/operator/yards/search/", {
+			const response = await http.post("/operations/yards/search/", {
 				q: value,
 				where: searchWhere,
 			});
@@ -1181,7 +1181,7 @@ function IntakeView({
 		setSaving(true);
 
 		try {
-			const response = await http.post("/operator/yards/save/", {
+			const response = await http.post("/operations/yards/save/", {
 				shipment_id: shipment.shipment_id,
 				containers,
 			});

@@ -70,24 +70,47 @@
             exit;
         }
 
-        $requestedStatus = trim((string) ($_POST["status"] ?? "PENDING_REVIEW"));
-
-        $status = in_array($requestedStatus, ["DRAFT", "PENDING_REVIEW"], true)
-            ? $requestedStatus
-            : "PENDING_REVIEW";
+        $status = "PENDING_REVIEW";
 
         $declarationAccepted = strtolower(trim((string) (
             $_POST["declaration_accepted"] ?? $_POST["declarationAccepted"] ?? "0"
         )));
 
-        if (
-            $status === "PENDING_REVIEW" &&
-            !in_array($declarationAccepted, ["1", "true", "yes", "on"], true)
-        ) {
+        if (!in_array($declarationAccepted, ["1", "true", "yes", "on"], true)) {
             throw new InvalidArgumentException(
                 "Please accept the shipment declaration before submitting."
             );
         }
+
+        $valuationBasis = strtoupper(trim((string) (
+            $_POST["valuation_basis"] ?? $_POST["valuationBasis"] ?? ""
+        )));
+
+        $freightInsuranceCurrency = strtoupper(trim((string) (
+            $_POST["freight_insurance_currency"]
+            ?? $_POST["freightInsuranceCurrency"]
+            ?? "NGN"
+        )));
+
+        $freightCost = $_POST["freight_cost"] ?? $_POST["freightCost"] ?? "";
+        $insuranceCost = $_POST["insurance_cost"] ?? $_POST["insuranceCost"] ?? "";
+
+        if (!in_array($valuationBasis, ["CIF", "FOB", "EXW", "OTHER"], true)) {
+            throw new InvalidArgumentException("Select a valid cargo valuation basis.");
+        }
+
+        if (!in_array($freightInsuranceCurrency, ["NGN", "USD"], true)) {
+            throw new InvalidArgumentException("Freight and insurance currency must be NGN or USD.");
+        }
+
+        foreach (["Freight cost" => $freightCost, "Insurance cost" => $insuranceCost] as $label => $amount) {
+            if ($amount !== "" && (!is_numeric($amount) || (float) $amount < 0)) {
+                throw new InvalidArgumentException("Enter a valid " . strtolower($label) . ".");
+            }
+        }
+
+        $freightCost = $freightCost === "" ? null : round((float) $freightCost, 2);
+        $insuranceCost = $insuranceCost === "" ? null : round((float) $insuranceCost, 2);
 
         $shipmentType = trim((string) ($_POST["shipment_type"] ?? $_POST["shipmentType"] ?? ""));
         $cargoCategory = trim((string) ($_POST["cargo_category"] ?? $_POST["cargoCategory"] ?? ""));
@@ -435,6 +458,10 @@
             UPDATE portal_shipments
             SET
                 shipment_type = :shipment_type,
+                valuation_basis = :valuation_basis,
+                freight_insurance_currency = :freight_insurance_currency,
+                freight_cost = :freight_cost,
+                insurance_cost = :insurance_cost,
                 bill_of_lading = :bill_of_lading,
                 booking_number = :booking_number,
                 vessel_name = :vessel_name,
@@ -468,6 +495,10 @@
 
         $updateShipment->execute([
             ":shipment_type" => $shipmentType,
+            ":valuation_basis" => $valuationBasis,
+            ":freight_insurance_currency" => $freightInsuranceCurrency,
+            ":freight_cost" => $freightCost,
+            ":insurance_cost" => $insuranceCost,
             ":bill_of_lading" => $_POST["bill_of_lading"] ?? "",
             ":booking_number" => $_POST["booking_number"] ?? "",
             ":vessel_name" => $_POST["vessel_name"] ?? "",
@@ -526,15 +557,7 @@
                 seal_no,
                 package_count,
                 gross_weight,
-                customs_tariff_id,
-                cargo_description,
-                package_type,
-                hs_code,
-                item_quantity,
-                unit_of_measure,
-                unit_value,
-                currency,
-                total_value
+                status
             ) VALUES (
                 :id,
                 :shipment_id,
@@ -543,15 +566,7 @@
                 :seal_no,
                 :package_count,
                 :gross_weight,
-                :customs_tariff_id,
-                :cargo_description,
-                :package_type,
-                :hs_code,
-                :item_quantity,
-                :unit_of_measure,
-                :unit_value,
-                :currency,
-                :total_value
+                'EXPECTED'
             )
         ");
 
@@ -561,18 +576,38 @@
                 size = :size,
                 seal_no = :seal_no,
                 package_count = :package_count,
-                gross_weight = :gross_weight,
-                customs_tariff_id = :customs_tariff_id,
-                cargo_description = :cargo_description,
-                package_type = :package_type,
-                hs_code = :hs_code,
-                item_quantity = :item_quantity,
-                unit_of_measure = :unit_of_measure,
-                unit_value = :unit_value,
-                currency = :currency,
-                total_value = :total_value
+                gross_weight = :gross_weight
             WHERE id = :id
             AND shipment_id = :shipment_id
+        ");
+
+        $deleteContainerItems = $conn->prepare("
+            DELETE FROM portal_shipment_container_items
+            WHERE container_id = :container_id
+        ");
+
+        $insertContainerItem = $conn->prepare("
+            INSERT INTO portal_shipment_container_items (
+                id,
+                container_id,
+                customs_tariff_id,
+                item_description,
+                quantity,
+                unit_of_measure,
+                unit_value,
+                currency,
+                total_value
+            ) VALUES (
+                :id,
+                :container_id,
+                :customs_tariff_id,
+                :item_description,
+                :quantity,
+                :unit_of_measure,
+                :unit_value,
+                :currency,
+                :total_value
+            )
         ");
 
         $tariffByIdQuery = $conn->prepare("
@@ -657,141 +692,41 @@
                 $container["sealNo"] ?? $container["seal_no"] ?? ""
             )) ?: null;
 
-            $cargoDescription = trim((string) (
-                $container["cargoDescription"]
-                ?? $container["cargo_description"]
-                ?? ""
-            ));
-
             $containerPackageType = trim((string) (
                 $container["packageType"]
                 ?? $container["package_type"]
                 ?? $packageType
-            ));
+            )) ?: null;
 
-            $hsCode = trim((string) (
-                $container["hsCode"] ?? $container["hs_code"] ?? ""
-            ));
+            $items = $container["items"] ?? [];
 
-            $tariffId = trim((string) (
-                $container["customsTariffId"]
-                ?? $container["customs_tariff_id"]
-                ?? ""
-            ));
+            if (is_string($items)) {
+                $items = json_decode($items, true);
 
-            $itemQuantity = $container["itemQuantity"]
-                ?? $container["item_quantity"]
-                ?? $containerCount;
-
-            $unitOfMeasure = trim((string) (
-                $container["unitOfMeasure"]
-                ?? $container["unit_of_measure"]
-                ?? $containerPackageType
-            ));
-
-            $unitValue = $container["unitValue"]
-                ?? $container["unit_value"]
-                ?? 0;
-
-            $currency = strtoupper(trim((string) (
-                $container["currency"] ?? "NGN"
-            )));
-
-            if (
-                $itemQuantity !== "" &&
-                (!is_numeric($itemQuantity) || (float) $itemQuantity < 0)
-            ) {
-                throw new InvalidArgumentException(
-                    "Invalid cargo quantity for container " . $containerNo . "."
-                );
+                if (json_last_error() !== JSON_ERROR_NONE || !is_array($items)) {
+                    throw new InvalidArgumentException(
+                        "Invalid declared items for container " . $containerNo . "."
+                    );
+                }
             }
 
-            if (!is_numeric($unitValue) || (float) $unitValue < 0) {
+            if (!is_array($items)) {
                 throw new InvalidArgumentException(
-                    "Invalid cargo unit value for container " . $containerNo . "."
-                );
-            }
-
-            if (!preg_match('/^[A-Z]{3}$/', $currency)) {
-                throw new InvalidArgumentException(
-                    "Use a valid three-letter currency code for container " .
-                    $containerNo . "."
-                );
-            }
-
-            $tariff = null;
-
-            if ($tariffId !== "") {
-                $tariffByIdQuery->execute([
-                    ":id" => $tariffId
-                ]);
-
-                $tariff = $tariffByIdQuery->fetch(PDO::FETCH_ASSOC) ?: null;
-            } elseif ($hsCode !== "") {
-                $tariffByHsCodeQuery->execute([
-                    ":hs_code" => $hsCode
-                ]);
-
-                $tariff = $tariffByHsCodeQuery->fetch(PDO::FETCH_ASSOC) ?: null;
-            }
-
-            if ($tariffId !== "" && !$tariff) {
-                throw new InvalidArgumentException(
-                    "The selected customs tariff is invalid, inactive, or outside its effective dates for container " .
-                    $containerNo . "."
+                    "Invalid declared items for container " . $containerNo . "."
                 );
             }
 
             if (
                 $status === "PENDING_REVIEW" &&
-                $cargoCategory === "Containerised Cargo"
+                $cargoCategory === "Containerised Cargo" &&
+                count($items) === 0
             ) {
-                if ($cargoDescription === "") {
-                    throw new InvalidArgumentException(
-                        "Cargo description is required for container " .
-                        $containerNo . "."
-                    );
-                }
-
-                if (!$tariff) {
-                    throw new InvalidArgumentException(
-                        "Select a valid customs tariff for container " .
-                        $containerNo . "."
-                    );
-                }
-
-                if (
-                    $hsCode !== "" &&
-                    strcasecmp($hsCode, (string) $tariff["hs_code"]) !== 0
-                ) {
-                    throw new InvalidArgumentException(
-                        "The HS code does not match the selected customs tariff for container " .
-                        $containerNo . "."
-                    );
-                }
+                throw new InvalidArgumentException(
+                    "Add at least one cargo item to container " . $containerNo . "."
+                );
             }
 
-            if ($tariff) {
-                $tariffId = (string) $tariff["id"];
-                $hsCode = (string) $tariff["hs_code"];
-
-                if ($cargoDescription === "") {
-                    $cargoDescription = (string) $tariff["description"];
-                }
-            } else {
-                $tariffId = "";
-            }
-
-            $itemQuantityValue = $itemQuantity === ""
-                ? null
-                : (float) $itemQuantity;
-
-            $unitValueNumber = (float) $unitValue;
-
-            $totalValue = round(
-                ($itemQuantityValue ?? 0) * $unitValueNumber,
-                2
-            );
+            $containerId = $existingContainerNumbers[$containerNo] ?? generateId();
 
             $containerData = [
                 ":shipment_id" => $shipmentId,
@@ -800,25 +735,152 @@
                 ":seal_no" => $sealNo,
                 ":package_count" => $containerCount === "" ? null : $containerCount,
                 ":gross_weight" => $containerWeight === "" ? null : $containerWeight,
-                ":customs_tariff_id" => $tariffId !== "" ? $tariffId : null,
-                ":cargo_description" => $cargoDescription !== "" ? $cargoDescription : null,
-                ":package_type" => $containerPackageType !== "" ? $containerPackageType : null,
-                ":hs_code" => $hsCode !== "" ? $hsCode : null,
-                ":item_quantity" => $itemQuantityValue,
-                ":unit_of_measure" => $unitOfMeasure !== "" ? $unitOfMeasure : null,
-                ":unit_value" => $unitValueNumber,
-                ":currency" => $currency,
-                ":total_value" => $totalValue
+                ":id" => $containerId
             ];
 
             if (isset($existingContainerNumbers[$containerNo])) {
-                $containerId = $existingContainerNumbers[$containerNo];
-                $containerData[":id"] = $containerId;
                 $containerUpdate->execute($containerData);
             } else {
-                $containerId = generateId();
-                $containerData[":id"] = $containerId;
                 $containerInsert->execute($containerData);
+            }
+
+            $deleteContainerItems->execute([
+                ":container_id" => $containerId
+            ]);
+
+            foreach ($items as $item) {
+                if (is_object($item)) {
+                    $item = (array) $item;
+                }
+
+                if (!is_array($item)) {
+                    throw new InvalidArgumentException(
+                        "Invalid cargo item in container " . $containerNo . "."
+                    );
+                }
+
+                $description = trim((string) (
+                    $item["description"]
+                    ?? $item["item_description"]
+                    ?? $item["itemDescription"]
+                    ?? ""
+                ));
+
+                $hsCode = trim((string) (
+                    $item["hsCode"] ?? $item["hs_code"] ?? ""
+                ));
+
+                $tariffId = trim((string) (
+                    $item["customsTariffId"]
+                    ?? $item["customs_tariff_id"]
+                    ?? ""
+                ));
+
+                $quantity = $item["quantity"] ?? "";
+                $unit = trim((string) (
+                    $item["unit"]
+                    ?? $item["unit_of_measure"]
+                    ?? $item["unitOfMeasure"]
+                    ?? ""
+                ));
+
+                $unitValue = $item["unitValue"]
+                    ?? $item["unit_value"]
+                    ?? "";
+
+                $currency = strtoupper(trim((string) (
+                    $item["currency"] ?? "NGN"
+                )));
+
+                $isEmptyItem = (
+                    $description === "" &&
+                    $hsCode === "" &&
+                    $tariffId === "" &&
+                    $quantity === "" &&
+                    $unit === "" &&
+                    $unitValue === ""
+                );
+
+                if ($isEmptyItem) {
+                    continue;
+                }
+
+                if ($description === "") {
+                    throw new InvalidArgumentException(
+                        "Item description is required in container " . $containerNo . "."
+                    );
+                }
+
+                if ($quantity === "" || !is_numeric($quantity) || (float) $quantity <= 0) {
+                    throw new InvalidArgumentException(
+                        "Enter a valid quantity for " . $description . "."
+                    );
+                }
+
+                if ($unit === "") {
+                    throw new InvalidArgumentException(
+                        "Select a unit of measure for " . $description . "."
+                    );
+                }
+
+                if ($unitValue === "" || !is_numeric($unitValue) || (float) $unitValue < 0) {
+                    throw new InvalidArgumentException(
+                        "Enter a valid unit value for " . $description . "."
+                    );
+                }
+
+                if (!in_array($currency, ["NGN", "USD"], true)) {
+                    throw new InvalidArgumentException(
+                        "Currency must be NGN or USD for " . $description . "."
+                    );
+                }
+
+                $tariff = null;
+
+                if ($tariffId !== "") {
+                    $tariffByIdQuery->execute([
+                        ":id" => $tariffId
+                    ]);
+
+                    $tariff = $tariffByIdQuery->fetch(PDO::FETCH_ASSOC) ?: null;
+                } elseif ($hsCode !== "") {
+                    $tariffByHsCodeQuery->execute([
+                        ":hs_code" => $hsCode
+                    ]);
+
+                    $tariff = $tariffByHsCodeQuery->fetch(PDO::FETCH_ASSOC) ?: null;
+                }
+
+                if (!$tariff) {
+                    throw new InvalidArgumentException(
+                        "Select a valid active customs tariff for " . $description . "."
+                    );
+                }
+
+                if (
+                    $hsCode !== "" &&
+                    strcasecmp($hsCode, (string) $tariff["hs_code"]) !== 0
+                ) {
+                    throw new InvalidArgumentException(
+                        "The HS code does not match the selected tariff for " . $description . "."
+                    );
+                }
+
+                $quantityValue = (float) $quantity;
+                $unitValueNumber = (float) $unitValue;
+                $totalValue = round($quantityValue * $unitValueNumber, 2);
+
+                $insertContainerItem->execute([
+                    ":id" => generateId(),
+                    ":container_id" => $containerId,
+                    ":customs_tariff_id" => $tariff["id"],
+                    ":item_description" => $description,
+                    ":quantity" => $quantityValue,
+                    ":unit_of_measure" => $unit,
+                    ":unit_value" => $unitValueNumber,
+                    ":currency" => $currency,
+                    ":total_value" => $totalValue
+                ]);
             }
 
             $processedContainerIds[] = $containerId;

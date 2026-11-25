@@ -1,9 +1,9 @@
-
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
+    header("Content-Type: application/json; charset=utf-8");
+
     if ($_SERVER["REQUEST_METHOD"] !== "GET") {
-    
         echo json_encode(["error" => true, "data" => "Method not allowed.", "code" => null]);
         exit;
     }
@@ -14,7 +14,6 @@
                 p.id AS id,
                 p.id AS gate_pass_id,
                 p.pass_code,
-                p.organisation_id,
                 p.type AS pass_type,
                 p.status AS pass_status,
                 p.issued_at,
@@ -39,7 +38,6 @@
                 v.roadworthiness_expiry,
                 v.insurance_certificate,
                 v.roadworthiness_certificate,
-
                 d.id AS driver_id,
                 d.name AS driver_name,
                 d.phone AS driver_phone,
@@ -50,7 +48,6 @@
                 d.notes AS driver_notes,
                 d.licence_expiry,
                 d.licence_document AS driver_licence_document,
-
                 (
                     SELECT GROUP_CONCAT(
                         ac.container_no
@@ -138,7 +135,6 @@
                 sc.container_no AS shipment_container_no,
                 sc.size,
                 sc.seal_no,
-                sc.hs_code,
                 sc.package_count,
                 sc.gross_weight,
                 sc.status AS container_status,
@@ -154,8 +150,7 @@
                 s.organisation_id AS shipment_organisation_id
             FROM gate_appointment_containers ac
             LEFT JOIN portal_shipment_containers sc
-                ON UPPER(TRIM(sc.container_no)) = UPPER(TRIM(ac.container_no))
-                AND sc.id = (
+                ON sc.id = (
                     SELECT sc2.id
                     FROM portal_shipment_containers sc2
                     WHERE UPPER(TRIM(sc2.container_no)) = UPPER(TRIM(ac.container_no))
@@ -173,7 +168,99 @@
             $containerStmt->execute();
             $containerRows = $containerStmt->fetchAll(PDO::FETCH_ASSOC);
 
+            $shipmentContainerIds = array_values(array_unique(array_filter(array_map(
+                static fn($container) => (string) ($container["shipment_container_id"] ?? ""),
+                $containerRows
+            ))));
+
+            $itemsByContainer = [];
+
+            if ($shipmentContainerIds) {
+                $itemPlaceholders = implode(", ", array_fill(0, count($shipmentContainerIds), "?"));
+
+                $itemStmt = $conn->prepare("
+                    SELECT
+                        i.id,
+                        i.container_id,
+                        i.customs_tariff_id,
+                        i.item_description,
+                        i.quantity,
+                        i.unit_of_measure,
+                        i.unit_value,
+                        i.currency,
+                        i.total_value,
+                        i.created_at,
+                        i.updated_at,
+                        ct.hs_code,
+                        ct.description AS tariff_description,
+                        ct.category AS tariff_category,
+                        ct.rate_type,
+                        ct.rate,
+                        ct.unit AS tariff_unit,
+                        ct.import_duty,
+                        ct.vat,
+                        ct.levy,
+                        ct.exc,
+                        ct.wgl,
+                        ct.ric,
+                        ct.brl,
+                        ct.wfl,
+                        ct.sug,
+                        ct.cem,
+                        ct.cig,
+                        ct.iro,
+                        ct.crl,
+                        ct.tpl,
+                        ct.nau,
+                        ct.nan,
+                        ct.gts
+                    FROM portal_shipment_container_items i
+                    LEFT JOIN customs_tariffs ct
+                        ON ct.id = i.customs_tariff_id
+                    WHERE i.container_id IN ($itemPlaceholders)
+                    ORDER BY i.created_at ASC, i.id ASC
+                ");
+
+                $itemStmt->execute($shipmentContainerIds);
+
+                foreach ($itemStmt->fetchAll(PDO::FETCH_ASSOC) as $item) {
+                    $containerId = (string) $item["container_id"];
+
+                    foreach ([
+                        "quantity",
+                        "unit_value",
+                        "total_value",
+                        "rate",
+                        "import_duty",
+                        "vat",
+                        "levy",
+                        "exc",
+                        "wgl",
+                        "ric",
+                        "brl",
+                        "wfl",
+                        "sug",
+                        "cem",
+                        "cig",
+                        "iro",
+                        "crl",
+                        "tpl",
+                        "nau",
+                        "nan",
+                        "gts"
+                    ] as $numericField) {
+                        if (array_key_exists($numericField, $item) && $item[$numericField] !== null) {
+                            $item[$numericField] = (float) $item[$numericField];
+                        }
+                    }
+
+                    $itemsByContainer[$containerId][] = $item;
+                }
+            }
+
             $containers = [];
+            $organisationId = null;
+
             foreach ($containerRows as $containerRow) {
                 $container = [];
 
@@ -195,7 +282,6 @@
                     "shipment_container_id",
                     "shipment_id",
                     "shipment_container_no",
-                    "hs_code",
                     "package_count",
                     "container_status",
                     "gate_in_at",
@@ -214,6 +300,14 @@
                     }
                 }
 
+                if ($organisationId === null && !empty($containerRow["shipment_organisation_id"])) {
+                    $organisationId = $containerRow["shipment_organisation_id"];
+                }
+
+                $shipmentContainerId = (string) ($containerRow["shipment_container_id"] ?? "");
+                $container["items"] = $itemsByContainer[$shipmentContainerId] ?? [];
+                $container["item_count"] = count($container["items"]);
+
                 $containers[] = $container;
             }
 
@@ -223,8 +317,10 @@
                 WHERE id = ?
                 LIMIT 1
             ");
-            $organisationStmt->execute([$row["organisation_id"] ?? null]);
+            $organisationStmt->execute([$organisationId]);
             $row["organisation"] = $organisationStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+            $row["organisation_id"] = $organisationId;
 
             $row["vehicle"] = [
                 "id" => $row["vehicle_id"] ?? null,
@@ -238,9 +334,9 @@
                 "transporter" => $row["transporter"] ?? null,
                 "status" => $row["vehicle_status"] ?? null,
                 "insurance_expiry" => $row["insurance_expiry"] ?? null,
-                "roadworthiness_expiry" => $row["roadworthiness_expiry"],
-                "roadworthiness_certificate" => $row["roadworthiness_certificate"],
-                "roadworthiness_expiry" => $row["roadworthiness_expiry"] ?? null
+                "roadworthiness_expiry" => $row["roadworthiness_expiry"] ?? null,
+                "insurance_certificate" => $row["insurance_certificate"] ?? null,
+                "roadworthiness_certificate" => $row["roadworthiness_certificate"] ?? null
             ];
 
             $row["driver"] = [
@@ -252,7 +348,7 @@
                 "licence_expiry" => $row["licence_expiry"] ?? null,
                 "status" => $row["driver_status"] ?? null,
                 "transporter" => $row["driver_transporter"] ?? null,
-                "licence_document" => $row["driver_licence_document"],
+                "licence_document" => $row["driver_licence_document"] ?? null,
                 "notes" => $row["driver_notes"] ?? null
             ];
 
@@ -270,6 +366,7 @@
             $driverStatus = strtolower(trim((string) ($row["driver_status"] ?? "")));
 
             $used = (bool) $row["used"];
+
             $appointmentDate = !empty($row["appointment_date"])
                 ? date("Y-m-d", strtotime((string) $row["appointment_date"]))
                 : "";
@@ -307,7 +404,6 @@
                 )))
                 : [];
 
-
             $normalize = static function (array $values): array {
                 $values = array_map(
                     static fn($value) => strtoupper(trim((string) $value)),
@@ -335,9 +431,11 @@
                 if ($vehicleStatus !== "approved") {
                     $holds[] = "Vehicle is not approved";
                 }
+
                 if (empty($row["insurance_expiry"]) || $row["insurance_expiry"] < $today) {
                     $holds[] = "Vehicle insurance is missing or expired";
                 }
+
                 if (empty($row["roadworthiness_expiry"]) || $row["roadworthiness_expiry"] < $today) {
                     $holds[] = "Vehicle roadworthiness is missing or expired";
                 }
@@ -347,6 +445,7 @@
                 if ($driverStatus !== "approved") {
                     $holds[] = "Driver is not approved";
                 }
+
                 if (empty($row["licence_expiry"]) || $row["licence_expiry"] < $today) {
                     $holds[] = "Driver licence is missing or expired";
                 }
@@ -385,7 +484,15 @@
             }
 
             $readiness = "Ready";
-            if (!$vehicleEligible || !$driverEligible || !$assignmentEligible || !$appointmentEligible || !$cargoEligible || !$passEligible) {
+
+            if (
+                !$vehicleEligible ||
+                !$driverEligible ||
+                !$assignmentEligible ||
+                !$appointmentEligible ||
+                !$cargoEligible ||
+                !$passEligible
+            ) {
                 $readiness = "Needs verification";
             }
 
@@ -420,11 +527,10 @@
         ], JSON_UNESCAPED_SLASHES);
     } catch (Throwable $e) {
         error_log("Gate-in queue error: " . $e->getMessage());
-        
+
         echo json_encode([
             "error" => true,
             "data" => "Could not load today's gate-in passes.",
-            "code" => null
+            "code" => $e->getMessage()
         ]);
     }
-

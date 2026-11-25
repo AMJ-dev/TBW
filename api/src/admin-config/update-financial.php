@@ -106,16 +106,67 @@
 
         $q->execute();
 
-        $actorId = $user_id ?? $userId ?? null;
+        $actorId = $my_details->id ?? null;
 
-        $q = $conn->prepare("INSERT INTO financial_configuration_audit (id, configuration_id, actor_id, action, old_values, new_values, change_reason, created_at) VALUES (:id, :configuration_id, :actor_id, :action, :old_values, :new_values, :change_reason, CURRENT_TIMESTAMP)");
+        $q = $conn->prepare("
+            INSERT INTO activity_logs (
+                id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                reason,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :reason,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                CURRENT_TIMESTAMP
+            )
+        ");
+
         $q->bindValue(":id", generateId(), PDO::PARAM_STR);
-        $q->bindValue(":configuration_id", $configurationId, PDO::PARAM_STR);
         $q->bindValue(":actor_id", $actorId, $actorId === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
-        $q->bindValue(":action", $existing ? "updated" : "created", PDO::PARAM_STR);
-        $q->bindValue(":old_values", $oldValues === null ? null : json_encode($oldValues, JSON_THROW_ON_ERROR), $oldValues === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $q->bindValue(":category", "CONFIGURATION", PDO::PARAM_STR);
+        $q->bindValue(":action", $existing ? "FINANCIAL_CONFIGURATION_UPDATED" : "FINANCIAL_CONFIGURATION_CREATED", PDO::PARAM_STR);
+        $q->bindValue(":entity_type", "FINANCIAL_CONFIGURATION", PDO::PARAM_STR);
+        $q->bindValue(":entity_id", $configurationId, PDO::PARAM_STR);
+        $q->bindValue(
+            ":description",
+            $existing ? "Financial configuration updated." : "Financial configuration created.",
+            PDO::PARAM_STR
+        );
+        $q->bindValue(":reason", $changeReason, PDO::PARAM_STR);
+        $q->bindValue(
+            ":old_values",
+            $oldValues === null ? null : json_encode($oldValues, JSON_THROW_ON_ERROR),
+            $oldValues === null ? PDO::PARAM_NULL : PDO::PARAM_STR
+        );
         $q->bindValue(":new_values", json_encode($newValues, JSON_THROW_ON_ERROR), PDO::PARAM_STR);
-        $q->bindValue(":change_reason", $changeReason, PDO::PARAM_STR);
+        $q->bindValue(
+            ":metadata",
+            json_encode([
+                "source_table" => "financial_configuration_audit",
+                "configuration_id" => $configurationId
+            ], JSON_THROW_ON_ERROR),
+            PDO::PARAM_STR
+        );
+        $q->bindValue(":severity", "INFO", PDO::PARAM_STR);
         $q->execute();
 
         $conn->commit();
@@ -132,8 +183,6 @@
         if (isset($conn) && $conn instanceof PDO && $conn->inTransaction()) {
             $conn->rollBack();
         }
-
-        
 
         echo json_encode([
             "error" => true,

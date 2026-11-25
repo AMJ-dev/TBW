@@ -92,17 +92,54 @@
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         $event = $conn->prepare("
-            INSERT INTO operation_manifest_events
-            (id, manifest_id, actor_id, action, from_status, to_status, details)
-            VALUES (:event_id, :manifest_id, :actor_id, 'FLAGGED_FOR_REVIEW', :from_status, 'Discrepancy', :details)
+            INSERT INTO activity_logs (
+                id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                CURRENT_TIMESTAMP
+            )
         ");
 
         $event->execute([
-            ':event_id' => generateId(),
-            ':manifest_id' => $id,
-            ':actor_id' => (string)$my_details->id,
-            ':from_status' => $status,
-            ':details' => $details
+            ":id" => generateId(),
+            ":actor_id" => (string) $my_details->id,
+            ":category" => "MANIFEST",
+            ":action" => "FLAGGED_FOR_REVIEW",
+            ":entity_type" => "MANIFEST",
+            ":entity_id" => $id,
+            ":description" => "Manifest flagged for review due to a discrepancy.",
+            ":old_values" => json_encode([
+                "status" => $status
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":new_values" => json_encode([
+                "status" => "Discrepancy"
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "operation_manifest_events",
+                "details" => $details
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":severity" => "WARNING"
         ]);
 
         $conn->commit();

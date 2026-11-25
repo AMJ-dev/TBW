@@ -1,3 +1,4 @@
+
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
 
@@ -133,40 +134,91 @@
                     c.seal_no,
                     c.package_count,
                     c.gross_weight,
-                    c.cargo_description,
                     c.package_type,
-                    c.hs_code,
-                    c.customs_tariff_id,
-                    c.item_quantity,
-                    c.unit_of_measure,
-                    c.unit_value,
-                    c.currency,
-                    c.total_value,
                     c.status,
                     c.gate_in_at,
                     c.received_at,
                     c.stored_at,
+                    c.current_location_id,
                     c.gate_out_at,
                     c.created_at,
-                    c.updated_at,
-                    ct.description AS customs_tariff_description
+                    c.updated_at
                 FROM portal_shipment_containers c
-                LEFT JOIN customs_tariffs ct
-                    ON ct.id = c.customs_tariff_id
                 WHERE c.shipment_id IN ($placeholders)
                 ORDER BY c.container_no ASC, c.created_at ASC
             ");
 
             $containerQuery->execute($ids);
 
-            $containersByShipment = [];
+            $containers = $containerQuery->fetchAll(PDO::FETCH_ASSOC);
 
-            foreach ($containerQuery->fetchAll(PDO::FETCH_ASSOC) as $container) {
-                $containersByShipment[(string) $container["shipment_id"]][] = $container;
+            $containersByShipment = [];
+            $containerIds = [];
+
+            foreach ($containers as $container) {
+                $containerId = (string) $container["id"];
+                $shipmentId = (string) $container["shipment_id"];
+
+                $container["items"] = [];
+
+                $containersByShipment[$shipmentId][] = $container;
+                $containerIds[] = $containerId;
+            }
+
+            $containersById = [];
+
+            foreach ($containersByShipment as $shipmentId => $shipmentContainers) {
+                foreach ($shipmentContainers as $index => $container) {
+                    $containersById[(string) $container["id"]] = [
+                        "shipment_id" => $shipmentId,
+                        "index" => $index
+                    ];
+                }
+            }
+
+            if ($containerIds) {
+                $itemPlaceholders = implode(",", array_fill(0, count($containerIds), "?"));
+
+                $itemQuery = $conn->prepare("
+                    SELECT
+                        i.id,
+                        i.container_id,
+                        i.customs_tariff_id,
+                        ct.hs_code,
+                        i.item_description,
+                        ct.description AS customs_tariff_description,
+                        i.quantity,
+                        i.unit_of_measure,
+                        i.unit_value,
+                        i.currency,
+                        i.total_value,
+                        i.created_at,
+                        i.updated_at
+                    FROM portal_shipment_container_items i
+                    LEFT JOIN customs_tariffs ct
+                        ON ct.id = i.customs_tariff_id
+                    WHERE i.container_id IN ($itemPlaceholders)
+                    ORDER BY i.created_at ASC
+                ");
+
+                $itemQuery->execute($containerIds);
+
+                foreach ($itemQuery->fetchAll(PDO::FETCH_ASSOC) as $item) {
+                    $containerId = (string) $item["container_id"];
+
+                    if (!isset($containersById[$containerId])) {
+                        continue;
+                    }
+
+                    $shipmentId = $containersById[$containerId]["shipment_id"];
+                    $containerIndex = $containersById[$containerId]["index"];
+
+                    $containersByShipment[$shipmentId][$containerIndex]["items"][] = $item;
+                }
             }
 
             $manifestQuery = $conn->prepare("
-                SELECT
+                SELECT DISTINCT
                     om.id,
                     om.manifest_ref,
                     om.bill_of_lading,
@@ -177,15 +229,14 @@
                     om.notes,
                     om.received_at,
                     om.updated_at,
-                    om.matched_shipment_id
+                    om.matched_shipment_id,
+                    COALESCE(omsm.shipment_id, om.matched_shipment_id) AS shipment_id
                 FROM operation_manifests om
-                WHERE om.matched_shipment_id IN ($placeholders)
-                OR EXISTS (
-                        SELECT 1
-                        FROM operation_manifest_shipment_matches omsm
-                        WHERE omsm.manifest_id = om.id
-                        AND omsm.shipment_id IN ($placeholders)
-                )
+                LEFT JOIN operation_manifest_shipment_matches omsm
+                    ON omsm.manifest_id = om.id
+                WHERE
+                    om.matched_shipment_id IN ($placeholders)
+                    OR omsm.shipment_id IN ($placeholders)
                 ORDER BY om.updated_at DESC, om.received_at DESC
             ");
 
@@ -194,7 +245,7 @@
             $manifestsByShipment = [];
 
             foreach ($manifestQuery->fetchAll(PDO::FETCH_ASSOC) as $manifest) {
-                $shipmentKey = (string) ($manifest["matched_shipment_id"] ?? "");
+                $shipmentKey = (string) ($manifest["shipment_id"] ?? "");
 
                 if ($shipmentKey !== "") {
                     $manifestsByShipment[$shipmentKey][] = $manifest;

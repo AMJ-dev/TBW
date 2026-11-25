@@ -32,6 +32,17 @@ import { Button } from "@/components/ui/button";
 import { http, type Resp } from "@/lib/httpClient";
 import { cn } from "@/lib/utils";
 
+type CargoItem = {
+  id?: string;
+  item_description?: string | null;
+  description?: string | null;
+  hs_code?: string | null;
+  tariff_description?: string | null;
+  quantity?: number | string | null;
+  unit_of_measure?: string | null;
+  unit?: string | null;
+};
+
 type ContainerDetail = {
   id: string;
   container_no: string;
@@ -53,6 +64,7 @@ type ContainerDetail = {
   shipment_status: string;
   container_created_at: string;
   container_updated_at: string;
+  items?: CargoItem[];
 };
 
 type VehicleDetail = {
@@ -609,10 +621,10 @@ export default function GatePassDetailsPage() {
                         <div>
                           <p className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-ink-soft">
                             <Hash className="size-3" />
-                            HS Code
+                            Cargo Items
                           </p>
                           <p className="mt-1 font-mono text-xs font-semibold text-ink">
-                            {container.hs_code || "—"}
+                            {container.items?.length || 0}
                           </p>
                         </div>
 
@@ -636,6 +648,38 @@ export default function GatePassDetailsPage() {
                           </p>
                         </div>
                       </div>
+
+                      {container.items && container.items.length > 0 && (
+                        <div className="border-t border-line px-4 py-3">
+                          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-ink-soft">
+                            Declared Items
+                          </p>
+                          <div className="space-y-2">
+                            {container.items.map((item, itemIndex) => (
+                              <div
+                                key={item.id || `${container.id}-${itemIndex}`}
+                                className="rounded-lg bg-sand/50 px-3 py-2"
+                              >
+                                <p className="text-xs font-semibold text-ink">
+                                  {item.item_description || item.description || "Cargo item"}
+                                </p>
+                                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-ink-soft">
+                                  {(item.hs_code || item.tariff_description) && (
+                                    <span>
+                                      HS: {item.hs_code || item.tariff_description}
+                                    </span>
+                                  )}
+                                  {item.quantity !== null && item.quantity !== undefined && (
+                                    <span>
+                                      Qty: {formatNumber(item.quantity)} {item.unit_of_measure || item.unit || ""}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Timeline */}
                       {(container.gate_in_at || container.received_at || container.stored_at || container.gate_out_at) && (

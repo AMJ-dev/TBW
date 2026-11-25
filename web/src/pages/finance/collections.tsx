@@ -26,6 +26,7 @@ import { AppShell, Metric, StatusBadge, statusTone } from "@/components/auth-she
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { format_currency } from "@/lib/functions";
 
 type AgeingBucket = "Current" | "1–30 days" | "31–60 days" | "61–90 days" | "90+ days";
 type DunningStage =
@@ -56,13 +57,6 @@ interface CollectionAccount {
 	contactPhone: string;
 	notes: string;
 }
-
-const formatNaira = (amount: number) =>
-	new Intl.NumberFormat("en-NG", {
-		style: "currency",
-		currency: "NGN",
-		maximumFractionDigits: 0,
-	}).format(amount);
 
 const initialAccounts: CollectionAccount[] = [
 	{
@@ -317,14 +311,14 @@ export default function FinanceCollectionsRoute() {
 			<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
 				<Metric
 					label="Outstanding receivables"
-					value={formatNaira(stats.totalOutstanding)}
+					value={format_currency(stats.totalOutstanding)}
 					detail="Across all accounts"
 					tone="warning"
 					icon={Banknote}
 				/>
 				<Metric
 					label="Overdue amount"
-					value={formatNaira(stats.overdueAmount)}
+					value={format_currency(stats.overdueAmount)}
 					detail={`${accounts.filter((a) => a.daysOverdue > 0).length} invoices`}
 					tone="critical"
 					icon={AlertTriangle}
@@ -374,7 +368,7 @@ export default function FinanceCollectionsRoute() {
 									{bucket}
 								</p>
 								<p className="mt-2 font-display text-lg font-bold text-ink">
-									{formatNaira(amount)}
+									{format_currency(amount)}
 								</p>
 								<p className="mt-0.5 text-[11px] text-ink-soft">
 									{count} {count === 1 ? "invoice" : "invoices"}
@@ -508,7 +502,7 @@ export default function FinanceCollectionsRoute() {
 										Amount
 									</p>
 									<p className="mt-1 font-display text-xl font-bold text-ink">
-										{formatNaira(a.amount)}
+										{format_currency(a.amount)}
 									</p>
 								</div>
 
@@ -653,7 +647,7 @@ function CollectionDetailDialog({
 						</h3>
 						<p className="mt-1 text-[12px] text-ink-soft">
 							<span className="font-mono">{account.invoiceRef}</span> ·{" "}
-							{formatNaira(account.amount)} · {account.daysOverdue} days overdue
+							{format_currency(account.amount)} · {account.daysOverdue} days overdue
 						</p>
 					</div>
 					<Button
@@ -689,7 +683,7 @@ function CollectionDetailDialog({
 								Amount
 							</p>
 							<p className="mt-1 font-display text-lg font-bold text-ink">
-								{formatNaira(account.amount)}
+								{format_currency(account.amount)}
 							</p>
 						</div>
 						<div className="rounded-xl bg-sand p-3 ring-1 ring-line">

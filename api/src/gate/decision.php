@@ -1,5 +1,6 @@
 <?php
     require_once dirname(__DIR__, 2) . "/include/verify-user.php";
+    $code = null;
 
     header("Content-Type: application/json; charset=utf-8");
 
@@ -292,23 +293,20 @@
             "release" => null
         ];
 
-        if ($decision === "ADMIT" && $direction === "out") {
-            throw new RuntimeException(
-                "Gate-out is blocked until financial clearance and release authorisation are verified by the server."
-            );
-        }
-
         if ($decision === "ADMIT" && count($holds) > 0) {
+            $code = [
+                "holds" => $holds,
+                "checks" => $checks
+            ];
+
             throw new RuntimeException(
-                "Admission blocked. Resolve the outstanding checks first."
+                "Admission blocked: " . implode("; ", $holds) . "."
             );
         }
 
         if (isset($_FILES["gate_in_evidence"])) {
             $evidenceFile = $_FILES["gate_in_evidence"];
             
-            print_r($_FILES["gate_in_evidence"]);
-
             if (($evidenceFile["error"] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
                 if ($direction !== "in") {
                     throw new RuntimeException("Gate-In Evidence can only be uploaded for gate-in movements.");
@@ -610,26 +608,40 @@
         }
 
         $audit = $conn->prepare("
-            INSERT INTO gate_movement_audit (
+            INSERT INTO activity_logs (
                 id,
-                movement_id,
-                appointment_id,
-                gate_pass_id,
-                operator_id,
-                event_type,
-                event_data
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
             ) VALUES (
                 :id,
-                :movement_id,
-                :appointment_id,
-                :gate_pass_id,
-                :operator_id,
-                :event_type,
-                :event_data
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                NOW()
             )
         ");
 
         $auditData = json_encode([
+            "source_table" => "gate_movement_audit",
+            "movement_id" => $movementId,
+            "appointment_id" => $record["appointment_id"],
+            "gate_pass_id" => $record["gate_pass_id"],
             "plate" => $record["plate"],
             "pass_code" => $record["pass_code"],
             "gate_lane_id" => $gateLaneId,
@@ -642,24 +654,24 @@
             "holds" => $holds,
             "checks" => $checks,
             "shipment_statuses" => $shipmentStatusUpdates
-        ], JSON_UNESCAPED_SLASHES);
+        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 
-        $audit->bindValue(":id", generateId(), PDO::PARAM_STR);
-        $audit->bindValue(":movement_id", $movementId, PDO::PARAM_STR);
-        $audit->bindValue(":appointment_id", $record["appointment_id"], PDO::PARAM_STR);
-        $audit->bindValue(":gate_pass_id", $record["gate_pass_id"], PDO::PARAM_STR);
-        $audit->bindValue(
-            ":operator_id",
-            $operatorId,
-            $operatorId !== null ? PDO::PARAM_STR : PDO::PARAM_NULL
-        );
-        $audit->bindValue(
-            ":event_type",
-            "GATE_" . strtoupper($direction) . "_" . $decision,
-            PDO::PARAM_STR
-        );
-        $audit->bindValue(":event_data", $auditData, PDO::PARAM_STR);
-        $audit->execute();
+        $audit->execute([
+            ":id" => generateId(),
+            ":actor_id" => $operatorId,
+            ":category" => "GATE",
+            ":action" => "GATE_" . strtoupper($direction) . "_" . $decision,
+            ":entity_type" => "GATE_MOVEMENT",
+            ":entity_id" => $movementId,
+            ":description" => "Gate " . strtolower($direction) . " " . strtolower($decision) . " for vehicle " . $record["plate"] . ".",
+            ":old_values" => null,
+            ":new_values" => json_encode([
+                "direction" => $direction,
+                "decision" => $decision
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":metadata" => $auditData,
+            ":severity" => strtoupper($decision) === "REJECTED" ? "WARNING" : "INFO"
+        ]);
 
         $conn->commit();
 
@@ -703,6 +715,6 @@
         echo json_encode([
             "error" => true,
             "data" => $message,
-            "code" => null
-        ]);
+            "code" => $code
+        ], JSON_UNESCAPED_SLASHES);
     }

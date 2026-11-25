@@ -100,7 +100,7 @@
                 psc.seal_no,
                 psc.package_count AS container_package_count,
                 psc.gross_weight AS container_gross_weight,
-                psc.cargo_description,
+                ps.cargo_description,
                 psc.package_type AS container_package_type,
                 psc.status AS container_status,
                 psc.current_location_id,

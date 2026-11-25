@@ -13,12 +13,16 @@
     $db_user = "root";
     $db_pass = "";
 
+    // $db_user = "hqf";
+    // $db_pass = "2VKbE88C@wNKCyp";
+
     $baseURL = "http://localhost:8080/";
     $apiURL = "https://api.trinubondedwarehouse.com/";
 
     $redis_ip = "192.168.205.67";
     $redis_port = 6379;
     $redis_password="Group2020@";
+    // $redis_password='VFFq#SR4s*gcT%bmUQ=7K';
     
     $admin_email = "admin@trinubondedwarehouse.com";
 

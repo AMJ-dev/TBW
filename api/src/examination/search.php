@@ -3,8 +3,6 @@
 
     try {
         if ($_SERVER["REQUEST_METHOD"] !== "POST") {
-            http_response_code(405);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Method not allowed.",
@@ -24,8 +22,6 @@
         ];
 
         if (!isset($allowed_fields[$where])) {
-            http_response_code(422);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Invalid search type. Select container number, seal number, shipment reference or bill of lading.",
@@ -35,8 +31,6 @@
         }
 
         if ($search === "") {
-            http_response_code(422);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Enter a search value.",
@@ -46,8 +40,6 @@
         }
 
         if (strlen($search) > 150) {
-            http_response_code(422);
-
             echo json_encode([
                 "error" => true,
                 "data" => "Search value is too long.",
@@ -105,8 +97,6 @@
         exit;
 
     } catch (Throwable $e) {
-        http_response_code(500);
-
         echo json_encode([
             "error" => true,
             "data" => "Could not search shipment containers.",

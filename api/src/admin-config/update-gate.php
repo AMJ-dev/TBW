@@ -131,14 +131,51 @@
             "vehicle_requirements" => $validatedRequirements
         ];
 
-        $q = $conn->prepare("INSERT INTO gate_configuration_audit (id, configuration_id, actor_id, action, old_values, new_values) VALUES (:id, :configuration_id, :actor_id, :action, :old_values, :new_values)");
-        $q->bindValue(":id", generateId());
-        $q->bindValue(":configuration_id", $configurationId);
-        $q->bindValue(":actor_id", $actorId);
-        $q->bindValue(":action", "UPDATE");
-        $q->bindValue(":old_values", json_encode($oldConfig));
-        $q->bindValue(":new_values", json_encode($newConfig));
-        $q->execute();
+        $q = $conn->prepare("
+            INSERT INTO activity_logs (
+                id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                CURRENT_TIMESTAMP
+            )
+        ");
+
+        $q->execute([
+            ":id" => generateId(),
+            ":actor_id" => $actorId,
+            ":category" => "CONFIGURATION",
+            ":action" => "GATE_CONFIGURATION_UPDATED",
+            ":entity_type" => "GATE_CONFIGURATION",
+            ":entity_id" => $configurationId,
+            ":description" => "Gate configuration updated.",
+            ":old_values" => json_encode($oldConfig, JSON_THROW_ON_ERROR),
+            ":new_values" => json_encode($newConfig, JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "gate_configuration_audit"
+            ], JSON_THROW_ON_ERROR),
+            ":severity" => "INFO"
+        ]);
 
         $conn->commit();
 

@@ -83,7 +83,7 @@ export default function ExaminationsPage() {
 			try {
 				setLoading(true);
 
-				const response = await http.get("/operator/examination/");
+				const response = await http.get("/operations/examination/");
 				const resp: Resp = response.data;
 
 				if (resp.error) {

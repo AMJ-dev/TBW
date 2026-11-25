@@ -40,7 +40,26 @@ import { AppShell } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { http, type Resp } from "@/lib/httpClient";
-import { resolveSrc } from "@/lib/functions";
+import { resolveSrc, format_currency } from "@/lib/functions";
+
+type ShipmentCargoItem = {
+  id: string;
+  container_id: string;
+  customs_tariff_id: string | null;
+  hs_code: string | null;
+  tariff_hs_code: string | null;
+  customs_tariff_description: string | null;
+  item_description: string | null;
+  description: string | null;
+  quantity: number | null;
+  unit_of_measure: string | null;
+  unit: string | null;
+  unit_value: number | null;
+  currency: string | null;
+  total_value: number | null;
+  created_at: string;
+  updated_at: string;
+};
 
 type ShipmentContainer = {
   id: string;
@@ -55,19 +74,12 @@ type ShipmentContainer = {
   received_at: string | null;
   stored_at: string | null;
   gate_out_at: string | null;
+  current_location_id?: string | null;
   cargo_description: string | null;
   package_type: string | null;
-  hs_code: string | null;
-  customs_tariff_id: string | null;
-  tariff_hs_code: string | null;
-  customs_tariff_description: string | null;
-  item_quantity: number | null;
-  unit_of_measure: string | null;
-  unit_value: number | null;
-  currency: string | null;
-  total_value: number | null;
   created_at: string;
   updated_at: string;
+  items: ShipmentCargoItem[];
 };
 
 type ShipmentDocument = {
@@ -392,6 +404,25 @@ const normaliseAction = (raw: any): PermittedAction => ({
   reason: raw?.reason ?? null,
 });
 
+const normaliseCargoItem = (raw: any): ShipmentCargoItem => ({
+  id: String(raw?.id ?? ""),
+  container_id: String(raw?.container_id ?? ""),
+  customs_tariff_id: raw?.customs_tariff_id ?? null,
+  hs_code: raw?.hs_code ?? raw?.tariff_hs_code ?? null,
+  tariff_hs_code: raw?.tariff_hs_code ?? raw?.hs_code ?? null,
+  customs_tariff_description: raw?.customs_tariff_description ?? null,
+  item_description: raw?.item_description ?? raw?.description ?? null,
+  description: raw?.description ?? raw?.item_description ?? null,
+  quantity: raw?.quantity == null ? null : Number(raw.quantity),
+  unit_of_measure: raw?.unit_of_measure ?? raw?.unit ?? null,
+  unit: raw?.unit ?? raw?.unit_of_measure ?? null,
+  unit_value: raw?.unit_value == null ? null : Number(raw.unit_value),
+  currency: raw?.currency ?? "NGN",
+  total_value: raw?.total_value == null ? null : Number(raw.total_value),
+  created_at: String(raw?.created_at ?? ""),
+  updated_at: String(raw?.updated_at ?? ""),
+});
+
 const normaliseContainer = (raw: any): ShipmentContainer => ({
   id: String(raw?.id ?? ""),
   shipment_id: String(raw?.shipment_id ?? ""),
@@ -405,19 +436,12 @@ const normaliseContainer = (raw: any): ShipmentContainer => ({
   received_at: raw?.received_at ?? null,
   stored_at: raw?.stored_at ?? null,
   gate_out_at: raw?.gate_out_at ?? null,
+  current_location_id: raw?.current_location_id ?? null,
   cargo_description: raw?.cargo_description ?? null,
   package_type: raw?.package_type ?? null,
-  hs_code: raw?.hs_code ?? null,
-  customs_tariff_id: raw?.customs_tariff_id ?? null,
-  tariff_hs_code: raw?.tariff_hs_code ?? null,
-  customs_tariff_description: raw?.customs_tariff_description ?? null,
-  item_quantity: raw?.item_quantity == null ? null : Number(raw.item_quantity),
-  unit_of_measure: raw?.unit_of_measure ?? null,
-  unit_value: raw?.unit_value == null ? null : Number(raw.unit_value),
-  currency: raw?.currency ?? null,
-  total_value: raw?.total_value == null ? null : Number(raw.total_value),
   created_at: String(raw?.created_at ?? ""),
   updated_at: String(raw?.updated_at ?? ""),
+  items: Array.isArray(raw?.items) ? raw.items.map(normaliseCargoItem) : [],
 });
 
 const normaliseShipment = (raw: any): Shipment => ({
@@ -735,30 +759,11 @@ const activityKindMeta: Record<
   },
 };
 
-const humanise = (value: string) =>
-  value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+const humanise = (value: string) => value.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-const formatDate = (value: string | null | undefined) =>
-  value ? value.slice(0, 10) : "—";
+const formatDate = (value: string | null | undefined) => value ? value.slice(0, 10) : "—";
 
-const formatDateTime = (value: string | null | undefined) =>
-  value ? value.slice(0, 16).replace("T", " ") : "—";
-
-const formatMoney = (
-  value: number | null | undefined,
-  currency = "NGN"
-): string => {
-  if (value == null) return "—";
-  try {
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 2,
-    }).format(value);
-  } catch {
-    return `${currency} ${value.toLocaleString()}`;
-  }
-};
+const formatDateTime = (value: string | null | undefined) => value ? value.slice(0, 16).replace("T", " ") : "—";
 
 function phaseIndexForStatus(status: string): number {
   const index = PHASES.findIndex((phase) => phase.codes.includes(status));
@@ -1037,7 +1042,7 @@ export default function OperationsShipmentReviewPage() {
 
       try {
         const [shipmentRes, configRes] = await Promise.all([
-          http.get(`/operator/shipment/${id}/`),
+          http.get(`/operations/shipment/${id}/`),
           http.get("/portal/shipment/config/"),
         ]);
 
@@ -1346,7 +1351,15 @@ export default function OperationsShipmentReviewPage() {
               )}
             </Block>
 
-            <Block title="Containers" icon={<Container className="size-4" />}>
+            <Block
+              title="Containers"
+              icon={<Container className="size-4" />}
+              action={
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-soft">
+                  {shipment.containers.length} container{shipment.containers.length === 1 ? "" : "s"} · {shipment.containers.reduce((total, container) => total + container.items.length, 0)} cargo items
+                </span>
+              }
+            >
               {shipment.containers.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-line bg-sand/40 p-8 text-center">
                   <Container className="mx-auto size-6 text-ink-soft" />
@@ -1360,12 +1373,12 @@ export default function OperationsShipmentReviewPage() {
               ) : (
                 <div className="grid gap-4">
                   {shipment.containers.map((container, index) => (
-                    <div
+                    <details
                       key={container.id}
-                      className="overflow-hidden rounded-xl border border-line bg-paper shadow-sm"
+                      className="group overflow-hidden rounded-xl border border-line bg-paper"
+                      open={index === 0}
                     >
-                      {/* Container Header */}
-                      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-sand/50 px-5 py-3.5">
+                      <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 bg-sand/50 px-4 py-3.5 transition-colors hover:bg-sand sm:px-5 [&::-webkit-details-marker]:hidden">
                         <div className="flex items-center gap-3">
                           <span className="grid size-8 place-items-center rounded-lg bg-orange/10 text-orange-deep ring-1 ring-orange/20">
                             <Container className="size-4" />
@@ -1379,53 +1392,110 @@ export default function OperationsShipmentReviewPage() {
                             </p>
                           </div>
                         </div>
-                        {container.status && (
-                          <StatusPill status={container.status} />
-                        )}
-                      </div>
-
-                      {/* Container Details */}
-                      <div className="grid gap-6 p-5 sm:grid-cols-2">
-                        <div className="space-y-4">
-                          <Field
-                            label="Cargo Description"
-                            value={container.cargo_description || container.customs_tariff_description}
-                          />
-                          <div className="rounded-xl border border-teal/20 bg-teal/5 p-3.5">
-                            <div className="flex items-start gap-2.5">
-                              <ShieldCheck className="mt-0.5 size-4 shrink-0 text-teal-deep" />
-                              <div>
-                                <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-teal-deep">
-                                  Customs / HS Classification
-                                </p>
-                                <p className="mt-1 font-mono text-[13px] font-bold text-ink">
-                                  {container.hs_code || container.tariff_hs_code || "—"}
-                                </p>
-                                {container.customs_tariff_id && (
-                                  <p className="mt-1 font-mono text-[9px] text-ink-soft">
-                                    Tariff ID: {container.customs_tariff_id}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-paper px-2.5 py-1 font-mono text-[10px] text-ink-soft ring-1 ring-line">
+                            {container.items.length} item{container.items.length === 1 ? "" : "s"}
+                          </span>
+                          {container.status && <StatusPill status={container.status} />}
+                          <ChevronDown className="size-4 text-ink-soft transition-transform group-open:rotate-180" />
                         </div>
+                      </summary>
 
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                      <div className="grid gap-6 border-t border-line p-4 sm:grid-cols-2 sm:p-5">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-4">
                           <Field label="Size" value={container.size} />
-                          <Field label="Seal Number" value={container.seal_no} mono />
+                          <Field label="Seal number" value={container.seal_no} mono />
                           <Field label="Packages" value={container.package_count} mono />
                           <Field
-                            label="Gross Weight"
+                            label="Gross weight"
                             value={container.gross_weight == null ? null : `${container.gross_weight} kg`}
                             mono
                           />
-                          <Field label="Unit Value" value={formatMoney(container.unit_value, container.currency || "NGN")} mono />
-                          <Field label="Total Value" value={formatMoney(container.total_value, container.currency || "NGN")} mono />
+                        </div>
+
+                        <div className="rounded-xl border border-line bg-sand/30 p-3.5">
+                          <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">
+                            Cargo summary
+                          </p>
+                          <p className="mt-1 text-sm font-semibold text-ink">
+                            {container.items.length} declared cargo item{container.items.length === 1 ? "" : "s"}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-ink-soft">
+                            Cargo classification and values are recorded against each item below.
+                          </p>
                         </div>
                       </div>
 
                       {/* Container Timeline */}
+                      <div className="border-t border-line">
+                        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-5">
+                          <div>
+                            <h3 className="text-[12px] font-semibold text-ink">Declared cargo items</h3>
+                            <p className="mt-0.5 text-[10px] text-ink-soft">
+                              Item-level tariff classification, quantity and declared value
+                            </p>
+                          </div>
+                          <span className="rounded-full bg-orange/10 px-2.5 py-1 font-mono text-[10px] text-orange-deep">
+                            {container.items.length} item{container.items.length === 1 ? "" : "s"}
+                          </span>
+                        </div>
+
+                        {container.items.length === 0 ? (
+                          <div className="mx-4 mb-4 rounded-lg border border-dashed border-line bg-sand/30 px-4 py-5 text-center sm:mx-5">
+                            <Package className="mx-auto size-5 text-ink-soft" />
+                            <p className="mt-1.5 text-xs font-medium text-ink">No cargo items recorded</p>
+                          </div>
+                        ) : (
+                          <div className="mx-4 mb-4 overflow-hidden rounded-lg border border-line sm:mx-5">
+                            <div className="max-h-[360px] overflow-auto">
+                              <table className="w-full min-w-[850px] text-left text-xs">
+                                <thead className="sticky top-0 z-10 bg-sand text-[9px] uppercase tracking-[0.1em] text-ink-soft">
+                                  <tr>
+                                    <th className="px-3 py-2.5 font-medium">Cargo item</th>
+                                    <th className="px-3 py-2.5 font-medium">HS code</th>
+                                    <th className="px-3 py-2.5 font-medium">Tariff description</th>
+                                    <th className="px-3 py-2.5 text-right font-medium">Quantity</th>
+                                    <th className="px-3 py-2.5 text-right font-medium">Unit value</th>
+                                    <th className="px-3 py-2.5 text-right font-medium">Total value</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-line/70">
+                                  {container.items.map((item, itemIndex) => (
+                                    <tr key={item.id || `${container.id}-${itemIndex}`} className="align-top hover:bg-sand/30">
+                                      <td className="max-w-[220px] px-3 py-3">
+                                        <p className="font-semibold text-ink">
+                                          {item.item_description || item.description || `Cargo item ${itemIndex + 1}`}
+                                        </p>
+                                        {item.customs_tariff_id && (
+                                          <p className="mt-1 font-mono text-[9px] text-ink-soft">
+                                            Tariff ID: {item.customs_tariff_id}
+                                          </p>
+                                        )}
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-3 font-mono text-ink">
+                                        {item.hs_code || item.tariff_hs_code || "—"}
+                                      </td>
+                                      <td className="max-w-[280px] whitespace-normal px-3 py-3 text-ink-soft">
+                                        {item.customs_tariff_description || "—"}
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-ink">
+                                        {item.quantity == null ? "—" : `${item.quantity.toLocaleString()} ${item.unit_of_measure || item.unit || ""}`}
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-3 text-right font-mono text-ink">
+                                        {item.unit_value == null ? "—" : format_currency(item.unit_value, item.currency)}
+                                      </td>
+                                      <td className="whitespace-nowrap px-3 py-3 text-right font-mono font-semibold text-ink">
+                                        {item.total_value == null ? "—" : format_currency(item.total_value, item.currency)}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       {(container.gate_in_at || container.received_at || container.stored_at || container.gate_out_at) && (
                         <div className="border-t border-line bg-sand/20 px-5 py-3">
                           <p className="mb-2.5 font-mono text-[9px] uppercase tracking-[0.12em] text-ink-soft">
@@ -1451,7 +1521,7 @@ export default function OperationsShipmentReviewPage() {
                           </div>
                         </div>
                       )}
-                    </div>
+                    </details>
                   ))}
                 </div>
               )}
@@ -1799,12 +1869,12 @@ export default function OperationsShipmentReviewPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <Field
                         label="Amount due"
-                        value={formatMoney(finance.amount_due, finance.currency)}
+                        value={format_currency(finance.amount_due, finance.currency)}
                         mono
                       />
                       <Field
                         label="Amount paid"
-                        value={formatMoney(finance.amount_paid, finance.currency)}
+                        value={format_currency(finance.amount_paid, finance.currency)}
                         mono
                       />
                     </div>
@@ -1820,7 +1890,7 @@ export default function OperationsShipmentReviewPage() {
                             : "text-teal-deep"
                         )}
                       >
-                        {formatMoney(finance.balance, finance.currency)}
+                        {format_currency(finance.balance, finance.currency)}
                       </p>
                     </div>
                   </dl>

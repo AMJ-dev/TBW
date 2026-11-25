@@ -61,15 +61,61 @@
 
         $conn->beginTransaction();
 
-        $q = $conn->prepare("INSERT INTO organisation_audit_logs (id, organisation_id, user_id, action, details, ip_address, user_agent) VALUES (:id, :org_id, :user_id, :action, :details, :ip, :agent)");
-        $q->bindValue(":id", generateId());
-        $q->bindValue(":org_id", $doc["organisation_id"]);
-        $q->bindValue(":user_id", $my_details->id);
-        $q->bindValue(":action", "organisation.document_removed");
-        $q->bindValue(":details", json_encode(["document_id" => $docId, "document_type" => $doc["document_type"]], JSON_UNESCAPED_SLASHES));
-        $q->bindValue(":ip", $_SERVER["REMOTE_ADDR"] ?? null);
-        $q->bindValue(":agent", substr($_SERVER["HTTP_USER_AGENT"] ?? "", 0, 500));
-        $q->execute();
+        $q = $conn->prepare("
+            INSERT INTO activity_logs (
+                id,
+                organisation_id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                new_values,
+                metadata,
+                ip_address,
+                user_agent,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :organisation_id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :new_values,
+                :metadata,
+                :ip_address,
+                :user_agent,
+                :severity,
+                CURRENT_TIMESTAMP
+            )
+        ");
+
+        $q->execute([
+            ":id" => generateId(),
+            ":organisation_id" => $doc["organisation_id"],
+            ":actor_id" => $my_details->id,
+            ":category" => "ORGANISATION",
+            ":action" => "ORGANISATION_DOCUMENT_REMOVED",
+            ":entity_type" => "ORGANISATION_DOCUMENT",
+            ":entity_id" => $docId,
+            ":description" => "Organisation document removed.",
+            ":new_values" => json_encode([
+                "status" => "REMOVED"
+            ], JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "organisation_audit_logs",
+                "document_id" => $docId,
+                "document_type" => $doc["document_type"]
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            ":ip_address" => $_SERVER["REMOTE_ADDR"] ?? null,
+            ":user_agent" => substr($_SERVER["HTTP_USER_AGENT"] ?? "", 0, 500),
+            ":severity" => "WARNING"
+        ]);
 
         $q = $conn->prepare("DELETE FROM registration_documents WHERE id = :id");
         $q->bindValue(":id", $docId);

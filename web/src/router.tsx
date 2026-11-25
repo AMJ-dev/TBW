@@ -67,9 +67,13 @@ const FinancePage = lazy(() => import("@/pages/finance"));
 const FinanceDashboardPage = lazy(() => import("@/pages/finance/dashboard"));
 const FinanceInvoicesPage = lazy(() => import("@/pages/finance/invoices"));
 const FinancePaymentsPage = lazy(() => import("@/pages/finance/payments"));
-const FinanceTariffsPage = lazy(() => import("@/pages/finance/tariffs"));
-const FinanceCreditApplyPage = lazy(() => import("@/pages/finance/credit/apply"));
-const FinanceCreditLimitsPage = lazy(() => import("@/pages/finance/credit/limits"));
+ 
+const FinanceCreditPage = lazy(() => import("@/pages/finance/credit/all"));
+const PortalCreditPage = lazy(() => import("@/pages/finance/credit/portal"));
+const PortalCreditApplyPage = lazy(() => import("@/pages/finance/credit/apply"));
+		
+const FinanceCreditTiersPage = lazy(() => import("@/pages/finance/credit-tiers"));
+const FinanceCreditTierFormPage = lazy(() => import("@/pages/finance/credit-tiers/form"));
 const FinanceCollectionsPage = lazy(() => import("@/pages/finance/collections"));
 const FinanceStatementPage = lazy(() => import("@/pages/finance/statement"));
 const FinanceApprovalsPage = lazy(() => import("@/pages/finance/approvals"));
@@ -109,21 +113,26 @@ const ExaminationReviewDetailsPage = lazy(() => import("@/pages/operations/exami
 const OperationsWarehousePage = lazy(() => import("@/pages/operations/warehouse"));
 const OperationsYardPage = lazy(() => import("@/pages/operations/yard"));
 const OperationsManifestPage = lazy(() => import("@/pages/manifest"));
-const OperationsSealsPage = lazy(() => import("@/pages/operations/seals"));
-const OperationsInventoryPage = lazy(() => import("@/pages/operations/inventory"));
+
+const OperationsInventoryPage = lazy(() => import("@/pages/operations/inventory/"));
+const OperationsInventoryDetailsPage = lazy(() => import("@/pages/operations/inventory/details"));
+
+const GateAppointmentsPage = lazy(() => import("@/pages/gate/appointments"));
+const GateAppointmentDetailsPage = lazy(() => import("@/pages/gate/appointments-details"));
+
 const OperationsManifestReviewPage = lazy(() => import("@/pages/manifest/review"));
 const OperationsManifestIntakePage = lazy(() => import("@/pages/manifest/intake"));
 const OperationsManifestDetailsPage = lazy(() => import("@/pages/manifest/details"));
-const OperationsStuffingPage = lazy(() => import("@/pages/operations/stuffing"));
-const OperationsCycleCountPage = lazy(() => import("@/pages/operations/cycle-count"));
-const OperationsValueAddedPage = lazy(() => import("@/pages/operations/value-added"));
+
+const OperationsValueAddedPage = lazy(() => import("@/pages/operations/value-added/"));
+const OperationsValueAddedNewPage = lazy(() => import("@/pages/operations/value-added/new"));
+const OperationsValueAddedDetailsPage = lazy(() => import("@/pages/operations/value-added/details"));
+
 const OperationsReviewPage = lazy(() => import("@/pages/shipment/review"));
 const OperationsShipmentReviewPage = lazy(() => import("@/pages/shipment/shipment-review-details"));
 const OperationDocumentationPage = lazy(()=>import("@/pages/operations/documentation/"))
 const OperationDocumentDetailsPage = lazy(()=>import("@/pages/operations/documentation/details"))
 const OperationsOverstayPage = lazy(()=>import("@/pages/operations/overstay"))
-const OperationsTransferPage = lazy(()=>import("@/pages/operations/transfer"))
-
 const PortalDashboardPage = lazy(() => import("@/pages/portal/dashboard"));
 const CargoPage = lazy(() => import("@/pages/portal/cargo"));
 const CargoDetailPage = lazy(() => import("@/pages/portal/cargo/$id"));
@@ -226,16 +235,22 @@ export default function Routers() {
 						<Route path="/admin/configuration/retention" element={<AdminRetentionConfigurationPage />} />
 						<Route path="/admin/configuration/customs-tariffs" element={<AdminCustomsTariffsConfigurationPage />} />
 						<Route path="/admin/configuration/equipment" element={<AdminCustomsEquipmentPage />} />
-						
+						 
 						<Route path="/finance" element={<FinancePage />} />
 						<Route path="/finance/dashboard" element={<FinanceDashboardPage />} />
 						<Route path="/finance/invoices" element={<FinanceInvoicesPage />} />
 						<Route path="/finance/payments" element={<FinancePaymentsPage />} />
-						<Route path="/finance/tariffs" element={<FinanceTariffsPage />} />
-						<Route path="/finance/credit/apply" element={<FinanceCreditApplyPage />} />
-						<Route path="/finance/credit/limits" element={<FinanceCreditLimitsPage />} />
+					
+						<Route path="/finance/credit" element={<FinanceCreditPage />} />
+						<Route path="/finance/credit-tiers" element={<FinanceCreditTiersPage />} />
+						<Route path="/finance/credit-tiers/new" element={<FinanceCreditTierFormPage />} />
+						<Route path="/finance/credit-tiers/:id" element={<FinanceCreditTierFormPage />} />
+						
+						<Route path="/portal/credit" element={<PortalCreditPage />} />
+						<Route path="/portal/credit/apply" element={<PortalCreditApplyPage />} />
+
 						<Route path="/finance/collections" element={<FinanceCollectionsPage />} />
-						<Route path="/finance/statement/:customer" element={<FinanceStatementPage />} />
+						<Route path="/finance/statement/" element={<FinanceStatementPage />} />
 						<Route path="/finance/approvals" element={<FinanceApprovalsPage />} />
 						<Route path="/finance/tax" element={<FinanceTaxPage />} />
 						<Route path="/finance/reconciliation" element={<FinanceReconciliationPage />} />
@@ -266,17 +281,23 @@ export default function Routers() {
 						<Route path="/operations/warehouse" element={<OperationsWarehousePage />} />
 						<Route path="/operations/yard" element={<OperationsYardPage />} />
 						<Route path="/operations/manifest" element={<OperationsManifestPage />} />
-						<Route path="/operations/seals" element={<OperationsSealsPage />} />
+						
 						<Route path="/operations/inventory" element={<OperationsInventoryPage />} />
+						<Route path="/operations/inventory/:id" element={<OperationsInventoryDetailsPage />} />
+						
+						<Route path="/gate/appointments" element={<GateAppointmentsPage />} />
+						<Route path="/gate/appointment/:id" element={<GateAppointmentDetailsPage />} />
+
 						<Route path="/operations/manifests/review" element={<OperationsManifestReviewPage />} />
 						<Route path="/operations/manifests/intake" element={<OperationsManifestIntakePage />} />
 						<Route path="/operations/manifest/details/:id" element={<OperationsManifestDetailsPage />} />
-						<Route path="/operations/stuffing" element={<OperationsStuffingPage />} />
-						<Route path="/operations/cycle-count" element={<OperationsCycleCountPage />} />
+
 						<Route path="/operations/value-added" element={<OperationsValueAddedPage />} />
+						<Route path="/operations/value-added/new" element={<OperationsValueAddedNewPage />} />		
+						<Route path="/operations/value-added/:id" element={<OperationsValueAddedDetailsPage />} />					
+
 						<Route path="/operations/overrides" element={<OperationsOverridesPage />} />
 						<Route path="/operations/overstay" element={<OperationsOverstayPage />}/>
-						<Route path="/operations/transfers" element={<OperationsTransferPage />}/>
 						<Route path="/operations/shipments/review" element={<OperationsReviewPage />} />
 						<Route path="/operations/shipments/:id" element={<OperationsShipmentReviewPage />} />
 
@@ -307,6 +328,7 @@ export default function Routers() {
 						<Route path="/portal/packages/:id" element={<PackageDetailPage />} />
 						<Route path="/portal/cargo/:id/service-request" element={<ServiceRequestPage />} />
 						<Route path="/portal/cargo/:id/claim" element={<DiscrepancyClaimPage />} />
+						
 						<Route path="/portal/documents" element={<PortalDocumentsPage />} />
 						<Route path="/portal/documents/:id" element={<PortalDocumentDetailsPage />} />
 						<Route path="/portal/invoices" element={<PortalInvoicesPage />} />

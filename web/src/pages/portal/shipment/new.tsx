@@ -6,7 +6,6 @@ import {
 	ArrowRight, 
 	Check,
 	CheckCircle2,
-	ClipboardList,
 	FileCheck2,
 	FileText,
 	Info,
@@ -158,6 +157,17 @@ const normaliseDocuments = (raw: unknown): DocumentRequirement[] => {
 		.sort((a, b) => a.sortOrder - b.sortOrder);
 };
 
+type DeclaredCargoItem = {
+	id: string;
+	description: string;
+	hsCode: string;
+	customsTariffId: string | null;
+	quantity: string;
+	unit: string;
+	unitValue: string;
+	currency: "NGN" | "USD";
+};
+
 type ContainerItem = {
 	containerNo: string;
 	size: string;
@@ -165,7 +175,6 @@ type ContainerItem = {
 	packageCount: string;
 	grossWeight: string;
 	
-	// Cargo / Tariff details per container
 	cargoDescription: string;
 	packageType: string;
 	packageCountCargo: string;
@@ -173,13 +182,13 @@ type ContainerItem = {
 	hsCode: string;
 	customsTariffId: string | null;
 	
-	// UI state for tariff search
 	tariffQuery: string;
 	tariffResults: CustomsTariff[];
 	selectedTariff: CustomsTariff | null;
 	searchingTariffs: boolean;
 	tariffSearchError: string;
 	showTariffDropdown: boolean;
+	items: DeclaredCargoItem[];
 };
 
 type ShipmentDocument =
@@ -257,6 +266,10 @@ interface ExistingShipment {
 		customs_tariff_id?: string;
 	}>;
 	documents?: ExistingDocument[];
+	valuation_basis?: string;
+	freight_insurance_currency?: string;
+	freight_cost?: string;
+	insurance_cost?: string;
 }
 
 const inputClass =
@@ -273,6 +286,17 @@ const formatTariffRate = (val?: number | string | null) => {
 	const num = Number(val);
 	return Number.isNaN(num) ? "—" : `${num.toFixed(2)}%`;
 };
+
+const emptyDeclaredItem = (): DeclaredCargoItem => ({
+	id: `${Date.now()}-${Math.random()}`,
+	description: "",
+	hsCode: "",
+	customsTariffId: null,
+	quantity: "1",
+	unit: "PCS",
+	unitValue: "",
+	currency: "NGN",
+});
 
 const emptyContainer = (): ContainerItem => ({
 	containerNo: "",
@@ -292,6 +316,7 @@ const emptyContainer = (): ContainerItem => ({
 	searchingTariffs: false,
 	tariffSearchError: "",
 	showTariffDropdown: false,
+	items: [emptyDeclaredItem()],
 });
 
 const ALLOWED_EXTENSIONS = /\.(pdf|png|jpe?g)$/i;
@@ -344,14 +369,17 @@ export default function NewPortalShipmentPage() {
 
 	const [shipmentId, setShipmentId] = useState<string>(routeId);
 	const [step, setStep] = useState(1);
-	const [saving, setSaving] = useState(false);
-	const [submitting, setSubmitting] = useState(false);
+		const [submitting, setSubmitting] = useState(false);
 	const [loadingOptions, setLoadingOptions] = useState(true);
 	const [loadingShipment, setLoadingShipment] = useState(false);
 	const [optionsError, setOptionsError] = useState("");
 	const [options, setOptions] = useState<ConfigOptions>(emptyOptions);
 	const [form, setForm] = useState({
 		shipmentType: "",
+		valuationBasis: "",
+		freightInsuranceCurrency: "NGN",
+		freightCost: "",
+		insuranceCost: "",
 		billOfLading: "",
 		bookingNumber: "",
 		customsReference: "",
@@ -477,6 +505,10 @@ export default function NewPortalShipmentPage() {
 
 			setForm({
 				shipmentType: String(record.shipment_type ?? ""),
+				valuationBasis: String(record.valuation_basis ?? ""),
+				freightInsuranceCurrency: String(record.freight_insurance_currency ?? "NGN"),
+				freightCost: record.freight_cost != null ? String(record.freight_cost) : "",
+				insuranceCost: record.insurance_cost != null ? String(record.insurance_cost) : "",
 				billOfLading: String(record.bill_of_lading ?? ""),
 				bookingNumber: String(record.booking_number ?? ""),
 				customsReference: String(record.customs_reference ?? ""),
@@ -545,6 +577,18 @@ export default function NewPortalShipmentPage() {
 						searchingTariffs: false,
 						tariffSearchError: "",
 						showTariffDropdown: false,
+						items: Array.isArray((container as any).items) && (container as any).items.length
+							? (container as any).items.map((item: any) => ({
+								id: String(item.id ?? `${Date.now()}-${Math.random()}`),
+								description: String(item.item_description ?? item.description ?? ""),
+								hsCode: String(item.hs_code ?? ""),
+								customsTariffId: item.customs_tariff_id ?? null,
+								quantity: String(item.quantity ?? "1"),
+								unit: String(item.unit_of_measure ?? "PCS"),
+								unitValue: String(item.unit_value ?? ""),
+								currency: item.currency === "USD" ? "USD" : "NGN",
+							}))
+							: [emptyDeclaredItem()],
 					}))
 				);
 			}
@@ -593,14 +637,12 @@ export default function NewPortalShipmentPage() {
 		return () => {
 			cancelled = true;
 		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, []);
 
 	useEffect(() => {
 		if (routeId && routeId !== shipmentId) {
 			setShipmentId(routeId);
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [routeId]);
 
 	const searchCustomsTariffs = async (containerIndex: number, value: string) => {
@@ -814,6 +856,25 @@ export default function NewPortalShipmentPage() {
 		}
 
 		if (step === 3) {
+			if (!form.valuationBasis) {
+				toast.error("Select the cargo valuation basis.");
+				return false;
+			}
+
+			console.log({freightCost: Number(form.freightCost), insuranceCost:Number(form.insuranceCost)})
+			
+			const isInvalidCost = (value: unknown): boolean => {
+				if (value === undefined || value === null) return false;
+				const trimmed = String(value).trim();
+				if (trimmed === "") return false;
+				return !/^\d+(\.\d+)?$/.test(trimmed) || Number(trimmed) < 0;
+			};
+
+			if (isInvalidCost(form.freightCost) || isInvalidCost(form.insuranceCost)) {
+				toast.error("Freight and insurance costs must be valid non-negative amounts.");
+				return false;
+			}
+
 			if (!form.cargoDescription.trim()) {
 				toast.error("Enter a cargo description.");
 				return false;
@@ -874,13 +935,6 @@ export default function NewPortalShipmentPage() {
 				return false;
 			}
 
-			if (form.dangerousGoods === "yes" && !form.hsCode.trim()) {
-				toast.error(
-					"Provide the HS code for the declared dangerous goods."
-				);
-				return false;
-			}
-
 			if (
 				form.temperatureControlled === "yes" &&
 				!form.temperature.trim()
@@ -927,6 +981,21 @@ export default function NewPortalShipmentPage() {
 						);
 						return false;
 					}
+
+					for (const item of container.items.filter((entry) => entry.description.trim() || entry.hsCode.trim() || entry.unitValue.trim())) {
+						if (!item.description.trim() || !item.hsCode.trim() || !item.customsTariffId) {
+							toast.error(`Complete the description and HS classification for every item in ${container.containerNo}.`);
+							return false;
+						}
+						if (!/^\d+(\.\d+)?$/.test(item.quantity) || Number(item.quantity) <= 0) {
+							toast.error(`Enter a valid quantity for ${item.description}.`);
+							return false;
+						}
+						if (!/^\d+(\.\d+)?$/.test(item.unitValue) || Number(item.unitValue) < 0) {
+							toast.error(`Enter a valid unit value for ${item.description}.`);
+							return false;
+						}
+					}
 				}
 			}
 		}
@@ -941,7 +1010,7 @@ export default function NewPortalShipmentPage() {
 	const validContainersForSubmit = () =>
 		containers.filter((container) => container.containerNo.trim());
 
-	const buildFormData = (status: "DRAFT" | "PENDING_REVIEW") => {
+	const buildFormData = () => {
 		const formData = new FormData();
 
 		const consigneeName =
@@ -951,6 +1020,10 @@ export default function NewPortalShipmentPage() {
 
 		const fields: Record<string, string> = {
 			shipment_type: form.shipmentType,
+			valuation_basis: form.valuationBasis,
+			freight_insurance_currency: form.freightInsuranceCurrency,
+			freight_cost: form.freightCost,
+			insurance_cost: form.insuranceCost,
 			bill_of_lading: form.billOfLading.trim(),
 			booking_number: form.bookingNumber.trim(),
 			customs_reference: form.customsReference.trim(),
@@ -979,13 +1052,12 @@ export default function NewPortalShipmentPage() {
 			package_count: form.packageCount, 
 			gross_weight: form.grossWeight,
 			volume: form.volume,
-			hs_code: form.hsCode.trim(),
 			dangerous_goods: form.dangerousGoods,
 			temperature_controlled: form.temperatureControlled,
 			temperature: form.temperature.trim(),
 			special_instructions: form.specialInstructions.trim(),
 			declaration_accepted: declarationAccepted ? "1" : "0",
-			status,
+			status: "PENDING_REVIEW",
 		};
 
 		Object.entries(fields).forEach(([key, value]) =>
@@ -1001,10 +1073,18 @@ export default function NewPortalShipmentPage() {
 					sealNo: container.sealNo.trim(),
 					packageCount: container.packageCount,
 					grossWeight: container.grossWeight,
-					cargoDescription: container.cargoDescription.trim(),
+					cargoDescription: container.items.map((item) => item.description.trim()).filter(Boolean).join(", "),
 					packageType: container.packageType,
-					hsCode: container.hsCode.trim(),
-					customsTariffId: container.customsTariffId,
+					items: container.items.filter((item) => item.description.trim() || item.hsCode.trim()).map((item) => ({
+						customs_tariff_id: item.customsTariffId,
+						hs_code: item.hsCode.trim(),
+						item_description: item.description.trim(),
+						quantity: Number(item.quantity || 0),
+						unit_of_measure: item.unit,
+						unit_value: Number(item.unitValue || 0),
+						currency: item.currency,
+						total_value: Number(item.quantity || 0) * Number(item.unitValue || 0),
+					})),
 				}))
 			)
 		);
@@ -1050,14 +1130,12 @@ export default function NewPortalShipmentPage() {
 		return formData;
 	};
 
-	const persistShipment = async (
-		status: "DRAFT" | "PENDING_REVIEW"
-	): Promise<string | null> => {
+	const persistShipment = async (): Promise<string | null> => {
 		const endpoint = shipmentId
 			? `/portal/shipments/update/${shipmentId}/`
 			: "/portal/shipments/save/";
 
-		const res = await http.post(endpoint, buildFormData(status));
+		const res = await http.post(endpoint, buildFormData());
 		const resp: Resp = res.data;
 
 		if (resp.error) {
@@ -1075,30 +1153,6 @@ export default function NewPortalShipmentPage() {
 		return record?.id ?? shipmentId ?? null;
 	};
 
-	const saveDraft = async () => {
-		setSaving(true);
-		try {
-			const nextId = await persistShipment("DRAFT");
-			if (!nextId) return;
-
-			if (!shipmentId) {
-				setShipmentId(nextId);
-				navigate(`/portal/shipment/new?id=${nextId}`, {
-					replace: true,
-				});
-			}
-
-			toast.success("Draft saved. You can continue editing it later.");
-		} catch (error: any) {
-			toast.error(
-				error?.response?.data?.data ||
-					error?.response?.data?.message ||
-					"Unable to save the shipment draft."
-			);
-		} finally {
-			setSaving(false);
-		}
-	};
 
 	const submitShipment = async () => {
 		if (!validateStep()) return;
@@ -1110,7 +1164,7 @@ export default function NewPortalShipmentPage() {
 
 		setSubmitting(true);
 		try {
-			const nextId = await persistShipment("PENDING_REVIEW");
+			const nextId = await persistShipment();
 			if (!nextId) return;
 
 			setShipmentId(nextId);
@@ -1171,21 +1225,6 @@ export default function NewPortalShipmentPage() {
 						</h1>
 					</div>
 
-					<div className="flex items-center gap-2">
-						<Button
-							variant="outline"
-							disabled={saving || loadingShipment}
-							onClick={saveDraft}
-							className="gap-2 border-line bg-paper text-ink hover:bg-sand"
-						>
-							<ClipboardList className="size-4" />
-							{saving
-								? "Saving…"
-								: isEditing
-									? "Save changes"
-									: "Save draft"}
-						</Button>
-					</div>
 				</div>
 
 				{loadingShipment && (
@@ -1487,6 +1526,39 @@ export default function NewPortalShipmentPage() {
 									/>
 
 									<div className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
+										<div className="sm:col-span-2 rounded-xl border border-line bg-sand/50 p-4">
+											<div className="mb-4">
+												<p className="text-sm font-semibold text-ink">Cargo valuation</p>
+												<p className="mt-1 text-xs leading-5 text-ink-soft">Provide the valuation basis and any freight or insurance costs declared for this shipment.</p>
+											</div>
+											<div className="grid gap-4 sm:grid-cols-2">
+												<label className={labelClass}>
+													Valuation basis
+													<select className={inputClass} value={form.valuationBasis} onChange={(event) => updateField("valuationBasis", event.target.value)}>
+														<option value="">Select valuation basis</option>
+														<option value="CIF">CIF</option>
+														<option value="FOB">FOB</option>
+														<option value="EXW">EXW</option>
+														<option value="OTHER">Other</option>
+													</select>
+												</label>
+												<label className={labelClass}>
+													Freight / insurance currency
+													<select className={inputClass} value={form.freightInsuranceCurrency} onChange={(event) => updateField("freightInsuranceCurrency", event.target.value)}>
+														<option value="NGN">NGN — Nigerian Naira</option>
+														<option value="USD">USD — US Dollar</option>
+													</select>
+												</label>
+												<label className={labelClass}>
+													Freight cost
+													<Input type="number" min="0" step="0.01" value={form.freightCost} onChange={(event) => updateField("freightCost", event.target.value)} placeholder="0.00" className="mt-1.5 h-11 border-line bg-sand text-ink" />
+												</label>
+												<label className={labelClass}>
+													Insurance cost
+													<Input type="number" min="0" step="0.01" value={form.insuranceCost} onChange={(event) => updateField("insuranceCost", event.target.value)} placeholder="0.00" className="mt-1.5 h-11 border-line bg-sand text-ink" />
+												</label>
+											</div>
+										</div>
 										<label className={cn(labelClass, "sm:col-span-2")}>
 											Cargo description
 											<span className="text-coral"> *</span>
@@ -1869,127 +1941,45 @@ export default function NewPortalShipmentPage() {
 																className="mt-1.5 h-11 border-line bg-paper font-mono text-ink"
 															/>
 														</label>
+										</div>
 														
-														<label className={cn(labelClass, "sm:col-span-2")}>
-															Cargo Description (Items in this container)
-															<Input
-																value={container.cargoDescription}
-																onChange={(event) => updateContainer(index, "cargoDescription", event.target.value)}
-																placeholder="e.g. Electronics, textiles..."
-																className="mt-1.5 h-11 border-line bg-paper text-ink"
-															/>
-														</label>
-													</div>
-													
-													<div className="mt-4 border-t border-line pt-4">
-														<div className="flex items-center gap-2 mb-3">
-															<ShieldCheck className="size-4 text-orange" />
-															<h3 className="font-display text-sm font-bold text-ink">
-																Customs Tariff / HS Classification
-															</h3>
-														</div>
-														
-														<div className="relative">
-															<div className="relative">
-																<Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
-																<Input
-																	value={container.tariffQuery || container.hsCode}
-																	onChange={(event) => {
-																		void searchCustomsTariffs(index, event.target.value);
-																	}}
-																	onFocus={() => {
-																		if (container.tariffQuery.length >= 2) {
-																			setContainers(current => current.map((c, i) => i === index ? { ...c, showTariffDropdown: true } : c));
-																		}
-																	}}
-																	placeholder="Search HS code or commodity description (e.g. 0403201000)"
-																	className="h-12 w-full rounded-xl border-line bg-paper pl-10 pr-10 font-mono text-sm text-ink transition focus:ring-2 focus:ring-orange/30"
-																/>
-																{container.searchingTariffs && (
-																	<Loader2 className="absolute right-3.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-ink-soft" />
-																)}
+																											<div className="mt-5 border-t border-line pt-5">
+														<div className="flex flex-wrap items-center justify-between gap-3">
+															<div>
+																<div className="flex items-center gap-2">
+																	<ShieldCheck className="size-4 text-orange" />
+																	<h3 className="font-display text-sm font-bold text-ink">Container item declaration</h3>
+																</div>
+																<p className="mt-1 text-[11px] leading-5 text-ink-soft">Declare every different product in this container separately.</p>
 															</div>
-															
-															{container.tariffSearchError && (
-																<p role="alert" className="mt-2 text-xs text-carmine">{container.tariffSearchError}</p>
-															)}
-
-															{container.showTariffDropdown && container.tariffResults.length > 0 && (
-																<div className="absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-80 overflow-y-auto rounded-xl bg-paper p-1.5 shadow-2xl ring-1 ring-line">
-																	{container.tariffResults.map((tariff) => (
-																		<button
-																			key={tariff.id}
-																			type="button"
-																			onClick={() => chooseCustomsTariff(index, tariff)}
-																			className="flex w-full flex-col rounded-lg px-3 py-3 text-left transition-colors hover:bg-sand focus:bg-sand focus:outline-none"
-																		>
-																			<div className="flex w-full items-start justify-between gap-4">
-																				<div className="min-w-0 flex-1">
-																					<span className="block font-mono text-[13px] font-semibold text-ink">{tariff.hs_code}</span>
-																					<span className="mt-1 block text-[13px] leading-5 text-ink-soft">{tariff.description}</span>
-																				</div>
-																				<span className="shrink-0 rounded-md bg-sand-2 px-2 py-1 font-mono text-[10px] uppercase tracking-wider text-ink-soft ring-1 ring-line">
-																					{tariff.category || "General"}
-																				</span>
-																			</div>
-																			<div className="mt-2 flex gap-4 font-mono text-[10px] text-ink-soft">
-																				<span>Rate: {tariff.rate ?? "—"}{tariff.rate_type === "PERCENTAGE" ? "%" : ""}</span>
-																				{tariff.import_duty && <span>Duty: {tariff.import_duty}%</span>}
-																				{tariff.vat && <span>VAT: {tariff.vat}%</span>}
-																			</div>
-																		</button>
-																	))}
-																</div>
-															)}
-
-															{container.selectedTariff && (
-																<div className="mt-3 flex flex-col gap-3 rounded-xl border border-teal/25 bg-teal/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-																	<div className="min-w-0 flex-1">
-																		<div className="flex items-center gap-2">
-																			<CheckCircle2 className="size-4 text-teal-deep" />
-																			<p className="text-[13px] font-semibold text-teal-deep">
-																				{container.selectedTariff.hs_code}
-																			</p>
-																		</div>
-																		<p className="mt-1 truncate text-[13px] text-ink">
-																			{container.selectedTariff.description}
-																		</p>
-																	</div>
-																	
-																	<div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-																		<div>
-																			<p className="font-mono text-[9px] uppercase tracking-wider text-teal-deep/70">Import duty</p>
-																			<p className="font-mono text-[13px] font-semibold text-teal-deep">{formatTariffRate(container.selectedTariff.import_duty)}</p>
-																		</div>
-																		<div>
-																			<p className="font-mono text-[9px] uppercase tracking-wider text-teal-deep/70">VAT</p>
-																			<p className="font-mono text-[13px] font-semibold text-teal-deep">{formatTariffRate(container.selectedTariff.vat)}</p>
-																		</div>
-																		{container.selectedTariff.levy && (
-																			<div>
-																				<p className="font-mono text-[9px] uppercase tracking-wider text-teal-deep/70">Levy</p>
-																				<p className="font-mono text-[13px] font-semibold text-teal-deep">{container.selectedTariff.levy}%</p>
-																			</div>
-																		)}
-																		
-																		<Button
-																			type="button"
-																			variant="ghost"
-																			size="sm"
-																			onClick={() => clearCustomsTariff(index)}
-																			className="ml-2 h-8 px-2 text-xs text-teal-deep hover:bg-teal/10 hover:text-teal-deep"
-																		>
-																			Clear
-																		</Button>
-																	</div>
-																</div>
-															)}
-															
-															<p className="mt-3 text-[11px] leading-5 text-ink-soft">
-																Select a result to link the tariff record to this container. Classification should be verified before customs assessment.
-															</p>
+															<Button type="button" size="sm" variant="outline" onClick={() => setContainers(current => current.map((c, i) => i === index ? { ...c, items: [...c.items, emptyDeclaredItem()] } : c))} className="gap-2 border-line bg-paper text-ink hover:bg-sand">
+																<Plus className="size-3.5" /> Add item
+															</Button>
+														</div>
+														<div className="mt-4 space-y-4">
+															{container.items.map((item, itemIndex) => (
+																<ContainerDeclaredItemEditor
+																	key={item.id}
+																	item={item}
+																	index={itemIndex}
+																	disabled={submitting}
+																	onChange={(next) => setContainers(current => current.map((c, i) => i === index ? { ...c, items: c.items.map((entry, j) => j === itemIndex ? next : entry) } : c))}
+																	onRemove={() => setContainers(current => current.map((c, i) => i === index ? { ...c, items: c.items.length === 1 ? [emptyDeclaredItem()] : c.items.filter((_, j) => j !== itemIndex) } : c))}
+																/>
+															))}
+														</div>
+														<div className="mt-4 grid gap-3 rounded-xl bg-paper p-4 ring-1 ring-line sm:grid-cols-2">
+															<div>
+																<p className={labelClass}>Container declared value · NGN</p>
+																<p className="mt-1 text-base font-bold tabular-nums text-ink">{container.items.filter(x => x.currency === "NGN").reduce((sum, x) => sum + Number(x.quantity || 0) * Number(x.unitValue || 0), 0).toLocaleString("en-NG", { style: "currency", currency: "NGN" })}</p>
+															</div>
+															<div>
+																<p className={labelClass}>Container declared value · USD</p>
+																<p className="mt-1 text-base font-bold tabular-nums text-ink">{container.items.filter(x => x.currency === "USD").reduce((sum, x) => sum + Number(x.quantity || 0) * Number(x.unitValue || 0), 0).toLocaleString("en-US", { style: "currency", currency: "USD" })}</p>
+															</div>
 														</div>
 													</div>
+
 												</div>
 											))
 										)}
@@ -2351,17 +2341,8 @@ export default function NewPortalShipmentPage() {
 																	· {container.grossWeight} kg
 																</span>
 															)}
-															{container.cargoDescription && (
-																<span className="font-mono text-[11px] text-ink-soft">
-																	· {container.cargoDescription}
-																</span>
-															)}
-															{container.hsCode && (
-																<span className="font-mono text-[11px] text-ink-soft">
-																	· HS: {container.hsCode}
-																</span>
-															)}
-														</li>
+															<span className="font-mono text-[11px] text-ink-soft">· {container.items.filter(item => item.description.trim()).length} declared items</span>
+											</li>
 													)
 												)}
 											</ul>
@@ -2455,6 +2436,142 @@ export default function NewPortalShipmentPage() {
 				</form>
 			</div>
 		</AppShell>
+	);
+}
+
+function ContainerDeclaredItemEditor({
+	item,
+	index,
+	disabled,
+	onChange,
+	onRemove,
+}: {
+	item: DeclaredCargoItem;
+	index: number;
+	disabled: boolean;
+	onChange: (item: DeclaredCargoItem) => void;
+	onRemove: () => void;
+}) {
+	const [query, setQuery] = useState(item.hsCode);
+	const [results, setResults] = useState<CustomsTariff[]>([]);
+	const [searching, setSearching] = useState(false);
+	const [open, setOpen] = useState(false);
+	const [error, setError] = useState("");
+	const total = Number(item.quantity || 0) * Number(item.unitValue || 0);
+
+	useEffect(() => {
+		setQuery(item.hsCode);
+	}, [item.hsCode]);
+
+	const search = async (value: string) => {
+		setQuery(value);
+		setOpen(true);
+		setError("");
+		onChange({ ...item, hsCode: value, customsTariffId: null });
+		if (value.trim().length < 2) {
+			setResults([]);
+			return;
+		}
+		setSearching(true);
+		try {
+			const res = await http.post("/admin/config/customs-tariffs/search/", {
+				q: value.trim(),
+				as_of: new Date().toISOString().slice(0, 10),
+				limit: 20,
+				page: 1,
+			});
+			const resp: Resp = res.data;
+			if (resp.error) {
+				setResults([]);
+				setError(typeof resp.data === "string" ? resp.data : "Could not search tariff classifications.");
+				return;
+			}
+			const payload: any = resp.code ?? {};
+			setResults(Array.isArray(payload.tariffs) ? payload.tariffs : Array.isArray(payload.data) ? payload.data : []);
+		} catch (err: any) {
+			setResults([]);
+			setError(err?.response?.data?.data || err?.response?.data?.message || "Could not search tariff classifications.");
+		} finally {
+			setSearching(false);
+		}
+	};
+
+	const choose = (tariff: CustomsTariff) => {
+		setQuery(tariff.hs_code);
+		setOpen(false);
+		setResults([]);
+		onChange({ ...item, hsCode: tariff.hs_code, customsTariffId: tariff.id, description: item.description || tariff.description });
+	};
+
+	return (
+		<div className="rounded-xl border border-line bg-paper p-4">
+			<div className="mb-4 flex items-center justify-between gap-3">
+				<div className="flex items-center gap-2">
+					<span className="grid size-7 place-items-center rounded-lg bg-orange/10 font-mono text-[11px] font-bold text-orange-deep">{index + 1}</span>
+					<p className="text-[12px] font-semibold text-ink">Cargo item {index + 1}</p>
+				</div>
+				<Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={onRemove} className="h-8 text-carmine hover:bg-carmine/10">
+					<Trash2 className="mr-1.5 size-3.5" /> Remove item
+				</Button>
+			</div>
+			<div className="grid gap-4 sm:grid-cols-2">
+				<label className="block sm:col-span-2">
+					<span className={labelClass}>Item description *</span>
+					<Input value={item.description} disabled={disabled} onChange={e => onChange({ ...item, description: e.target.value })} placeholder="e.g. Samsung mobile phones" className="mt-1.5 h-11 border-line bg-sand text-ink" />
+				</label>
+				<div className="relative sm:col-span-2">
+					<label className="block">
+						<span className={labelClass}>HS code / tariff classification *</span>
+						<div className="relative mt-1.5">
+							<Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
+							<Input value={query} disabled={disabled} onChange={e => void search(e.target.value)} onFocus={() => query.length >= 2 && setOpen(true)} placeholder="Search HS code or product description" className="h-11 border-line bg-sand pl-10 font-mono text-ink" />
+							{searching && <Loader2 className="absolute right-3.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-ink-soft" />}
+						</div>
+					</label>
+					{error && <p className="mt-2 text-xs text-carmine">{error}</p>}
+					{open && (results.length > 0 || query.length >= 2) && (
+						<div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-64 overflow-y-auto rounded-xl bg-paper p-1.5 shadow-2xl ring-1 ring-line">
+							{searching ? <p className="p-4 text-center text-xs text-ink-soft">Searching tariff classifications…</p> : results.length ? results.map(tariff => (
+								<button key={tariff.id} type="button" onClick={() => choose(tariff)} className="flex w-full flex-col rounded-lg px-3 py-2.5 text-left hover:bg-sand">
+									<span className="font-mono text-xs font-semibold text-ink">{tariff.hs_code}</span>
+									<span className="mt-1 text-xs leading-5 text-ink-soft">{tariff.description}</span>
+									<span className="mt-1 font-mono text-[10px] text-ink-soft">Duty: {formatTariffRate(tariff.import_duty)} · VAT: {formatTariffRate(tariff.vat)}</span>
+								</button>
+							)) : <p className="p-4 text-center text-xs text-ink-soft">No matching tariff classification found.</p>}
+						</div>
+					)}
+					{item.customsTariffId && <p className="mt-2 flex items-center gap-1.5 text-[11px] text-teal-deep"><CheckCircle2 className="size-3.5" /> Tariff classification selected</p>}
+				</div>
+				<label className="block">
+					<span className={labelClass}>Quantity *</span>
+					<Input type="number" min="0.0001" step="any" value={item.quantity} disabled={disabled} onChange={e => onChange({ ...item, quantity: e.target.value })} className="mt-1.5 h-11 border-line bg-sand font-mono text-ink" />
+				</label>
+				<label className="block">
+					<span className={labelClass}>Unit of measure *</span>
+					<select value={item.unit} disabled={disabled} onChange={e => onChange({ ...item, unit: e.target.value })} className={inputClass}>
+						{["PCS", "KG", "TONNE", "CARTON", "BAG", "BOX", "SET", "PAIR", "LITRE", "METER", "DOZEN", "OTHER"].map(unit => <option key={unit} value={unit}>{unit}</option>)}
+					</select>
+				</label>
+				<label className="block">
+					<span className={labelClass}>Currency *</span>
+					<select value={item.currency} disabled={disabled} onChange={e => onChange({ ...item, currency: e.target.value as "NGN" | "USD" })} className={inputClass}>
+						<option value="NGN">NGN · Nigerian Naira</option>
+						<option value="USD">USD · US Dollar</option>
+					</select>
+				</label>
+				<label className="block">
+					<span className={labelClass}>Unit value ({item.currency}) *</span>
+					<Input type="number" min="0" step="any" value={item.unitValue} disabled={disabled} onChange={e => onChange({ ...item, unitValue: e.target.value })} placeholder="Enter value per unit" className="mt-1.5 h-11 border-line bg-sand font-mono text-ink" />
+				</label>
+			</div>
+			<div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-sand p-3.5 ring-1 ring-line">
+				<div>
+					<p className={labelClass}>Total item value</p>
+					<p className="mt-1 text-base font-bold tabular-nums text-ink">{total.toLocaleString(item.currency === "USD" ? "en-US" : "en-NG", { style: "currency", currency: item.currency })}</p>
+				</div>
+				<p className="text-[10px] text-ink-soft">{Number(item.quantity || 0).toLocaleString()} × {Number(item.unitValue || 0).toLocaleString()} {item.currency}</p>
+			</div>
+		</div>
 	);
 }
 

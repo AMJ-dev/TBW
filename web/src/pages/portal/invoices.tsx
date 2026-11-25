@@ -20,6 +20,7 @@ import {
 import { AppShell, StatusBadge, statusTone, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { format_currency } from "@/lib/functions";
 
 interface CustomerInvoice {
   id: string;
@@ -124,14 +125,6 @@ export default function PortalInvoicesRoute() {
   const [paymentMethod, setPaymentMethod] = useState<"remita" | "nibss" | "credit">("remita");
   const [remitaRRR, setRemitaRRR] = useState("");
 
-  const formatNaira = (amount: number) => {
-    return new Intl.NumberFormat("en-NG", {
-      style: "currency",
-      currency: "NGN",
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const filteredInvoices = useMemo(() => {
     return invoices.filter((inv) => {
       const matchesSearch =
@@ -159,9 +152,9 @@ export default function PortalInvoicesRoute() {
       .reduce((sum, i) => sum + i.amount, 0);
 
     return {
-      outstanding: formatNaira(outstanding),
-      overdue: formatNaira(overdue),
-      paid: formatNaira(paid),
+      outstanding: format_currency(outstanding),
+      overdue: format_currency(overdue),
+      paid: format_currency(paid),
       totalCount: invoices.length,
     };
   }, [invoices]);
@@ -320,7 +313,7 @@ export default function PortalInvoicesRoute() {
                       </div>
                     </td>
                     <td className="px-4 py-4 font-mono text-sm font-semibold">
-                      {formatNaira(inv.amount)}
+                      {format_currency(inv.amount)}
                     </td>
                     <td className="px-4 py-4">
                       <StatusBadge label={inv.status} tone={statusTone(inv.status)} />
@@ -410,16 +403,16 @@ export default function PortalInvoicesRoute() {
                       <div>
                         <div className="font-medium text-ink">{item.item}</div>
                         <div className="text-[10px] text-ink-soft">
-                          Qty: {item.qty} × {formatNaira(item.rate)}
+                          Qty: {item.qty} × {format_currency(item.rate)}
                         </div>
                       </div>
-                      <div className="font-mono font-semibold">{formatNaira(item.total)}</div>
+                      <div className="font-mono font-semibold">{format_currency(item.total)}</div>
                     </div>
                   ))}
                   <div className="flex justify-between bg-sand/40 p-2.5 text-sm font-bold">
                     <span>Total Amount Payable</span>
                     <span className="font-mono text-teal-deep">
-                      {formatNaira(selectedInvoice.amount)}
+                      {format_currency(selectedInvoice.amount)}
                     </span>
                   </div>
                 </div>
@@ -471,7 +464,7 @@ export default function PortalInvoicesRoute() {
                 <h3 className="mt-1 font-display text-lg font-bold">Pay {payingInvoice.number}</h3>
                 <p className="text-xs text-ink-soft">
                   Payable Total:{" "}
-                  <strong className="text-ink">{formatNaira(payingInvoice.amount)}</strong>
+                  <strong className="text-ink">{format_currency(payingInvoice.amount)}</strong>
                 </p>
               </div>
               <Button

@@ -64,7 +64,7 @@ export default function ExaminationReviewPage() {
 		setError(false);
 
 		try {
-			const response = await http.get("/operator/examination/review/");
+			const response = await http.get("/operations/examination/review/");
 			const resp = response.data as Resp;
 
 			if (resp.error) {

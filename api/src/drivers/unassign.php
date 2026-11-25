@@ -62,17 +62,58 @@
         $stmt->execute([":actor_id" => $actor_id, ":id" => $assignment["id"]]);
 
         $stmt = $conn->prepare("
-            INSERT INTO gate_driver_assignment_logs
-                (id, driver_id, vehicle_id, action, actor_id, details)
-            VALUES (:id, :driver_id, :vehicle_id, :action, :actor_id, :details)
+            INSERT INTO activity_logs (
+                id,
+                actor_id,
+                category,
+                action,
+                entity_type,
+                entity_id,
+                description,
+                old_values,
+                new_values,
+                metadata,
+                severity,
+                created_at
+            ) VALUES (
+                :id,
+                :actor_id,
+                :category,
+                :action,
+                :entity_type,
+                :entity_id,
+                :description,
+                :old_values,
+                :new_values,
+                :metadata,
+                :severity,
+                NOW()
+            )
         ");
+
         $stmt->execute([
             ":id" => generateId(),
-            ":driver_id" => $driver_id,
-            ":vehicle_id" => $assignment["vehicle_id"],
-            ":action" => "unassigned",
             ":actor_id" => $actor_id,
-            ":details" => json_encode(["assignment_id" => $assignment["id"]])
+            ":category" => "GATE",
+            ":action" => "DRIVER_UNASSIGNED_FROM_VEHICLE",
+            ":entity_type" => "DRIVER",
+            ":entity_id" => $driver_id,
+            ":description" => "Driver unassigned from vehicle.",
+            ":old_values" => json_encode([
+                "vehicle_id" => $assignment["vehicle_id"],
+                "assignment_id" => $assignment["id"]
+            ], JSON_THROW_ON_ERROR),
+            ":new_values" => json_encode([
+                "vehicle_id" => null
+            ], JSON_THROW_ON_ERROR),
+            ":metadata" => json_encode([
+                "source_table" => "gate_driver_assignment_logs",
+                "driver_id" => $driver_id,
+                "vehicle_id" => $assignment["vehicle_id"],
+                "assignment_id" => $assignment["id"],
+                "details" => "Driver unassigned from vehicle."
+            ], JSON_THROW_ON_ERROR),
+            ":severity" => "INFO"
         ]);
 
         $conn->commit();

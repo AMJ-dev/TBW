@@ -133,29 +133,33 @@ try {
 	");
 
 	$insertLog = $conn->prepare("
-		INSERT INTO terminal_warehouse_movement_logs (
+		INSERT INTO activity_logs (
 			id,
-			movement_id,
-			shipment_id,
-			container_id,
+			actor_id,
+			category,
 			action,
-			previous_location_id,
-			new_location_id,
+			entity_type,
+			entity_id,
+			entity_reference,
 			description,
+			old_values,
+			new_values,
 			metadata,
-			performed_by,
-			performed_at
+			severity,
+			created_at
 		) VALUES (
 			:id,
-			:movement_id,
-			:shipment_id,
-			:container_id,
+			:actor_id,
+			:category,
 			:action,
-			:previous_location_id,
-			:new_location_id,
+			:entity_type,
+			:entity_id,
+			:entity_reference,
 			:description,
+			:old_values,
+			:new_values,
 			:metadata,
-			:performed_by,
+			:severity,
 			NOW()
 		)
 	");
@@ -264,23 +268,36 @@ try {
 
 		$insertLog->execute([
 			":id" => generateId(),
-			":movement_id" => $movement_id,
-			":shipment_id" => $shipment_id,
-			":container_id" => $container_id,
+			":actor_id" => $operator_id,
+			":category" => "WAREHOUSE",
 			":action" => $action,
-			":previous_location_id" => $source_location_id,
-			":new_location_id" => $destination_id,
+			":entity_type" => "CONTAINER",
+			":entity_id" => $container_id,
+			":entity_reference" => $movement_reference,
 			":description" => $description,
+			":old_values" => json_encode([
+				"location_id" => $source_location_id,
+				"status" => $container["status"]
+			], JSON_THROW_ON_ERROR),
+			":new_values" => json_encode([
+				"location_id" => $destination_id,
+				"status" => "IN_WAREHOUSE"
+			], JSON_THROW_ON_ERROR),
 			":metadata" => json_encode([
+				"source_table" => "terminal_warehouse_movement_logs",
+				"movement_id" => $movement_id,
 				"movement_reference" => $movement_reference,
+				"shipment_id" => $shipment_id,
+				"container_id" => $container_id,
 				"container_no" => $container["container_no"],
-				"source_location_id" => $source_location_id,
+				"previous_location_id" => $source_location_id,
+				"new_location_id" => $destination_id,
 				"destination_code" => $destination["code"],
 				"destination_name" => $destination["name"],
 				"movement_type" => $action,
-				"remarks" => $remarks
-			]),
-			":performed_by" => $operator_id
+				"remarks" => $remarks !== "" ? $remarks : null
+			], JSON_THROW_ON_ERROR),
+			":severity" => "INFO"
 		]);
 
 		$saved[] = [

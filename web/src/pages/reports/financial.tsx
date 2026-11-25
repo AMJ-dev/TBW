@@ -11,6 +11,7 @@ import {
 import { AppShell, Metric } from "@/components/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { format_currency } from "@/lib/functions";
 
 interface FinancialStreamRecord {
 	id: string;
@@ -96,14 +97,6 @@ export default function ReportsFinancialRoute() {
 	const [exportPeriod, setExportPeriod] = useState("Month-to-Date (September 2026)");
 	const [exportFormat, setExportFormat] = useState("CSV");
 
-	const formatNaira = (amount: number) => {
-		return new Intl.NumberFormat("en-NG", {
-			style: "currency",
-			currency: "NGN",
-			maximumFractionDigits: 0,
-		}).format(amount);
-	};
-
 	const filteredStreams = useMemo(() => {
 		return streams.filter(
 			(s) =>
@@ -119,9 +112,9 @@ export default function ReportsFinancialRoute() {
 		const overallRate = ((totalCollected / totalInvoiced) * 100).toFixed(1);
 
 		return {
-			invoiced: formatNaira(totalInvoiced),
-			collected: formatNaira(totalCollected),
-			outstanding: formatNaira(totalOutstanding),
+			invoiced: format_currency(totalInvoiced),
+			collected: format_currency(totalCollected),
+			outstanding: format_currency(totalOutstanding),
 			recoveryRate: `${overallRate}%`,
 		};
 	}, [streams]);
@@ -299,13 +292,13 @@ export default function ReportsFinancialRoute() {
 										{s.transactionsCount} ops
 									</td>
 									<td className="px-4 py-4 font-mono text-xs font-semibold text-ink">
-										{formatNaira(s.invoiced)}
+										{format_currency(s.invoiced)}
 									</td>
 									<td className="px-4 py-4 font-mono text-xs font-semibold text-teal-deep">
-										{formatNaira(s.collected)}
+										{format_currency(s.collected)}
 									</td>
 									<td className="px-4 py-4 font-mono text-xs font-semibold text-orange-deep">
-										{formatNaira(s.outstanding)}
+										{format_currency(s.outstanding)}
 									</td>
 									<td className="px-4 py-4">
 										<span
