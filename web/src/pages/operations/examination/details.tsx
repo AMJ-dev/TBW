@@ -477,7 +477,7 @@ function Detail({
 
 function ChecklistResultBadge({ result }: { result: string }) {
 	const styles: Record<string, string> = {
-		PASS: "border-emerald-200 bg-emerald-50 text-emerald-700",
+		PASS: "border-orange-200 bg-orange-50 text-orange-700",
 		ISSUE: "border-red-200 bg-red-50 text-red-700",
 		PENDING: "border-amber-200 bg-amber-50 text-amber-700",
 		NA: "border-slate-200 bg-slate-50 text-slate-600",
@@ -507,7 +507,7 @@ function getReviewMessage(status: ExaminationStatus) {
 				title: "Changes requested",
 				description:
 					"The reviewer has returned this report for correction. Review the feedback below, update the report and resubmit it.",
-				className: "border-amber-200 bg-amber-50 text-amber-900",
+				className: "border-orange/30 bg-orange/10 text-ink",
 				icon: AlertCircle,
 			};
 		case "REJECTED":
@@ -515,7 +515,7 @@ function getReviewMessage(status: ExaminationStatus) {
 				title: "Examination rejected",
 				description:
 					"This examination report has been rejected and is read-only. An authorised supervisor must decide whether a new examination should be scheduled.",
-				className: "border-red-200 bg-red-50 text-red-900",
+				className: "border-carmine/40 bg-carmine/10 text-ink",
 				icon: XCircle,
 			};
 		case "APPROVED":
@@ -523,7 +523,7 @@ function getReviewMessage(status: ExaminationStatus) {
 				title: "Examination approved",
 				description:
 					"The examination report has been approved. This approval does not automatically authorise cargo release.",
-				className: "border-emerald-200 bg-emerald-50 text-emerald-900",
+				className: "border-orange-deep/35 bg-orange/10 text-ink",
 				icon: CheckCircle2,
 			};
 		case "PENDING_REVIEW":
@@ -531,7 +531,7 @@ function getReviewMessage(status: ExaminationStatus) {
 				title: "Awaiting review",
 				description:
 					"The officer has submitted the examination report. It is awaiting an authorised reviewer.",
-				className: "border-blue-200 bg-blue-50 text-blue-900",
+				className: "border-slate/30 bg-slate/10 text-ink",
 				icon: Clock3,
 			};
 		default:
@@ -1006,9 +1006,9 @@ export default function ExaminationDetailsPage() {
 												{checklistCounts.total}
 											</p>
 										</div>
-										<div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-											<p className="text-[10px] text-emerald-700">Passed</p>
-											<p className="mt-1 text-2xl font-semibold text-emerald-800">
+										<div className="rounded-xl border border-orange-100 bg-orange-50 p-3">
+											<p className="text-[10px] text-orange-700">Passed</p>
+											<p className="mt-1 text-2xl font-semibold text-orange-800">
 												{checklistCounts.pass}
 											</p>
 										</div>
@@ -1072,7 +1072,7 @@ export default function ExaminationDetailsPage() {
 						>
 							{examination.findings_list.length === 0 ? (
 								<div className="rounded-xl border border-dashed border-line px-4 py-8 text-center">
-									<CheckCircle2 size={26} className="mx-auto text-emerald-600" />
+									<CheckCircle2 size={26} className="mx-auto text-orange-600" />
 									<p className="mt-3 text-sm font-medium text-ink">
 										No additional findings
 									</p>
@@ -1254,7 +1254,7 @@ export default function ExaminationDetailsPage() {
 											{index !== timeline.length - 1 && (
 												<div
 													className={`absolute left-[11px] top-7 h-full w-px ${
-														event.done ? "bg-emerald-300" : "bg-line"
+														event.done ? "bg-orange-300" : "bg-line"
 													}`}
 												/>
 											)}
@@ -1262,7 +1262,7 @@ export default function ExaminationDetailsPage() {
 											<div
 												className={`relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
 													event.done
-														? "bg-emerald-100 text-emerald-700"
+														? "bg-orange-100 text-orange-700"
 														: "border border-line bg-paper text-ink-soft"
 												}`}
 											>

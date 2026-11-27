@@ -184,9 +184,9 @@ const systemMenu = [
             { label: "Warehouse", to: "/operations/warehouse", icon: Warehouse },
             { label: "Documentation", to: "/operations/documentation", icon: BookOpen },
             { label: "Examination", to: "/operations/examinations", icon: ClipboardCheck },
-            // { label: "Value-added Services", to: "/operations/value-added", icon: Settings },
-            // { label: "Holds & Exceptions", to: "/operations/holds", icon: AlertTriangle },
-            // { label: "Overstay", to: "/operations/overstay", icon: ClockAlert },
+            { label: "Value-added Services", to: "/operations/value-added", icon: Settings },
+            { label: "Holds & Exceptions", to: "/operations/holds", icon: AlertTriangle },
+            { label: "Overstay", to: "/operations/overstay", icon: ClockAlert },
         ],
     },
     {
